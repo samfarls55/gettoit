@@ -2,6 +2,7 @@
 fio-vault/
 docs/
 CONTEXT.md
+CLAUDE.md
 
 # Local Claude Code config (agent definitions, skills, local settings)
 .claude/
