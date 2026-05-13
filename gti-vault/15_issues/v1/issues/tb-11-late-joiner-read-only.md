@@ -1,6 +1,7 @@
 ---
 issue: tb-11
 title: Late-joiner read-only Verdict mode + re-invite CTA
+github_issue: 12
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

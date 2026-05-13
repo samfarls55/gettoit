@@ -1,6 +1,7 @@
 ---
 issue: tb-12
 title: Anonymous → Sign in with Apple upgrade chip on Waiting (S04)
+github_issue: 13
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

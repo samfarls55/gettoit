@@ -1,6 +1,7 @@
 ---
 issue: tb-03
 title: S01 timer chip + radius slider controls
+github_issue: 4
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

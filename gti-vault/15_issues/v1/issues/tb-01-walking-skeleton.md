@@ -1,6 +1,7 @@
 ---
 issue: tb-01
 title: Walking skeleton — monorepo, Swift token generator, anon auth hello-world
+github_issue: 2
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

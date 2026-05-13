@@ -1,6 +1,7 @@
 ---
 issue: tb-13
 title: Solo mode — Verdict (S05) variant + solo quiz path
+github_issue: 14
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

@@ -1,6 +1,7 @@
 ---
 issue: 05
 title: Verify Foursquare dietary-tag coverage for menu-compliance filtering
+github_issue: 23
 status: ready-for-agent
 created: 2026-05-12
 prd: v1-prd

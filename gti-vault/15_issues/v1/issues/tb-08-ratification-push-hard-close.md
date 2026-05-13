@@ -1,6 +1,7 @@
 ---
 issue: tb-08
 title: "I'm in" ratification + push permission + hard-close shutter
+github_issue: 9
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

@@ -1,6 +1,7 @@
 ---
 issue: tb-16
 title: Privacy Policy + TOS + Privacy Nutrition Labels + in-app delete
+github_issue: 17
 status: ready-for-agent
 type: HITL
 created: 2026-05-12

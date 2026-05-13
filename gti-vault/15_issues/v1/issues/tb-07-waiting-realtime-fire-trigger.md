@@ -1,6 +1,7 @@
 ---
 issue: tb-07
 title: Waiting surface + Realtime + initiator-set timer + Decide-now fire trigger
+github_issue: 8
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

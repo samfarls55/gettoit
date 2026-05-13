@@ -1,6 +1,7 @@
 ---
 issue: tb-04
 title: Full 5-question quiz Q1–Q5
+github_issue: 5
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

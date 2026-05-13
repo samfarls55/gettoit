@@ -1,6 +1,7 @@
 ---
 issue: tb-17
 title: TestFlight external + cohort 1 recruitment
+github_issue: 18
 status: ready-for-agent
 type: HITL
 created: 2026-05-12

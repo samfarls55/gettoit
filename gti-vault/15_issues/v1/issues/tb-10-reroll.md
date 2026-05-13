@@ -1,6 +1,7 @@
 ---
 issue: tb-10
 title: Reroll sheet (S07) + reason-to-constraint mechanics + 3-cap
+github_issue: 11
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

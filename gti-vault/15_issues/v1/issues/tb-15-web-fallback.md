@@ -1,6 +1,7 @@
 ---
 issue: tb-15
 title: Web fallback — Next.js routes for invite, quiz, verdict (read-only)
+github_issue: 16
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

@@ -1,6 +1,7 @@
 ---
 issue: tb-02
 title: Initiator creates room + Universal Link + deep-link invitee join
+github_issue: 3
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

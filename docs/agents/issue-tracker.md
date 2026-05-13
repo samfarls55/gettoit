@@ -1,25 +1,46 @@
-# Issue tracker: gti-vault
+# Issue tracker: gti-vault + GitHub Issues
 
-Issues and PRDs for this repo live as markdown notes in `gti-vault/15_issues/`. There is no remote tracker (no GitHub/GitLab/Linear).
+Issues and PRDs for this repo live in two places. The vault is canonical; GitHub Issues are a mirror for orchestration, label-based filtering, and AFK agent pickup.
+
+- **Canonical source:** markdown notes in `gti-vault/15_issues/`. Editing the source means editing the vault file.
+- **Mirror:** GitHub Issues on `samfarls55/gettoit`. Each vault file has a corresponding GitHub issue; the issue body contains the vault content with a pointer back to the vault file as canonical source. The vault file's frontmatter has a `github_issue: NN` field pointing back to the issue number.
+
+When the vault file changes, the GitHub issue body should be re-synced (use `gh issue edit <number> --body-file <vault path>` with the same prepended-pointer composition).
 
 ## Conventions
 
 - One feature per subdirectory: `gti-vault/15_issues/<feature-slug>/`
-- The PRD is `gti-vault/15_issues/<feature-slug>/PRD.md`
-- Implementation issues are `gti-vault/15_issues/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
-- Triage state is recorded in YAML frontmatter: `status: needs-triage` (see `triage-labels.md` for the role strings)
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
-- Cross-reference related vault content with `[[wikilinks]]` (Obsidian convention)
-- Keep `gti-vault/15_issues/_index.md` current — one line per feature directory
+- The PRD lives at either `gti-vault/15_issues/<feature-slug>/PRD.md` or `gti-vault/10_prds/<slug>-prd.md`; the feature folder's `_index.md` always points to the canonical PRD location.
+- Implementation issues are `gti-vault/15_issues/<feature-slug>/issues/<NN>-<slug>.md` numbered from `01`. Tracer-bullet build slices use `tb-NN-<slug>.md` so they sort separately from spec-gap or other sub-task issues.
+- Triage state is recorded in YAML frontmatter: `status: needs-triage` (see `triage-labels.md` for the role strings).
+- Work type for tracer bullets is recorded in YAML frontmatter: `type: AFK` or `type: HITL`.
+- GitHub issue number is recorded in YAML frontmatter: `github_issue: NN`.
+- Comments and conversation history append to the bottom of the vault file under a `## Comments` heading; threaded discussion lives on the GitHub issue.
+- Cross-reference related vault content with `[[wikilinks]]` (Obsidian convention).
+- Keep `gti-vault/15_issues/_index.md` current — one line per feature directory.
+- Keep each `gti-vault/15_issues/<feature>/_index.md` current — one line per issue with GitHub issue number.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a new file under `gti-vault/15_issues/<feature-slug>/`, creating the directory if needed. Update both `gti-vault/15_issues/_index.md` and `gti-vault/_index.md` (master) if a new feature folder is added.
+1. Write the issue body to a new file under `gti-vault/15_issues/<feature-slug>/`, creating the directory if needed. Apply the correct `status:` and (for tracer bullets) `type:` frontmatter fields.
+2. Create a corresponding GitHub issue via `gh issue create --repo samfarls55/gettoit` with:
+   - Title in the form `TB-NN: <vault title>` for tracer bullets, `spec-gap NN: <vault title>` for spec gaps, or `<feature slug> NN: <vault title>` for other features.
+   - Body composed by prepending a `> **Canonical source:** [vault path](github blob URL)` line, then stripping the YAML frontmatter from the vault file and appending the rest.
+   - Labels matching `status:`, `type:`, the feature slug (e.g. `v1`), and the artifact kind (`tracer-bullet` / `spec-gap`).
+3. Capture the returned issue number and add `github_issue: NN` to the vault file's frontmatter.
+4. Update both `gti-vault/15_issues/_index.md` and the feature's `_index.md`.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the file at the referenced path. The user will normally pass the path or the feature slug + issue number directly.
+Read the vault file at the referenced path. If the user references a GitHub issue number, look up the vault file via the `github_issue:` frontmatter field (grep `github_issue: NN` across `gti-vault/15_issues/`).
 
 ## Tooling
 
-Use `obsidian:*` skills when editing inside the vault. Frontmatter, wikilinks, and tags follow Obsidian Flavored Markdown.
+Use `obsidian:*` skills when editing inside the vault. Use `gh` CLI for GitHub Issues operations (`gh issue create`, `gh issue edit`, `gh issue close`, `gh issue list`). Frontmatter, wikilinks, and tags follow Obsidian Flavored Markdown.
+
+## Closing an issue
+
+When work completes, close on both sides:
+
+1. Update the vault file's `status:` to `done` (or remove it if the issue is genuinely no longer relevant). Append a closing note under `## Comments` if context is worth preserving.
+2. `gh issue close <number>` (with optional `--comment` for the closing note).

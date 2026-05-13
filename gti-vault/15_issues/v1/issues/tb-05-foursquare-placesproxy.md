@@ -1,6 +1,7 @@
 ---
 issue: tb-05
 title: Foursquare PlacesProxy Edge Function + cache
+github_issue: 6
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

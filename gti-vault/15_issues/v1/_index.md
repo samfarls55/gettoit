@@ -16,26 +16,26 @@ All issues have `status: ready-for-agent`.
 
 ## Tracer-bullet build slices
 
-| # | Title | Type | Blocked by |
-|---|---|---|---|
-| TB-00 | [[issues/tb-00-external-accounts\|External account setup]] | HITL | — |
-| TB-01 | [[issues/tb-01-walking-skeleton\|Walking skeleton]] | AFK | TB-00 |
-| TB-02 | [[issues/tb-02-room-create-deeplink-join\|Initiator creates room + invitee deep-link join]] | AFK | TB-01 |
-| TB-03 | [[issues/tb-03-s01-timer-radius\|S01 timer chip + radius slider]] | AFK | TB-02 |
-| TB-04 | [[issues/tb-04-full-quiz\|Full 5-question quiz]] | AFK | TB-02 |
-| TB-05 | [[issues/tb-05-foursquare-placesproxy\|Foursquare PlacesProxy + cache]] | AFK | TB-01, TB-00 |
-| TB-06 | [[issues/tb-06-verdict-engine-clean-run\|VerdictEngine clean run + S05 default]] | AFK | TB-04, TB-05 |
-| TB-07 | [[issues/tb-07-waiting-realtime-fire-trigger\|Waiting + Realtime + fire trigger]] | AFK | TB-06 |
-| TB-08 | [[issues/tb-08-ratification-push-hard-close\|Ratification + push perm + hard close]] | AFK | TB-07 |
-| TB-09 | [[issues/tb-09-no-survivor-terminal\|Soft-pref relax + no-survivor terminal]] | AFK | TB-06 |
-| TB-10 | [[issues/tb-10-reroll\|Reroll sheet + 3-cap + reason-to-constraint]] | AFK | TB-08 |
-| TB-11 | [[issues/tb-11-late-joiner-read-only\|Late-joiner read-only verdict]] | AFK | TB-08 |
-| TB-12 | [[issues/tb-12-apple-signin-upgrade\|Apple Sign-in upgrade chip]] | AFK | TB-02 |
-| TB-13 | [[issues/tb-13-solo-mode-variant\|Solo mode variant]] | AFK | TB-08 |
-| TB-14 | [[issues/tb-14-checkin-telemetry\|Next-day check-in + telemetry views]] | AFK | TB-08 |
-| TB-15 | [[issues/tb-15-web-fallback\|Web fallback (Next.js)]] | AFK | TB-07 |
-| TB-16 | [[issues/tb-16-privacy-legal-delete\|Privacy + TOS + Nutrition Labels + delete]] | HITL | TB-14, TB-00 |
-| TB-17 | [[issues/tb-17-testflight-cohort\|TestFlight external + cohort 1 recruit]] | HITL | TB-16 |
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| TB-00 | [[issues/tb-00-external-accounts\|External account setup]] | HITL | [#1](https://github.com/samfarls55/gettoit/issues/1) | — |
+| TB-01 | [[issues/tb-01-walking-skeleton\|Walking skeleton]] | AFK | [#2](https://github.com/samfarls55/gettoit/issues/2) | TB-00 |
+| TB-02 | [[issues/tb-02-room-create-deeplink-join\|Initiator creates room + invitee deep-link join]] | AFK | [#3](https://github.com/samfarls55/gettoit/issues/3) | TB-01 |
+| TB-03 | [[issues/tb-03-s01-timer-radius\|S01 timer chip + radius slider]] | AFK | [#4](https://github.com/samfarls55/gettoit/issues/4) | TB-02 |
+| TB-04 | [[issues/tb-04-full-quiz\|Full 5-question quiz]] | AFK | [#5](https://github.com/samfarls55/gettoit/issues/5) | TB-02 |
+| TB-05 | [[issues/tb-05-foursquare-placesproxy\|Foursquare PlacesProxy + cache]] | AFK | [#6](https://github.com/samfarls55/gettoit/issues/6) | TB-01, TB-00 |
+| TB-06 | [[issues/tb-06-verdict-engine-clean-run\|VerdictEngine clean run + S05 default]] | AFK | [#7](https://github.com/samfarls55/gettoit/issues/7) | TB-04, TB-05 |
+| TB-07 | [[issues/tb-07-waiting-realtime-fire-trigger\|Waiting + Realtime + fire trigger]] | AFK | [#8](https://github.com/samfarls55/gettoit/issues/8) | TB-06 |
+| TB-08 | [[issues/tb-08-ratification-push-hard-close\|Ratification + push perm + hard close]] | AFK | [#9](https://github.com/samfarls55/gettoit/issues/9) | TB-07 |
+| TB-09 | [[issues/tb-09-no-survivor-terminal\|Soft-pref relax + no-survivor terminal]] | AFK | [#10](https://github.com/samfarls55/gettoit/issues/10) | TB-06 |
+| TB-10 | [[issues/tb-10-reroll\|Reroll sheet + 3-cap + reason-to-constraint]] | AFK | [#11](https://github.com/samfarls55/gettoit/issues/11) | TB-08 |
+| TB-11 | [[issues/tb-11-late-joiner-read-only\|Late-joiner read-only verdict]] | AFK | [#12](https://github.com/samfarls55/gettoit/issues/12) | TB-08 |
+| TB-12 | [[issues/tb-12-apple-signin-upgrade\|Apple Sign-in upgrade chip]] | AFK | [#13](https://github.com/samfarls55/gettoit/issues/13) | TB-02 |
+| TB-13 | [[issues/tb-13-solo-mode-variant\|Solo mode variant]] | AFK | [#14](https://github.com/samfarls55/gettoit/issues/14) | TB-08 |
+| TB-14 | [[issues/tb-14-checkin-telemetry\|Next-day check-in + telemetry views]] | AFK | [#15](https://github.com/samfarls55/gettoit/issues/15) | TB-08 |
+| TB-15 | [[issues/tb-15-web-fallback\|Web fallback (Next.js)]] | AFK | [#16](https://github.com/samfarls55/gettoit/issues/16) | TB-07 |
+| TB-16 | [[issues/tb-16-privacy-legal-delete\|Privacy + TOS + Nutrition Labels + delete]] | HITL | [#17](https://github.com/samfarls55/gettoit/issues/17) | TB-14, TB-00 |
+| TB-17 | [[issues/tb-17-testflight-cohort\|TestFlight external + cohort 1 recruit]] | HITL | [#18](https://github.com/samfarls55/gettoit/issues/18) | TB-16 |
 
 ### Critical path
 
@@ -53,11 +53,13 @@ TB-00 → TB-01 → TB-02 → TB-04 → TB-05 → TB-06 → TB-07 → TB-08 → 
 
 These are surface-level changes to the locked `design-system/` spec required by the PRD. Each is referenced by exactly one tracer bullet via `implements_spec_gap` in that tracer bullet's frontmatter.
 
-- [[issues/01-s01-timer-radius-controls|01 — S01 timer chip + radius slider]] (consumed by TB-03)
-- [[issues/02-s04-decide-now-countdown|02 — S04 Decide-now + countdown]] (consumed by TB-07)
-- [[issues/03-s05-late-joiner-read-only|03 — S05 read-only mode]] (consumed by TB-11)
-- [[issues/04-s05-no-survivor-terminal|04 — S05 no-survivor terminal]] (consumed by TB-09)
-- [[issues/05-foursquare-dietary-tags|05 — Foursquare dietary-tag coverage research]] (informs TB-05)
+| # | Title | GitHub | Consumed by |
+|---|---|---|---|
+| 01 | [[issues/01-s01-timer-radius-controls\|S01 timer chip + radius slider]] | [#19](https://github.com/samfarls55/gettoit/issues/19) | TB-03 |
+| 02 | [[issues/02-s04-decide-now-countdown\|S04 Decide-now + countdown]] | [#20](https://github.com/samfarls55/gettoit/issues/20) | TB-07 |
+| 03 | [[issues/03-s05-late-joiner-read-only\|S05 read-only mode]] | [#21](https://github.com/samfarls55/gettoit/issues/21) | TB-11 |
+| 04 | [[issues/04-s05-no-survivor-terminal\|S05 no-survivor terminal]] | [#22](https://github.com/samfarls55/gettoit/issues/22) | TB-09 |
+| 05 | [[issues/05-foursquare-dietary-tags\|Foursquare dietary-tag coverage research]] | [#23](https://github.com/samfarls55/gettoit/issues/23) | TB-05 (informs) |
 
 ## Related
 

@@ -1,6 +1,7 @@
 ---
 issue: tb-14
 title: Next-day check-in (S08) + CheckinScheduler + telemetry SQL views
+github_issue: 15
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

@@ -1,6 +1,7 @@
 ---
 issue: tb-00
 title: External account setup (Apple Developer, Foursquare, Supabase, domain)
+github_issue: 1
 status: ready-for-agent
 type: HITL
 created: 2026-05-12

@@ -1,6 +1,7 @@
 ---
 issue: tb-06
 title: VerdictEngine clean run + Verdict default surface
+github_issue: 7
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

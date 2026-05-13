@@ -1,6 +1,7 @@
 ---
 issue: tb-09
 title: VerdictEngine soft-pref relax cascade + no-survivor terminal
+github_issue: 10
 status: ready-for-agent
 type: AFK
 created: 2026-05-12

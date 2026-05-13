@@ -1,6 +1,7 @@
 ---
 issue: 04
 title: S05 — add terminal no-survivor state to Verdict
+github_issue: 22
 status: ready-for-agent
 created: 2026-05-12
 surface: 05-verdict
