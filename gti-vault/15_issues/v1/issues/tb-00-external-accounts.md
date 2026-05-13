@@ -46,3 +46,15 @@ The four external accounts and assets that every later tracer bullet depends on.
 ## Blocked by
 
 None — can start immediately.
+
+## Post-completion addendum (2026-05-13)
+
+Added after TB-00 was closed, in the same session, to clear the remaining hard blocker for TB-08 / TB-14:
+
+- **APNs auth key** generated (`AuthKey_H929WAC8SC.p8`). Environment: `Both` (sandbox + production). Key Restriction: `Team Scoped (All Topics)` — Apple disallows `Topic Specific` when Environment = `Both`; theoretical privilege only with one app under the team.
+- **Push Notifications capability** confirmed enabled on App ID `app.gettoit.GetToIt`.
+- GitHub Actions secrets: `APNS_AUTH_KEY_ID`, `APNS_AUTH_KEY` set.
+- Supabase Edge Function secrets: `APNS_AUTH_KEY_ID`, `APNS_AUTH_KEY`, `APNS_TEAM_ID`, `APNS_TOPIC` set via Management API.
+- **Foursquare key fanout**: `FOURSQUARE_API_KEY` also added to GitHub Actions secrets (was only in `.env`) and Supabase Edge Function secrets.
+
+Runbook updates: [[../../../60_engineering/apple-keys-setup#key-3--apns-auth-key|apple-keys-setup §Key 3]] and [[../../../60_engineering/devcontainer-setup|devcontainer-setup §Step 4]].
