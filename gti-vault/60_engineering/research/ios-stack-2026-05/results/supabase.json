@@ -1,0 +1,132 @@
+{
+  "name": "Swift + SwiftUI + Supabase",
+  "primary_language": "Swift",
+  "ui_framework": "SwiftUI",
+  "backend": "Supabase (Postgres + Realtime + Auth + Storage + Edge Functions)",
+
+  "realtime_quality": "Solid for typical group-vote workloads. Three primitives: (1) Postgres Changes — pushes table-level INSERT/UPDATE/DELETE via logical replication, processed on a single thread to maintain order (can lag at scale, 100 subscribers to one table = 100 RLS auth checks per insert); (2) Broadcast — low-latency WebSocket messaging between clients, the recommended path for vote events; (3) Presence — sync of arbitrary client state. For GetToIt's 5-person group + occasional fanout, Broadcast + table read on first paint is the clean pattern. Median replication lag visible in 'Broadcast from Database Replication Lag' report. Postgres Changes have reported flakiness in production threads; Broadcast is more reliable.",
+
+  "presence_support": "First-class. Built-in Presence channel — each client publishes a payload, server maintains merged view, emits sync/join/leave events. Swift SDK exposes this directly. Use case (who's in the room, who voted) is the canonical example in Supabase docs.",
+
+  "optimistic_updates": "No built-in optimistic mutation framework. Solo dev pattern: update local SwiftUI @State immediately, fire Supabase write, reconcile on Realtime echo or rollback on error. Workable but DIY. Compare to Convex/InstantDB which automate this.",
+
+  "offline_handling": "Weakest dimension. Native client has no offline queue, no conflict resolution, no local cache. Three escape hatches: (1) pair with SwiftData and write a sync layer (Medium tutorials exist, ~1-2 weeks effort); (2) bolt on PowerSync (commercial, LWW conflict resolution out of the box, partner-listed integration); (3) WatermelonDB/RxDB (community plugins, JS-leaning). For 'vote on subway' v1 with 5-person groups, a thin SwiftData mirror with last-write-wins is adequate; full offline-first requires PowerSync.",
+
+  "auth_flow_friction": "Low. Native Sign in with Apple via Authentication Services framework + signInWithIdToken — one SDK call. signInAnonymously() works without any PII, can be linked to a real identity later. Magic links + deep linking documented for iOS. Custom URL scheme required in Info.plist for OAuth redirect.",
+
+  "social_invites": "DIY but unobstructed. Universal Links via Associated Domains, share sheet via SwiftUI ShareLink. Supabase has no native invite primitive — you build /join/{roomId} URLs against your own API. Anonymous sign-in means an invitee can land on a deep link and vote without first signing up.",
+
+  "push_notifications": "No native APNs sender — you ship via Edge Function calling APNs directly with .p8 key, or via FCM as a relay. Database webhooks trigger Edge Functions on row inserts (e.g., new vote → push 'Verdict ready'). Adds ~half a day of plumbing vs Firebase's zero-config FCM. OneSignal listed as partner integration.",
+
+  "group_session_model": "Excellent fit. A 'room of N humans voting on M options with a deadline' maps to a rooms table + members table (room_id, user_id, role) + options table + votes table (room_id, user_id, option_id). All joined in one SQL query — Firestore would need multiple round trips. RLS policies enforce 'only members of room X can read/write' declaratively. Server-authoritative deadline via timestamptz column + pg_cron job.",
+
+  "vote_write_fanout_pattern": "One vote → one Postgres INSERT → logical replication → fan-out to all subscribed clients via Realtime. Broadcast pattern (preferred): client emits vote event on room channel, all subscribers receive in ~50–200ms, also writes to DB asynchronously for durability. Cost per vote is trivial in DB ($0.18 / 1M reads is not the model; Pro plan includes unlimited DB queries). Realtime billed by messages: free tier 2M/mo, then $2.50 per 1M.",
+
+  "session_ttl_support": "Native. Postgres has timestamptz + pg_cron. Schedule a job to run every minute, find rooms with deadline <= now() AND status='open', compute verdict, broadcast result. Edge Functions can also be cron-triggered. pgmq queue available for deferred work.",
+
+  "room_membership_model": "DIY (write your own members table) but trivial in SQL. RLS policies make permission enforcement declarative: 'user X can SELECT from votes WHERE room_id IN (SELECT room_id FROM members WHERE user_id = auth.uid())'. Cleaner than Firestore's collection-level rules.",
+
+  "quorum_or_deadline_eval": "Native. SQL trigger on votes INSERT can check 'count(votes) = count(members)' and update room.status to 'closed' + compute verdict. Or pg_cron sweeps deadlines. Server-authoritative, race-free.",
+
+  "anonymous_invite_join": "Supported via signInAnonymously() — creates an anonymous JWT, no PII required. User can vote, then later link credentials (Apple/Google/email) to upgrade without losing their data. Combine with deep link → instant join with zero taps to vote.",
+
+  "app_clip_support": "No first-class Supabase support, but no blockers either. App Clip is an iOS framework concern; Supabase SDK runs inside an App Clip just like a full app (it's the same Swift package). 10MB binary limit means you'd subset the SDK to Auth + PostgREST only, drop Storage/Realtime if not needed in the Clip. [uncertain] — no public case studies found.",
+
+  "universal_link_invite_pattern": "Standard iOS pattern. Associated Domains entitlement + apple-app-site-association file hosted on your domain. Supabase has no built-in invite link service — you generate /room/{id} links yourself.",
+
+  "contacts_pull_friction": "Apple Contacts framework concern, not Supabase. Standard CNContactStore + permission prompt. Supabase happily stores hashed phone numbers for friend-graph matching.",
+
+  "shareplay_groupactivities_fit": "[uncertain] — no Supabase-specific SharePlay tutorials surfaced. SharePlay (GroupActivities framework) is transport-agnostic; you'd use GroupSessionMessenger for in-call sync and Supabase as the durable backing store. Feasible but DIY.",
+
+  "time_to_first_prototype": "3–7 days to a working group-vote room for a solo dev with Claude Code. supabase-swift mirrors supabase-js, SwiftUI quickstart in official docs, Sign in with Apple snippet ready to copy. Schema in 30 min, RLS in 1–2 hr, Realtime subscribe in 1 hr, voting UI in a day.",
+
+  "learning_curve": "Low for a Swift dev who knows any SQL. Higher if they've never written RLS policies — that's the one new concept. Postgres extensions (pg_cron, PostGIS, pgmq) are gravy once oriented.",
+
+  "ecosystem_maturity_2026": "Strong and rising. $5B valuation Oct 2025, ARR ~$70M (2.5x YoY), Series E closed, seeking $10B round Apr 2026. Stable releases monthly. Realtime sub-system maturing — Broadcast more reliable than Postgres Changes per community reports.",
+
+  "hiring_pool": "Good for Postgres talent (huge generalist pool). Smaller pool of dedicated Supabase contractors than Firebase, but any Postgres + iOS dev ramps in days.",
+
+  "claude_code_familiarity": "High and improving. supabase-swift API mirrors supabase-js exactly, and supabase-js has massive training-data coverage. SQL/RLS extremely well-represented in LLM training. Official Supabase MCP server and Claude skills exist. Code generation quality for Swift bindings is solid; minor friction around newer publishable/secret key migration (Supabase rolled out 2025).",
+
+  "xcode_first_class": "Standard SwiftPM integration. No schema → Swift codegen tool (vs Firestore's @DocumentID — Supabase queries return generic [String: Any] or you write Codable structs by hand). Swift Macros for codegen would be community-built. Type-safety via PostgREST is decent but not as ergonomic as Convex's TS reactivity.",
+
+  "free_tier_ceiling": "Two free projects (pause after 1 week inactivity). Per project: 500 MB Postgres, 1 GB Storage, 50K MAU, unlimited API requests, 200 peak Realtime connections, 2M Realtime messages/mo, 256KB max message size, 5GB egress/mo. Realistic GetToIt v1 ceiling: ~1–2K DAU before Realtime connections or egress force Pro upgrade.",
+
+  "cost_per_DAU_first_1k": "$0/mo if comfortable with free-tier project pause risk; $25/mo Pro plan to remove pause + raise ceilings (8GB DB, 100GB storage, 100K MAU, 500 peak connections, 5M Realtime messages, 250GB egress). At 1K DAU with food-app vote pattern, well inside Pro included quotas. Effective: ~$0.025/DAU/mo on Pro.",
+
+  "cost_per_DAU_first_10k": "$25 Pro base + likely overages on Realtime messages (~$5–20/mo if heavy presence usage; 5M included, $2.50 per 1M after) + peak connections if more than 500 simultaneous voters ($10 per 1,000 packs) + egress if dish photos large (250GB included, $0.09/GB uncached / $0.03/GB cached). Realistic 10K DAU: $50–150/mo total. Effective: ~$0.005–0.015/DAU/mo.",
+
+  "cost_at_100k_DAU": "Auth overage ($0.00325/MAU above 100K) becomes the dominant variable. 100K MAU = at-quota; 200K MAU = $325/mo extra Auth + base + Realtime. Likely $500–1500/mo total. Still 40–60% cheaper than Firebase at equivalent scale per third-party comparisons. [uncertain] — exact varies with read/write/egress mix.",
+
+  "perf_per_dollar": "Best-in-class for the 0–10K DAU social/group bracket among hosted BaaS. $25/mo Pro covers MVP traffic with headroom; unlimited DB ops (vs Firestore's per-op pricing) is the structural advantage for write-heavy voting workloads. Postgres on dedicated micro instance can saturate before pricing does.",
+
+  "realtime_message_cost_per_1k": "$2.50 per 1M messages = $0.0025 per 1K messages. Free tier 2M/mo, Pro tier 5M/mo included. Compare to Firebase: FCM push is free, Firestore listener events are billed as document reads ($0.18 per 100K reads = $1.80 per 1M).",
+
+  "concurrent_connection_ceiling_free": "200 peak concurrent Realtime connections on free tier — caps roughly 40 simultaneous 5-person rooms. Pro: 500 connections (100 simultaneous rooms). $10 per additional 1,000 connections.",
+
+  "auth_mau_cost_curve": "Free up to 50K MAU. Pro plan ($25/mo) raises to 100K MAU included. Above that: $0.00325 per additional MAU. Significantly cheaper than Firebase's $0.0055/MAU above 50K.",
+
+  "egress_cost_image_heavy": "$0.09/GB uncached, $0.03/GB cached via Smart CDN. 250GB included on Pro. Dish photos at 500KB avg × 100 views per user × 10K DAU = 500GB/mo → 250GB billable × $0.03 (cached) = ~$7.50/mo. Reasonable.",
+
+  "cold_start_egress_pattern": "Subscriptions are pull on demand — client opens app, subscribes to room channel, fetches initial state via REST. No firehose. Cold-start cost = one query per active room.",
+
+  "vendor_lockin_risk": "Low. Data lives in vanilla Postgres — pg_dump → restore anywhere. Auth schema is portable (users in auth.users table). Realtime + Storage + Edge Functions are Supabase-specific but each is replaceable (any WebSocket server, S3, Cloudflare Workers). The OSS stack runs self-hosted via docker-compose, all components MIT/Apache/PostgreSQL-licensed.",
+
+  "scaling_ceiling": "Postgres-bound. Compute add-ons scale to 16XL ($3,730/mo, 64 vCPU / 256GB RAM). Realtime tier scales by contacting support past Pro. Practical ceiling: ~100K–500K DAU before sharding or read replicas needed. Far beyond GetToIt's relevant horizon.",
+
+  "data_export_path": "pg_dump (native SQL dump), CSV per table from Studio, daily PITR backups on Pro. Most portable export path of any BaaS evaluated.",
+
+  "swiftui_native_feel": "Pure-Swift SDK, async/await throughout, Codable models. No bridge weirdness. SwiftUI integration is idiomatic — @Observable view models calling SupabaseClient async methods.",
+
+  "sign_in_with_apple_native": "First-class. signInWithIdToken(provider: .apple, idToken: ...) — pass Apple's ASAuthorizationAppleIDCredential token directly. No web redirect, no secret key rotation needed for native iOS. Caveat: Apple's ID token omits full name, must be captured client-side from first auth and stored via updateUser.",
+
+  "app_review_friction": "Low. Privacy Manifest disclosure required — Supabase Auth logs email + IP, both count as third-party PII transmission, must be listed in privacy policy. No known structural App Review rejections tied to Supabase specifically.",
+
+  "foundation_models_ready": "Backend-agnostic — iOS 26 Foundation Models run on-device. Pattern: pull room state from Supabase → feed to FoundationModels Apple Intelligence session → display verdict rationale. No SDK conflict.",
+
+  "app_intents_data_dependency": "DIY but unobstructed. Build an App Intent that takes a room ID, calls SupabaseClient inside the intent's perform(), returns the verdict. Works with @Dependency for shared client instance.",
+
+  "liveactivity_dynamic_island_push": "Supabase doesn't natively send Live Activity pushes (requires APNs push-type: liveactivity headers). Pattern: Database webhook → Edge Function → APNs HTTP/2 call with .p8 key + activity push token. ~1–2 days of glue code. iOS 16.1+ for Live Activities, iOS 17.2+ for remote-start.",
+
+  "widget_timeline_data_access": "Standard WidgetKit + App Group container pattern. App writes latest room state to UserDefaults(suiteName:) on Realtime update, widget reads from suite. Or background refresh task fetches from Supabase directly.",
+
+  "geo_query_support": "Excellent. PostGIS extension is one click in Supabase dashboard. Native SQL operators for distance (<->), bounding-box (ST_MakeBox2D), and radius queries. Sort restaurants by distance from user via ORDER BY location <-> ST_Point(lng, lat). Call from Swift via .rpc() with Codable response.",
+
+  "places_data_integration": "Backend-agnostic — places data sourced from Apple MapKit (free, MKLocalSearch), Foursquare (10K calls/mo free until Jun 2026, then 500/mo), or Google Places (paid since Feb 2025). Cache results in PostGIS for repeat queries.",
+
+  "places_api_total_cost_at_1k_DAU": "Depends on provider. MapKit: $0. Foursquare current free tier (10K calls/mo) covers 1K DAU at ~10 lookups each before paying $15/CPM. Post-Jun-2026 (500/mo free), Foursquare ~$135/mo at 10K calls. Cache aggressively in Postgres to keep costs near zero.",
+
+  "places_data_freshness": "Inherited from chosen provider. MapKit is Apple-curated, generally fresh hours/open-now data. Foursquare strong on hours/menus. Caching layer must respect TTL.",
+
+  "image_storage_cost": "$0.021/GB/mo Storage on Pro. 100GB included. Dish photos at ~500KB avg → 200K photos per included GB.",
+
+  "image_cdn_included": "Yes. Smart CDN with built-in image transformations (resize, format conversion). Cached egress at $0.03/GB. Image transformation has a separate per-origin charge — many devs generate thumbnails client-side to avoid it.",
+
+  "silent_push_to_compute_widget": "Standard APNs background push (content-available: 1) via Edge Function → APNs. Works for widget refresh. No Supabase abstraction over this.",
+
+  "apns_priority_tier_support": "Full APNs control when sending directly from Edge Function — priority 10 (immediate) vs 5 (efficient), push-type, expiration. No Supabase layer to flatten the API.",
+
+  "cross_user_push_fanout_cost": "Edge Function invocations: 500K/mo free, then $2 per 1M. Per push: one HTTP/2 connection to APNs, batched per-token. 5-person group, every vote pushes 4 watchers: 4 pushes × 1 vote × 10K users × 5 votes/day × 30 days = 6M pushes/mo = ~$12 in Edge Function invocations. APNs delivery itself is free.",
+
+  "single_founder_maintainability": "High. SQL skills transfer to any future hire. Self-host escape hatch via docker-compose if hosted dies. No proprietary query language to forget.",
+
+  "community_size": "Large and growing. supabase-swift ~1.1K GitHub stars; main supabase repo ~75K+ stars. Active Discord, GitHub Discussions. Smaller than Firebase Stack Overflow corpus (~50K Firebase questions) but younger and rising.",
+
+  "last_major_release": "supabase-swift releases roughly bi-weekly through May 2026. Main platform releases monthly Docker images. Active development.",
+
+  "notable_failure_modes": "(1) Postgres Changes lag/drop under heavy load — use Broadcast instead for hot paths. (2) RLS misconfiguration is the #1 production foot-gun — easy to leak data with permissive policy. (3) Connection limits hit suddenly when scaling (200 free / 500 Pro). (4) Free-tier projects pause after 1 week of inactivity — must upgrade or keep warm. (5) Edge Function cold starts on free plan (150s timeout, occasional warm-up lag).",
+
+  "funding_runway_signal": "Excellent. $5B valuation Oct 2025, $80M Series C + $200M Series D + $100M Series E ladder, $70M ARR up 250% YoY, seeking $10B valuation Apr 2026. No layoffs or product cuts on record. Investor base includes Accel, Peak XV, Craft, Coatue.",
+
+  "eol_history": "No products killed. Realtime v2 superseded v1 with migration path. Storage tier changes recent (3x cheaper cached egress, 10x upload size — May 2024 blog post). Track record is additive, not subtractive.",
+
+  "self_host_escape_hatch": "Yes — docker-compose stack in supabase/supabase repo, ~30 min to stand up. All components OSS-licensed (Postgres, GoTrue/Auth, PostgREST, Realtime in Elixir, Storage in Node, Kong gateway). Production-parity with hosted. Reverse proxy (Caddy/Nginx) required for HTTPS.",
+
+  "data_export_format": "Native SQL via pg_dump. Also CSV per table from Studio UI. Most portable export format among BaaS options — Postgres is the lingua franca.",
+
+  "uncertain": [
+    "app_clip_support",
+    "shareplay_groupactivities_fit",
+    "cost_at_100k_DAU"
+  ]
+}

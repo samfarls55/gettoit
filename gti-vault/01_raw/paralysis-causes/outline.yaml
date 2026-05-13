@@ -1,0 +1,41 @@
+topic: paralysis-causes
+description: >
+  Identify the 1-2 dominant causes of decision paralysis for GetToIt's use
+  case (going-out, group, trivial-to-mid stakes, food vertical v1). Determines
+  what signal the 5-question quiz must primarily extract: constraints, mood,
+  preferences, or veto signal. Source: gti-vault/50_product/research-brief.md
+  Priority 2.
+context:
+  product: GetToIt (group decision-paralysis killer, food vertical v1)
+  use_case: going-out, group of 2-6, mid-stakes, often end-of-workday timing
+  north_star: verdicts followed through (whole group commits, not just majority)
+  decision_to_lock: which signal type the quiz extracts (constraints / mood / preferences / veto)
+items:
+  - name: Paradox_of_Choice
+    full_name: "Paradox of Choice / Choice Overload (Schwartz; Iyengar & Lepper)"
+    summary: Too many options paralyze and reduce satisfaction even when chosen
+    primary_source: "Iyengar & Lepper 2000 JPSP; Schwartz 2004"
+  - name: Fear_of_Regret_FOMO
+    full_name: "Anticipated Regret / FOMO on un-chosen options (Loomes & Sugden; Zeelenberg)"
+    summary: Imagined regret over the road-not-taken blocks current commitment
+    primary_source: "Loomes & Sugden 1982; Zeelenberg & Pieters 2007"
+  - name: Misaligned_Preferences
+    full_name: "Misaligned preferences in group decisions (Arrow; preference aggregation literature)"
+    summary: Group members want different things, no fair aggregation rule, deadlock
+    primary_source: "Arrow 1951; List & Pettit 2002 social choice theory"
+  - name: Decision_Fatigue
+    full_name: "Decision Fatigue / Ego Depletion (Baumeister; Vohs et al.)"
+    summary: Cumulative decisions deplete self-regulation; end-of-day choices suffer
+    primary_source: "Baumeister et al. 1998; Vohs et al. 2008"
+  - name: Social_Friction
+    full_name: "Social friction / Taste-imposition aversion (Goffman face; politeness theory)"
+    summary: Members avoid asserting preferences to not impose on others, producing null signal
+    primary_source: "Goffman 1955 face-work; Brown & Levinson 1987 politeness"
+  - name: Cognitive_Load
+    full_name: "Cognitive Load / Working memory limits (Sweller; Miller)"
+    summary: Raw mental effort of holding/comparing options exceeds working-memory capacity
+    primary_source: "Miller 1956 magic number 7; Sweller 1988 cognitive load theory"
+execution:
+  batch_size: 6
+  items_per_agent: 1
+  output_dir: C:/development/GetToIt/gti-vault/01_raw/paralysis-causes/results

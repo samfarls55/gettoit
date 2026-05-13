@@ -1,0 +1,84 @@
+topic: optimal_ios_tech_stack_groups_food
+description: >
+  Evaluate iOS-only tech stack options for GetToIt — a group-first
+  decision-paralysis killer with food vertical v1. Balanced priority lens:
+  ship v1 fastest without painting into corner. Performance-per-dollar
+  weighs heavy in the 0–10k DAU range.
+
+context:
+  product: GetToIt
+  category: social / group-coordination / light-discovery
+  comparables: [Partiful, Splitwise, Geneva, Marco Polo, BeReal]
+  north_star: follow-through %
+  v1_vertical: food
+  team_size: solo dev with Claude Code
+  priority_lens: balanced (ship v1 but don't paint into corner)
+  android_path: deferred — iOS-only v1, cross-platform stacks dropped
+  generated_at: 2026-05-12
+
+items:
+  - id: supabase
+    name: Swift + SwiftUI + Supabase
+    backend: Supabase (Postgres + Realtime + Auth + Storage)
+    note: Default BaaS for SwiftUI in 2026; Postgres+RLS, presence channels.
+
+  - id: firebase
+    name: Swift + SwiftUI + Firebase
+    backend: Firebase (Firestore + FCM + Firebase Auth)
+    note: Mature; default fast-MVP for social/group apps.
+
+  - id: convex
+    name: Swift + SwiftUI + Convex
+    backend: Convex (TS-defined reactive backend, optimistic updates)
+    note: Swift SDK now GA — https://docs.convex.dev/client/swift — re-anchored for 2026.
+
+  - id: supabase_powersync
+    name: Swift + SwiftUI + Supabase + PowerSync
+    backend: Supabase + PowerSync overlay (local SQLite, offline-first)
+    note: Solves "vote on subway" without leaving the Supabase ecosystem.
+
+  - id: instantdb
+    name: Swift + SwiftUI + InstantDB
+    backend: InstantDB (typed local-first BaaS, optimistic + presence)
+    note: Group-room model architecturally native. Swift SDK community-maintained.
+
+  - id: cloudkit
+    name: Swift + SwiftUI + CloudKit
+    backend: CloudKit (Apple-native, CKShare zones for groups)
+    note: Free at scale, zero ops; Apple-only forever.
+
+  - id: nakama
+    name: Swift + SwiftUI + Nakama
+    backend: Nakama (open-source game-backend repurposed for social)
+    note: Native friends / groups / parties / presence primitives.
+
+  - id: turso
+    name: Swift + SwiftUI + Turso
+    backend: Turso (libSQL/SQLite embedded replicas, edge sync)
+    note: Per-room SQLite database maps to "room of N humans voting on M options".
+
+excluded_from_deep_research:
+  rationale: Out of balanced-priority scope but kept on record so future readers don't relitigate.
+  items:
+    - Swift + UIKit + Custom Node + Pusher/Ably — too DIY for solo-dev velocity
+    - Swift + SwiftUI + AWS Amplify — enterprise weight, slow to first prototype
+    - Swift + SwiftUI + Hasura / PostgREST self-hosted — DIY graph layer
+    - Swift + SwiftUI + Appwrite — profile overlaps Supabase, less differentiation
+    - Swift + SwiftUI + PocketBase — requires self-host VPS appetite
+    - Swift + SwiftUI + Ditto — P2P mesh overkill for v1
+    - Swift + SwiftUI + Automerge — CRDT DIY lift; revisit only if collab editing becomes core
+
+anti_recommendations:
+  reason: Avoid for GetToIt v1; documented to prevent revisiting.
+  items:
+    - Realm + MongoDB Atlas Device Sync — EOL Sep 30 2025
+    - Replicache — maintenance mode; Rocicorp moved focus to Zero
+    - Zero (Rocicorp) — no Swift client yet (web / React-only); revisit late 2026
+    - Triplit — no Swift SDK; recently acquired, future unclear
+    - Electric SQL Swift — community port, experimental
+
+execution:
+  batch_size: 4
+  items_per_agent: 2
+  output_dir: ./results/
+  detail_level_default: moderate

@@ -1,0 +1,21 @@
+# Design System Changelog
+
+Append-only log of every change to the design system spec. Newest at top. One line per change unless a `BREAKING:` entry needs context.
+
+Format: `YYYY-MM-DD — short description. (PR / commit / reason)`
+
+Prefix `BREAKING:` for any change that requires code or downstream consumers to update.
+
+---
+
+## 2026-05-12
+
+- **BREAKING:** Product renamed `figureitout` → `GetToIt`. Domain locked to `gettoit.app`. Identifier sweep: `Fio*` types/functions → `GTI*` (`FioTokens` → `GTITokens`, `FioMark` → `GTIMark`, `FioColor` → `GTIColor`, `FioGradient`/`FioSurface`/`FioChip` similarly). Constants `FIO_GRADIENTS` / `FIO_PALETTES` → `GTI_*`. CSS classes + keyframes `fio-*` → `gti-*` (`fio-canvas`, `fio-display`, `fio-rise`, `fio-fade-up`, `fio-pop`, `fio-stagger-in`, `fio-shutter-top`/`bot`, `fio-gradient`, `fio-grain`, `fio-eyebrow`, `fio-cta`). Wordmark tile letter `f` → `g`. Vault directory `fio-vault/` → `gti-vault/`. Web fallback URL paths shift from `fio.app/s/<id>` → `gettoit.app/s/<id>` (see surfaces/02-invite, ScreenInviteUnfurl, ScreenInviteWeb).
+- Introduced `tokens.json` as canonical source of truth. `code/tokens.css` is now generated via `scripts/gen-css.mjs`. (Motivation: prevent three-way drift between `tokens.md`, `tokens.css`, and `components.jsx GTI_GRADIENTS`.)
+- Added `scripts/verify.mjs` — drift gate + orphan-hex sweep over all JSX in `code/`.
+- Added `--r-sheet: 26px` to generated CSS. Previously in `tokens.md §4` but missing from the hand-written `tokens.css`. Now consistent.
+- Registered `color.ink-3` (`#0A0A0F`) — hard-close shutter fill (S06). Spec-backed per `surfaces/06-hard-close.md`. Was previously inlined hex in `ScreenLocked.jsx`.
+- Registered `color.member-identity` (`#7DDFB5`, `#FF8DA1`, `#9BC0FF`) — per-member dot colors on the waiting surface (S08). **Spec gap closure** — previously inlined in `ScreenWaiting.jsx` with no spec coverage. Flag: tension with the "Sun is THE accent" rule (`tokens.md §1`) — palette beyond 3 members needs design review.
+- Registered `color.chrome.imessage` (`#1C1C1E`, `#26262A`, `#3A3A3C`) — external iOS Messages dark-theme chrome mocked in `ScreenInviteUnfurl.jsx`. Not GetToIt brand; registered only to keep the orphan-hex sweep clean.
+- Added `CLAUDE.md` — editing rules for this directory (source-of-truth contract, regenerate steps, verification commands).
+- Added YAML frontmatter to every `surfaces/0N-*.md` (`surface`, `status`, `locked-date`, `jsx`). Extended `verify.mjs` with a third check: every surface doc claims its JSX, every JSX in `code/screens/` is claimed by exactly one surface, no orphans or double-claims.

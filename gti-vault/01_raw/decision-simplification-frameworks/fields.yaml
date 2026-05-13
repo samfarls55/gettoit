@@ -1,0 +1,129 @@
+field_categories:
+  - category: basic_info
+    fields:
+      - name: framework_name
+        description: Canonical name of the framework
+        detail_level: brief
+        required: true
+      - name: originators
+        description: Primary author(s) or researcher(s) who introduced it
+        detail_level: brief
+        required: true
+      - name: origin_year
+        description: Year of first publication or seminal work
+        detail_level: brief
+        required: true
+      - name: discipline
+        description: Field of origin (e.g., behavioral econ, cognitive psych, decision science)
+        detail_level: brief
+        required: true
+      - name: one_sentence_summary
+        description: Plain-English summary of the framework in one sentence
+        detail_level: brief
+        required: true
+
+  - category: mechanic
+    fields:
+      - name: core_mechanism
+        description: How the framework actually simplifies a decision (the operation it performs)
+        detail_level: detailed
+        required: true
+      - name: steps_or_components
+        description: Ordered steps or named components, if any
+        detail_level: detailed
+        required: true
+      - name: input_signals
+        description: What the decider must supply (preferences, constraints, attributes, threshold, etc.)
+        detail_level: moderate
+        required: true
+      - name: output_form
+        description: What the framework produces (a single choice, a ranked set, an eliminated set, a default, etc.)
+        detail_level: moderate
+        required: true
+      - name: typical_use_cases
+        description: Domains and decision types where it is most commonly applied
+        detail_level: moderate
+        required: true
+
+  - category: evidence_base
+    fields:
+      - name: empirical_support
+        description: Strength and type of empirical validation (lab, field, replications)
+        detail_level: detailed
+        required: true
+      - name: known_limitations
+        description: Documented failure modes, criticisms, or boundary conditions
+        detail_level: detailed
+        required: true
+      - name: replication_status
+        description: Notable replications, meta-analyses, or replication failures
+        detail_level: moderate
+        required: false
+
+  - category: group_decision_fit
+    fields:
+      - name: individual_vs_group
+        description: Whether the framework was designed for individual or group decisions, and how it generalizes
+        detail_level: detailed
+        required: true
+      - name: aggregation_strategy
+        description: How (if at all) the framework combines multiple parties' inputs into one outcome
+        detail_level: detailed
+        required: true
+      - name: handles_disagreement
+        description: How it deals with conflicting preferences or constraints among group members
+        detail_level: detailed
+        required: true
+      - name: procedural_fairness
+        description: Whether the process is likely to feel fair to a "loser" (someone whose preference did not win)
+        detail_level: moderate
+        required: true
+
+  - category: quiz_mapping
+    fields:
+      - name: fit_for_fixed_length_quiz
+        description: How well the framework adapts to a fixed-length (~5 question) parallel quiz format
+        detail_level: detailed
+        required: true
+      - name: question_design_implications
+        description: What the quiz questions would have to ask to feed this framework
+        detail_level: detailed
+        required: true
+      - name: signal_type
+        description: Primary signal the quiz must extract for this framework (constraints, mood, preferences, veto, threshold, attribute ranking, etc.)
+        detail_level: moderate
+        required: true
+      - name: tiebreaker_rule_implication
+        description: What rule the framework implies for breaking ties when group inputs conflict
+        detail_level: moderate
+        required: true
+      - name: implementation_complexity
+        description: Engineering and UX complexity to implement this framework in v1 (low / medium / high) with rationale
+        detail_level: moderate
+        required: true
+
+  - category: recommendation
+    fields:
+      - name: strengths_for_GetToIt
+        description: Why this framework is a strong candidate for the going-out group-decision use case
+        detail_level: detailed
+        required: true
+      - name: weaknesses_for_GetToIt
+        description: Why this framework might not fit, or what it would force the product to compromise
+        detail_level: detailed
+        required: true
+      - name: adoption_verdict
+        description: One of "primary candidate", "secondary / sub-signal", "reject", with one-line rationale
+        detail_level: brief
+        required: true
+
+  - category: sources
+    fields:
+      - name: primary_sources
+        description: List of canonical papers/books with citation
+        detail_level: brief
+        required: true
+      - name: secondary_sources
+        description: Useful blog posts, reviews, or applied write-ups
+        detail_level: brief
+        required: false

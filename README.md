@@ -1,4 +1,4 @@
-# figureitout
+# GetToIt
 
 Group decision-paralysis killer. Food vertical v1.
 

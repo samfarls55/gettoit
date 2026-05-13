@@ -1,0 +1,117 @@
+field_categories:
+  - category: basic_info
+    fields:
+      - name: construct_name
+        description: Canonical name of the fairness construct or effect
+        detail_level: brief
+        required: true
+      - name: originators
+        description: Researcher(s) who introduced or formalized the construct
+        detail_level: brief
+        required: true
+      - name: origin_year
+        description: Year of the seminal paper or work
+        detail_level: brief
+        required: true
+      - name: discipline
+        description: Field of origin (social psych, organizational behavior, law, social exchange, group dynamics)
+        detail_level: brief
+        required: true
+      - name: one_sentence_summary
+        description: Plain-English statement of what the construct claims and why it matters for fairness perception
+        detail_level: brief
+        required: true
+
+  - category: mechanism
+    fields:
+      - name: causal_mechanism
+        description: How the construct moves from antecedent (procedural feature, signal, distribution rule) to perceived fairness and behavioral acceptance
+        detail_level: detailed
+        required: true
+      - name: behavioral_signature
+        description: Observable signs that this construct is producing acceptance (or its absence is producing rejection) in a given decision
+        detail_level: detailed
+        required: true
+      - name: typical_triggers
+        description: Conditions under which this construct's effect is strongest (stakes, in-group identity, outcome valence, resource type)
+        detail_level: moderate
+        required: true
+
+  - category: evidence_base
+    fields:
+      - name: empirical_support
+        description: Strength and type of empirical validation (effect sizes, meta-analyses, replication, lab vs field)
+        detail_level: detailed
+        required: true
+      - name: replication_status
+        description: Notable replications, meta-analyses, replication failures, post-2010 status
+        detail_level: detailed
+        required: true
+      - name: known_limitations
+        description: Documented criticisms, boundary conditions, contested findings, cultural moderators
+        detail_level: detailed
+        required: true
+
+  - category: GetToIt_fit
+    fields:
+      - name: fit_to_use_case
+        description: How well this construct applies to the GetToIt verdict screen — small group, low stakes, algorithm-as-decider, member who lost out on their preference
+        detail_level: detailed
+        required: true
+      - name: dominance_estimate
+        description: Estimated importance for GetToIt's follow-through metric (high / medium / low) with rationale
+        detail_level: detailed
+        required: true
+      - name: group_size_specificity
+        description: Whether the effect is amplified, muted, or unchanged in 2-6 person friend groups vs larger or hierarchical groups
+        detail_level: moderate
+        required: true
+      - name: ingroup_friend_specificity
+        description: Whether the effect is changed by the fact that GetToIt groups are friends (high prior trust, repeated interaction) rather than strangers, employees, or litigants
+        detail_level: moderate
+        required: true
+
+  - category: verdict_screen_implication
+    fields:
+      - name: design_signal_to_express
+        description: What the verdict screen must communicate or enact to activate this construct (voice acknowledgment, explanation, public lock-in, distribution rule, etc.)
+        detail_level: detailed
+        required: true
+      - name: copy_framework_implications
+        description: Concrete copy patterns or phrasing rules implied by this construct (e.g., name the inputs, name the rule, name the loser, give an account)
+        detail_level: detailed
+        required: true
+      - name: ux_mechanic_implications
+        description: UX mechanics implied (ratification button, who-wanted-what reveal, opt-out window, dispute/correctability path, etc.)
+        detail_level: detailed
+        required: true
+      - name: failure_mode_if_ignored
+        description: What happens to verdict acceptance and follow-through if the verdict screen ignores this construct
+        detail_level: moderate
+        required: true
+
+  - category: recommendation
+    fields:
+      - name: priority_for_v1
+        description: One of "must-have for verdict screen", "should-have", "nice-to-have", "out of scope", with one-line rationale
+        detail_level: brief
+        required: true
+      - name: dependency_on_other_constructs
+        description: How this construct interacts with the other fairness constructs (substitutes for, amplifies, requires, conflicts with)
+        detail_level: moderate
+        required: false
+      - name: interaction_with_p1_p2
+        description: How this construct interacts with the chosen P1 framework (likely EBA + Satisficing hybrid) and P2 dominant causes (Misaligned_Preferences, Social_Friction, Fear_of_Regret) — does it amplify or undermine them
+        detail_level: moderate
+        required: true
+
+  - category: sources
+    fields:
+      - name: primary_sources
+        description: Canonical papers/books with full citations
+        detail_level: brief
+        required: true
+      - name: secondary_sources
+        description: Useful reviews, meta-analyses, applied write-ups
+        detail_level: brief
+        required: false

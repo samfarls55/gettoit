@@ -1,0 +1,21 @@
+---
+folder: 60_engineering/adr
+purpose: Architecture Decision Records — context, decision, consequences
+---
+
+# adr — Index
+
+Architecture Decision Records. One file per decision, numbered from `0001`. Filename pattern: `NNNN-<kebab-slug>.md`.
+
+ADRs are created lazily by `/grill-with-docs` when decisions crystallise. See `docs/agents/domain.md` for the consumer contract.
+
+## Records
+
+- [[0001-ios-tech-stack-supabase|0001 — iOS v1 tech stack: Swift + SwiftUI + Supabase]] (accepted 2026-05-12) — rejects Firebase (lock-in + per-doc-read fanout cost) and Convex (two-language tax + no PostGIS) on a balanced priority lens.
+- [[0002-places-data-foursquare-mapkit|0002 — Places data: Foursquare primary, MapKit fallback]] (accepted 2026-05-12) — free-tier cost floor with vendor-risk hedge; rejects Google Places + Yelp Fusion (both paid).
+- [[0003-web-fallback-nextjs-vercel|0003 — Web fallback: Next.js on Vercel]] (accepted 2026-05-12) — preserves viral loop for non-iOS invitees; reuses `design-system/tokens.css` directly.
+- [[0004-monorepo-layout|0004 — Monorepo layout]] (accepted 2026-05-12) — `ios/`, `web/`, `design-system/`, `gti-vault/` siblings at repo root.
+- [[0005-telemetry-supabase-event-store|0005 — Telemetry: Supabase tables + SQL views]] (accepted 2026-05-12) — north-star metric computable via in-stack SQL; no third-party analytics in v1.
+- [[0006-privacy-posture-v1|0006 — Privacy posture v1]] (accepted 2026-05-12) — claimed-retained / anonymous-30d-TTL / in-app delete / no third-party preference sharing / US-only beta.
+- [[0007-auth-anonymous-default-apple-upgrade|0007 — Auth: anonymous default + post-quiz Apple upgrade]] (accepted 2026-05-12) — preserves two-tap invitee promise; upgrade chip on Waiting surface.
+- [[0008-ios-min-target-17|0008 — iOS minimum deployment target: iOS 17]] (accepted 2026-05-12) — Observable macro, stable ActivityKit, ~95% device reach.

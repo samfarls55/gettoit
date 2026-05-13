@@ -1,0 +1,46 @@
+topic: group-fairness-procedural-justice
+description: >
+  Survey procedural- and distributive-justice constructs for fit to GetToIt's
+  verdict-screen design. Output drives verdict-explanation copy framework, public
+  ratification mechanic, and any tiebreaker tie-rule that must feel fair to the
+  member whose preference loses. Source: gti-vault/50_product/research-brief.md
+  Priority 3.
+context:
+  product: GetToIt (group decision-paralysis killer, food vertical v1)
+  use_case: 2-6 friends, mid-stakes social decision (where to eat tonight), single committed verdict
+  north_star: verdicts followed-through (whole group commits and shows up, not just majority agreement)
+  decision_to_lock: verdict-explanation copy framework, ratification UX, tiebreaker fairness rule
+  dependency: P1 (frameworks) and P2 (paralysis causes) complete; this priority informs verdict-screen surface that uses the chosen mechanic + signal type
+items:
+  - name: Tyler_Group_Value_Model
+    full_name: "Group Value / Group Engagement Model (Tom R. Tyler)"
+    summary: People accept group authority and outcomes when treated with respect, neutrality, and trustworthy motives — relational signals dominate outcome favorability
+    primary_source: "Tyler 1989; Tyler & Lind 1992 relational model; Tyler & Blader 2003 group engagement model"
+  - name: Voice_Effect
+    full_name: "Voice effect / process control (Thibaut & Walker; Folger; Lind)"
+    summary: Allowing parties to express views before a decision raises perceived fairness and acceptance independent of outcome
+    primary_source: "Thibaut & Walker 1975; Folger 1977; Lind, Kanfer & Earley 1990"
+  - name: Leventhal_Six_Rules
+    full_name: "Leventhal's six procedural-justice rules"
+    summary: Procedures are perceived fair when consistent, bias-suppressed, accurate, correctable, representative, and ethical
+    primary_source: "Leventhal 1980 (in Gergen, Greenberg, Willis eds. Social Exchange)"
+  - name: Outcome_Favorability_Interaction
+    full_name: "Fair-process effect / outcome-favorability × procedural-justice interaction (Brockner)"
+    summary: Procedural justice matters most when outcomes are unfavorable to the perceiver — fair process buffers loss
+    primary_source: "Brockner & Wiesenfeld 1996 meta-analysis; Brockner 2002"
+  - name: Informational_Justice_Explanation
+    full_name: "Informational justice / accounts and explanations (Bies & Moag; Greenberg; Colquitt)"
+    summary: Adequate, sincere explanations of how/why a decision was made increase perceived fairness and reduce retaliation
+    primary_source: "Bies & Moag 1986 interactional justice; Greenberg 1993; Colquitt 2001 four-factor model"
+  - name: Public_Commitment_Ratification
+    full_name: "Public commitment / ratification (Cialdini; Kiesler; Lewin)"
+    summary: Publicly committing to a decision increases follow-through via consistency pressure and reduced exit options
+    primary_source: "Lewin 1947 group decision; Kiesler 1971 commitment psychology; Cialdini Influence (1984)"
+  - name: Distributive_Justice_Equity
+    full_name: "Distributive justice — equity, equality, need (Adams; Deutsch)"
+    summary: Outcome fairness judged against distribution rule (equity by contribution, equality, or need) — choice of rule is itself a fairness signal
+    primary_source: "Adams 1965 equity theory; Deutsch 1975 three-rule typology; Walster, Walster & Berscheid 1978"
+execution:
+  batch_size: 7
+  items_per_agent: 1
+  output_dir: C:/development/GetToIt/gti-vault/01_raw/group-fairness-procedural-justice/results

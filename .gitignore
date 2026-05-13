@@ -1,11 +1,13 @@
-# Documentation / knowledge base — kept local, never committed
-fio-vault/
-docs/
-CONTEXT.md
-CLAUDE.md
-
 # Local Claude Code config (agent definitions, skills, local settings)
 .claude/
+
+# Agent instructions — machine-specific, not for humans reading the repo
+CLAUDE.md
+
+# Obsidian local workspace state (per-machine window layout, recents)
+**/.obsidian/workspace.json
+**/.obsidian/workspace-mobile.json
+**/.obsidian/graph.json
 
 # OS / editor cruft
 .DS_Store

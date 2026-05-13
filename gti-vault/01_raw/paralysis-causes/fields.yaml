@@ -1,0 +1,113 @@
+field_categories:
+  - category: basic_info
+    fields:
+      - name: cause_name
+        description: Canonical name of the paralysis cause
+        detail_level: brief
+        required: true
+      - name: originators
+        description: Researcher(s) who introduced or formalized the construct
+        detail_level: brief
+        required: true
+      - name: origin_year
+        description: Year of the seminal paper or work
+        detail_level: brief
+        required: true
+      - name: discipline
+        description: Field of origin (behavioral econ, social psych, cognitive psych, social choice, sociology)
+        detail_level: brief
+        required: true
+      - name: one_sentence_summary
+        description: Plain-English explanation of how this cause produces paralysis
+        detail_level: brief
+        required: true
+
+  - category: mechanism
+    fields:
+      - name: causal_mechanism
+        description: Step-by-step account of how the cause moves from antecedent to paralysis behavior
+        detail_level: detailed
+        required: true
+      - name: behavioral_signature
+        description: Observable signs that this cause (rather than another) is at work in a given decision
+        detail_level: detailed
+        required: true
+      - name: typical_triggers
+        description: Conditions that activate this cause (context, group composition, timing, stake level)
+        detail_level: moderate
+        required: true
+
+  - category: evidence_base
+    fields:
+      - name: empirical_support
+        description: Strength and type of empirical validation (effect sizes, replications, meta-analyses)
+        detail_level: detailed
+        required: true
+      - name: replication_status
+        description: Notable replications, meta-analyses, replication failures
+        detail_level: detailed
+        required: true
+      - name: known_limitations
+        description: Documented criticisms, boundary conditions, contested findings
+        detail_level: detailed
+        required: true
+
+  - category: GetToIt_fit
+    fields:
+      - name: fit_to_use_case
+        description: How well this cause explains paralysis in going-out, group, trivial-mid stakes, end-of-day food decisions
+        detail_level: detailed
+        required: true
+      - name: dominance_estimate
+        description: Estimated dominance for the GetToIt use case (high / medium / low) with rationale
+        detail_level: detailed
+        required: true
+      - name: group_specificity
+        description: Whether this cause is amplified or muted in group (vs solo) decisions
+        detail_level: moderate
+        required: true
+      - name: timing_specificity
+        description: Whether this cause is amplified by end-of-workday timing (decision fatigue context)
+        detail_level: moderate
+        required: true
+
+  - category: quiz_signal_implication
+    fields:
+      - name: signal_to_extract
+        description: What the 5-question quiz must extract to defuse this cause (constraints / mood / preferences / veto / threshold / commitment / option-cap)
+        detail_level: detailed
+        required: true
+      - name: question_design_implications
+        description: What types of questions follow if this cause is dominant
+        detail_level: detailed
+        required: true
+      - name: mitigation_strategy
+        description: Product mechanics that defuse this cause (option compression, regret-preview, default, deadline, anonymous input, etc.)
+        detail_level: detailed
+        required: true
+      - name: failure_mode_if_ignored
+        description: What happens to the verdict and follow-through if this cause is dominant but the quiz ignores it
+        detail_level: moderate
+        required: true
+
+  - category: recommendation
+    fields:
+      - name: priority_for_v1
+        description: One of "primary defuse target", "secondary defuse target", "monitor only", "out of scope", with one-line rationale
+        detail_level: brief
+        required: true
+      - name: dependency_on_other_causes
+        description: Whether this cause interacts with the other paralysis causes (amplifies, masks, substitutes for)
+        detail_level: moderate
+        required: false
+
+  - category: sources
+    fields:
+      - name: primary_sources
+        description: Canonical papers/books with citation
+        detail_level: brief
+        required: true
+      - name: secondary_sources
+        description: Useful reviews, applied write-ups, blog posts
+        detail_level: brief
+        required: false

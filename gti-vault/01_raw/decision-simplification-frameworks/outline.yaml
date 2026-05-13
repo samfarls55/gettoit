@@ -1,0 +1,39 @@
+topic: decision-simplification-frameworks
+description: >
+  Survey validated decision-simplification frameworks for fit to a fixed-length
+  group quiz (5-ish questions, parallel inputs, mid-stakes social decisions like
+  "where to eat tonight"). Source: gti-vault/50_product/research-brief.md
+  Priority 1.
+context:
+  product: GetToIt (group decision-paralysis killer, food vertical v1)
+  use_case: 5-question parallel-group quiz that produces single verdict
+  north_star: verdicts followed through (whole group commits, not just majority)
+items:
+  - name: WRAP
+    full_name: "WRAP framework (Heath & Heath, Decisive)"
+    summary: Widen options, Reality-test, Attain distance, Prepare to be wrong
+    primary_source: "Decisive (2013), Chip & Dan Heath"
+  - name: Satisficing
+    full_name: "Satisficing (Herbert Simon)"
+    summary: Pick first option meeting threshold rather than optimize
+    primary_source: "Models of Man (1957), Herbert A. Simon"
+  - name: Elimination_by_Aspects
+    full_name: "Elimination by Aspects (Amos Tversky)"
+    summary: Sequential filter on most important attribute, then next, etc.
+    primary_source: "Tversky 1972, Psychological Review"
+  - name: Pre_Mortem_Regret_Minimization
+    full_name: "Pre-mortem / Regret minimization (Kahneman, Klein, Bezos)"
+    summary: Imagine failure or future-self regret to test current choice
+    primary_source: "Klein 2007 HBR; Kahneman, Thinking Fast and Slow"
+  - name: Choice_Architecture_Nudge
+    full_name: "Choice architecture / Nudge (Thaler & Sunstein)"
+    summary: Defaults, ordering, and framing shape decisions without restricting choice
+    primary_source: "Nudge (2008), Thaler & Sunstein"
+  - name: Maximizer_Satisficer_Scale
+    full_name: "Maximizer vs. Satisficer scale (Schwartz)"
+    summary: Trait-level disposition; maximizers struggle more with abundant options
+    primary_source: "Paradox of Choice (2004), Barry Schwartz; Schwartz et al. 2002"
+execution:
+  batch_size: 6
+  items_per_agent: 1
+  output_dir: C:/development/GetToIt/gti-vault/01_raw/decision-simplification-frameworks/results

@@ -1,0 +1,132 @@
+{
+  "name": "Swift + SwiftUI + Firebase",
+  "primary_language": "Swift",
+  "ui_framework": "SwiftUI",
+  "backend": "Firebase (Cloud Firestore + Cloud Messaging + Firebase Authentication + Cloud Storage + Cloud Functions)",
+
+  "realtime_quality": "Mature, battle-tested, the gold standard for mobile real-time. Firestore snapshot listeners push document/query changes over a single multiplexed HTTP/2 connection with automatic exponential-backoff reconnect, offline cache replay, and order guarantees. The system is engineered specifically for mobile networks (handles airplane mode, cellular handoff, app suspension gracefully). For group voting: every connected client gets an updated vote count in 100–500ms with no DIY plumbing. Caveat: per-document read is billed on every listener trigger — $0.18 per 100K reads compounds with chat-heavy fanout.",
+
+  "presence_support": "No native Firestore presence. Standard pattern requires bridging to Realtime Database (which has native onDisconnect()) and mirroring state into Firestore via Cloud Functions. Three moving parts vs Supabase's one-channel presence. Documented in official Firebase docs but adds setup friction and a second billed product.",
+
+  "optimistic_updates": "Built-in. Firestore's local cache applies writes immediately, snapshot listeners fire local 'pending' events with metadata.hasPendingWrites = true, then re-fire with server-confirmed state. SwiftUI views see instant feedback without manual reconciliation code. One of Firebase's strongest UX wins.",
+
+  "offline_handling": "Best-in-class. Persistent disk cache enabled by default on iOS — reads/writes/queries/listeners all work fully offline, sync automatically on reconnect. No conflict-resolution config needed; last-write-wins with server timestamps. 'Vote on subway' is zero engineering effort. The single feature where Firebase clearly outpaces Supabase.",
+
+  "auth_flow_friction": "Very low. FirebaseAuth + Sign in with Apple integration is canonical, samples plentiful. Anonymous auth in one call (Auth.auth().signInAnonymously()), upgradeable to linked identity later without losing UID. FirebaseUI provides drop-in auth screens.",
+
+  "social_invites": "Significant regression May 2025. Firebase Dynamic Links shut down Aug 25, 2025 — the previous flagship invite/deep-link product is gone. Replacement path: roll your own Universal Links + apple-app-site-association, or pay third-party (Branch, AppsFlyer, Kochava, ChottuLink). Same DIY position as Supabase now — Firebase no longer has a structural advantage here.",
+
+  "push_notifications": "FCM is the strongest push story in mobile. Free unlimited push delivery for iOS/Android/web — no per-message charge ever. APNs token handling abstracted away. Topic subscriptions, conditional sends, scheduled pushes all built-in. The 'no cost per push' line is genuinely true.",
+
+  "group_session_model": "Awkward fit. Firestore is document-oriented; a 'room of N humans voting on M options with a deadline' becomes /rooms/{id} doc + /rooms/{id}/members subcollection + /rooms/{id}/votes subcollection. Joining a room with members + recent votes requires multiple round trips (Firestore can't JOIN). Security rules per collection — workable but more verbose than RLS. The shape works, but you feel the NoSQL grain.",
+
+  "vote_write_fanout_pattern": "One vote = one document write ($0.18 per 100K writes) → snapshot listeners on /rooms/{id}/votes fire for every subscriber. The fanout is automatic but billed per read: 5-person room, 1 vote → 4 listener reads. At 10K DAU × 5 votes/day × 4 watchers = 200K reads/day just for votes ≈ $11/mo. Compounds with chat, presence updates, status changes. This is the core Firestore cost-at-scale concern.",
+
+  "session_ttl_support": "DIY via Cloud Functions + Cloud Scheduler. Schedule a function to scan /rooms where deadline < now() AND status == 'open' every minute. No native TTL evaluator (Firestore has document TTL for deletion but not for triggering business logic). Workable, ~half-day setup.",
+
+  "room_membership_model": "DIY subcollection pattern. Security rules read room membership from a subcollection or array field — works but rule logic gets gnarly past 2 levels of nesting. No declarative 'user X is in room Y' primitive.",
+
+  "quorum_or_deadline_eval": "Cloud Functions trigger on /votes write → read all votes for room → if count == member count, write verdict to room doc. Or scheduled function for deadline. Each trigger is billable. Functions cold-start lag occasionally visible (~200–800ms).",
+
+  "anonymous_invite_join": "signInAnonymously() is one call, creates a Firebase UID, linkable to real auth later. Combined with Universal Link → vote in zero taps after install (must install app first; no App Clip story documented).",
+
+  "app_clip_support": "Firebase SDK does compile into App Clips, but binary-size constraints (10MB) force subsetting — typically drop FirebaseAnalytics, Crashlytics, Performance, leaving Auth + Firestore + Messaging. Community recipes exist. Firebase has no first-class App Clip onboarding feature. [uncertain] — recent 2026 case studies sparse.",
+
+  "universal_link_invite_pattern": "Post-Dynamic-Links death (Aug 2025), pure Apple Universal Links with apple-app-site-association on your domain. Firebase Hosting can host the AASA file for free. No bundled link-shortener — third-party or DIY.",
+
+  "contacts_pull_friction": "Apple Contacts framework, not Firebase. Standard CNContactStore flow. Firebase Auth supports phone-number sign-in (paid SMS) for friend-graph matching.",
+
+  "shareplay_groupactivities_fit": "[uncertain] — no Firebase-specific SharePlay docs found. GroupActivities framework is transport-agnostic; you'd sync via GroupSessionMessenger and persist to Firestore. No structural conflict.",
+
+  "time_to_first_prototype": "2–5 days for a solo dev with Claude Code. Firebase's tutorial coverage is the largest in mobile (~50K SO questions, official Codelabs, YouTube). SwiftUI + Firestore listener boilerplate is canonical, copy-paste. Faster than Supabase to first prototype mainly because offline + optimistic updates are free, no extra plumbing for snappy feel.",
+
+  "learning_curve": "Low if you've used Firestore before; moderate if you haven't — NoSQL data modeling (denormalization, subcollections, fanout writes) is a different muscle from SQL. Security Rules language is its own DSL.",
+
+  "ecosystem_maturity_2026": "Most mature mobile BaaS in existence. Firebase Apple SDK v12.13.x as of May 2026, releases every 1–2 weeks, Swift Package Manager primary (CocoaPods goes read-only Oct 2026). FirebaseFirestore module absorbed FirebaseFirestoreSwift extension — Codable + property wrappers in main SDK. Google's strongest mobile platform play.",
+
+  "hiring_pool": "Largest pool of all backends evaluated. Firebase is the default at bootcamps and the most-Googled mobile backend.",
+
+  "claude_code_familiarity": "Very high. Firebase has the largest training-data footprint of any BaaS (50K+ SO questions, decade of tutorials). Claude Code generates idiomatic FirestoreSwift + AuthSwift code reliably. Google released official Firebase MCP server + Agent Skills (Feb 2026) specifically for Claude Code / Gemini CLI / Cursor — most polished AI-assist story among BaaS options.",
+
+  "xcode_first_class": "Strong. @DocumentID property wrapper, Codable decode/encode built into FirestoreSwift, async/await throughout, Swift Macros for query building emerging. Xcode previews work because Firestore offline cache returns synchronously when seeded. Best Swift ergonomics among the BaaS options.",
+
+  "free_tier_ceiling": "Spark plan (forever free): Firestore 1 GB storage, 50K reads/day, 20K writes/day, 20K deletes/day, 10GB/mo egress. Auth: 50K MAU. FCM: unlimited free pushes forever. Cloud Storage 5GB. Hard ceiling: if you exceed Spark, the product shuts off for the month unless you upgrade. Spark is a hard cap, not soft throttle — this is a structural risk for viral apps.",
+
+  "cost_per_DAU_first_1k": "Typically $0–10/mo on Blaze if you stay under daily free quotas. 1K DAU × 50 reads/day = 50K reads — at Spark's free limit. Real-world reports: $0.22/mo for 100 DAU, ~$5–10/mo for 1K DAU. Effective: ~$0.01/DAU/mo. Per-document-read billing is the constant risk.",
+
+  "cost_per_DAU_first_10k": "Documented example: 10K DAU social app with 5 feed loads + 1 post/day on denormalized model = $23/mo ($18 reads + $3.24 writes + $1.80 storage). Un-denormalized variant: $38/mo. For GetToIt's 5-person voting rooms with snapshot listeners: estimate $25–60/mo at 10K DAU, dominated by listener reads. Effective: ~$0.003–0.006/DAU/mo.",
+
+  "cost_at_100k_DAU": "Auth crosses 50K MAU threshold → Identity Platform billing kicks in ($0.0055/MAU on next 50K = ~$275/mo at 100K MAU). Firestore reads at chat-app scale typically $200–800/mo. Storage modest. Realistic total $500–2000/mo, generally 40–60% more than Supabase at equivalent scale per third-party comparisons. [uncertain] — Firestore costs are highly sensitive to listener / read patterns.",
+
+  "perf_per_dollar": "Strong for read-light apps, weak for read-heavy (chat, voting, presence). Per-document-read pricing means every snapshot listener tick costs money. Free quotas are generous enough that v1 typically costs nothing, but the cost curve steepens earlier than Supabase. Free push delivery (FCM) is uniquely valuable.",
+
+  "realtime_message_cost_per_1k": "Firestore doesn't bill messages — it bills reads. Each listener event = one read = $0.0018 per 1K. FCM push delivery is free regardless of volume. Different cost model than Supabase: pay per data-change-fanned-out, not per WebSocket message.",
+
+  "concurrent_connection_ceiling_free": "Firestore auto-scales to ~1M concurrent connections (no published free-tier cap beyond daily read limits). Realtime Database caps at 200K concurrent per database instance, shardable. No connection-count cliff — daily read quota is the real free-tier ceiling.",
+
+  "auth_mau_cost_curve": "Free up to 50K MAU. Above 50K, Identity Platform kicks in: $0.0055 per MAU on 50,001–100,000, steps down at higher volumes. ~70% more expensive per MAU than Supabase ($0.00325) above the free tier. Enterprise SSO different bracket ($0.015/MAU).",
+
+  "egress_cost_image_heavy": "Cloud Storage egress ~$0.12/GB after 10GB/mo free. Compare to Supabase Pro: $0.03/GB cached / $0.09/GB uncached. Firebase is meaningfully more expensive for image-heavy egress, especially without an explicit CDN tier. Mitigations: front Storage with Cloud CDN (extra setup + cost), or use Firebase Hosting cache.",
+
+  "cold_start_egress_pattern": "Snapshot listeners replay from local cache on app open — minimal cold-start network cost. Initial subscribe pulls only deltas if the cache is warm. Best-in-class cold-start UX.",
+
+  "vendor_lockin_risk": "High. Firestore query model, security rules, and proprietary data format have no off-Google equivalent. Export path: Firestore export → Cloud Storage → BigQuery (one-way analytics, not portable to another OLTP store). Migrating off Firebase to Postgres is a substantial rewrite. Auth schema (custom claims, providers) is Firebase-shaped. The Firebase Extensions ecosystem deepens lock-in further.",
+
+  "scaling_ceiling": "Firestore: ~10K writes/sec per database (sharding via multiple databases possible since Native mode multi-DB GA), ~1M concurrent connections. Hot-document writes capped at ~1/sec/document. Far beyond GetToIt's v1 horizon. At very high scale, Firestore's per-op cost becomes prohibitive before its technical ceiling.",
+
+  "data_export_path": "Firestore export to Cloud Storage (proprietary format loadable into BigQuery only). No SQL dump. Auth users exportable via Admin SDK to JSON. Storage assets accessible via gsutil. Practical migration off Firebase is a multi-week project.",
+
+  "swiftui_native_feel": "Excellent. FirebaseFirestore Swift APIs are Codable-first, @DocumentID + @FirestoreQuery property wrappers feel SwiftUI-native. Async/await across SDK. SwiftUI environment injection patterns documented.",
+
+  "sign_in_with_apple_native": "First-class. AuthCredential from ASAuthorizationAppleIDCredential identity token + nonce, then Auth.auth().signIn(with: credential). Standard 30-line implementation. Anonymous → Apple link conversion supported (anonymous UID preserved).",
+
+  "app_review_friction": "Low. Firebase has zero known structural App Review issues. Privacy Manifests shipped in SDK (took until ~2024 to land — early days were rough but settled). Crashlytics manifest required disk-space-collection removal in 2024 SDK update.",
+
+  "foundation_models_ready": "Backend-agnostic — Foundation Models run on-device. Firebase also offers Firebase AI Logic / Genkit for cloud LLMs (Vertex / Gemini) with optional federation, but for GetToIt's iOS 26 Foundation Models use case, no Firebase-side integration needed.",
+
+  "app_intents_data_dependency": "DIY but unobstructed. App Intent → instantiates shared Firestore reference → Codable fetch. Works with Firestore's offline cache (intents resolve fast).",
+
+  "liveactivity_dynamic_island_push": "FCM HTTP v1 supports Live Activity push remotely via push-type: liveactivity headers — documented, with FCM handling the APNs translation. push-to-start tokens supported (iOS 17.2+). Cleaner integration than Supabase's direct-APNs path. 'Get started with Live Activity' is in official FCM docs.",
+
+  "widget_timeline_data_access": "Standard WidgetKit + App Group container. Firestore offline cache available from within widget extension (FirebaseFirestore configured in widget bundle). Reads served from local cache, listener can be triggered on widget timeline refresh.",
+
+  "geo_query_support": "DIY via geohashing — Firestore has no native PostGIS. Standard pattern: store geohash + lat/lng on document, query by geohash prefix range, filter false positives client-side. Libraries: GeoFirestore-iOS (community-maintained). Recent multi-field inequality query support (March 2024) helps but Firestore is structurally weaker than PostGIS for geo.",
+
+  "places_data_integration": "Backend-agnostic. Apple MapKit (free, MKLocalSearch), Foursquare, Google Places — choose any. Cache in Firestore if desired. Firebase has no places product of its own.",
+
+  "places_api_total_cost_at_1k_DAU": "Same as Supabase / any backend — depends on chosen provider. MapKit: $0. Foursquare: free 10K/mo (drops to 500/mo Jun 2026). Google Places: paid since Feb 2025 (~$17/1K Place Details calls). Cache aggressively in Firestore to stay near zero.",
+
+  "places_data_freshness": "Inherited from provider. No Firebase-side caching layer — DIY TTL on Firestore docs.",
+
+  "image_storage_cost": "Cloud Storage: $0.026/GB/mo (Standard, us-central1). 5GB free. Comparable to Supabase Pro ($0.021/GB/mo) but Firebase egress costs (~$0.12/GB) erode the difference quickly.",
+
+  "image_cdn_included": "No built-in transformations. Cloud Storage serves raw bytes; transformations require Firebase Extensions (Resize Images) or Cloud Functions image processing. Frontend can pipe through Imgix / Cloudinary / Cloud CDN. Less batteries-included than Supabase's Smart CDN.",
+
+  "silent_push_to_compute_widget": "FCM supports content_available silent pushes with full APNs priority/expiration control. Standard pattern.",
+
+  "apns_priority_tier_support": "Full APNs priority control through FCM HTTP v1 API (apns_priority field, push-type headers). Same expressiveness as direct APNs.",
+
+  "cross_user_push_fanout_cost": "$0. FCM delivery free for unlimited iOS pushes. 5-person group × every vote × 4 watchers fanout = zero marginal push cost. This is Firebase's structural win vs Supabase (where Edge Function invocations bill at $2 per 1M past 500K free).",
+
+  "single_founder_maintainability": "Very high. Largest community, longest track record, Google-funded — solo dev has the deepest support tail. But the lock-in means a failed pivot off Firebase is costly.",
+
+  "community_size": "Largest of any BaaS. ~50K Stack Overflow questions, official Firebase Slack, Google Groups (firebase-talk), Firebase Summit annual conference, hundreds of YouTube channels, dozens of paid courses.",
+
+  "last_major_release": "Firebase Apple SDK v12.13.x as of May 2026, weekly-to-biweekly cadence. Firestore Live Activity push support, Identity Platform features, MCP server, Agent Skills all shipped in 2025–2026 window.",
+
+  "notable_failure_modes": "(1) Per-document read pricing surprises — unbounded snapshot listeners on growing collections silently bleed budget. (2) Hot-document write contention (~1 write/sec limit). (3) Security Rules misconfiguration (similar foot-gun to RLS, less expressive). (4) Spark plan hard cutoff — exceed daily quota, product locks until reset. (5) Dynamic Links death (Aug 2025) blindsided projects relying on invite links. (6) Crashlytics startup performance regression debates ongoing.",
+
+  "funding_runway_signal": "N/A — Google subsidiary, no independent funding events. Strategic priority for Google Cloud / Android. No layoff signals affecting Firebase team. But: Google has killed products at scale before (see eol_history) — strategic-priority signal is weaker than Supabase's growth-stage VC commitment.",
+
+  "eol_history": "Yes — significant. Firebase Dynamic Links shut down Aug 25, 2025 (one of the platform's flagship features for a decade). Firebase Hosting console UI consolidations, Firebase Realtime Database backseat to Firestore. Google more broadly: Stadia, Optimize, Google+, etc. Firebase has a real precedent of killing products customers depended on.",
+
+  "self_host_escape_hatch": "None. Firestore, FCM, Firebase Auth are proprietary managed services with no open-source equivalent. The 'escape' is a multi-month rewrite to a different stack (Postgres + APNs server + Keycloak/Auth0).",
+
+  "data_export_format": "Firestore: proprietary export to GCS (loadable to BigQuery, not portable). Auth: JSON via Admin SDK. Storage: native object format via gsutil. No SQL dump path. Weakest export story among options evaluated.",
+
+  "uncertain": [
+    "app_clip_support",
+    "shareplay_groupactivities_fit",
+    "cost_at_100k_DAU"
+  ]
+}

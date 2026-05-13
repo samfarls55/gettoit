@@ -1,0 +1,297 @@
+detail_levels: [brief, moderate, detailed]
+
+field_categories:
+
+  - category: basic_info
+    description: Identity of the stack archetype.
+    fields:
+      - name: name
+        required: true
+        detail_level: brief
+        description: Stack archetype label.
+      - name: primary_language
+        required: true
+        detail_level: brief
+        description: Swift / TS / other.
+      - name: ui_framework
+        required: true
+        detail_level: brief
+        description: SwiftUI / UIKit / hybrid.
+      - name: backend
+        required: true
+        detail_level: brief
+        description: BaaS or custom backend layer.
+
+  - category: category_fit
+    description: Fit for GetToIt — group-first, real-time multi-user voting, food discovery.
+    fields:
+      - name: realtime_quality
+        required: true
+        detail_level: detailed
+        description: Multi-client state-sync cleanliness for group voting and live verdict.
+      - name: presence_support
+        required: false
+        detail_level: moderate
+        description: Who's in the room, typing, voted indicators.
+      - name: optimistic_updates
+        required: false
+        detail_level: moderate
+        description: Vote feels instant before server confirm.
+      - name: offline_handling
+        required: true
+        detail_level: moderate
+        description: Vote on subway, sync later.
+      - name: auth_flow_friction
+        required: false
+        detail_level: moderate
+        description: Group invite → join → vote, minimum taps.
+      - name: social_invites
+        required: false
+        detail_level: moderate
+        description: Deep links, share sheets, contacts pull.
+      - name: push_notifications
+        required: false
+        detail_level: moderate
+        description: Verdict ready, friend voted.
+      - name: group_session_model
+        required: true
+        detail_level: detailed
+        description: How naturally the stack expresses "a room of N humans voting on M options with a deadline".
+      - name: vote_write_fanout_pattern
+        required: true
+        detail_level: detailed
+        description: How 1 vote propagates to N watchers — affects perceived latency and bill at scale.
+      - name: session_ttl_support
+        required: false
+        detail_level: moderate
+        description: Time-bounded rooms — deadline, auto-close, scheduled verdict eval.
+      - name: room_membership_model
+        required: false
+        detail_level: moderate
+        description: First-class group/room/session concept with members + permissions, or DIY.
+      - name: quorum_or_deadline_eval
+        required: false
+        detail_level: moderate
+        description: Server-side evaluation of "all voted" or "deadline hit" to compute verdict.
+      - name: anonymous_invite_join
+        required: false
+        detail_level: moderate
+        description: Can someone vote without creating an account first (App Clip / share-sheet / passwordless).
+
+  - category: onboarding_invite_friction
+    description: Group-first apps live or die by share-to-join conversion.
+    fields:
+      - name: app_clip_support
+        required: false
+        detail_level: moderate
+        description: Native iOS App Clip flow for invitee-without-app onboarding.
+      - name: universal_link_invite_pattern
+        required: false
+        detail_level: brief
+        description: Out-of-the-box deep-link-to-room from share sheet / iMessage / SMS.
+      - name: contacts_pull_friction
+        required: false
+        detail_level: brief
+        description: Cost of friend-graph bootstrap.
+      - name: shareplay_groupactivities_fit
+        required: false
+        detail_level: brief
+        description: Can the room start from an iMessage thread (Group Activities framework alignment).
+
+  - category: velocity
+    description: Solo dev + Claude Code shipping in 1–3 months.
+    fields:
+      - name: time_to_first_prototype
+        required: true
+        detail_level: moderate
+        description: Realistic days to first working group-vote room.
+      - name: learning_curve
+        required: false
+        detail_level: brief
+        description: Onboarding cost for a Swift dev unfamiliar with the backend.
+      - name: ecosystem_maturity_2026
+        required: true
+        detail_level: brief
+        description: SDK stability, doc quality, community signal.
+      - name: hiring_pool
+        required: false
+        detail_level: brief
+        description: Future contractor availability.
+      - name: claude_code_familiarity
+        required: true
+        detail_level: moderate
+        description: Quality of LLM-generated code — training-data coverage and SDK ergonomics.
+      - name: xcode_first_class
+        required: false
+        detail_level: brief
+        description: Xcode previews, schema codegen, Swift Macros, type-safe queries.
+
+  - category: operational
+    description: Cost-emphasized — perf-per-dollar weighs heavy in 0–10k DAU range.
+    fields:
+      - name: free_tier_ceiling
+        required: true
+        detail_level: detailed
+        description: How far does the free tier carry before first $ spend.
+      - name: cost_per_DAU_first_1k
+        required: true
+        detail_level: detailed
+        description: Realistic monthly $ at 1k DAU with typical group-vote write pattern.
+      - name: cost_per_DAU_first_10k
+        required: true
+        detail_level: detailed
+        description: Same modeled at 10k DAU.
+      - name: cost_at_100k_DAU
+        required: false
+        detail_level: moderate
+        description: Trajectory check for "don't paint into corner".
+      - name: perf_per_dollar
+        required: true
+        detail_level: detailed
+        description: Qualitative — most realtime + auth + storage per $ in 0–10k DAU range.
+      - name: realtime_message_cost_per_1k
+        required: false
+        detail_level: detailed
+        description: $ per 1k realtime messages — Supabase, Pusher, Ably, Firebase bill differently.
+      - name: concurrent_connection_ceiling_free
+        required: false
+        detail_level: brief
+        description: Free-tier concurrent realtime connections — caps simultaneous groups.
+      - name: auth_mau_cost_curve
+        required: false
+        detail_level: moderate
+        description: Does the BaaS bill auth on MAU, and at what break point.
+      - name: egress_cost_image_heavy
+        required: false
+        detail_level: moderate
+        description: Food vertical = dish photos. $ per GB egress.
+      - name: cold_start_egress_pattern
+        required: false
+        detail_level: brief
+        description: Does the stack push or pull state on app open (subscription warmup cost).
+      - name: vendor_lockin_risk
+        required: true
+        detail_level: moderate
+        description: Effort to migrate off if vendor dies.
+      - name: scaling_ceiling
+        required: false
+        detail_level: brief
+        description: Where the stack breaks (DAU, write throughput, connection count).
+      - name: data_export_path
+        required: false
+        detail_level: brief
+        description: SQL dump / proprietary export / event log availability.
+
+  - category: apple_platform_alignment
+    description: iOS 26 + Apple Intelligence are first-class for GetToIt.
+    fields:
+      - name: swiftui_native_feel
+        required: false
+        detail_level: brief
+        description: Gestures, animations, haptics integration.
+      - name: sign_in_with_apple_native
+        required: false
+        detail_level: brief
+        description: First-class SiwA support.
+      - name: app_review_friction
+        required: false
+        detail_level: brief
+        description: Known App Store review blockers.
+      - name: foundation_models_ready
+        required: false
+        detail_level: moderate
+        description: Can feed on-device LLM (iOS 26 Foundation Models, ~3B param) for verdict summaries, place rationale.
+      - name: app_intents_data_dependency
+        required: false
+        detail_level: moderate
+        description: App Intents reading live data from the stack (SwiftData / @Dependency).
+      - name: liveactivity_dynamic_island_push
+        required: false
+        detail_level: moderate
+        description: Server push to Live Activity — "3 of 5 voted, deadline 2m".
+      - name: widget_timeline_data_access
+        required: false
+        detail_level: brief
+        description: Lock-screen widget showing verdict status.
+
+  - category: food_vertical_fit
+    description: Places data + image-heavy assets.
+    fields:
+      - name: geo_query_support
+        required: false
+        detail_level: moderate
+        description: Nearby places, radius queries — PostGIS / Firestore GeoQueries / MapKit native.
+      - name: places_data_integration
+        required: false
+        detail_level: moderate
+        description: Foursquare / Google Places / Apple MapKit integration paths.
+      - name: places_api_total_cost_at_1k_DAU
+        required: false
+        detail_level: detailed
+        description: Modeled $ for places lookups — Google ended free credit Feb 2025; Yelp paid; Foursquare 10k/mo free; MapKit free.
+      - name: places_data_freshness
+        required: false
+        detail_level: brief
+        description: Hours, open-now, menu, photo quality.
+      - name: image_storage_cost
+        required: false
+        detail_level: brief
+        description: Dish photo storage $.
+      - name: image_cdn_included
+        required: false
+        detail_level: brief
+        description: Storage with built-in CDN transforms vs BYO.
+
+  - category: push_notification_ux
+    description: Verdict-ready is the load-bearing notification.
+    fields:
+      - name: silent_push_to_compute_widget
+        required: false
+        detail_level: brief
+        description: Server-driven widget refresh without alert.
+      - name: apns_priority_tier_support
+        required: false
+        detail_level: brief
+        description: Fine-grained priority for time-sensitive verdicts.
+      - name: cross_user_push_fanout_cost
+        required: false
+        detail_level: moderate
+        description: Notifying all 5 members when one votes — $ per push.
+
+  - category: risk_longevity
+    description: Realm just died (EOL Sep 2025) — vet for vendor longevity.
+    fields:
+      - name: single_founder_maintainability
+        required: false
+        detail_level: brief
+        description: Can solo dev keep this running long-term.
+      - name: community_size
+        required: false
+        detail_level: brief
+        description: GitHub stars, Discord activity, Stack Overflow volume.
+      - name: last_major_release
+        required: false
+        detail_level: brief
+        description: Date of last meaningful release.
+      - name: notable_failure_modes
+        required: false
+        detail_level: moderate
+        description: Known production gotchas.
+      - name: funding_runway_signal
+        required: false
+        detail_level: moderate
+        description: Last announced raise, layoffs, acquisition events.
+      - name: eol_history
+        required: false
+        detail_level: brief
+        description: Has this vendor killed a product before.
+      - name: self_host_escape_hatch
+        required: false
+        detail_level: moderate
+        description: If the hosted version dies, can you run the OSS bits.
+      - name: data_export_format
+        required: false
+        detail_level: brief
+        description: Export format if migrating out.
+
+uncertain: []
