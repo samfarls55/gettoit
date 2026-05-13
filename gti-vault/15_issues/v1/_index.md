@@ -12,7 +12,7 @@ Two issue groups:
 - **Tracer-bullet build slices** (`tb-NN-*`) — vertical slices that cut through every layer (schema → Edge → iOS / web → tests) and are demoable end-to-end. Picked up by an AFK agent in dependency order. Some are HITL (external accounts, legal, recruitment).
 - **Design-system spec-gap issues** (`NN-*`) — surface-level changes to the locked `design-system/` spec that the PRD requires. Each is consumed by exactly one tracer bullet (cross-referenced via `implements_spec_gap` in the tracer bullet's frontmatter).
 
-All issues have `status: ready-for-agent`.
+Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-gap issues (`01`–`05`) landed 2026-05-12** — see `design-system/CHANGELOG.md`. Tracer bullets that depend on them (TB-03, TB-07, TB-09, TB-11, TB-05) are now unblocked on the spec side.
 
 ## Tracer-bullet build slices
 
@@ -53,13 +53,13 @@ TB-00 → TB-01 → TB-02 → TB-04 → TB-05 → TB-06 → TB-07 → TB-08 → 
 
 These are surface-level changes to the locked `design-system/` spec required by the PRD. Each is referenced by exactly one tracer bullet via `implements_spec_gap` in that tracer bullet's frontmatter.
 
-| # | Title | GitHub | Consumed by |
-|---|---|---|---|
-| 01 | [[issues/01-s01-timer-radius-controls\|S01 timer chip + radius slider]] | [#19](https://github.com/samfarls55/gettoit/issues/19) | TB-03 |
-| 02 | [[issues/02-s04-decide-now-countdown\|S04 Decide-now + countdown]] | [#20](https://github.com/samfarls55/gettoit/issues/20) | TB-07 |
-| 03 | [[issues/03-s05-late-joiner-read-only\|S05 read-only mode]] | [#21](https://github.com/samfarls55/gettoit/issues/21) | TB-11 |
-| 04 | [[issues/04-s05-no-survivor-terminal\|S05 no-survivor terminal]] | [#22](https://github.com/samfarls55/gettoit/issues/22) | TB-09 |
-| 05 | [[issues/05-foursquare-dietary-tags\|Foursquare dietary-tag coverage research]] | [#23](https://github.com/samfarls55/gettoit/issues/23) | TB-05 (informs) |
+| # | Title | Status | GitHub | Consumed by |
+|---|---|---|---|---|
+| 01 | [[issues/01-s01-timer-radius-controls\|S01 timer chip + radius slider]] | ✅ done | [#19](https://github.com/samfarls55/gettoit/issues/19) | TB-03 |
+| 02 | [[issues/02-s04-decide-now-countdown\|S04 Decide-now + countdown]] | ✅ done | [#20](https://github.com/samfarls55/gettoit/issues/20) | TB-07 |
+| 03 | [[issues/03-s05-late-joiner-read-only\|S05 read-only mode]] | ✅ done | [#21](https://github.com/samfarls55/gettoit/issues/21) | TB-11 |
+| 04 | [[issues/04-s05-no-survivor-terminal\|S05 no-survivor terminal]] | ✅ done | [#22](https://github.com/samfarls55/gettoit/issues/22) | TB-09 |
+| 05 | [[issues/05-foursquare-dietary-tags\|Foursquare dietary-tag coverage research]] | ✅ done · `needs-human-review` for Lock 1 update | [#23](https://github.com/samfarls55/gettoit/issues/23) | TB-05 (informs) |
 
 ## Related
 

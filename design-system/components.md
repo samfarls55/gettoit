@@ -332,3 +332,32 @@ After `We went` or `Snooze`: confirmation plate with a one-liner. Always a singl
 Placeholder. Lockup: 5-radius sun-yellow tile containing Inter 900 lowercase `g` (size 0.55×) + Inter 800 wordmark `GetToIt` (size 0.78×) with letter-spacing 0.6.
 
 Treat as **not final** — real wordmark is owned by `40_marketing_branding/`.
+
+---
+
+## C-21 · Range Slider
+
+Continuous numeric input on a gradient surface. Used by S01 for radius. Single primitive — no min/max chips, no end labels, no histogram. The current value renders as a readable label in the row above the slider (e.g. `"2.0 mi"`).
+
+| Element | Spec |
+|---|---|
+| Row | full-width, vertical padding 18 (gives a 60-tall hit row clearing 44pt) |
+| Track | height 6, radius 999, background `rgba(255,255,255,0.22)`, inset shadow `inset 0 1px 0 rgba(0,0,0,0.18)` |
+| Filled track (left of thumb) | `var(--sun)` with glow `0 0 12px rgba(255,210,63,0.45)` |
+| Thumb | 22×22 disk, `#FFFFFF`, shadow `0 4px 12px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.7)` |
+| Hit target | the `<input type="range">` overlay is `height: 44`, opacity 0 — clears HIG 44pt min |
+| Transition | none on the thumb (latency-sensitive). Filled-track width follows the drag 1:1. |
+
+**Visual treatment chosen — sun-filled left of thumb:**
+The C-08 vibe slider already uses sun-fill for its selected stop. Continuity with that pattern keeps "state = sun" intact (`tokens.md §1.3`). White-glass fill would have read as inert/decorative.
+
+**Tap target:** The visual bar is 6px; the input overlay is 44pt tall. Both the bar and the row above (label) are inside the same hit row.
+
+**Accessibility:**
+- `aria-label` describes what's being adjusted (e.g. `"Walk radius"`).
+- `aria-valuetext` mirrors the visible label so VO reads `"2.0 miles"` rather than `"2"`.
+- VO order: row label → live value → slider hint (`"Adjustable. Swipe up or down to change."`).
+
+**SwiftUI primitive:** `Slider(value: $radius, in: 0.5...5.0, step: 0.5)` with `.tint(GTIColor.sun)` and a custom `.frame(height: 44)`. Render the value label separately above the slider so it can use `mono-tag` or similar treatment.
+
+**When NOT to use:** ordinal/cardinal-scalar inputs (vibe Q4) — use C-08 Vibe Slider; users should land on discrete labeled stops, not in-between values.

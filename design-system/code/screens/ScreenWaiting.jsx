@@ -1,7 +1,8 @@
 // Surface 08 — Waiting / coordination
 // Honest, calm. No spinners.
+// v1: initiator gets a "Decide now" CTA (disabled until quorum); all members see a live countdown.
 
-function ScreenWaiting({ onAdvance }) {
+function ScreenWaiting({ onAdvance, isInitiator = true, secondsRemaining = 462 }) {
   const people = [
     { name: 'You',  color: '#FFD23F', answered: true },
     { name: 'Alex', color: '#7DDFB5', answered: true },
@@ -9,6 +10,15 @@ function ScreenWaiting({ onAdvance }) {
     { name: 'Sam',  color: '#9BC0FF', answered: false },
   ];
   const done = people.filter(p => p.answered).length;
+  const quorum = done >= 2;
+
+  const mm = Math.floor(secondsRemaining / 60);
+  const ss = String(secondsRemaining % 60).padStart(2, '0');
+  const countdownLabel = `Auto-fires in ${mm}:${ss}`;
+
+  const decideLabel = quorum
+    ? `Decide now · ${done} of ${people.length} in`
+    : `Decide now · need 2 in`;
 
   return (
     <GradientSurface stop="waiting">
@@ -54,7 +64,7 @@ function ScreenWaiting({ onAdvance }) {
             </div>
 
             <div style={{
-              marginTop: 40,
+              marginTop: 36,
               fontSize: 14, fontWeight: 600,
               color: 'rgba(255,255,255,0.78)', maxWidth: 260,
             }}>
@@ -62,7 +72,26 @@ function ScreenWaiting({ onAdvance }) {
             </div>
           </div>
 
+          {/* low-emphasis live countdown — every member sees it */}
+          <div style={{
+            padding: '0 22px',
+            textAlign: 'center',
+            fontFamily: 'var(--ff-mono)',
+            fontSize: 11, fontWeight: 500,
+            letterSpacing: '0.18em', textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.6)',
+            marginBottom: 14,
+          }}>{countdownLabel}</div>
+
           <CTADock>
+            {isInitiator && (
+              <PillCTA
+                label={decideLabel}
+                fill="ghost"
+                disabled={!quorum}
+                onClick={onAdvance}
+              />
+            )}
             <PillCTA label="Nudge Sam" fill="ghost" onClick={onAdvance} />
           </CTADock>
         </div>

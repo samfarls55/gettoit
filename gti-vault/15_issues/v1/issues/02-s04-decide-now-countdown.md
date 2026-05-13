@@ -2,7 +2,8 @@
 issue: 02
 title: S04 — add Decide-now button + timer countdown to Waiting
 github_issue: 20
-status: ready-for-agent
+status: done
+completed: 2026-05-12
 created: 2026-05-12
 surface: 04-waiting
 prd: v1-prd

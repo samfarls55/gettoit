@@ -2,7 +2,8 @@
 issue: 01
 title: S01 — add timer chip + radius slider to Initiator Landing
 github_issue: 19
-status: ready-for-agent
+status: done
+completed: 2026-05-12
 created: 2026-05-12
 surface: 01-initiator
 prd: v1-prd

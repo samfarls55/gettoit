@@ -2,7 +2,8 @@
 issue: 03
 title: S05 — add read-only mode for late-joiner Verdict
 github_issue: 21
-status: ready-for-agent
+status: done
+completed: 2026-05-12
 created: 2026-05-12
 surface: 05-verdict
 prd: v1-prd

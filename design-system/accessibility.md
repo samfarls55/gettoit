@@ -67,6 +67,8 @@ iOS HIG minimum: **44×44pt**. We hit this almost everywhere — exceptions are 
 | Reroll reason tile (C-16) | padding 14 — ~64 height | ✅ |
 | Check-in tap row (C-18) | padding `16 22` — ~62 height | ✅ |
 | Vertical picker row (C-19) | padding `14 18` — ~62 height | ✅ |
+| Timer chip (S01) | min-height 44, padding `10 0` | ✅ |
+| Range slider (C-21) | visual track 6 / hit row 44 (transparent input overlay) | ✅ |
 
 **Fixes for the SwiftUI port:**
 1. **Regret rating row** — bump min-height to 44. Reduces vertical density slightly; acceptable trade.
@@ -86,12 +88,24 @@ Per surface, the focus order ladders from top → bottom, with the primary CTA a
 4. Each chip / picker / control in source order
 5. Primary CTA
 
-### Verdict
+### Verdict (default / cuts / committed)
 1. Top-bar close (none — verdict is post-quiz; close exits to home)
 2. Eyebrow → Hero → Meta → Time → Rule → Receipt 1..4 (this read order is the **five-second test**)
 3. Cuts drawer trigger
 4. Primary CTA (`I'm in` / `You're in`)
 5. Secondary (`Start over`)
+
+### Verdict (`read-only` mode)
+1. Eyebrow (`"Tonight's verdict"`) → Hero → Meta → Time → Rule → Receipt 1..N (late-joiner not in list)
+2. Cuts drawer trigger (informational)
+3. Primary CTA (`"Start a new decision"`)
+   - Ratification path is announced by VO as **"Not available — this verdict is closed."**
+
+### Verdict (`no-survivor` mode)
+1. Eyebrow (`"Tonight"`) → Hero (`"No spot fits"`) → Meta (surviving hard-needs) → **Rule chip (load-bearing message — first read priority)**
+2. Primary CTA (`"Widen radius"`) — initiator only; for invitees the focus skips to secondary
+3. Secondary (`"Start over"`)
+   - When widen slider expands inline, VO focus moves to the slider with `aria-label="Widen walk radius"`; the CTA label updates to `"Re-run · {N} mi"` and is announced on focus return.
 
 ### Reroll sheet
 1. Eyebrow + headline (modal title)
@@ -125,6 +139,8 @@ Per-component:
 | Rule sentence | (read as static text; no special handling) |
 | Receipt chip | `"{name}: {action}"` |
 | Cuts trigger | `"See what got cut. Double tap to expand."` |
+| Timer chip (S01) | `"{N} minute timer"` `state: aria-pressed` (selected/not) |
+| Range slider (C-21) | `aria-label` = control name (e.g. `"Walk radius"`); `aria-valuetext` = live label (`"2.0 miles"`) |
 | Cuts row | `"{name}, cut: {reason}"` |
 | I'm in (default) | `"I'm in. Double tap to commit to this verdict."` |
 | I'm in (committed) | `"You're in. 3 of 4 committed."` |

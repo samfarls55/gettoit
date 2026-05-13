@@ -2,7 +2,9 @@
 issue: 05
 title: Verify Foursquare dietary-tag coverage for menu-compliance filtering
 github_issue: 23
-status: ready-for-agent
+status: done
+completed: 2026-05-12
+triage: needs-human-review
 created: 2026-05-12
 prd: v1-prd
 adr: 0002
@@ -52,3 +54,11 @@ This is a research + documentation issue, not a design or implementation issue.
 - Whether a third source (e.g. HappyCow for vegan, Find Me Gluten Free) would be worth bolting on as a v1.1 enrichment layer. Out of v1 scope per [[../../../50_product/v1-scope|v1-scope]] "Multi-provider data sourcing per vertical."
 
 ## Comments
+
+### 2026-05-12 — audit landed, needs human review
+
+Research bundle published at [[../../../60_engineering/research/foursquare-dietary-tags-2026-05/_index|gti-vault/60_engineering/research/foursquare-dietary-tags-2026-05/]]. Report recommends **Option C** (narrow Q1 to what Foursquare reliably exposes) with a future Option B feedback loop.
+
+**Proposed Lock 1 change** (flagged `needs-human-review`): drop allergen filtering from Q1; surface a disclaimer instead. Halal / kosher / vegan / vegetarian filter at category level; gluten-free at `tastes` if a live probe confirms free-tier + ≥40% coverage.
+
+Live probe is blocked on TB-00 (Foursquare API key acquisition) and runs as step 1 of TB-05. Until that lands, the report `status: draft-pending-live-probe`. After the probe, the report flips to `final` and the rules in §decision-rules either hold or trigger their fallback.

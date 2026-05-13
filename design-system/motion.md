@@ -68,6 +68,11 @@ Total time to interactive: ~1.88s. **The hero, time, and rule all land before 1.
 | `quick` | All elements arrive between 0–320ms with 60ms staggers. Same visual order, no rest beats. Use case: returning to the verdict after a reroll — don't make people watch the full reveal twice. |
 | `off` | No animation. Use case: reduced-motion users; testing; printouts. |
 
+**Mode-specific reveal:**
+
+- **`read-only`** — same sequence as `choreo`. CTA fade-up at 1380ms lands on the re-invite CTA (`"Start a new decision"`) instead of `"I'm in"`. Cuts drawer trigger remains in its slot.
+- **`no-survivor`** — compressed reveal. There's no time badge or receipt row to choreograph, so the sequence collapses to: eyebrow (80ms · 500ms) → hero (280ms · 800ms) → meta (700ms · 500ms) → rule chip (1020ms · 500ms) → CTA (1380ms · 500ms). The rule chip carries the load-bearing message and lands before the CTA on purpose; the user reads the why before being offered the widen action. The inline `"Widen radius"` slider, when opened, fades up in 320ms (`gti-fade-up`).
+
 **SwiftUI implementation:**
 ```swift
 // One `@State var revealStep: Int = 0` advanced by .task on appear
@@ -126,6 +131,8 @@ The shutters are **dark blue-black** (`#0A0A0F`) with **sun-yellow hairline edge
 | Receipt stagger | per-chip delay | 80ms | n/a |
 | Receipt entry | translateY 8 + scale 0.96 → 1 + opacity 0→1 | 480ms | ease-out-soft |
 | Vibe word change | rise + blur 4→0 | 480ms | ease-out-soft |
+| Waiting countdown tick | mono-tag text swap (no animation, every 1s) | n/a | n/a |
+| Decide-now CTA quorum unlock | opacity 0.45 → 1 | 320ms | ease-out |
 
 ---
 

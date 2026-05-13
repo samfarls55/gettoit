@@ -253,6 +253,58 @@ function Glass({ children, style = {}, soft = false }) {
   );
 }
 
+// ────────────────────────────────────────────────────────────
+// Range Slider (C-21) — continuous numeric input on gradient surface.
+// Used on S01 for radius. Sun-yellow filled track + white thumb.
+// Visual track is 6px; tap target is the full row (44 tall) via hit-slop.
+// ────────────────────────────────────────────────────────────
+function RangeSlider({ value, min, max, step, onChange, valueLabel, ariaLabel }) {
+  const pct = ((value - min) / (max - min)) * 100;
+  return (
+    <div style={{
+      position: 'relative', width: '100%',
+      paddingTop: 18, paddingBottom: 18,
+    }}>
+      <div style={{
+        position: 'absolute', inset: '18px 0',
+        display: 'flex', alignItems: 'center', pointerEvents: 'none',
+      }}>
+        <div style={{
+          position: 'relative', width: '100%', height: 6, borderRadius: 999,
+          background: 'rgba(255,255,255,0.22)',
+          boxShadow: 'inset 0 1px 0 rgba(0,0,0,0.18)',
+        }}>
+          <div style={{
+            position: 'absolute', left: 0, top: 0, bottom: 0,
+            width: `calc(${pct}% )`, borderRadius: 999,
+            background: 'var(--sun)',
+            boxShadow: '0 0 12px rgba(255,210,63,0.45)',
+          }} />
+          <div style={{
+            position: 'absolute', top: '50%', left: `calc(${pct}% )`,
+            width: 22, height: 22, borderRadius: '50%',
+            background: '#fff',
+            transform: 'translate(-50%, -50%)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.7)',
+          }} />
+        </div>
+      </div>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        aria-label={ariaLabel}
+        aria-valuetext={valueLabel}
+        style={{
+          appearance: 'none', WebkitAppearance: 'none',
+          width: '100%', height: 44, background: 'transparent',
+          margin: 0, padding: 0, cursor: 'pointer',
+          position: 'relative', zIndex: 2, opacity: 0,
+        }}
+      />
+    </div>
+  );
+}
+
 function GTIMark({ size = 18 }) {
   return (
     <div style={{
@@ -278,4 +330,5 @@ Object.assign(window, {
   GradientSurface, TopBar, QuestionHeader,
   Chip, PillCTA, ReceiptChip, AvatarDot,
   CTADock, Eyebrow, Glass, GTIMark,
+  RangeSlider,
 });
