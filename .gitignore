@@ -27,6 +27,12 @@ Desktop.ini
 !.env.example
 *.pem
 *.key
+*.p8
+secrets/
+
+# Supabase CLI local state (pooler URL contains DB password in plaintext)
+supabase/.temp/
+supabase/.branches/
 
 # Logs
 *.log

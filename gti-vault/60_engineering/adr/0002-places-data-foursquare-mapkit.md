@@ -34,6 +34,18 @@ Implementation outline:
 - iOS client never calls Foursquare directly; an Edge Function proxies, signs the API key from environment, returns shaped rows, and writes to the cache.
 - MapKit fallback is iOS-side because the API is native. Web fallback skips MapKit — Foursquare-only on web; if Foursquare fails on web, surface a graceful "couldn't load options nearby" state.
 
+### Live API surface (verified 2026-05-13)
+
+Foursquare migrated from the legacy `api.foursquare.com/v3/*` Places API to a new "Places API" surface in 2025. The old endpoints now return **HTTP 410** with a migration notice. The decision in this ADR is unchanged — only the implementation details below are updated to reflect the live surface.
+
+- **Base URL**: `https://places-api.foursquare.com/`
+- **Auth header**: `Authorization: Bearer <service_key>` (was `Authorization: <api_key>` on the legacy surface).
+- **Required version header**: `X-Places-Api-Version: 2025-06-17` (pin a date; bump deliberately when migrating).
+- **Field renames**: `fsq_id` → `fsq_place_id`. The `place_id` column in the `places` cache and `options` tables stores `fsq_place_id`. Other shape changes are TBD per endpoint and tracked in [[../../15_issues/v1/issues/tb-05-foursquare-placesproxy|TB-05]].
+- **Key shape**: new keys use a Service Key prefix (not the legacy `fsq3…` API key format).
+
+Re-evaluation trigger added: **another forced migration before v1 GA**. The legacy → 2025 migration was a hard cutover with no parallel-run window — assume future Foursquare migrations will be equally abrupt and budget the MapKit-only escape hatch accordingly.
+
 ## Why
 
 1. **Cost floor.** Free tier covers a single-metro beta with comfortable headroom.

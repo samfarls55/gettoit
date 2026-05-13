@@ -25,11 +25,22 @@ The four external accounts and assets that every later tracer bullet depends on.
 
 ## Acceptance criteria
 
-- [ ] Apple Developer account approved; Bundle ID `app.gettoit.GetToIt` (or equivalent) reserved.
-- [ ] Foursquare API key generated; recorded in secure storage.
-- [ ] Supabase project provisioned; URL + service-role key + anon key recorded; PostGIS / pg_cron / pgmq enabled.
+- [x] Apple Developer account approved; Bundle ID `app.gettoit.GetToIt` reserved. _(2026-05-13)_
+- [x] App Store Connect API key generated (`.p8` stored locally; Key ID + Issuer ID recorded). _(2026-05-13)_
+- [x] Sign in with Apple key generated (`.p8`, Key ID, Services ID `app.gettoit.GetToIt.signin` recorded). _(2026-05-13)_
+- [x] App Store Connect API key wired into GitHub Actions secrets (`APPLE_TEAM_ID`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`, `APPLE_API_PRIVATE_KEY`). See [[../../../60_engineering/apple-keys-setup#wire-into-ci|runbook §Wire into CI]]. _(2026-05-13 — all 4 secrets present per `gh secret list`.)_
+- [x] Sign in with Apple key wired into Supabase (Auth → Providers → Apple). See [[../../../60_engineering/apple-keys-setup#wire-into-supabase|runbook §Wire into Supabase]]. _(2026-05-13 — Management API confirms `external_apple_enabled: true`, client IDs `app.gettoit.GetToIt, app.gettoit.GetToIt.signin`, secret set.)_
+- [x] Foursquare API key generated; recorded in secure storage. _(2026-05-13 — key in `.env` as `FOURSQUARE_API_KEY`; live `places/search` call returns 200. ⚠️ Legacy `api.foursquare.com/v3/*` endpoints return HTTP 410 — new key auth + endpoint required. See follow-up note below.)_
+- [x] Supabase project provisioned; URL + service-role key + anon key recorded; PostGIS / pg_cron / pgmq enabled. _(2026-05-13 — `gettoit-prod` ref `rlnevdqebmzbxpntghzb`, West US Oregon; anon auth on; postgis 3.3.7 / pg_cron 1.6.4 / pgmq 1.5.1; 3 GH Actions secrets set. See [[../../../60_engineering/supabase-setup|supabase-setup.md]].)_
 - [ ] `gettoit.app` DNS pointed at a placeholder (or Vercel) target.
-- [ ] AASA file hosted at `https://gettoit.app/.well-known/apple-app-site-association` with the v1 Bundle ID and a placeholder team ID until iOS build lands.
+- [ ] AASA file hosted at `https://gettoit.app/.well-known/apple-app-site-association` with the v1 Bundle ID and Team ID.
+
+> MapKit JS key is **not required** for v1 — per [[../../../60_engineering/adr/0002-places-data-foursquare-mapkit|ADR-0002]], native iOS MapKit needs no key and the web fallback skips MapKit. Documented in [[../../../60_engineering/apple-keys-setup|apple-keys-setup.md]].
+
+## References
+
+- [[../../../60_engineering/apple-keys-setup|apple-keys-setup.md]] — full step-by-step for the three Apple keys (and why MapKit JS is skipped).
+- [[../../../60_engineering/devcontainer-setup|devcontainer-setup.md]] — Step 4 lists every `gh secret set` command the project uses.
 
 ## Blocked by
 
