@@ -2,9 +2,10 @@
 issue: tb-00
 title: External account setup (Apple Developer, Foursquare, Supabase, domain)
 github_issue: 1
-status: ready-for-agent
+status: done
 type: HITL
 created: 2026-05-12
+completed: 2026-05-13
 prd: v1-prd
 ---
 
@@ -32,8 +33,8 @@ The four external accounts and assets that every later tracer bullet depends on.
 - [x] Sign in with Apple key wired into Supabase (Auth → Providers → Apple). See [[../../../60_engineering/apple-keys-setup#wire-into-supabase|runbook §Wire into Supabase]]. _(2026-05-13 — Management API confirms `external_apple_enabled: true`, client IDs `app.gettoit.GetToIt, app.gettoit.GetToIt.signin`, secret set.)_
 - [x] Foursquare API key generated; recorded in secure storage. _(2026-05-13 — key in `.env` as `FOURSQUARE_API_KEY`; live `places/search` call returns 200. ⚠️ Legacy `api.foursquare.com/v3/*` endpoints return HTTP 410 — new key auth + endpoint required. See follow-up note below.)_
 - [x] Supabase project provisioned; URL + service-role key + anon key recorded; PostGIS / pg_cron / pgmq enabled. _(2026-05-13 — `gettoit-prod` ref `rlnevdqebmzbxpntghzb`, West US Oregon; anon auth on; postgis 3.3.7 / pg_cron 1.6.4 / pgmq 1.5.1; 3 GH Actions secrets set. See [[../../../60_engineering/supabase-setup|supabase-setup.md]].)_
-- [ ] `gettoit.app` DNS pointed at a placeholder (or Vercel) target.
-- [ ] AASA file hosted at `https://gettoit.app/.well-known/apple-app-site-association` with the v1 Bundle ID and Team ID.
+- [x] `gettoit.app` DNS pointed at a placeholder (or Vercel) target. _(2026-05-13 — Namecheap nameservers delegated to `ns1/ns2.vercel-dns.com`; Vercel serves `web/` placeholder at apex with auto-provisioned Let's Encrypt cert. Authoritative A: `216.198.79.65`, `64.29.17.65`.)_
+- [x] AASA file hosted at `https://gettoit.app/.well-known/apple-app-site-association` with the v1 Bundle ID and Team ID. _(2026-05-13 — HTTP 200, `content-type: application/json`, served by Vercel; appID `WXTMNYM34A.app.gettoit.GetToIt`, components claim `/join/*` for TB-02 room-join deeplink.)_
 
 > MapKit JS key is **not required** for v1 — per [[../../../60_engineering/adr/0002-places-data-foursquare-mapkit|ADR-0002]], native iOS MapKit needs no key and the web fallback skips MapKit. Documented in [[../../../60_engineering/apple-keys-setup|apple-keys-setup.md]].
 
