@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["WXTMNYM34A.app.gettoit.GetToIt"],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "Room join deep-link (TB-02). Format: /join/<roomCode>."
+          }
+        ]
+      }
+    ]
+  }
+}
