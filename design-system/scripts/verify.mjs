@@ -60,6 +60,16 @@ if (proc.status !== 0) {
   notes.push(`drift-check: code/tokens.css matches tokens.json`);
 }
 
+// ── 2b. Swift drift gate ───────────────────────────────────
+const genSwiftPath = path.join(__dirname, 'gen-swift.mjs');
+const swiftProc = spawnSync(process.execPath, [genSwiftPath, '--check'], { encoding: 'utf8' });
+if (swiftProc.status !== 0) {
+  failures.push(`ios/Sources/GTITokens.swift drift: regenerate via "node design-system/scripts/gen-swift.mjs"`);
+  if (swiftProc.stderr) notes.push(swiftProc.stderr.trim());
+} else {
+  notes.push(`drift-check: ios/Sources/GTITokens.swift matches tokens.json`);
+}
+
 // ── 3. Orphan-hex sweep ────────────────────────────────────
 const registered = collectRegisteredHex(tokens);
 
