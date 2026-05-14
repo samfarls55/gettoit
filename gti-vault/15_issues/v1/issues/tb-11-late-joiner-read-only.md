@@ -2,9 +2,10 @@
 issue: tb-11
 title: Late-joiner read-only Verdict mode + re-invite CTA
 github_issue: 12
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-12
+completed: 2026-05-14
 prd: v1-prd
 implements_spec_gap: 03-s05-late-joiner-read-only
 ---
@@ -30,12 +31,12 @@ This is the implementation of [[03-s05-late-joiner-read-only|spec-gap issue 03]]
 
 ## Acceptance criteria
 
-- [ ] All [[03-s05-late-joiner-read-only|spec-gap 03]] acceptance criteria pass.
-- [ ] Deep-link router routes by `rooms.status`.
-- [ ] S05 SwiftUI view supports the `read-only` mode.
-- [ ] Re-invite CTA opens S01 with prior timer + radius defaults.
-- [ ] Late-joiner is not added to `members` of the closed room.
-- [ ] Integration tests for late-join routing, read-only render, re-invite defaults.
+- [x] All [[03-s05-late-joiner-read-only|spec-gap 03]] acceptance criteria pass.
+- [x] Deep-link router routes by `rooms.status`.
+- [x] S05 SwiftUI view supports the `read-only` mode.
+- [x] Re-invite CTA opens S01 with prior timer + radius defaults.
+- [x] Late-joiner is not added to `members` of the closed room.
+- [x] Integration tests for late-join routing, read-only render, re-invite defaults.
 
 ## Blocked by
 
