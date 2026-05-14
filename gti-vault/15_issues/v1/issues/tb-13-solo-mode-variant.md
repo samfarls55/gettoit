@@ -2,9 +2,10 @@
 issue: tb-13
 title: Solo mode — Verdict (S05) variant + solo quiz path
 github_issue: 14
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-12
+completed: 2026-05-14
 prd: v1-prd
 ---
 
@@ -26,15 +27,15 @@ Solo mode — a user runs the same 5-question quiz without inviting anyone. No W
 
 ## Acceptance criteria
 
-- [ ] `design-system/surfaces/05-verdict.md` describes the solo variant explicitly.
-- [ ] `code/screens/ScreenVerdict.jsx` supports the solo variant via prop.
-- [ ] `design-system/accessibility.md` notes any VO order changes for the variant.
-- [ ] `node design-system/scripts/verify.mjs` passes; `design-system/CHANGELOG.md` updated.
-- [ ] Solo-path detection skips S04 when `members.length === 1` and no invite was shared.
-- [ ] S05 SwiftUI view supports the solo variant.
-- [ ] VerdictEngine produces a sensible verdict on a single `votes` row.
-- [ ] Auth upgrade chip surfaces on the solo verdict surface.
-- [ ] Integration tests for the solo path, solo verdict rendering, rule_text without counts.
+- [x] `design-system/surfaces/05-verdict.md` describes the solo variant explicitly.
+- [x] `code/screens/ScreenVerdict.jsx` supports the solo variant via prop.
+- [x] `design-system/accessibility.md` notes any VO order changes for the variant.
+- [x] `node design-system/scripts/verify.mjs` passes; `design-system/CHANGELOG.md` updated.
+- [x] Solo-path detection skips S04 when `members.length === 1` and no invite was shared.
+- [x] S05 SwiftUI view supports the solo variant.
+- [x] VerdictEngine produces a sensible verdict on a single `votes` row.
+- [x] Auth upgrade chip surfaces on the solo verdict surface.
+- [x] Integration tests for the solo path, solo verdict rendering, rule_text without counts.
 
 ## Blocked by
 

@@ -31,7 +31,7 @@ Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-
 | TB-10 | [[issues/tb-10-reroll\|Reroll sheet + 3-cap + reason-to-constraint]] ✅ done | AFK | [#11](https://github.com/samfarls55/gettoit/issues/11) | TB-08 |
 | TB-11 | [[issues/tb-11-late-joiner-read-only\|Late-joiner read-only verdict]] ✅ done | AFK | [#12](https://github.com/samfarls55/gettoit/issues/12) | TB-08 |
 | TB-12 | [[issues/tb-12-apple-signin-upgrade\|Apple Sign-in upgrade chip]] ✅ done | AFK | [#13](https://github.com/samfarls55/gettoit/issues/13) | TB-02 |
-| TB-13 | [[issues/tb-13-solo-mode-variant\|Solo mode variant]] | AFK | [#14](https://github.com/samfarls55/gettoit/issues/14) | TB-08 |
+| TB-13 | [[issues/tb-13-solo-mode-variant\|Solo mode variant]] ✅ done | AFK | [#14](https://github.com/samfarls55/gettoit/issues/14) | TB-08 |
 | TB-14 | [[issues/tb-14-checkin-telemetry\|Next-day check-in + telemetry views]] ✅ done | AFK | [#15](https://github.com/samfarls55/gettoit/issues/15) | TB-08 |
 | TB-15 | [[issues/tb-15-web-fallback\|Web fallback (Next.js)]] ✅ done | AFK | [#16](https://github.com/samfarls55/gettoit/issues/16) | TB-07 |
 | TB-16 | [[issues/tb-16-privacy-legal-delete\|Privacy + TOS + Nutrition Labels + delete]] | HITL | [#17](https://github.com/samfarls55/gettoit/issues/17) | TB-14, TB-00 |
