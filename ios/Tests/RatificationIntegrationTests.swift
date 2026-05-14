@@ -121,67 +121,64 @@ final class RatificationIntegrationTests: XCTestCase {
     }
 
     // ── tests ──────────────────────────────────────────────────────
+    //
+    // We bundle every TB-08 integration assertion into one test method
+    // so we only sign up one anonymous user per CI run. The Supabase
+    // anonymous-signup rate limit is shared across the whole test
+    // suite (60/hour by default), so adding three fresh signups would
+    // push the bundle over the limit and flake unrelated suites.
 
-    func testRatificationStoreIsIdempotentOnDoubleTap() async throws {
+    func testRatifyPushTokenAndDenialFlagRoundTripsForASingleAnonymousUser() async throws {
         let client = try makeClient()
         let userID = try await signInFreshAnon(on: client)
-        let roomStore = RoomStore(client: client)
-        let room = try await roomStore.createRoom(as: userID)
-        guard let verdictID = try await seedVerdictForRoom(client: client, roomID: room.id) else {
-            throw XCTSkip("No engine wiring available in this build; skipping live ratification test.")
-        }
 
-        let store = RatificationStore(client: client, roomID: room.id, verdictID: verdictID)
-
-        try await store.ratify(userID: userID)
-        XCTAssertTrue(store.hasRatified, "first ratify flips hasRatified")
-        XCTAssertEqual(store.count, 1)
-        XCTAssertEqual(store.total, 1, "solo room — one member")
-
-        // Idempotent on retry — PK conflict swallowed.
-        try await store.ratify(userID: userID)
-        XCTAssertEqual(store.count, 1, "double-tap doesn't double-count")
-    }
-
-    func testPushTokenWriterUpsertsAndIsIdempotent() async throws {
-        let client = try makeClient()
-        let userID = try await signInFreshAnon(on: client)
-        let writer = SupabasePushTokenWriter(client: client)
-
+        // 1. push_tokens upsert idempotency ────────────────────────
+        let tokenWriter = SupabasePushTokenWriter(client: client)
         let token = "ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00ff00"
-        try await writer.record(deviceToken: token, userID: userID)
-        // Re-insert the same row — should be a swallowed no-op.
-        try await writer.record(deviceToken: token, userID: userID)
+        try await tokenWriter.record(deviceToken: token, userID: userID)
+        // Re-insert — should be a swallowed no-op via the PK conflict.
+        try await tokenWriter.record(deviceToken: token, userID: userID)
 
-        struct Row: Decodable {
+        struct TokenRow: Decodable {
             let device_token: String
             let platform: String
         }
-        let rows: [Row] = try await client
+        let tokenRows: [TokenRow] = try await client
             .from("push_tokens")
             .select("device_token, platform")
             .eq("user_id", value: userID.uuidString.lowercased())
             .execute()
             .value
+        XCTAssertEqual(tokenRows.count, 1, "re-inserting the same (user, token) is idempotent")
+        XCTAssertEqual(tokenRows.first?.device_token, token)
+        XCTAssertEqual(tokenRows.first?.platform, "ios")
 
-        XCTAssertEqual(rows.count, 1, "re-inserting the same (user, token) is idempotent")
-        XCTAssertEqual(rows.first?.device_token, token)
-        XCTAssertEqual(rows.first?.platform, "ios")
-    }
-
-    func testPushDenialFlagStoreRoundTripsTheStamp() async throws {
-        let client = try makeClient()
-        let userID = try await signInFreshAnon(on: client)
-        let store = SupabasePushDenialFlagStore(client: client)
-
-        // `XCTAssertFalse` / `XCTAssertTrue` take autoclosures that
-        // don't support `try await` — hoist the call out.
-        let preDenied = try await store.wasDenied(userID: userID)
+        // 2. push_denied_at flag round-trip ────────────────────────
+        let flagStore = SupabasePushDenialFlagStore(client: client)
+        let preDenied = try await flagStore.wasDenied(userID: userID)
         XCTAssertFalse(preDenied, "fresh user has no denial flag")
-
-        try await store.setDenied(userID: userID, at: Date())
-        let postDenied = try await store.wasDenied(userID: userID)
+        try await flagStore.setDenied(userID: userID, at: Date())
+        let postDenied = try await flagStore.wasDenied(userID: userID)
         XCTAssertTrue(postDenied,
             "after setDenied the flag must round-trip via wasDenied")
+
+        // 3. Ratification idempotency on a real verdict ───────────
+        //    Skip when the engine isn't reachable in this build —
+        //    the schema-level RLS coverage above is the load-bearing
+        //    part. Engine reachability is a TB-07-era concern that's
+        //    XCTSkip'd in the same shape from VerdictIntegrationTests.
+        let roomStore = RoomStore(client: client)
+        let room = try await roomStore.createRoom(as: userID)
+        guard let verdictID = try await seedVerdictForRoom(client: client, roomID: room.id) else {
+            throw XCTSkip("No engine wiring available in this build; skipping live ratification round-trip.")
+        }
+        let store = RatificationStore(client: client, roomID: room.id, verdictID: verdictID)
+        try await store.ratify(userID: userID)
+        XCTAssertTrue(store.hasRatified, "first ratify flips hasRatified")
+        XCTAssertEqual(store.count, 1)
+        XCTAssertEqual(store.total, 1, "solo room — one member")
+        // Double-tap is swallowed via the PK conflict.
+        try await store.ratify(userID: userID)
+        XCTAssertEqual(store.count, 1, "double-tap doesn't double-count")
     }
 }
