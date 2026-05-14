@@ -81,9 +81,10 @@ public struct InitiatorScreen: View {
 
             Text("Figure\nit out\ntogether")
                 // Display weight is locked at 900 in tokens.json; SwiftUI's
-                // `.black` weight maps to 900 in the Inter family.
-                .font(.system(size: GTIFont.Size.displayL, weight: .black))
-                .tracking(GTIFont.TrackingEm.displayL * GTIFont.Size.displayL)
+                // `.black` weight maps to 900 in the Inter family. `display-m`
+                // is the token tokens.md §2 maps to the initiator headline.
+                .font(.system(size: GTIFont.Size.displayM, weight: .black))
+                .tracking(GTIFont.TrackingEm.displayM * GTIFont.Size.displayM)
                 .foregroundStyle(GTIColor.TextOnGradient.primary)
                 .textCase(.uppercase)
                 .lineSpacing(0)
@@ -116,7 +117,7 @@ public struct InitiatorScreen: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label)
-                    .font(.system(size: GTIFont.Size.title - 5, weight: .heavy))
+                    .font(.system(size: GTIFont.Size.body, weight: .heavy))
                     .foregroundStyle(GTIColor.TextOnGradient.primary)
                 Text(meta.uppercased())
                     .font(.system(size: GTIFont.Size.eyebrow, weight: .semibold))

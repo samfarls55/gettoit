@@ -78,9 +78,11 @@ public enum InviteLink {
         let path = components.path
         guard path.hasPrefix(pathPrefix) else { return nil }
         let tail = String(path.dropFirst(pathPrefix.count))
-        // The next segment is the room id; reject anything after another slash.
+        // The next segment is the room id. The AASA glob `/join/*` matches
+        // exactly one path segment, so reject extras (or a trailing
+        // slash) to keep our parsing in sync with the AASA contract.
         let segments = tail.split(separator: "/", omittingEmptySubsequences: false)
-        guard let first = segments.first, !first.isEmpty else { return nil }
+        guard segments.count == 1, let first = segments.first, !first.isEmpty else { return nil }
         guard let roomID = UUID(uuidString: String(first)) else { return nil }
 
         // Token is optional. URLComponents.queryItems returns nil for

@@ -110,4 +110,12 @@ final class InviteLinkTests: XCTestCase {
         let url = URL(string: "https://gettoit.app/join/?inviteToken=x")!
         XCTAssertNil(InviteLink.parse(url))
     }
+
+    func testParseRejectsExtraPathSegmentsAfterTheRoomID() {
+        // The AASA components claim `/join/*` — exactly one segment.
+        // Reject anything else to keep parsing in sync with the AASA.
+        let roomID = UUID().uuidString.lowercased()
+        let url = URL(string: "https://gettoit.app/join/\(roomID)/extra?inviteToken=x")!
+        XCTAssertNil(InviteLink.parse(url))
+    }
 }
