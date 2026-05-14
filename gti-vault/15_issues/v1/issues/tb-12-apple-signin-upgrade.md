@@ -8,6 +8,7 @@ created: 2026-05-12
 completed: 2026-05-13
 prd: v1-prd
 adr: 0007
+pr: 29
 ---
 
 # TB-12 — Apple Sign-in upgrade chip
@@ -58,3 +59,14 @@ Surfaced while implementing TB-12; **not** silently fixed — flagged for triage
 - **`linking` state added to `AuthCoordinator.State`.** TB-01's State enum had four cases (`.idle`, `.signingIn`, `.anonymous`, `.error`); TB-12 adds two more (`.linking`, `.linkedApple`). The chip's render gate uses `.isAnonymous` to know when to render — the new gate-helper covers the new cases cleanly.
 
 ## Comments
+
+### 2026-05-13 — final CI green, merged
+
+Two bugs caught only by the integration tests, fixed in the second agent pass:
+
+1. **`AuthCoordinator.linkApple` drift detection.** The `.error` state set inside the `do` block was being overwritten by the outer `catch` clause (because `throw LinkError.userIDChanged(...)` re-entered the `catch`, which reset state to `.anonymous`). Refactored to detect drift OUTSIDE the do/catch so the `.error` transition survives the throw.
+2. **`AuthPromptStore` timestamp parsing.** A single `ISO8601DateFormatter` configured with `.withFractionalSeconds` cannot parse PostgREST's `timestamptz` responses across all three shapes (no fraction / millisecond / 6-digit microsecond). The integration tests round-tripped `Date(timeIntervalSinceReferenceDate: 800_000_000)` and got `nil` back because the parser rejected the microsecond-precision response Postgres emits by default. Replaced with a 3-attempt parser: fractional → plain → truncate-to-ms-then-fractional. The whole thing is documented at the call site so the next codebase reader doesn't repeat the trap.
+
+`gti-vault/60_engineering/stack-patterns.md` could be updated with the timestamp-parsing pattern — flagging as adjacency rather than in-scope here.
+
+Merged via PR #29 (squash) at 2026-05-14T06:21Z, commit `c401819`.
