@@ -668,6 +668,33 @@ public struct VerdictScreen: View {
         .accessibilityLabel(VerdictScreen.committedCtaLabel(count: ratifiedCount, total: ratifiedTotal))
     }
 
+    /// TB-10 — tertiary "REROLL" button below the primary CTA on the
+    /// `default` and `committed` flavors. When the room has already
+    /// burned its 3-cap (`rerollsUsed >= 3`), the button is replaced
+    /// with a non-tappable `"No rerolls left"` footer per S07's
+    /// `"Edge cases"` register. Suppressed entirely in `.readOnly` and
+    /// `.noSurvivor` (those branches don't render `rerollTertiary`).
+    @ViewBuilder
+    private var rerollTertiary: some View {
+        if rerollsUsed >= 3 {
+            Text("No rerolls left")
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.55))
+                .padding(GTISpacing.step1)
+                .accessibilityIdentifier("verdict.cta.reroll.exhausted")
+        } else {
+            Button(action: onReroll) {
+                Text("REROLL")
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
+                    .padding(GTISpacing.step1)
+            }
+            .accessibilityIdentifier("verdict.cta.reroll")
+        }
+    }
+
     /// TB-08 — pre-permission line surfacing the upcoming check-in.
     /// Copy is locked by PRD user story 38 + the TB-08 ticket:
     /// `"We'll check in tomorrow — see if you went."` Voluntary
