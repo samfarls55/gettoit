@@ -35,7 +35,7 @@ Pattern:
 
 For TB-02 the members SELECT policy is `user_id = auth.uid()` (own row only). The `rooms` SELECT policy joins through `members`, but only needs the caller's own member row to compute "which rooms admit me", which the self-policy admits without recursion.
 
-When wider visibility is needed (e.g. TB-07's Waiting surface — every member sees every co-member): use a SECURITY DEFINER function (`is_room_member(room_id, user_id)`) that bypasses RLS internally. Mark it `SECURITY DEFINER` + `SET search_path = ''` and grant `EXECUTE` to `authenticated` only.
+When wider visibility is needed (e.g. TB-07's Waiting surface — every member sees every co-member): use a SECURITY DEFINER function (`is_room_member(room_id, user_id)`) that bypasses RLS internally. Mark it `SECURITY DEFINER` + `SET search_path = ''` and grant `EXECUTE` to `authenticated` only. TB-07 lands this in `20260513223000000_rooms_deadline_at_and_firing_status.sql` and pairs it with a `members_select_via_helper` SELECT policy. See [[waiting-fire-trigger|waiting-fire-trigger.md]] for the full pattern + the trigger / cron dispatcher.
 
 **RLS-aware insert-then-read order.** `client.from("X").insert(values).select().single()` does an insert then a SELECT to return the row, and the SELECT evaluates the SELECT policy. For self-bootstrap rows (room creator inserts a `rooms` row, then their own `members` row), the SELECT policy on `rooms` may require `members` membership — which doesn't exist yet. Allocate the id client-side, insert without `returning=representation`, then fetch later when the bootstrap membership exists. See `RoomStore.createRoom`.
 

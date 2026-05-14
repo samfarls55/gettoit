@@ -108,6 +108,57 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
       return (data ?? null) as VerdictRow | null;
     },
+    async markRoomVerdictReady(room_id): Promise<void> {
+      // Flip rooms.status from firing → verdict_ready. The migration
+      // schema admits the transition from `open` directly too (the
+      // single-tap manual fire can land while the dispatcher is in
+      // flight and the trigger may have not yet seen `firing`).
+      const { error } = await client
+        .from("rooms")
+        .update({ status: "verdict_ready" })
+        .eq("id", room_id)
+        // Only flip from these two states — never overwrite `locked`
+        // or `expired`.
+        .in("status", ["open", "firing"]);
+      if (error) {
+        console.warn("compute-verdict markRoomVerdictReady failed:", error.message);
+        throw error;
+      }
+    },
+    async emitVerdictReadyBroadcast(room_id, verdict_id): Promise<void> {
+      // Realtime Broadcast — `room:{roomId}` channel, `verdict_ready`
+      // event. iOS subscribers receive in ~50–200ms per
+      // stack-patterns.md §Realtime.
+      //
+      // We use the HTTP-based Realtime API rather than the WS channel
+      // because the Edge Function lives in a short-lived Deno worker;
+      // setting up a websocket per invocation is more brittle than
+      // a single POST. The endpoint accepts the same broadcast shape
+      // as `channel.send` and authenticates with the service-role key.
+      const endpoint = `${supabaseUrl}/realtime/v1/api/broadcast`;
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceRoleKey}`,
+          "apikey": serviceRoleKey,
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              topic: `room:${room_id}`,
+              event: "verdict_ready",
+              payload: { verdict_id, room_id },
+              private: false,
+            },
+          ],
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`broadcast failed: ${res.status} ${text}`);
+      }
+    },
   };
 }
 

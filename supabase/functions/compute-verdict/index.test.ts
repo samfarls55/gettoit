@@ -35,11 +35,15 @@ interface AdapterState {
   adapter: ComputeVerdictDataAdapter;
   inserts: VerdictInsert[];
   cuts: OptionCutInsert[][];
+  marked: string[];
+  broadcasts: Array<{ room_id: string; verdict_id: string }>;
 }
 
 function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
   const inserts: VerdictInsert[] = [];
   const cuts: OptionCutInsert[][] = [];
+  const marked: string[] = [];
+  const broadcasts: Array<{ room_id: string; verdict_id: string }> = [];
   const adapter: ComputeVerdictDataAdapter = {
     async fetchRoom(_id) {
       return seed.room === undefined
@@ -69,8 +73,14 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
     async insertOptionCuts(rows) {
       cuts.push(rows);
     },
+    async markRoomVerdictReady(room_id) {
+      marked.push(room_id);
+    },
+    async emitVerdictReadyBroadcast(room_id, verdict_id) {
+      broadcasts.push({ room_id, verdict_id });
+    },
   };
-  return { adapter, inserts, cuts };
+  return { adapter, inserts, cuts, marked, broadcasts };
 }
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
@@ -302,6 +312,99 @@ Deno.test("compute-verdict — single-survivor path writes one verdict and the c
   assertEquals(body.cuts[0].cut_reason, "budget");
   assertEquals(inserts.length, 1);
   assertEquals(cuts[0].length, 1);
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// TB-07 — auto-fire method passthrough
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("compute-verdict — quorum method passes through to the verdict row", async () => {
+  const { adapter, inserts } = memoryAdapter({
+    options: [
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
+      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3, walk_minutes_estimate: 12 } },
+    ],
+    votes: [
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
+      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
+    ],
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, method: "quorum" }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.method, "quorum");
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].method, "quorum");
+});
+
+Deno.test("compute-verdict — deadline method passes through to the verdict row", async () => {
+  const { adapter, inserts } = memoryAdapter({
+    options: [
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
+      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3, walk_minutes_estimate: 12 } },
+    ],
+    votes: [
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
+      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
+    ],
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, method: "deadline" }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.method, "deadline");
+  assertEquals(inserts[0].method, "deadline");
+});
+
+Deno.test("compute-verdict — unknown method falls back to manual", async () => {
+  const { adapter, inserts } = memoryAdapter({
+    options: [
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
+    ],
+    votes: [
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5 } },
+    ],
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, method: "garbage" }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.method, "manual", "unknown methods must default to manual to avoid CHECK violations");
+  assertEquals(inserts[0].method, "manual");
+});
+
+Deno.test("compute-verdict — happy path flips rooms.status to verdict_ready and emits a broadcast", async () => {
+  const { adapter, marked, broadcasts } = memoryAdapter({
+    options: [
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
+    ],
+    votes: [
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5 } },
+    ],
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, method: "quorum" }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+
+  assertEquals(marked, [VALID_ROOM_ID],
+    "expected markRoomVerdictReady to be invoked exactly once with the room id");
+  assertEquals(broadcasts.length, 1,
+    "expected exactly one verdict_ready broadcast to be emitted");
+  assertEquals(broadcasts[0].room_id, VALID_ROOM_ID);
+  assertEquals(broadcasts[0].verdict_id, "verdict-1");
 });
 
 Deno.test("compute-verdict — engine no-survivor surfaces 422", async () => {
