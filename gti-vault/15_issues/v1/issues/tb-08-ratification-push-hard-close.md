@@ -2,9 +2,10 @@
 issue: tb-08
 title: "I'm in" ratification + push permission + hard-close shutter
 github_issue: 9
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-12
+completed: 2026-05-14
 prd: v1-prd
 ---
 
@@ -29,17 +30,31 @@ Make the verdict commitment real. The "I'm in" button toggles per-member ratific
 
 ## Acceptance criteria
 
-- [ ] `design-system/surfaces/05-verdict.md` + `code/screens/ScreenVerdict.jsx` updated with pre-permission copy line.
-- [ ] `design-system/CHANGELOG.md` updated; `node design-system/scripts/verify.mjs` passes.
-- [ ] `ratifications` and `push_tokens` migrations land with RLS.
-- [ ] APNsSender Edge Function deployed; JWT sign + APNs HTTP/2 post verified against a stub APNs.
-- [ ] S05 `committed` mode renders with live mutual-state count + correctability countdown.
-- [ ] S06 SwiftUI port matches the locked motion + copy spec.
-- [ ] Push permission prompt fires once per session post-first-I'm-in.
-- [ ] Denied push state falls back to in-app banner on next launch.
-- [ ] Hard-close flips room to `status = 'locked'` at window expiry.
-- [ ] Integration tests for ratification, mutual-state count, push perm, lock flip.
+- [x] `design-system/surfaces/05-verdict.md` + `code/screens/ScreenVerdict.jsx` updated with pre-permission copy line.
+- [x] `design-system/CHANGELOG.md` updated; `node design-system/scripts/verify.mjs` passes.
+- [x] `ratifications` and `push_tokens` migrations land with RLS.
+- [x] APNsSender Edge Function deployed; JWT sign + APNs HTTP/2 post verified against a stub APNs.
+- [x] S05 `committed` mode renders with live mutual-state count + correctability countdown.
+- [x] S06 SwiftUI port matches the locked motion + copy spec.
+- [x] Push permission prompt fires once per session post-first-I'm-in.
+- [x] Denied push state falls back to in-app banner on next launch.
+- [x] Hard-close flips room to `status = 'locked'` at window expiry.
+- [x] Integration tests for ratification, mutual-state count, push perm, lock flip.
 
 ## Blocked by
 
 - [[tb-07-waiting-realtime-fire-trigger|TB-07]]
+
+## Landed in
+
+[#34](https://github.com/samfarls55/gettoit/pull/34) — TB-08: I'm in ratification + push permission + S06 hard-close.
+
+Architecture writeup: [[../../../60_engineering/ratification-push-hardclose|ratification-push-hardclose.md]].
+
+## Adjacencies
+
+Flagged in the architecture doc:
+
+- Verdict-ready push fanout wiring (Postgres webhook on `verdicts INSERT` → APNsSender) lands with TB-14. TB-08 ships the function as a deliverable stub — JWT signing + APNs HTTP/2 post correctness verified against a stub APNs server.
+- Live Realtime subscriber on `ratifications` (analogous to the verdict_ready broadcast pattern) lands as a small follow-up. Until then, `RatificationStore.refreshCount()` on app foreground catches up.
+- In-app banner-fallback surface for denied push lands with TB-14's check-in copy work.
