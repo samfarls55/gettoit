@@ -34,19 +34,12 @@ public final class RoomStore {
 
     // MARK: - public surface
 
-    /// Create a new room owned by the currently-authenticated user and
-    /// insert their `members` row with `role='owner'`. Returns the
-    /// freshly-written row.
+    /// Create a new room owned by `userID` and insert their `members`
+    /// row with `role='owner'`. The caller is responsible for ensuring
+    /// `userID` matches the active Supabase auth session — RLS rejects
+    /// the insert otherwise.
     @discardableResult
-    public func createRoom() async throws -> Room {
-        // Read the locally-cached current user rather than awaiting
-        // `client.auth.session` — the async accessor refreshes the
-        // session and throws `sessionMissing` in CI when an anon
-        // sign-in has been issued in the same test run but hasn't yet
-        // propagated through the refresh pipeline. The synchronous
-        // accessor returns the user already in memory.
-        let userID = try currentUserID()
-
+    public func createRoom(as userID: UUID) async throws -> Room {
         let insert = RoomInsert(creatorUserID: userID, status: "open", vertical: "food")
         let room: Room = try await client
             .from("rooms")
@@ -70,9 +63,7 @@ public final class RoomStore {
     /// would reject a duplicate insert — callers can choose to swallow
     /// the conflict if they want re-join-is-a-no-op semantics. For TB-02
     /// the join surface only calls this once per deep-link tap.
-    public func joinRoom(id roomID: UUID) async throws {
-        let userID = try currentUserID()
-
+    public func joinRoom(id roomID: UUID, as userID: UUID) async throws {
         let membership = MemberInsert(roomID: roomID, userID: userID, role: "participant")
         try await client
             .from("members")
@@ -101,11 +92,9 @@ public final class RoomStore {
         }
     }
 
-    /// Look up the caller's role in a given room. Returns nil when no
-    /// row exists for the caller (either not a member, or RLS hid it).
-    public func fetchOwnRole(roomID: UUID) async throws -> String? {
-        let userID = try currentUserID()
-
+    /// Look up the given user's role in a given room. Returns nil when
+    /// no row exists for the user (either not a member, or RLS hid it).
+    public func fetchRole(roomID: UUID, userID: UUID) async throws -> String? {
         do {
             let row: MemberRoleRow = try await client
                 .from("members")
@@ -119,23 +108,6 @@ public final class RoomStore {
         } catch {
             return nil
         }
-    }
-
-    // MARK: - errors
-
-    public enum StoreError: Error, Equatable {
-        /// No authenticated user is currently available on the client.
-        /// Callers (e.g. JoinScreen) ensure `AuthCoordinator.ensureSignedIn`
-        /// has run before invoking RoomStore writes, so this surfaces as
-        /// a misuse rather than a transient state.
-        case notAuthenticated
-    }
-
-    private func currentUserID() throws -> UUID {
-        guard let user = client.auth.currentUser else {
-            throw StoreError.notAuthenticated
-        }
-        return user.id
     }
 
     // MARK: - wire types

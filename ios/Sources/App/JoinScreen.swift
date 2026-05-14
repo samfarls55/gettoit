@@ -90,8 +90,13 @@ public struct JoinScreen: View {
         // membership insert — RLS rejects an unauthenticated client.
         await auth.ensureSignedIn()
 
+        guard case .anonymous(let userID) = auth.state else {
+            phase = .error("Couldn't sign in anonymously.")
+            return
+        }
+
         do {
-            try await roomStore.joinRoom(id: payload.roomID)
+            try await roomStore.joinRoom(id: payload.roomID, as: userID)
             phase = .joined(roomID: payload.roomID)
         } catch {
             phase = .error("Couldn't join the room. \(String(describing: error))")

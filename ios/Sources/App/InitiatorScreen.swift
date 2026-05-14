@@ -25,9 +25,11 @@ public struct InitiatorScreen: View {
     @State private var pendingShare: PendingShare?
 
     private let roomStore: RoomStore
+    private let userID: UUID
 
-    public init(roomStore: RoomStore) {
+    public init(roomStore: RoomStore, userID: UUID) {
         self.roomStore = roomStore
+        self.userID = userID
     }
 
     public enum Phase: Equatable {
@@ -193,7 +195,7 @@ public struct InitiatorScreen: View {
         phase = .creating
         Task {
             do {
-                let room = try await roomStore.createRoom()
+                let room = try await roomStore.createRoom(as: userID)
                 // Token is a placeholder for v1 — TB-02 just needs the
                 // round-trip-able shape. Signed/expiring tokens land in a
                 // later tracer bullet once the abuse surface materializes.

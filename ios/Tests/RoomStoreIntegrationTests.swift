@@ -43,7 +43,7 @@ final class RoomStoreIntegrationTests: XCTestCase {
         let (client, creatorID) = try await freshAnonClient()
         let store = RoomStore(client: client)
 
-        let room = try await store.createRoom()
+        let room = try await store.createRoom(as: creatorID)
 
         XCTAssertEqual(room.creatorUserID, creatorID,
                        "expected creator_user_id to match the signed-in user")
@@ -56,7 +56,7 @@ final class RoomStoreIntegrationTests: XCTestCase {
         XCTAssertEqual(fetched?.id, room.id)
 
         // And the creator's `members` row carries the owner role.
-        let role = try await store.fetchOwnRole(roomID: room.id)
+        let role = try await store.fetchRole(roomID: room.id, userID: creatorID)
         XCTAssertEqual(role, "owner")
 
         try? await client.auth.signOut()
@@ -64,18 +64,18 @@ final class RoomStoreIntegrationTests: XCTestCase {
 
     func testJoinRoomWritesParticipantMembershipForADifferentUser() async throws {
         // Device A — creator.
-        let (creatorClient, _) = try await freshAnonClient()
+        let (creatorClient, creatorID) = try await freshAnonClient()
         let creatorStore = RoomStore(client: creatorClient)
-        let room = try await creatorStore.createRoom()
+        let room = try await creatorStore.createRoom(as: creatorID)
         try? await creatorClient.auth.signOut()
 
         // Device B — invitee.
         let (joinerClient, joinerID) = try await freshAnonClient()
         let joinerStore = RoomStore(client: joinerClient)
 
-        try await joinerStore.joinRoom(id: room.id)
+        try await joinerStore.joinRoom(id: room.id, as: joinerID)
 
-        let role = try await joinerStore.fetchOwnRole(roomID: room.id)
+        let role = try await joinerStore.fetchRole(roomID: room.id, userID: joinerID)
         XCTAssertEqual(role, "participant")
 
         // The joiner can now read the `rooms` row — RLS admits them
@@ -90,9 +90,9 @@ final class RoomStoreIntegrationTests: XCTestCase {
 
     func testRLSHidesARoomFromANonMember() async throws {
         // Device A creates a room.
-        let (creatorClient, _) = try await freshAnonClient()
+        let (creatorClient, creatorID) = try await freshAnonClient()
         let creatorStore = RoomStore(client: creatorClient)
-        let room = try await creatorStore.createRoom()
+        let room = try await creatorStore.createRoom(as: creatorID)
         try? await creatorClient.auth.signOut()
 
         // Device C — never joined — must not see it.

@@ -38,8 +38,14 @@ public struct RootView: View {
                         auth: coordinators.auth,
                         roomStore: coordinators.roomStore
                     )
+                } else if case .anonymous(let userID) = coordinators.auth.state {
+                    InitiatorScreen(roomStore: coordinators.roomStore, userID: userID)
                 } else {
-                    InitiatorScreen(roomStore: coordinators.roomStore)
+                    Text("Sign-in failed. Pull to retry.")
+                        .font(.system(size: GTIFont.Size.body, weight: .semibold))
+                        .foregroundStyle(GTIColor.TextOnGradient.primary)
+                        .multilineTextAlignment(.center)
+                        .padding(GTISpacing.step6)
                 }
             } else {
                 ProgressView()
