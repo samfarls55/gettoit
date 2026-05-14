@@ -46,12 +46,21 @@ targets:
         # so each upload gets a unique, monotonically-increasing
         # build number — TestFlight rejects duplicates.
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        # CFBundleIconName binds the Info.plist to the asset-catalog set
+        # at Sources/Assets.xcassets/AppIcon.appiconset. App Store Connect
+        # validation rejects uploads without this key when an icon set is
+        # present.
+        CFBundleIconName: AppIcon
         UILaunchScreen:
           UIColorName: ""
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UIRequiredDeviceCapabilities:
           - armv7
+        # v1 is iPhone-only, portrait-only (see design-system/surfaces/).
+        # App Store Connect requires this key to be present for iOS apps.
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
         # Supabase project URL + anon key are injected at build time via
         # build settings (SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY). On the
         # macOS CI runner these come from GitHub secrets; locally they come
@@ -61,7 +70,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.gettoit.GetToIt
-        TARGETED_DEVICE_FAMILY: "1,2"
+        # iPhone-only for v1. iPad scope is deliberately out per the v1 PRD.
+        TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGN_IDENTITY: ""
         DEVELOPMENT_TEAM: ""
