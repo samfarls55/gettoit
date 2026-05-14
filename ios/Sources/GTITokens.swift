@@ -32,10 +32,11 @@ public enum GTIColor {
     ]
 
     public enum Glass {
-        public static let fill        = Color.white.opacity(0.18)
-        public static let fillStrong  = Color.white.opacity(0.28)
-        public static let fillSoft    = Color.white.opacity(0.10)
-        public static let stroke      = Color.white.opacity(0.42)
+        public static let fill          = Color.white.opacity(0.18)
+        public static let fillStrong    = Color.white.opacity(0.28)
+        public static let fillSoft      = Color.white.opacity(0.10)
+        public static let fillSoftPress = Color.white.opacity(0.16)
+        public static let stroke        = Color.white.opacity(0.42)
     }
 
     public enum TextOnGradient {
@@ -177,6 +178,7 @@ public enum GTISpacing {
 public enum GTIRadii {
     public static let chip: CGFloat = 999
     public static let tag: CGFloat = 8
+    public static let row: CGFloat = 12
     public static let card: CGFloat = 18
     public static let cardLg: CGFloat = 22
     public static let hero: CGFloat = 28

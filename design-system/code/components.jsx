@@ -411,10 +411,414 @@ function GTIMark({ size = 18 }) {
   );
 }
 
+// ────────────────────────────────────────────────────────────
+// LocationPicker (C-23) — persistent location selector.
+// Decision in ADR 0009: reusable component, not ad-hoc composition.
+// Two JSX exports compose into one conceptual primitive — chip readout
+// + bottom-sheet typeahead editor.
+//
+// Refero anchor: Lumy "Changing location" (screen a18a8df8). Dark
+// surface, sun-yellow accent for selected, paper-plane glyph on the
+// "Use current location" row, recents grouped under an eyebrow rule.
+//
+// States: auto | manual | stale | empty | loading
+//   auto    — permission granted + GPS resolved a coordinate
+//   manual  — denied OR user typed-and-committed a value
+//   stale   — granted but last GPS fix > 30 min ago
+//   empty   — denied AND user has not yet selected
+//   loading — initial GPS request in flight
+//
+// The iOS data layer (`MKLocalSearchCompleter`, `CLLocationManager`) is
+// wired in tb-03. The design-system spec is data-agnostic — the host
+// surface supplies `state`, `place`, `suggestions`, and the callbacks.
+// ────────────────────────────────────────────────────────────
+function LocationPickerChip({
+  state = 'auto',
+  place,                              // { name, sub } | null
+  staleMinutes,                       // number — only meaningful when state === 'stale'
+  onOpen = () => {},
+}) {
+  const showGPSGlyph = state === 'auto' || state === 'stale';
+  const isLoading = state === 'loading';
+
+  const subLabel = (() => {
+    switch (state) {
+      case 'stale': return 'Out of date — tap to refresh';
+      case 'empty': return 'Tap to select';
+      default:      return 'Your location';
+    }
+  })();
+
+  const displayName = isLoading
+    ? null
+    : (place?.name || 'Set your location');
+
+  return (
+    <button
+      onClick={onOpen}
+      disabled={isLoading}
+      aria-label={`Edit location. Current value: ${displayName || 'locating'}.`}
+      style={{
+        appearance: 'none', border: 0, cursor: isLoading ? 'wait' : 'pointer',
+        textAlign: 'left',
+        width: '100%', minHeight: 56,
+        padding: '12px 16px',
+        borderRadius: 'var(--r-row)',
+        background: 'var(--glass-fill-soft)',
+        border: '1px solid rgba(255,255,255,0.18)',
+        backdropFilter: 'blur(12px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(12px) saturate(160%)',
+        display: 'flex', alignItems: 'center', gap: 12,
+        color: '#fff',
+        transition: 'background 140ms var(--ease-out)',
+      }}
+    >
+      {showGPSGlyph && (
+        <span aria-hidden="true" style={{
+          display: 'inline-block',
+          fontSize: 16, fontWeight: 900, lineHeight: 1,
+          color: 'var(--sun)',
+          opacity: state === 'stale' ? 0.45 : 1,
+          transform: 'rotate(-45deg)',
+        }}>➤</span>
+      )}
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {isLoading ? (
+          <div style={{
+            fontFamily: 'var(--ff-mono)',
+            fontSize: 11, fontWeight: 500,
+            letterSpacing: '0.18em', textTransform: 'uppercase',
+            color: 'rgba(255,255,255,0.6)',
+            animation: 'gti-locate-pulse 1400ms var(--ease-in-out) infinite',
+          }}>Locating…</div>
+        ) : (
+          <>
+            <div style={{
+              fontFamily: 'var(--ff-body)',
+              fontSize: 17, fontWeight: 700, lineHeight: 1.2,
+              color: place ? '#fff' : 'rgba(255,255,255,0.6)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>{displayName}{state === 'stale' && (
+              <span style={{
+                fontFamily: 'var(--ff-mono)',
+                fontSize: 11, fontWeight: 500,
+                letterSpacing: '0.18em', textTransform: 'uppercase',
+                color: 'rgba(255,255,255,0.55)',
+                marginLeft: 8,
+              }}>· Out of date</span>
+            )}</div>
+            <div className="gti-eyebrow" style={{
+              color: 'rgba(255,255,255,0.6)', marginTop: 2,
+            }}>{subLabel}</div>
+          </>
+        )}
+      </div>
+
+      {!isLoading && (
+        <span aria-hidden="true" style={{
+          fontSize: 14, fontWeight: 900, color: 'rgba(255,255,255,0.55)',
+          marginLeft: 4,
+        }}>›</span>
+      )}
+    </button>
+  );
+}
+
+function LocationPickerSheet({
+  open = false,
+  state = 'auto',                     // permission state (same as chip)
+  query = '',
+  onQueryChange = () => {},
+  suggestions = [],                   // [{ id, name, sub }]
+  recents = [],                       // [{ id, name, sub }]
+  selectedId = null,
+  staleMinutes,
+  onUseCurrentLocation = () => {},
+  onSelectSuggestion = () => {},
+  onOpenSettings = () => {},
+  onDismiss = () => {},
+}) {
+  if (!open) return null;
+
+  const showCurrentLocationRow = state === 'auto' || state === 'stale';
+  const showDenyCard = state === 'empty';
+  const hasQuery = query.trim().length > 0;
+  const showEmptyState = !hasQuery && recents.length === 0 && !showDenyCard;
+  const listItems = hasQuery ? suggestions : recents;
+  const listLabel = hasQuery ? 'Results' : 'Recent';
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Location" style={{
+      position: 'absolute', inset: 0, zIndex: 10,
+      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+    }}>
+      {/* Backdrop — tap to dismiss */}
+      <button
+        onClick={onDismiss}
+        aria-label="Close location picker"
+        style={{
+          position: 'absolute', inset: 0,
+          background: 'rgba(0,0,0,0.32)',
+          border: 0, padding: 0, cursor: 'pointer',
+          animation: 'gti-fade-up 280ms var(--ease-out) both',
+        }}
+      />
+
+      {/* Sheet */}
+      <div style={{
+        position: 'relative',
+        margin: '0 12px 12px',
+        padding: '14px 18px 22px',
+        borderRadius: 'var(--r-sheet)',
+        background: 'rgba(20,20,30,0.92)',
+        backdropFilter: 'blur(24px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+        border: '1px solid rgba(255,255,255,0.10)',
+        boxShadow: 'var(--shadow-sheet, 0 -20px 60px rgba(0,0,0,0.5))',
+        color: '#fff',
+        animation: 'gti-sheet-rise 380ms var(--ease-out-soft) both',
+      }}>
+        {/* Handle */}
+        <div aria-hidden="true" style={{
+          width: 38, height: 4, borderRadius: 999,
+          background: 'rgba(255,255,255,0.22)',
+          margin: '0 auto 18px',
+        }} />
+
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 14, minHeight: 32,
+        }}>
+          <button
+            onClick={onDismiss}
+            aria-label="Close"
+            style={{
+              appearance: 'none', border: 0, background: 'transparent',
+              width: 44, height: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-start',
+              color: 'rgba(255,255,255,0.85)',
+              fontFamily: 'var(--ff-body)', fontWeight: 900, fontSize: 22,
+              lineHeight: 1, cursor: 'pointer',
+            }}
+          >×</button>
+          <div className="gti-eyebrow" style={{ color: 'rgba(255,255,255,0.6)' }}>
+            Location
+          </div>
+          <div style={{ width: 44 }} aria-hidden="true" />
+        </div>
+
+        {/* Typeahead input */}
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '14px 16px',
+          borderRadius: 'var(--r-row)',
+          background: 'var(--glass-fill-soft)',
+          border: '1px solid rgba(255,255,255,0.18)',
+          transition: 'border-color 180ms var(--ease-out)',
+        }}>
+          <span aria-hidden="true" style={{
+            fontSize: 14, fontWeight: 900, color: 'rgba(255,255,255,0.55)',
+          }}>⌕</span>
+          <input
+            type="text"
+            value={query}
+            onChange={e => onQueryChange(e.target.value)}
+            placeholder="Search a city, neighborhood, or address"
+            aria-label="Search a city, neighborhood, or address"
+            style={{
+              flex: 1, appearance: 'none', border: 0, outline: 0,
+              background: 'transparent',
+              fontFamily: 'var(--ff-body)',
+              fontSize: 16, fontWeight: 600, lineHeight: 1.2,
+              color: '#fff',
+              caretColor: 'var(--sun)',
+            }}
+          />
+          {hasQuery && (
+            <button
+              onClick={() => onQueryChange('')}
+              aria-label="Clear search"
+              style={{
+                appearance: 'none', border: 0, background: 'transparent',
+                width: 32, height: 32, cursor: 'pointer',
+                color: 'rgba(255,255,255,0.6)',
+                fontFamily: 'var(--ff-body)', fontWeight: 900, fontSize: 14,
+                lineHeight: 1,
+              }}
+            >×</button>
+          )}
+        </label>
+
+        {/* "Use current location" affordance — granted states only */}
+        {showCurrentLocationRow && (
+          <button
+            onClick={onUseCurrentLocation}
+            style={{
+              appearance: 'none', border: 0, background: 'transparent',
+              width: '100%', minHeight: 52, marginTop: 8,
+              padding: '12px 16px',
+              borderRadius: 'var(--r-row)',
+              display: 'flex', alignItems: 'center', gap: 12,
+              color: '#fff', cursor: 'pointer', textAlign: 'left',
+              transition: 'background 140ms var(--ease-out)',
+            }}
+            aria-label="Use current location"
+          >
+            <span aria-hidden="true" style={{
+              fontSize: 14, fontWeight: 900, color: 'var(--sun)',
+              transform: 'rotate(-45deg)', display: 'inline-block',
+            }}>➤</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--ff-body)', fontSize: 15, fontWeight: 700 }}>
+                Use current location
+              </div>
+              {state === 'stale' && typeof staleMinutes === 'number' && (
+                <div className="gti-eyebrow" style={{
+                  color: 'rgba(255,255,255,0.6)', marginTop: 2,
+                }}>Last fix {staleMinutes} min ago</div>
+              )}
+            </div>
+          </button>
+        )}
+
+        {/* Deny-state re-enable card — permission denied only */}
+        {showDenyCard && (
+          <div style={{
+            marginTop: 12,
+            padding: 16,
+            borderRadius: 'var(--r-card)',
+            background: 'var(--glass-fill-soft)',
+            border: '1px solid rgba(255,255,255,0.18)',
+          }}>
+            <div className="gti-eyebrow" style={{ color: 'var(--sun)' }}>
+              Location off
+            </div>
+            <div style={{
+              fontFamily: 'var(--ff-body)',
+              fontSize: 15, fontWeight: 800, lineHeight: 1.3,
+              color: '#fff', marginTop: 6,
+              textWrap: 'balance',
+            }}>Type a place above to keep going.</div>
+            <div style={{
+              fontFamily: 'var(--ff-body)',
+              fontSize: 13, fontWeight: 500, lineHeight: 1.4,
+              color: 'rgba(255,255,255,0.7)', marginTop: 4,
+            }}>Or turn on location in Settings if you'd rather we pick it up automatically.</div>
+            <button
+              onClick={onOpenSettings}
+              style={{
+                appearance: 'none', border: 0, background: 'transparent',
+                width: '100%', height: 48, marginTop: 12,
+                borderRadius: 999,
+                fontFamily: 'var(--ff-body)',
+                fontWeight: 800, fontSize: 14,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: '#fff',
+                cursor: 'pointer',
+                boxShadow: 'inset 0 0 0 1.5px rgba(255,255,255,0.55)',
+              }}
+            >Open Settings</button>
+          </div>
+        )}
+
+        {/* Section header — Recent / Results */}
+        {listItems.length > 0 && (
+          <div className="gti-eyebrow" style={{
+            color: 'rgba(255,255,255,0.6)',
+            marginTop: 18, marginBottom: 6,
+            padding: '0 4px',
+          }}>{listLabel}</div>
+        )}
+
+        {/* Suggestion list */}
+        {listItems.length > 0 && (
+          <div role="listbox" aria-live="polite" style={{
+            display: 'flex', flexDirection: 'column', gap: 4,
+            maxHeight: 280, overflowY: 'auto',
+          }}>
+            {listItems.map(item => {
+              const selected = item.id === selectedId;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onSelectSuggestion(item)}
+                  role="option"
+                  aria-selected={selected}
+                  style={{
+                    appearance: 'none', border: 0, cursor: 'pointer',
+                    width: '100%', minHeight: 52, padding: '12px 16px',
+                    borderRadius: 'var(--r-row)',
+                    textAlign: 'left',
+                    background: selected ? 'var(--sun)' : 'transparent',
+                    color: selected ? 'var(--ink)' : '#fff',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    transition: 'background 140ms var(--ease-out)',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: 'var(--ff-body)',
+                      fontSize: 15, fontWeight: 700, lineHeight: 1.2,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{item.name}</div>
+                    <div style={{
+                      fontFamily: 'var(--ff-body)',
+                      fontSize: 12, fontWeight: 500, lineHeight: 1.3,
+                      color: selected ? 'rgba(14,16,17,0.7)' : 'rgba(255,255,255,0.6)',
+                      marginTop: 2,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                    }}>{item.sub}</div>
+                  </div>
+                  {selected && (
+                    <span aria-hidden="true" style={{
+                      width: 18, height: 18,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--ink)',
+                      fontFamily: 'var(--ff-body)', fontWeight: 900, fontSize: 12,
+                      lineHeight: 1,
+                    }}>✓</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty state — no query, no recents, permission not denied */}
+        {showEmptyState && (
+          <div style={{
+            padding: '48px 22px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+            textAlign: 'center',
+          }}>
+            <span aria-hidden="true" style={{
+              fontSize: 32, fontWeight: 900, color: 'var(--sun)', lineHeight: 1,
+            }}>◎</span>
+            <div style={{
+              fontFamily: 'var(--ff-body)',
+              fontSize: 16, fontWeight: 800, lineHeight: 1.3,
+              color: '#fff', textWrap: 'balance',
+            }}>Type a place to get started.</div>
+            <div style={{
+              fontFamily: 'var(--ff-body)',
+              fontSize: 13, fontWeight: 500, lineHeight: 1.4,
+              color: 'rgba(255,255,255,0.65)', maxWidth: 260,
+              textWrap: 'balance',
+            }}>City, neighborhood, or street address — whatever lands quickest.</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 Object.assign(window, {
   GTI_GRADIENTS, VIBE_LABELS,
   GradientSurface, TopBar, QuestionHeader,
   Chip, PillCTA, ReceiptChip, AvatarDot,
   CTADock, Eyebrow, Glass, GTIMark,
   RangeSlider, AuthUpgradeChip,
+  LocationPickerChip, LocationPickerSheet,
 });

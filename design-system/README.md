@@ -12,7 +12,7 @@ This is the handoff package for Claude Code → SwiftUI implementation. Tokens, 
 |---|---|
 | [`tokens.json`](./tokens.json) | **Canonical source of truth** for all tokens. `code/tokens.css` is generated from this. Future `GTITokens.swift` will be too. |
 | [`tokens.md`](./tokens.md) | Human-readable tokens reference: color, gradient, type, spacing, radii, shadow, motion. SwiftUI primitive map. |
-| [`components.md`](./components.md) | Every component (C-01…C-20) — states, sizes, tap targets, SwiftUI primitives. |
+| [`components.md`](./components.md) | Every component (C-01…C-23) — states, sizes, tap targets, SwiftUI primitives. |
 | [`motion.md`](./motion.md) | Per-component motion timings, verdict-reveal choreography, reduced-motion. |
 | [`accessibility.md`](./accessibility.md) | Contrast tables on every gradient, tap-target audit, focus order, VO, Dynamic Type. |
 | [`surfaces/`](./surfaces/) | 8 surface docs — purpose, defenses, copy register, edge cases. Each links to its JSX. |
@@ -31,6 +31,7 @@ Every surface has a corresponding JSX file. The markdown is the **why**, the JSX
 |---|---|---|---|
 | 00 | Landing | [`surfaces/00-landing.md`](./surfaces/00-landing.md) | [`code/screens/ScreenLanding.jsx`](./code/screens/ScreenLanding.jsx) |
 | 00a | Forced sign-in gate (iOS, first launch) | [`surfaces/00a-signin.md`](./surfaces/00a-signin.md) | [`code/screens/ScreenSignIn.jsx`](./code/screens/ScreenSignIn.jsx) |
+| 00b | Location permission pre-prime | [`surfaces/00b-location-permission.md`](./surfaces/00b-location-permission.md) | [`code/screens/ScreenLocationPermission.jsx`](./code/screens/ScreenLocationPermission.jsx) |
 | 01 | Initiator landing | [`surfaces/01-initiator.md`](./surfaces/01-initiator.md) | [`code/screens/ScreenInitiator.jsx`](./code/screens/ScreenInitiator.jsx) |
 | 02a | Invite (iMessage unfurl) | [`surfaces/02-invite.md`](./surfaces/02-invite.md) | [`code/screens/ScreenInviteUnfurl.jsx`](./code/screens/ScreenInviteUnfurl.jsx) |
 | 02b | Invite (web fallback) | ↑ | [`code/screens/ScreenInviteWeb.jsx`](./code/screens/ScreenInviteWeb.jsx) |

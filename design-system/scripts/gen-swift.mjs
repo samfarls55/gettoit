@@ -73,10 +73,11 @@ function renderSwift(t) {
   lines.push('    ]');
   lines.push('');
   lines.push('    public enum Glass {');
-  lines.push(`        public static let fill        = Color.white.opacity(${rgbaAlpha(t.color.glass['fill'])})`);
-  lines.push(`        public static let fillStrong  = Color.white.opacity(${rgbaAlpha(t.color.glass['fill-strong'])})`);
-  lines.push(`        public static let fillSoft    = Color.white.opacity(${rgbaAlpha(t.color.glass['fill-soft'])})`);
-  lines.push(`        public static let stroke      = Color.white.opacity(${rgbaAlpha(t.color.glass['stroke'])})`);
+  lines.push(`        public static let fill          = Color.white.opacity(${rgbaAlpha(t.color.glass['fill'])})`);
+  lines.push(`        public static let fillStrong    = Color.white.opacity(${rgbaAlpha(t.color.glass['fill-strong'])})`);
+  lines.push(`        public static let fillSoft      = Color.white.opacity(${rgbaAlpha(t.color.glass['fill-soft'])})`);
+  lines.push(`        public static let fillSoftPress = Color.white.opacity(${rgbaAlpha(t.color.glass['fill-soft-press'])})`);
+  lines.push(`        public static let stroke        = Color.white.opacity(${rgbaAlpha(t.color.glass['stroke'])})`);
   lines.push('    }');
   lines.push('');
   lines.push('    public enum TextOnGradient {');

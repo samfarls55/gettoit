@@ -69,6 +69,11 @@ iOS HIG minimum: **44×44pt**. We hit this almost everywhere — exceptions are 
 | Vertical picker row (C-19) | padding `14 18` — ~62 height | ✅ |
 | Timer chip (S01) | min-height 44, padding `10 0` | ✅ |
 | Range slider (C-21) | visual track 6 / hit row 44 (transparent input overlay) | ✅ |
+| LocationPicker chip (C-23) | min-height 56 | ✅ |
+| LocationPicker sheet `×` | 44pt hit-row wrapping 32×32 glyph | ✅ |
+| LocationPicker suggestion row (C-23) | min-height 52 | ✅ |
+| LocationPicker "Use current location" row (C-23) | min-height 52 | ✅ |
+| LocationPicker Settings deep-link (C-23) | C-05 ghost height 48 | ✅ |
 
 **Fixes for the SwiftUI port:**
 1. **Regret rating row** — bump min-height to 44. Reduces vertical density slightly; acceptable trade.

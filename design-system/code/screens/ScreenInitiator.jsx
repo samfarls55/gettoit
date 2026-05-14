@@ -1,13 +1,35 @@
 // Surface 01 — Initiator landing
-// Pick a vertical, set timer + radius (sensible defaults for zero-tap path),
-// drop the invite link.
+// Pick a vertical, state your location (C-23 LocationPicker), set timer +
+// radius (sensible defaults for zero-tap path), drop the invite link.
+//
+// The LocationPicker chip lives between the headline block and the timer
+// chip group. The session writes the resolved place to `rooms.location_*`
+// when the CTA fires. Auto-populates from GPS when permission is granted;
+// manual selection when denied; either is overridable by tap.
 
-function ScreenInitiator({ onAdvance, onSettings }) {
+function ScreenInitiator({
+  onAdvance,
+  onSettings,
+  // C-23 wiring — host surface supplies state + place; tb-03 wires the
+  // actual CLLocationManager + MKLocalSearchCompleter. Defaults model the
+  // canonical post-pre-prime granted state so the JSX renders a populated
+  // chip in the preview.
+  locationState = 'auto',                       // 'auto' | 'manual' | 'stale' | 'empty' | 'loading'
+  locationPlace = { name: 'Mission · San Francisco', sub: 'San Francisco, CA' },
+  locationStaleMinutes,
+  locationSuggestions = [],
+  locationRecents = [
+    { id: 'r1', name: 'Mission · San Francisco', sub: 'San Francisco, CA' },
+    { id: 'r2', name: 'Downtown · Oakland',      sub: 'Oakland, CA' },
+  ],
+  onLocationOpen = () => {},
+}) {
   const [vertical, setVertical] = React.useState('food');
   const [timer, setTimer] = React.useState(10);          // minutes
   const [radius, setRadius] = React.useState(2.0);       // miles
 
   const TIMER_OPTIONS = [5, 10, 15, 30];
+  const cannotAdvance = locationState === 'empty';
 
   return (
     <GradientSurface stop="initiator">
@@ -30,6 +52,18 @@ function ScreenInitiator({ onAdvance, onSettings }) {
             margin: '18px 0 0', fontSize: 15, fontWeight: 600,
             color: 'rgba(255,255,255,0.84)', maxWidth: 280,
           }}>Five quick taps each. One verdict. Sixty seconds.</p>
+        </div>
+
+        {/* C-23 LocationPicker chip — first concrete fact about the session.
+            Sits above the timer + radius controls. Tap opens the sheet;
+            the sheet's wiring is owned by the host (tb-03 on iOS). */}
+        <div style={{ marginTop: 28 }}>
+          <LocationPickerChip
+            state={locationState}
+            place={locationPlace}
+            staleMinutes={locationStaleMinutes}
+            onOpen={onLocationOpen}
+          />
         </div>
 
         {/* Timer chip group + radius slider — set expectations, not configure */}
@@ -131,7 +165,12 @@ function ScreenInitiator({ onAdvance, onSettings }) {
         </div>
 
         <CTADock>
-          <PillCTA label="Drop the invite link" fill="white" onClick={onAdvance} />
+          <PillCTA
+            label="Drop the invite link"
+            fill="white"
+            disabled={cannotAdvance}
+            onClick={onAdvance}
+          />
           {/* Settings link — spec exception, see surfaces/01-initiator.md §"Settings footer link" */}
           <button
             onClick={onSettings}
