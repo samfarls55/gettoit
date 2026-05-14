@@ -1,0 +1,14 @@
+{
+  "name": "gettoit-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GetToIt monorepo root. Houses ios/, web/, supabase/, design-system/, docs/, gti-vault/ as siblings per ADR 0004.",
+  "scripts": {
+    "verify:design-system": "node design-system/scripts/verify.mjs",
+    "tokens:css": "node design-system/scripts/gen-css.mjs",
+    "tokens:swift": "node design-system/scripts/gen-swift.mjs",
+    "tokens": "npm run tokens:css && npm run tokens:swift",
+    "web:build": "npm run build --prefix web",
+    "web:dev": "npm run dev --prefix web"
+  }
+}

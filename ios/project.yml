@@ -1,0 +1,95 @@
+# XcodeGen spec for the GetToIt iOS app.
+#
+# Why XcodeGen: the .xcodeproj is generated from this YAML in CI on the
+# macOS runner, so we don't commit Xcode-managed binary `project.pbxproj`
+# files that would race on every change. Regenerate locally with
+# `xcodegen generate` from this directory (`ios/`).
+name: GetToIt
+options:
+  bundleIdPrefix: app.gettoit
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+# Apply consistent build settings to every target.
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    GCC_TREAT_WARNINGS_AS_ERRORS: NO
+    ENABLE_HARDENED_RUNTIME: YES
+
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    # Tracks the v2 line. supabase-swift requires iOS 13+; we target iOS 17.
+    from: "2.0.0"
+
+targets:
+  GetToIt:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Sources
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        CFBundleDisplayName: GetToIt
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: ""
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIRequiredDeviceCapabilities:
+          - armv7
+        # Supabase project URL + anon key are injected at build time via
+        # build settings (SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY). On the
+        # macOS CI runner these come from GitHub secrets; locally they come
+        # from `.env`.
+        SUPABASE_PROJECT_URL: $(SUPABASE_PROJECT_URL)
+        SUPABASE_ANON_KEY: $(SUPABASE_ANON_KEY)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.gettoit.GetToIt
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_IDENTITY: ""
+        DEVELOPMENT_TEAM: ""
+        # Empty-string defaults so the build doesn't fail when the env vars
+        # aren't set (e.g. design-system-only PRs). The integration test
+        # skips itself in that case.
+        SUPABASE_PROJECT_URL: ""
+        SUPABASE_ANON_KEY: ""
+    dependencies:
+      - package: Supabase
+        product: Supabase
+
+  GetToItTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: Tests
+    settings:
+      base:
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_IDENTITY: ""
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - target: GetToIt
+
+schemes:
+  GetToIt:
+    build:
+      targets:
+        GetToIt: all
+        GetToItTests: [test]
+    test:
+      gatherCoverageData: false
+      targets:
+        - GetToItTests

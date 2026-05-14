@@ -20,6 +20,7 @@ Step-by-step for obtaining and wiring the Apple credentials v1 needs. Pairs with
 |---|---|---|---|
 | App Store Connect API key (`.p8`) | CI uploads to TestFlight, App Store submission via `xcrun altool` | GitHub Actions secrets | Required |
 | Sign in with Apple key (`.p8`) | Supabase verifies Apple identity tokens server-side ([[../15_issues/v1/issues/tb-12-apple-signin-upgrade\|TB-12]]) | Supabase dashboard (Auth → Providers → Apple) | Required |
+| APNs auth key (`.p8`) | Edge Function signs JWTs to deliver pushes ([[../15_issues/v1/issues/tb-08-ratification-push-hard-close\|TB-08]], [[../15_issues/v1/issues/tb-14-checkin-telemetry\|TB-14]]) | GitHub Actions + Supabase Edge Function secrets | Required |
 | MapKit JS key | Embedding Apple Maps on a webpage | — | **Not needed.** Per [[adr/0002-places-data-foursquare-mapkit\|ADR-0002]], native iOS uses MapKit framework (no key); web fallback skips MapKit entirely (Foursquare-only). |
 
 Native iOS MapKit (`import MapKit`) needs zero keys. Skip MapKit JS for v1.
@@ -91,7 +92,9 @@ Skip whichever already exists.
 
 1. https://developer.apple.com/account/resources → **Identifiers** → **+** → **App IDs** → **App**.
 2. Description: `GetToIt`. Bundle ID: `app.gettoit.GetToIt` (matches `APPLE_BUNDLE_ID`).
-3. Capabilities: tick **Sign in with Apple**. Continue → Register.
+3. Capabilities: tick **Sign in with Apple** AND **Push Notifications** (the latter is for Key 3 — APNs). Continue → Register.
+
+If the App ID already exists, edit it: click into the App ID and tick any missing capability, then **Save** (Apple may warn about invalidating provisioning profiles — fine when none exist yet).
 
 **Services ID** (the OAuth `client_id` Supabase uses):
 
@@ -127,7 +130,73 @@ No `gh secret` entries needed — Supabase holds these credentials, not CI.
 
 Same yearly cadence as #1. Generate new → update Supabase → revoke old.
 
-## Key 3 — MapKit JS
+## Key 3 — APNs auth key
+
+Used by the **APNsSender Edge Function** ([[../15_issues/v1/issues/tb-08-ratification-push-hard-close|TB-08]]) to sign short-lived JWTs that authenticate `POST` requests to Apple's APNs HTTP/2 endpoint. Native iOS device-token registration (`UIApplication.registerForRemoteNotifications`) does **not** need this `.p8` — only the server side does.
+
+### Prereq
+
+**Push Notifications** capability must be enabled on the App ID (see prereq block above). Without that, APNs rejects deliveries even with a valid key.
+
+### Generate
+
+1. https://developer.apple.com/account/resources/authkeys/list → **+**.
+2. **Key Name**: `GetToIt APNs v1`.
+3. Tick **Apple Push Notifications service (APNs)** — leave everything else unchecked.
+4. **Environment**: `Both` (one key serves sandbox endpoint `api.sandbox.push.apple.com` for dev/TestFlight-internal and production endpoint `api.push.apple.com` for App Store builds).
+5. **Key Restriction**: `Team Scoped (All Topics)`. Apple does not allow `Topic Specific` when Environment = `Both`. With one app in the team the wider scope is theoretical privilege only; revisit if a second app ever lands (then revoke + regenerate two topic-scoped keys).
+6. Continue → Register → **download the `.p8` immediately**. One shot, like every other Apple key.
+7. Record the **Key ID** (10 chars).
+
+### Store locally
+
+```bash
+mv ~/Downloads/AuthKey_*.p8 ~/.appstoreconnect/
+chmod 600 ~/.appstoreconnect/AuthKey_*.p8
+```
+
+### Wire into GitHub Actions (CI)
+
+```bash
+gh secret set APNS_AUTH_KEY_ID --body "<key id>"
+gh secret set APNS_AUTH_KEY < ~/.appstoreconnect/AuthKey_<key id>.p8
+```
+
+The companion identifiers `APPLE_TEAM_ID` and the topic `app.gettoit.GetToIt` are already in CI (Team ID) or derivable from `APPLE_BUNDLE_ID` — no new secrets needed there.
+
+### Wire into Supabase Edge Function secrets
+
+The APNsSender Edge Function reads from Supabase secrets, not GitHub. Set via the Management API:
+
+```bash
+TOK=$SUPABASE_ACCESS_TOKEN
+REF=$SUPABASE_PROJECT_REF
+python3 -c "import json; print(json.dumps([
+  {'name':'APNS_AUTH_KEY_ID','value':'<key id>'},
+  {'name':'APNS_AUTH_KEY','value':open('AuthKey_<key id>.p8').read()},
+  {'name':'APNS_TEAM_ID','value':'<team id>'},
+  {'name':'APNS_TOPIC','value':'app.gettoit.GetToIt'},
+]))" > /tmp/apns.json
+curl -sS -X POST "https://api.supabase.com/v1/projects/${REF}/secrets" \
+  -H "Authorization: Bearer ${TOK}" -H "Content-Type: application/json" \
+  --data-binary @/tmp/apns.json
+shred -u /tmp/apns.json
+```
+
+Verify:
+
+```bash
+curl -sS "https://api.supabase.com/v1/projects/${REF}/secrets" \
+  -H "Authorization: Bearer ${TOK}" | python3 -m json.tool | grep -i apns
+```
+
+> **Cloudflare gotcha.** The Supabase Management API sits behind Cloudflare and 403s on Python `urllib`'s default User-Agent when posting PEM payloads. Use `curl` or set an explicit User-Agent header in Python.
+
+### Rotation
+
+APNs auth keys don't expire (unlike the SiwA-derived OAuth client_secret JWT — see [[#key-2--sign-in-with-apple-key|Key 2]]). Rotate annually for hygiene: generate new → swap GH + Supabase secrets atomically → revoke old in Apple Developer Console. APNs deliveries with revoked keys fail immediately on Apple's side, so make sure the swap is atomic.
+
+## Key 4 — MapKit JS
 
 **Skip.** Not required for v1. Documented here so the question doesn't get re-asked.
 

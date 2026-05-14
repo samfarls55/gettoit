@@ -130,6 +130,8 @@ gh secret set APPLE_API_KEY_ID --body "<key id from App Store Connect>"
 gh secret set APPLE_API_ISSUER_ID --body "<issuer id>"
 gh secret set APPLE_API_PRIVATE_KEY < AuthKey_XXXX.p8
 gh secret set APPLE_TEAM_ID --body "<team id from developer.apple.com>"
+gh secret set APNS_AUTH_KEY_ID --body "<10-char APNs key ID>"
+gh secret set APNS_AUTH_KEY < AuthKey_<apns key id>.p8
 gh secret set SUPABASE_ACCESS_TOKEN --body "<token>"
 gh secret set SUPABASE_DB_PASSWORD --body "<db password>"
 gh secret set SUPABASE_PROJECT_REF --body "<project ref>"

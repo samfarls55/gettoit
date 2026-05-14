@@ -8,6 +8,10 @@ Prefix `BREAKING:` for any change that requires code or downstream consumers to 
 
 ---
 
+## 2026-05-13
+
+- Added `scripts/gen-swift.mjs` — reads `tokens.json`, emits `ios/Sources/GTITokens.swift` (GTIColor / GTIGradient / GTIFont / GTISpacing / GTIRadii / GTIMotion / GTIVibeLabels / GTITexture). `--check` mode enforced by `scripts/verify.mjs`, so any drift between Swift output and `tokens.json` fails CI alongside the existing CSS drift gate. (TB-01.)
+
 ## 2026-05-12
 
 - **S05 Verdict:** added `read-only` mode for late-joiners. Eyebrow shifts to `"Tonight's verdict"`, ratification CTA + reroll + `"Start over"` secondary suppressed, replaced by `"Start a new decision"` re-invite CTA (returns to S01 as new initiator, defaults pre-populated from prior room). Receipt row excludes the late-joiner — they didn't contribute. Cuts drawer remains available (informational). Motion: same `choreo` sequence; CTA fade-up lands on re-invite CTA. (Spec gap 03 — consumed by TB-11.)
