@@ -91,7 +91,7 @@ If marketing-branding lands the final copy and wants a different register, the c
 
 Tracked in subsequent tracer bullets:
 
-- **TB-07** — `AFTER INSERT ON votes` trigger that fires the engine on full quorum; `pg_cron` job that fires on deadline expiry. Realtime broadcast on `verdict_ready`.
+- **TB-07** ✅ landed — `AFTER INSERT ON votes` trigger that fires the engine on full quorum + status='firing'; `pg_cron` job (`gettoit_verdict_auto_fire`) that fires on deadline expiry; Realtime Broadcast on `verdict_ready`; `fire_verdict(room_id)` RPC for the initiator's "Decide now" tap. See [[waiting-fire-trigger|waiting-fire-trigger.md]].
 - **TB-08** — `"I'm in"` ratification wiring + push permission prompt + hard-close motion.
 - **TB-09** — soft-pref silent relax (cuisine veto → vibe floor → radius widen). No-survivor terminal surface (S05 `no-survivor` mode).
 - **TB-10** — reroll sheet, 3-per-session cap, reason-to-constraint mapping.

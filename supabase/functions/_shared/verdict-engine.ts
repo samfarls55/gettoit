@@ -77,9 +77,21 @@ export interface MemberVote {
   q5_regret: Record<string, number>;
 }
 
+/** How the verdict was triggered. The engine doesn't decide this — the
+ *  caller (Edge Function entry point) classifies the fire path and
+ *  passes it through. TB-06 only used `manual`; TB-07 widens to
+ *  `quorum` (auto-fire on full-quorum vote INSERT) and `deadline`
+ *  (auto-fire on pg_cron timer expiry). `no_survivor` belongs to
+ *  TB-09's terminal. */
+export type VerdictMethod = "manual" | "quorum" | "deadline" | "no_survivor";
+
 export interface VerdictEngineInput {
   candidates: CandidateOption[];
   votes: MemberVote[];
+  /** Optional caller-supplied method; defaults to `manual` (TB-06's
+   *  original behavior). TB-07 dispatcher passes the auto-fire method
+   *  through so the row reflects the actual fire path. */
+  method?: VerdictMethod;
 }
 
 /** Receipt row surfaced on S05. One per member. */
@@ -103,8 +115,10 @@ export interface OptionCut {
 export interface VerdictEngineOutput {
   /** `verdicts.option_id`. */
   winning_option_id: string;
-  /** `verdicts.method`. TB-06 always emits `manual`. */
-  method: "manual";
+  /** `verdicts.method`. Defaults to `manual` when the caller doesn't
+   *  pass one. TB-07's trigger / cron paths supply `quorum` / `deadline`
+   *  so the durable row reflects how the fire actually happened. */
+  method: VerdictMethod;
   /** `verdicts.rule_text` — the rule-chip copy. Aggregate attribution. */
   rule_text: string;
   /** `option_cuts` rows. */
@@ -362,7 +376,7 @@ export function computeVerdict(
 
   return {
     winning_option_id: winning.id,
-    method: "manual",
+    method: input.method ?? "manual",
     rule_text: ruleText,
     cuts,
     receipts,

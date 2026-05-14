@@ -37,6 +37,7 @@ import {
   computeVerdict,
   type MemberVote,
   type VerdictEngineOutput,
+  type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
 
 export interface ComputeVerdictEnv {
@@ -64,6 +65,16 @@ export interface ComputeVerdictDataAdapter {
   insertOptionCuts(rows: OptionCutInsert[]): Promise<void>;
   /** Check whether a verdict already exists for this room (idempotency). */
   existingVerdict(room_id: string): Promise<VerdictRow | null>;
+  /** Flip rooms.status to `verdict_ready` after the verdict row
+   *  lands. The iOS client subscribes to Realtime Postgres changes on
+   *  `rooms.status` to route into S05; the flip from `firing` to
+   *  `verdict_ready` is the fire-side handshake. Optional — tests
+   *  may omit. */
+  markRoomVerdictReady?(room_id: string): Promise<void>;
+  /** Emit a `verdict_ready` broadcast on `room:{room_id}` so iOS
+   *  subscribers route into S05 within the Realtime window. Optional
+   *  — production wires this to supabase-js Realtime, tests omit. */
+  emitVerdictReadyBroadcast?(room_id: string, verdict_id: string): Promise<void>;
 }
 
 export interface ComputeVerdictDeps {
@@ -99,7 +110,7 @@ export interface MemberVoteRow {
 export interface VerdictInsert {
   room_id: string;
   option_id: string;
-  method: "manual";
+  method: VerdictMethod;
   rule_text: string;
 }
 
@@ -195,6 +206,15 @@ export async function handleRequest(
     });
   }
 
+  // Optional `method` field — TB-07's auto-fire trigger and cron pass
+  // `quorum` / `deadline` so the durable verdict row reflects how the
+  // fire actually happened. Anything else falls back to `manual` (the
+  // legacy TB-06 behavior).
+  const rawMethod = (body as { method?: unknown })?.method;
+  const method: VerdictMethod = (rawMethod === "quorum" || rawMethod === "deadline")
+    ? rawMethod
+    : "manual";
+
   const data = deps.buildDataAdapter(deps.env);
 
   // Idempotency — if a verdict already exists for this room, return it
@@ -255,7 +275,7 @@ export async function handleRequest(
 
   let result: VerdictEngineOutput;
   try {
-    result = computeVerdict({ candidates, votes });
+    result = computeVerdict({ candidates, votes, method });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     // TB-06 scope-out: empty survivor set is the TB-09 terminal.
@@ -286,6 +306,27 @@ export async function handleRequest(
       cut_reason: c.cut_reason,
       cut_text: c.cut_text,
     })));
+  }
+
+  // Post-write notifications. The room status flip lets iOS clients
+  // observing rooms.status route to S05; the broadcast emit is the
+  // canonical "verdict_ready" signal per stack-patterns.md §Realtime
+  // ("Use Realtime Broadcast for live ... the verdict_ready notification").
+  // Both are best-effort — a failure here is logged but doesn't fail
+  // the user-visible verdict response.
+  if (data.markRoomVerdictReady) {
+    try {
+      await data.markRoomVerdictReady(roomId);
+    } catch (e) {
+      console.warn("compute-verdict markRoomVerdictReady failed:", e);
+    }
+  }
+  if (data.emitVerdictReadyBroadcast) {
+    try {
+      await data.emitVerdictReadyBroadcast(roomId, verdict.id);
+    } catch (e) {
+      console.warn("compute-verdict emitVerdictReadyBroadcast failed:", e);
+    }
   }
 
   return jsonResponse({

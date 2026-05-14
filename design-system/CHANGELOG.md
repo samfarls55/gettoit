@@ -8,6 +8,10 @@ Prefix `BREAKING:` for any change that requires code or downstream consumers to 
 
 ---
 
+## 2026-05-14
+
+- **TB-07 consumed spec-gap 02** — `surfaces/04-waiting.md` description of Decide-now CTA, countdown timer, and the expired-no-quorum terminal landed in the iOS port (`ios/Sources/App/WaitingScreen.swift`). No spec changes — the JSX + markdown were already in place from 2026-05-12. (TB-07.)
+
 ## 2026-05-13
 
 - Added **C-22 Auth Upgrade Chip** component (`components.md`, `code/components.jsx`) — non-blocking Sign-in-with-Apple affordance on S04. Voluntary warm-friend register: primary `"Save this taste profile"` / dismiss `"Maybe later"` / success quiet mono-tag `"Saved."`. States: `default` / `in-progress` / `success` / `dismissed` / `hidden`. iOS-only; web fallback never renders it per ADR 0007. Dismiss persists `user_preferences.auth_prompt_dismissed_at` and suppresses re-prompt for 30 days. (TB-12.)

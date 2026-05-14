@@ -1,24 +1,30 @@
-// GetToIt — WaitingScreen (TB-12 minimal placeholder).
+// GetToIt — WaitingScreen (S04 — TB-12 chip + TB-07 full surface).
 //
-// SCOPE GUARD: this view is intentionally MINIMAL. It exists to host
-// the C-22 Auth Upgrade Chip (TB-12) and exercise its render gate
-// against the AuthCoordinator + AuthPromptStore state machine. The
-// full S04 surface (avatar row, headline, countdown, Decide-now,
-// Nudge) is owned by TB-07 — do NOT pre-empt it here.
+// History:
+//   * TB-12 introduced a minimal placeholder hosting just the C-22
+//     Auth Upgrade Chip. Render gate state machine documented in the
+//     ChipPhase enum below.
+//   * TB-07 fleshes the surface out to the full S04 spec:
+//       — avatar row with answered / answering states (live via
+//         `WaitingStore` events)
+//       — display headline `"N of M / ARE IN"`
+//       — initiator-only `"Decide now"` ghost CTA with quorum gate
+//       — mono-tag countdown (`"AUTO-FIRES IN 7:42"`)
+//       — Nudge ghost CTA (rate-limited 1 per 2 min)
+//       — Auth Upgrade Chip preserved in the CTA dock
+//       — expired-no-quorum terminal mode
 //
-// What this view does:
-//   1. Reads the AuthCoordinator state. If anonymous AND the prompt
-//      store says render-OK, renders the C-22 chip in its canonical
-//      states.
-//   2. On chip tap → save: drives `AuthSignInController` to run the
-//      `ASAuthorizationController` flow, then hands the idToken to
-//      `AuthCoordinator.linkApple`.
-//   3. On chip tap → dismiss: writes through `AuthPromptStore.recordDismissal`
-//      and flips the chip to its `dismissed` state.
+// Tokens consumed: GTIColor / GTIGradient / GTIFont / GTISpacing /
+// GTIRadii / GTIMotion. Per repo CLAUDE.md no inline hex / px / easing.
 //
-// Web fallback is hosted in `web/` — that path never instantiates
-// this view, so the chip never renders on web by construction.
-// Confirmed in `AuthUpgradeChipRenderGateTests`.
+// What this view DOES NOT own:
+//   * Wiring the Realtime channel to `WaitingStore.apply(event:)` —
+//     that's the responsibility of the call-site that owns the
+//     SupabaseClient. Tests drive `apply(event:)` directly; the
+//     production call site (RootView, when it lands TB-07 routing)
+//     binds the channel callbacks.
+//   * Routing into S05 when the verdict lands — also up to the call
+//     site. The view publishes the ready bit via `WaitingStore.verdictReady`.
 
 import SwiftUI
 import AuthenticationServices
@@ -37,25 +43,49 @@ public struct WaitingScreen: View {
 
     @State private var phase: ChipPhase = .loading
     @State private var linkError: String?
+    @State private var fireError: String?
+    /// `Date()` snapshot pinned to the start of each second so the
+    /// countdown re-renders once per second without spinning a
+    /// `Timer` directly inside the view body. The `.task` modifier
+    /// below drives the update loop.
+    @State private var tick: Date = .now
+    /// Local state for the Nudge CTA — surfaces "tap again later"
+    /// after a rate-limited press.
+    @State private var nudgeMessage: String?
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let auth: AuthCoordinator
     private let promptStore: AuthPromptStore
     private let appleProvider: AppleSignInProviding
     private let now: () -> Date
+    /// New in TB-07. `nil` for the legacy TB-12 instantiation that
+    /// only needed the chip surface.
+    private let waitingStore: WaitingStore?
+    private let timerCoordinator: TimerCoordinator?
+    private let onAdvanceToVerdict: ((UUID) -> Void)?
+    private let onStartOver: (() -> Void)?
 
+    /// Designated initializer — used by TB-07 to drive the full
+    /// surface against a live `WaitingStore` + `TimerCoordinator`.
     public init(
         auth: AuthCoordinator,
         promptStore: AuthPromptStore,
+        waitingStore: WaitingStore? = nil,
+        timerCoordinator: TimerCoordinator? = nil,
         appleProvider: AppleSignInProviding? = nil,
-        now: @escaping () -> Date = { .now }
+        now: @escaping () -> Date = { .now },
+        onAdvanceToVerdict: ((UUID) -> Void)? = nil,
+        onStartOver: (() -> Void)? = nil
     ) {
         self.auth = auth
         self.promptStore = promptStore
-        // Default-construct inside the init body so MainActor isolation
-        // on `LiveAppleSignInProvider` is in scope. A nonisolated default
-        // expression in the parameter list cannot call a @MainActor init.
+        self.waitingStore = waitingStore
+        self.timerCoordinator = timerCoordinator
         self.appleProvider = appleProvider ?? LiveAppleSignInProvider()
         self.now = now
+        self.onAdvanceToVerdict = onAdvanceToVerdict
+        self.onStartOver = onStartOver
     }
 
     public var body: some View {
@@ -63,43 +93,390 @@ public struct WaitingScreen: View {
             GTIGradient.surface(.waiting)
                 .ignoresSafeArea()
 
-            VStack(spacing: GTISpacing.step6) {
-                // Minimal headline so the surface isn't blank. TB-07
-                // replaces this with the full N-of-M avatar row.
-                Text("Waiting")
-                    .font(.system(size: GTIFont.Size.heading, weight: .heavy))
-                    .foregroundStyle(GTIColor.TextOnGradient.primary)
-                    .accessibilityIdentifier("waiting.headline")
-
-                Spacer()
-
-                if let linkError {
-                    Text(linkError)
-                        .font(.system(size: GTIFont.Size.sm, weight: .semibold))
-                        .foregroundStyle(GTIColor.TextOnGradient.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, GTISpacing.step6)
-                        .accessibilityIdentifier("authChip.error")
-                }
-
-                AuthUpgradeChip(
-                    state: chipState,
-                    onSave: { Task { await onSaveTapped() } },
-                    onDismiss: { Task { await onDismissTapped() } }
-                )
-                .padding(.horizontal, GTISpacing.step6)
-                .padding(.bottom, GTISpacing.step5)
+            if let store = waitingStore, store.status == .expired {
+                expiredTerminal(store: store)
+            } else {
+                mainBody
             }
         }
         .task {
             await refreshChipPhase()
         }
+        .task {
+            // 1Hz countdown update. The loop runs for the lifetime
+            // of the view; flipping `tick` is what re-renders the
+            // mono-tag countdown label. Reduced-motion users still
+            // get updates; the *label* (`formatCountdownReducedMotion`)
+            // flattens to coarse minute granularity per `motion.md`
+            // §"Utility motion" entry for the waiting countdown tick.
+            await runCountdownLoop()
+        }
+        .onChange(of: waitingStore?.verdictReady ?? false) { _, ready in
+            guard ready, let store = waitingStore else { return }
+            onAdvanceToVerdict?(store.roomID)
+        }
+    }
+
+    // MARK: - main body
+
+    @ViewBuilder
+    private var mainBody: some View {
+        VStack(spacing: 0) {
+            topRow
+                .padding(.horizontal, GTISpacing.step6)
+                .padding(.top, GTISpacing.step4)
+
+            Spacer(minLength: 0)
+
+            if let store = waitingStore {
+                headlineBlock(store: store)
+                    .padding(.horizontal, GTISpacing.step6)
+                    .padding(.top, GTISpacing.step10)
+
+                avatarRow(store: store)
+                    .padding(.top, GTISpacing.step8)
+
+                bodyCopy(store: store)
+                    .padding(.horizontal, GTISpacing.step6)
+                    .padding(.top, GTISpacing.step8)
+            } else {
+                // TB-12 legacy path: no store wired — just hold space.
+                Text("Waiting")
+                    .font(.system(size: GTIFont.Size.heading, weight: .heavy))
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+                    .accessibilityIdentifier("waiting.headline")
+            }
+
+            Spacer(minLength: 0)
+
+            countdownLabel
+                .padding(.horizontal, GTISpacing.step6)
+                .padding(.bottom, GTISpacing.step3 + GTISpacing.step1 / 2)
+
+            ctaDock
+                .padding(.horizontal, GTISpacing.step6)
+                .padding(.bottom, GTISpacing.step5)
+        }
+    }
+
+    private var topRow: some View {
+        HStack(alignment: .center) {
+            // GTIMark stand-in — small wordmark tile.
+            ZStack {
+                RoundedRectangle(cornerRadius: GTISpacing.step1, style: .continuous)
+                    .fill(GTIColor.paper.opacity(0.18))
+                    .frame(width: 22, height: 22)
+                Text("g")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+            }
+            .accessibilityHidden(true)
+
+            Spacer()
+
+            Text("YOU'RE IN")
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                .accessibilityIdentifier("waiting.eyebrow")
+        }
+    }
+
+    private func headlineBlock(store: WaitingStore) -> some View {
+        VStack(spacing: GTISpacing.step1 + 2) {
+            Text("\(store.answeredCount) of \(store.memberCount)")
+                .font(.system(size: GTIFont.Size.displayL, weight: .black))
+                .tracking(GTIFont.TrackingEm.displayL * GTIFont.Size.displayL)
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .accessibilityIdentifier("waiting.ratio")
+            Text("ARE IN")
+                .font(.system(size: GTIFont.Size.displayS, weight: .black))
+                .tracking(GTIFont.TrackingEm.displayS * GTIFont.Size.displayS)
+                .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                .textCase(.uppercase)
+                .accessibilityIdentifier("waiting.areIn")
+        }
+        .frame(maxWidth: .infinity)
+        .multilineTextAlignment(.center)
+    }
+
+    private func avatarRow(store: WaitingStore) -> some View {
+        HStack(spacing: GTISpacing.step3 + 2) {
+            ForEach(Array(store.members.enumerated()), id: \.element.id) { (index, member) in
+                avatarDot(member: member, index: index, isAnswered: store.answered.contains(member.id))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("waiting.avatarRow")
+    }
+
+    private func avatarDot(member: WaitingMember, index: Int, isAnswered: Bool) -> some View {
+        // Sun-yellow for the current user; per-member-identity palette
+        // for the rest, cycling through the 3 registered colors.
+        let isMe = member.id == waitingStore?.currentUserID
+        let palette = GTIColor.memberIdentity
+        let fill: Color = isMe
+            ? GTIColor.sun
+            : palette[index % palette.count]
+        let initialChar: String = isMe ? "Y" : String(member.id.uuidString.prefix(1)).uppercased()
+
+        return ZStack {
+            Circle()
+                .fill(fill)
+                .frame(width: 48, height: 48)
+                .shadow(color: isAnswered ? Color.black.opacity(0.18) : .clear,
+                        radius: isAnswered ? 11 : 0, x: 0, y: 8)
+                .overlay(
+                    Circle()
+                        .stroke(GTIColor.paper.opacity(isAnswered ? 0.85 : 0.25),
+                                lineWidth: isAnswered ? 2.5 : 1)
+                )
+                .saturation(isAnswered ? 1.0 : 0.5)
+                .opacity(isAnswered ? 1.0 : 0.55)
+                .animation(
+                    .timingCurve(
+                        GTIMotion.Easing.out.0,
+                        GTIMotion.Easing.out.1,
+                        GTIMotion.Easing.out.2,
+                        GTIMotion.Easing.out.3,
+                        duration: 0.320
+                    ),
+                    value: isAnswered
+                )
+            Text(initialChar)
+                .font(.system(size: 48 * 0.42, weight: .black))
+                .foregroundStyle(GTIColor.ink)
+                .accessibilityHidden(true)
+            if isAnswered {
+                checkBadge
+                    .offset(x: 17, y: 17)
+            }
+        }
+        .frame(width: 48, height: 48)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(isMe ? "You" : "Member"))
+        .accessibilityValue(Text(isAnswered ? "answered" : "still answering"))
+        .accessibilityIdentifier("waiting.avatar.\(isAnswered ? "answered" : "pending")")
+    }
+
+    private var checkBadge: some View {
+        ZStack {
+            Circle()
+                .fill(GTIColor.sun)
+                .overlay(Circle().stroke(GTIColor.paper, lineWidth: 2))
+                .frame(width: 14, height: 14)
+            Text("✓")
+                .font(.system(size: 8, weight: .black))
+                .foregroundStyle(GTIColor.ink)
+        }
+    }
+
+    private func bodyCopy(store: WaitingStore) -> some View {
+        let pending = store.members.filter { store.answered.contains($0.id) == false }
+        let copyText: String
+        if pending.isEmpty {
+            copyText = "Everyone's in. Holding for the engine — no spinners, promise."
+        } else if pending.count == 1 {
+            copyText = "Someone's still answering. We'll surface the verdict the second they're done — no spinners, promise."
+        } else {
+            copyText = "\(pending.count) people are still answering. We'll surface the verdict the second they're done — no spinners, promise."
+        }
+        return Text(copyText)
+            .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+            .foregroundStyle(GTIColor.TextOnGradient.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 280)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .accessibilityIdentifier("waiting.body")
+    }
+
+    @ViewBuilder
+    private var countdownLabel: some View {
+        if let coord = timerCoordinator {
+            // Pure-function format so the label is stable and the
+            // re-render is cheap. Reduced-motion users get a coarse
+            // minute-granularity variant. The `_ = tick` line wires
+            // the view's re-render to the 1Hz tick state so the
+            // label refreshes every second without the coordinator
+            // needing to publish per-second updates.
+            let _ = tick
+            let secondsRemaining = coord.secondsRemaining
+            let label = reduceMotion
+                ? TimerCoordinator.formatCountdownReducedMotion(secondsRemaining: secondsRemaining)
+                : TimerCoordinator.formatCountdown(secondsRemaining: secondsRemaining)
+            Text(label)
+                .font(.system(size: GTIFont.Size.monoTag, weight: .medium, design: .monospaced))
+                .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
+                .textCase(.uppercase)
+                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .accessibilityIdentifier("waiting.countdown")
+        } else {
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var ctaDock: some View {
+        VStack(spacing: GTISpacing.step3 + 2) {
+            // Surface the fire-error and nudge messages first — they're
+            // both transient.
+            if let fireError {
+                Text(fireError)
+                    .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("waiting.fireError")
+            }
+            if let nudgeMessage {
+                Text(nudgeMessage)
+                    .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("waiting.nudgeMessage")
+            }
+            if let linkError {
+                Text(linkError)
+                    .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier("authChip.error")
+            }
+
+            AuthUpgradeChip(
+                state: chipState,
+                onSave: { Task { await onSaveTapped() } },
+                onDismiss: { Task { await onDismissTapped() } }
+            )
+
+            decideNowCTA
+
+            nudgeCTA
+        }
+    }
+
+    @ViewBuilder
+    private var decideNowCTA: some View {
+        if let coord = timerCoordinator, coord.isInitiator, let store = waitingStore {
+            let quorumMet = store.quorumMet
+            let label = quorumMet
+                ? "DECIDE NOW · \(store.answeredCount) OF \(store.memberCount) IN"
+                : "DECIDE NOW · NEED 2 IN"
+            Button {
+                Task { await onDecideNowTapped() }
+            } label: {
+                Text(label)
+                    .font(.system(size: GTIFont.Size.cta, weight: .black))
+                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .background(
+                        Capsule(style: .continuous)
+                            .stroke(GTIColor.Glass.stroke, lineWidth: 1.5)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(!quorumMet || coord.isFiring)
+            .opacity(quorumMet ? (coord.isFiring ? 0.7 : 1.0) : 0.45)
+            .animation(
+                .timingCurve(
+                    GTIMotion.Easing.out.0,
+                    GTIMotion.Easing.out.1,
+                    GTIMotion.Easing.out.2,
+                    GTIMotion.Easing.out.3,
+                    duration: 0.320
+                ),
+                value: quorumMet
+            )
+            .accessibilityIdentifier("waiting.decideNow")
+            .accessibilityLabel(Text(quorumMet ? "Decide now" : "Decide now, need at least two in"))
+            .accessibilityHint(Text("Fires the verdict for whoever has answered"))
+            .accessibilityAddTraits(quorumMet ? [] : [.isStaticText])
+        }
+    }
+
+    @ViewBuilder
+    private var nudgeCTA: some View {
+        if let store = waitingStore, store.pendingTargets().isEmpty == false {
+            Button {
+                onNudgeTapped(store: store)
+            } label: {
+                Text("NUDGE")
+                    .font(.system(size: GTIFont.Size.cta, weight: .black))
+                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .background(
+                        Capsule(style: .continuous)
+                            .stroke(GTIColor.Glass.stroke, lineWidth: 1.5)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("waiting.nudge")
+            .accessibilityLabel(Text("Nudge"))
+        }
+    }
+
+    // MARK: - expired terminal
+
+    private func expiredTerminal(store: WaitingStore) -> some View {
+        VStack(spacing: GTISpacing.step6) {
+            Spacer()
+
+            VStack(spacing: GTISpacing.step3) {
+                Text("COULDN'T REACH")
+                    .font(.system(size: GTIFont.Size.displayS, weight: .black))
+                    .tracking(GTIFont.TrackingEm.displayS * GTIFont.Size.displayS)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+                Text("QUORUM TONIGHT")
+                    .font(.system(size: GTIFont.Size.displayS, weight: .black))
+                    .tracking(GTIFont.TrackingEm.displayS * GTIFont.Size.displayS)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+            }
+            .multilineTextAlignment(.center)
+            .accessibilityIdentifier("waiting.expired.headline")
+
+            Text("Only one of you answered before the timer ran out. Start a new round?")
+                .font(.system(size: GTIFont.Size.body, weight: .semibold))
+                .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 280)
+                .accessibilityIdentifier("waiting.expired.body")
+
+            Spacer()
+
+            Button {
+                onStartOver?()
+            } label: {
+                Text("START OVER")
+                    .font(.system(size: GTIFont.Size.cta, weight: .black))
+                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                    .foregroundStyle(GTIColor.ink)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(GTIColor.paper)
+                    )
+                    .shadow(color: Color.black.opacity(0.18), radius: 16, x: 0, y: 12)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("waiting.expired.startOver")
+            .padding(.horizontal, GTISpacing.step6)
+            .padding(.bottom, GTISpacing.step5)
+        }
+        // Keep the root content centered when the terminal is the
+        // only thing on screen.
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     /// Map the local phase to the AuthUpgradeChip's state enum.
     private var chipState: AuthUpgradeChip.State {
         switch phase {
-        case .loading:    return .hidden    // no flash while we check
+        case .loading:    return .hidden
         case .idle:       return .defaultIdle
         case .linking:    return .inProgress
         case .linked:     return .success
@@ -108,10 +485,58 @@ public struct WaitingScreen: View {
         }
     }
 
-    // MARK: - phase transitions
+    // MARK: - actions
+
+    private func runCountdownLoop() async {
+        // Update the tick state once per second so the countdown
+        // label re-renders. The loop exits when the task is cancelled
+        // (view dismissal). Reduced-motion users still tick — the
+        // label just renders a coarser minute granularity.
+        while !Task.isCancelled {
+            tick = .now
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+        }
+    }
+
+    private func onDecideNowTapped() async {
+        guard let coord = timerCoordinator else { return }
+        fireError = nil
+        let outcome = await coord.tapDecideNow()
+        switch outcome {
+        case .firing, .alreadyFiring:
+            // Server will broadcast verdict_ready when the engine
+            // commits. No-op here — the view re-renders via
+            // WaitingStore.verdictReady.
+            break
+        case .belowQuorum(let count):
+            fireError = "Need 2 in to fire — only \(count) so far."
+        case .notInitiator:
+            fireError = "Only the room owner can fire the verdict."
+        case .roomNotFound:
+            fireError = "Couldn't find this room."
+        case .unauthenticated:
+            fireError = "You're signed out. Try opening the link again."
+        case .rpcError(let message):
+            fireError = "Couldn't fire the verdict. \(message)"
+        }
+    }
+
+    private func onNudgeTapped(store: WaitingStore) {
+        let outcome = store.nudge()
+        switch outcome {
+        case .sent:
+            nudgeMessage = "Nudge sent."
+        case .rateLimited(let seconds):
+            let minutes = max(1, Int((Double(seconds) / 60.0).rounded(.up)))
+            nudgeMessage = "Wait \(minutes) min before nudging again."
+        case .noOneToNudge:
+            nudgeMessage = "Everyone's already in."
+        }
+    }
+
+    // MARK: - chip phase transitions
 
     private func refreshChipPhase() async {
-        // If the user is no longer anonymous, hide unconditionally.
         guard auth.state.isAnonymous, let userID = auth.state.userID else {
             phase = (auth.state.userID != nil) ? .hidden : .loading
             return
@@ -120,9 +545,6 @@ public struct WaitingScreen: View {
             let render = try await promptStore.shouldRenderAuthChip(for: userID, now: now())
             phase = render ? .idle : .dismissed
         } catch {
-            // Read failure shouldn't crash the surface. Default to
-            // showing the chip — better one extra tap than a missed
-            // upgrade moment. (Re-evaluation trigger in ADR 0007.)
             phase = .idle
         }
     }
@@ -139,8 +561,6 @@ public struct WaitingScreen: View {
             )
             phase = .linked
         } catch is CancellationError {
-            // User cancelled the Apple sheet — return to idle without
-            // recording a dismissal. The chip remains available.
             phase = .idle
         } catch {
             phase = .idle
@@ -154,10 +574,7 @@ public struct WaitingScreen: View {
         do {
             try await promptStore.recordDismissal(for: userID, now: now())
         } catch {
-            // Even if the write fails, flip the chip locally — the
-            // user signalled intent. A failed write means they'll see
-            // the chip on the next launch; not great, but a hard error
-            // here would feel punitive for a soft preference.
+            // Read fail-soft. Local intent honored.
         }
         phase = .dismissed
     }
@@ -213,9 +630,7 @@ public final class LiveAppleSignInProvider: NSObject, AppleSignInProviding {
         self.activeDelegate = delegate
 
         // Await the delegate callback, then clear the retain so the
-        // delegate can deallocate. Using `withCheckedThrowingContinuation`
-        // doesn't accept a defer that crosses the suspension point, so
-        // we wrap explicitly.
+        // delegate can deallocate.
         do {
             let credential = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<AppleSignInCredential, Error>) in
                 delegate.continuation = cont
@@ -248,15 +663,12 @@ public final class LiveAppleSignInProvider: NSObject, AppleSignInProviding {
     }
 
     private static func sha256(_ input: String) -> String {
-        // CryptoKit is available on iOS 13+; our deployment target is
-        // iOS 17 so the import at the top of the file is unconditional.
         let digest = SHA256.hash(data: Data(input.utf8))
         return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
 
 /// Continuation-bridging delegate for `ASAuthorizationController`.
-/// Hidden inside the file since nothing else needs it.
 private final class AppleAuthDelegate: NSObject,
                                         ASAuthorizationControllerDelegate,
                                         ASAuthorizationControllerPresentationContextProviding {
@@ -298,9 +710,6 @@ private final class AppleAuthDelegate: NSObject,
     func presentationAnchor(
         for controller: ASAuthorizationController
     ) -> ASPresentationAnchor {
-        // SwiftUI manages the scene; returning a blank anchor lets
-        // Apple find the active window on iOS 17+. This is the same
-        // pattern Supabase's own iOS sample uses.
         ASPresentationAnchor()
     }
 }
