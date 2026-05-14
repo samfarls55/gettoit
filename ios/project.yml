@@ -60,6 +60,11 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGN_IDENTITY: ""
         DEVELOPMENT_TEAM: ""
+        # Universal Links — `applinks:gettoit.app` is mirrored in the
+        # AASA file at https://gettoit.app/.well-known/apple-app-site-association
+        # (TB-00 published it; TB-02 plumbs the iOS side). Entitlement file
+        # at `Sources/App/GetToIt.entitlements`.
+        CODE_SIGN_ENTITLEMENTS: Sources/App/GetToIt.entitlements
         # Empty-string defaults so the build doesn't fail when the env vars
         # aren't set (e.g. design-system-only PRs). The integration test
         # skips itself in that case.
