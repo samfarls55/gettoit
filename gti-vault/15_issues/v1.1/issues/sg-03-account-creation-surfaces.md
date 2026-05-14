@@ -2,9 +2,10 @@
 issue: sg-03
 title: Account creation — forced first-launch Apple sign-in gate + invitee waiting-screen download CTA
 github_issue: 47
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-14
+closed: 2026-05-14
 prd: v1-prd
 ---
 
@@ -48,11 +49,11 @@ The cuisine likes/dislikes profile editor is **deferred** to the pre-public-laun
 
 ## Acceptance criteria
 
-- [ ] Sign-in surface spec exists and describes the forced first-launch gate, with reference to [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]].
-- [ ] Waiting-surface spec updated for the web-only "Download the app" CTA.
-- [ ] Corresponding JSX exists in `design-system/code/screens/`.
-- [ ] `node design-system/scripts/verify.mjs` green.
-- [ ] `design-system/CHANGELOG.md` entry referencing this issue.
+- [x] Sign-in surface spec exists and describes the forced first-launch gate, with reference to [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]. — `design-system/surfaces/00a-signin.md`
+- [x] Waiting-surface spec updated for the web-only "Download the app" CTA. — `design-system/surfaces/04-waiting.md` §"Download the app" CTA (web fallback, anonymous-only)
+- [x] Corresponding JSX exists in `design-system/code/screens/`. — `ScreenSignIn.jsx` (new); `ScreenWaiting.jsx` updated with the conditional web-anonymous CTA branch
+- [x] `node design-system/scripts/verify.mjs` green. — 5/5 gates pass (drift-check CSS + Swift, orphan-hex sweep JSX + web, surface↔jsx pairing 10 docs / 15 screens)
+- [x] `design-system/CHANGELOG.md` entry referencing this issue. — three lines added under 2026-05-14, referencing sg-03
 
 ## Open questions
 
