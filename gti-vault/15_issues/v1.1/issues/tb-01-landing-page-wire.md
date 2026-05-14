@@ -2,7 +2,7 @@
 issue: tb-01
 title: Wire landing surface into iOS — route to existing Pick a Vertical
 github_issue: 49
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -33,10 +33,10 @@ End-to-end behavior:
 
 ## Acceptance criteria
 
-- [ ] Cold-launching the app on a signed-in account lands on the new landing screen, not directly on the initiator surface.
-- [ ] "Start a Decision" navigates to the existing "Pick a Vertical" screen with no behavior change downstream.
-- [ ] "Account Settings" navigates to the existing settings / delete-your-data screen.
-- [ ] No raw hex / px / easing in the new SwiftUI view — tokens only.
+- [x] Cold-launching the app on a signed-in account lands on the new landing screen, not directly on the initiator surface. _(RootView routing flipped: signed-in `.anonymous` / `.linkedApple` defaults to `LandingScreen`; `showingInitiator` flips to true on Start a Decision tap, on the late-joiner re-invite prefill path.)_
+- [x] "Start a Decision" navigates to the existing "Pick a Vertical" screen with no behavior change downstream. _(Routes to existing `InitiatorScreen` with no callback changes — share / solo / settings handlers unchanged.)_
+- [x] "Account Settings" navigates to the existing settings / delete-your-data screen. _(Same `showingSettings` toggle as the S01 footer link; `SettingsScreen.onDone` returns to S00 Landing.)_
+- [x] No raw hex / px / easing in the new SwiftUI view — tokens only. _(One px-literal kept: `fontSize: 36` for the headline, mirroring the JSX spec exactly per surfaces/00-landing.md §"Copy register" — `display-m` token is 44pt; the spec calls for 36pt explicitly. GTIMark stand-in uses 22/14 mirroring `WaitingScreen` precedent. Ghost-pill stroke uses `Color.white.opacity(0.5)` per components.md §C-05 + `CheckinScreen` precedent.)_
 - [ ] Manual TestFlight smoke check: launch → land on landing → both buttons route correctly → existing food flow still works end-to-end.
 
 ## Blocked by
