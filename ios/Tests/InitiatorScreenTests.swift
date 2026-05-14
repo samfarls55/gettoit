@@ -62,4 +62,47 @@ final class InitiatorScreenTests: XCTestCase {
     func testTimerOptionsMatchSpecAndMigrationCheckSet() {
         XCTAssertEqual(InitiatorScreen.timerOptions, [5, 10, 15, 30])
     }
+
+    // MARK: - TB-11 — re-invite prefill defaults
+
+    /// The TB-11 re-invite CTA on the read-only S05 surface returns
+    /// the late-joiner to S01 with the prior room's timer + radius
+    /// pre-populated as defaults. The InitiatorScreen accepts those
+    /// values via its `prefilledTimerMinutes` / `prefilledRadiusMiles`
+    /// init parameters; absent the parameters, the canonical S01
+    /// defaults (10 min / 2.0 mi) still apply.
+    func testPrefilledDefaultsFallBackToCanonicalS01ValuesWhenNotProvided() {
+        let resolved = InitiatorScreen.resolvedPrefill(
+            timerMinutes: nil,
+            radiusMiles: nil
+        )
+        XCTAssertEqual(resolved.timer, InitiatorScreen.defaultTimerMinutes,
+            "no prefill → 10 min default per S01 spec")
+        XCTAssertEqual(resolved.miles, InitiatorScreen.defaultRadiusMiles, accuracy: 0.001,
+            "no prefill → 2.0 mi default per S01 spec")
+    }
+
+    func testPrefilledDefaultsPassThroughTimerAndRadiusWhenProvided() {
+        let resolved = InitiatorScreen.resolvedPrefill(
+            timerMinutes: 15,
+            radiusMiles: 3.0
+        )
+        XCTAssertEqual(resolved.timer, 15)
+        XCTAssertEqual(resolved.miles, 3.0, accuracy: 0.001)
+    }
+
+    func testPrefilledDefaultsClampOutOfRangeRadius() {
+        // A prefill from a widened no-survivor room could carry, say,
+        // 9.5 mi. The S01 slider range is `0.5 mi .. 5.0 mi` — the
+        // prefill must clamp to the legal range.
+        XCTAssertEqual(InitiatorScreen.resolvedPrefill(timerMinutes: nil, radiusMiles: 9.5).miles, 5.0, accuracy: 0.001)
+        XCTAssertEqual(InitiatorScreen.resolvedPrefill(timerMinutes: nil, radiusMiles: 0.1).miles, 0.5, accuracy: 0.001)
+    }
+
+    func testPrefilledTimerClampsToLegalSet() {
+        // 20 min isn't in the {5,10,15,30} set. Clamp to nearest legal.
+        XCTAssertEqual(InitiatorScreen.resolvedPrefill(timerMinutes: 20, radiusMiles: nil).timer, 15)
+        XCTAssertEqual(InitiatorScreen.resolvedPrefill(timerMinutes: 60, radiusMiles: nil).timer, 30)
+        XCTAssertEqual(InitiatorScreen.resolvedPrefill(timerMinutes: 1,  radiusMiles: nil).timer, 5)
+    }
 }

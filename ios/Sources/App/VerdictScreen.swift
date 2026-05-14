@@ -582,9 +582,22 @@ public struct VerdictScreen: View {
                 noSurvivorPrimary
                 noSurvivorSecondary
             } else if mode == .readOnly {
-                // Read-only late-joiner — re-invite CTA, no ratify
-                // path, no pre-permission line. TB-11 polish wires
-                // the navigation; TB-08 just makes the CTA tappable.
+                // TB-11 — read-only late-joiner CTA. Re-invite the
+                // caller to a fresh round as the new initiator;
+                // ratification + reroll + "Start over" secondary are
+                // ALL suppressed in this branch (they imply the
+                // late-joiner can still influence the closed
+                // verdict). The pre-permission line is also dropped
+                // because there's no "I'm in" tap to chase with the
+                // native push prompt.
+                //
+                // VO contract (locked in `design-system/accessibility.md`
+                // §"Verdict (`read-only` mode)"): the absent
+                // ratification path is announced as "Not available —
+                // this verdict is closed." We surface it as the
+                // accessibilityHint on the re-invite CTA so a VO
+                // user reading the focus chain hears the closure
+                // before they hear the CTA's action.
                 Button(action: onAdvance) {
                     Text("START A NEW DECISION")
                         .font(.system(size: GTIFont.Size.cta, weight: .black))
@@ -597,6 +610,8 @@ public struct VerdictScreen: View {
                         )
                 }
                 .accessibilityIdentifier("verdict.cta.primary")
+                .accessibilityLabel("Start a new decision")
+                .accessibilityHint(VerdictScreen.readOnlyRatificationVOAnnouncement)
             } else if isCommittedFlavor {
                 // Committed mode — sun-fill pill, ink check prefix,
                 // "You're in · N of M" label. Window countdown lives
@@ -952,6 +967,15 @@ public struct VerdictScreen: View {
     /// NEVER paraphrase to "Enable notifications" / "Allow alerts" —
     /// the wording is voluntary register, the prompt is the call.
     public static let preCheckInCopy = "We'll check in tomorrow — see if you went."
+
+    /// TB-11 — VO announcement for the suppressed ratification path in
+    /// `.readOnly` mode. Locked by
+    /// `design-system/accessibility.md` §"Verdict (`read-only` mode)" —
+    /// VoiceOver users hear this when they would otherwise focus on
+    /// the (absent) "I'm in" button. Surfaced as the `accessibilityHint`
+    /// on the re-invite CTA.
+    public static let readOnlyRatificationVOAnnouncement =
+        "Not available — this verdict is closed."
 
     /// S05 §Modes — committed CTA reads `"You're in · N of M"`. We
     /// guard against `total = 0` (count snapshot hasn't loaded yet)
