@@ -1,20 +1,23 @@
-// GetToIt — S01 · Initiator landing (TB-02 minimal port).
+// GetToIt — S01 · Initiator landing.
 //
-// This is the minimum port required by TB-02:
-//   * Food vertical visibly selected; Drinks + Movie rendered as
-//     disabled future-plan rows.
-//   * Primary CTA "Drop the invite link" creates a room and triggers
-//     the iOS share sheet with the generated Universal Link.
+// TB-02 baseline: food vertical visibly selected; Drinks + Movie
+// rendered as disabled future-plan rows; primary CTA creates a room
+// and triggers the iOS share sheet with the generated Universal Link.
 //
-// Explicitly **deferred to TB-03**:
-//   * Timer chip group (5 · 10 · 15 · 30 min)
-//   * Radius slider (0.5 – 5.0 mi)
-// Those controls land in TB-03 with their schema columns
-// (`rooms.timer_minutes`, `rooms.radius_meters`). For TB-02 we write
-// the row without them and the server-side schema defaults take over.
+// TB-03 adds the two initiator-set controls above the vertical picker:
+//   * Timer chip group — `5 · 10 · 15 · 30` minutes (single-select,
+//     default 10), drives `rooms.timer_minutes`.
+//   * Radius slider — `0.5 mi – 5.0 mi` (step 0.5, default 2.0 mi),
+//     drives `rooms.radius_meters` after a miles→meters conversion.
 //
-// All color, type, spacing, and motion come from `GTITokens.swift` —
-// per repo CLAUDE.md, never inline hex/px/easing.
+// Both controls are documented as a spec exception against S01's
+// "no optional fields" defense in
+// `design-system/surfaces/01-initiator.md` § "Timer + radius controls".
+// Framing: setting expectations, not configuring options — both have
+// sensible defaults that ship the zero-tap session.
+//
+// All color, type, spacing, motion comes from `GTITokens.swift` — per
+// repo CLAUDE.md, never inline hex/px/easing.
 
 import SwiftUI
 import UIKit
@@ -23,6 +26,8 @@ import UIKit
 public struct InitiatorScreen: View {
     @State private var phase: Phase = .ready
     @State private var pendingShare: PendingShare?
+    @State private var timerMinutes: Int = InitiatorScreen.defaultTimerMinutes
+    @State private var radiusMiles: Double = InitiatorScreen.defaultRadiusMiles
 
     private let roomStore: RoomStore
     private let userID: UUID
@@ -41,11 +46,33 @@ public struct InitiatorScreen: View {
         case error(String)
     }
 
-    /// State the share sheet reads when present. Driven into a sheet
-    /// item so SwiftUI cleanly tears down the share view after dismiss.
-    public struct PendingShare: Identifiable, Equatable {
-        public let id: UUID
-        public let url: URL
+    /// Canonical S01 timer chip options. Source of truth is
+    /// `design-system/surfaces/01-initiator.md` § "Timer chip group".
+    /// The legal set is mirrored on the server by the
+    /// `rooms.timer_minutes` CHECK constraint (TB-03 migration).
+    public static let timerOptions: [Int] = [5, 10, 15, 30]
+    public static let defaultTimerMinutes: Int = 10
+
+    /// Canonical S01 radius slider range — `0.5 mi … 5.0 mi`, step
+    /// `0.5 mi`, default `2.0 mi`. Source of truth is the surface doc.
+    public static let radiusMinMiles: Double = 0.5
+    public static let radiusMaxMiles: Double = 5.0
+    public static let radiusStepMiles: Double = 0.5
+    public static let defaultRadiusMiles: Double = 2.0
+
+    /// Conversion factor used by the candidate-pool fetch (TB-05's
+    /// PlacesProxy speaks meters to Foursquare). The migration stores
+    /// `radius_meters` as integer meters; we round on conversion.
+    public static let metersPerMile: Double = 1609.344
+
+    public static func metersFromMiles(_ miles: Double) -> Int {
+        Int((miles * metersPerMile).rounded())
+    }
+
+    /// `String(format:)` mirrors the JSX's `radius.toFixed(1)` so the
+    /// slider label reads `"2.0 MI"` (never `"2 MI"` or `"2.00 MI"`).
+    public static func formatRadiusLabel(_ miles: Double) -> String {
+        String(format: "%.1f MI", miles)
     }
 
     public var body: some View {
@@ -53,20 +80,25 @@ public struct InitiatorScreen: View {
             GTIGradient.surface(.initiator)
                 .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: GTISpacing.step6) {
-                header
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: GTISpacing.step6) {
+                    header
 
-                Spacer(minLength: GTISpacing.step6)
+                    timerChipRow
 
-                verticalPicker
+                    radiusSliderRow
 
-                Spacer(minLength: 0)
+                    verticalPicker
 
-                cta
+                    Spacer(minLength: GTISpacing.step6)
+
+                    cta
+                }
+                .padding(.horizontal, GTISpacing.step6)
+                .padding(.top, GTISpacing.step16)
+                .padding(.bottom, GTISpacing.step6)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, GTISpacing.step6)
-            .padding(.top, GTISpacing.step16)
-            .padding(.bottom, GTISpacing.step6)
         }
         .sheet(item: $pendingShare) { share in
             ShareSheet(items: [share.url])
@@ -108,6 +140,99 @@ public struct InitiatorScreen: View {
                 .foregroundStyle(GTIColor.TextOnGradient.secondary)
                 .frame(maxWidth: 280, alignment: .leading)
                 .accessibilityIdentifier("initiator.subhead")
+        }
+    }
+
+    /// Single-select chip group. C-04 variant per surface spec —
+    /// `5 · 10 · 15 · 30` minute chips, equal-flex row, default 10.
+    private var timerChipRow: some View {
+        VStack(alignment: .leading, spacing: GTISpacing.step2) {
+            Text("HOW LONG")
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                .accessibilityIdentifier("initiator.timer.eyebrow")
+
+            HStack(spacing: GTISpacing.step2) {
+                ForEach(Self.timerOptions, id: \.self) { minutes in
+                    timerChip(minutes: minutes)
+                }
+            }
+            .accessibilityIdentifier("initiator.timer.row")
+        }
+    }
+
+    @ViewBuilder
+    private func timerChip(minutes: Int) -> some View {
+        let selected = timerMinutes == minutes
+        Button {
+            timerMinutes = minutes
+        } label: {
+            Text("\(minutes) MIN")
+                .font(.system(size: GTIFont.Size.cta, weight: .heavy))
+                .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                .foregroundStyle(selected ? GTIColor.ink : GTIColor.TextOnGradient.primary)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 44)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(selected ? GTIColor.sun : GTIColor.Glass.fillSoft)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(selected ? Color.clear : GTIColor.Glass.stroke, lineWidth: 1.5)
+                )
+                .scaleEffect(selected ? 1.02 : 1.0)
+                .animation(
+                    .timingCurve(
+                        GTIMotion.Easing.out.0,
+                        GTIMotion.Easing.out.1,
+                        GTIMotion.Easing.out.2,
+                        GTIMotion.Easing.out.3,
+                        duration: GTIMotion.Duration.chip
+                    ),
+                    value: selected
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("initiator.timer.chip.\(minutes)")
+        .accessibilityLabel("\(minutes) minute timer")
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    /// C-21 Range Slider row — `0.5 … 5.0 mi`, step `0.5`, default
+    /// `2.0`. The live value label sits in the same row as the
+    /// `"HOW FAR"` eyebrow (right-aligned), mirroring the JSX.
+    private var radiusSliderRow: some View {
+        VStack(alignment: .leading, spacing: GTISpacing.step1) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("HOW FAR")
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                Spacer()
+                Text(Self.formatRadiusLabel(radiusMiles))
+                    .font(.system(size: GTIFont.Size.monoTag, weight: .medium, design: .monospaced))
+                    .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
+                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                    .accessibilityIdentifier("initiator.radius.value")
+            }
+            .accessibilityIdentifier("initiator.radius.eyebrow")
+
+            // SwiftUI's `Slider` keeps drag latency in the framework
+            // (no per-frame onChange storm). `.tint(GTIColor.sun)` paints
+            // the filled-left-of-thumb track per the C-21 spec; the
+            // thumb is the platform default disk.
+            Slider(
+                value: $radiusMiles,
+                in: Self.radiusMinMiles...Self.radiusMaxMiles,
+                step: Self.radiusStepMiles
+            )
+            .tint(GTIColor.sun)
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("initiator.radius.slider")
+            .accessibilityLabel("Walk radius")
+            .accessibilityValue("\(String(format: "%.1f", radiusMiles)) miles")
         }
     }
 
@@ -203,9 +328,15 @@ public struct InitiatorScreen: View {
 
     private func shareInviteLink() {
         phase = .creating
+        let chosenTimer = timerMinutes
+        let chosenRadiusMeters = Self.metersFromMiles(radiusMiles)
         Task {
             do {
-                let room = try await roomStore.createRoom(as: userID)
+                let room = try await roomStore.createRoom(
+                    as: userID,
+                    timerMinutes: chosenTimer,
+                    radiusMeters: chosenRadiusMeters
+                )
                 // Token is a placeholder for v1 — TB-02 just needs the
                 // round-trip-able shape. Signed/expiring tokens land in a
                 // later tracer bullet once the abuse surface materializes.
@@ -218,6 +349,13 @@ public struct InitiatorScreen: View {
                 phase = .error("Couldn't create the session. \(String(describing: error))")
             }
         }
+    }
+
+    /// State the share sheet reads when present. Driven into a sheet
+    /// item so SwiftUI cleanly tears down the share view after dismiss.
+    public struct PendingShare: Identifiable, Equatable {
+        public let id: UUID
+        public let url: URL
     }
 }
 

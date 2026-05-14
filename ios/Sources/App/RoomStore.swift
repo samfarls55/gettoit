@@ -39,6 +39,14 @@ public final class RoomStore {
     /// `userID` matches the active Supabase auth session — RLS rejects
     /// the insert otherwise.
     ///
+    /// `timerMinutes` and `radiusMeters` are the S01 initiator controls
+    /// (TB-03). Both parameters are optional — `nil` leaves them off
+    /// the wire payload entirely so the column defaults
+    /// (`timer_minutes=10`, `radius_meters=3219`) take effect. That
+    /// keeps the zero-tap path identical to the TB-02 behavior and is
+    /// what `surfaces/01-initiator.md` calls the "sensible default"
+    /// contract.
+    ///
     /// We allocate the room id client-side rather than letting Postgres
     /// generate it. Reason: the `rooms` SELECT policy requires the
     /// caller to be a member of the room, but the bootstrap member
@@ -48,9 +56,20 @@ public final class RoomStore {
     /// `.single()`. Skipping the read-back lets us return the row built
     /// from the values we already hold.
     @discardableResult
-    public func createRoom(as userID: UUID) async throws -> Room {
+    public func createRoom(
+        as userID: UUID,
+        timerMinutes: Int? = nil,
+        radiusMeters: Int? = nil
+    ) async throws -> Room {
         let roomID = UUID()
-        let insert = RoomInsert(id: roomID, creatorUserID: userID, status: "open", vertical: "food")
+        let insert = RoomInsert(
+            id: roomID,
+            creatorUserID: userID,
+            status: "open",
+            vertical: "food",
+            timerMinutes: timerMinutes,
+            radiusMeters: radiusMeters
+        )
         try await client
             .from("rooms")
             .insert(insert)
@@ -64,22 +83,34 @@ public final class RoomStore {
 
         // Now that the membership row exists the rooms SELECT policy
         // admits the caller; read the row back so we surface the
-        // server-side defaults (`status`, `vertical`, `created_at`).
+        // server-side defaults (`status`, `vertical`, `created_at`,
+        // and — when the caller passed `nil` — `timer_minutes` and
+        // `radius_meters`).
         if let room = try await fetchRoom(id: roomID) {
             return room
         }
 
         // Server didn't echo the row back — extremely unlikely, but
         // construct a best-effort representation so callers don't fail
-        // silently. The id and creator are authoritative.
+        // silently. The id and creator are authoritative; for the
+        // S01 controls we fall back to the canonical defaults.
         return Room(
             id: roomID,
             creatorUserID: userID,
             status: "open",
             vertical: "food",
+            timerMinutes: timerMinutes ?? RoomStore.defaultTimerMinutes,
+            radiusMeters: radiusMeters ?? RoomStore.defaultRadiusMeters,
             createdAt: ""
         )
     }
+
+    /// Canonical S01 defaults. Source of truth is the column default in
+    /// `supabase/migrations/20260513212500000_rooms_timer_radius.sql`;
+    /// these constants mirror it for the unlikely "server didn't echo
+    /// the row" fallback path.
+    public static let defaultTimerMinutes: Int = 10
+    public static let defaultRadiusMeters: Int = 3219
 
     /// Join an existing room as `role='participant'`. Idempotent in
     /// the sense that the underlying primary key on `(room_id, user_id)`
@@ -135,6 +166,14 @@ public final class RoomStore {
         public let creatorUserID: UUID
         public let status: String
         public let vertical: String
+        /// Initiator-set verdict-fire timer in minutes (S01 chip
+        /// group, TB-03). Column default `10`; legal set
+        /// `{5, 10, 15, 30}`.
+        public let timerMinutes: Int
+        /// Initiator-set candidate-pool radius in meters (S01 slider,
+        /// TB-03). Column default `3219` (≈ 2.0 mi). Stored in meters
+        /// because the PlacesProxy (TB-05) speaks meters to Foursquare.
+        public let radiusMeters: Int
         // Keep `created_at` as a string for now. The Postgres timestamp
         // shape (with microseconds and a timezone offset) doesn't decode
         // cleanly via the default supabase-swift JSON decoder, and v1's
@@ -142,26 +181,68 @@ public final class RoomStore {
         // realtime broadcast carry the timing semantics.
         public let createdAt: String
 
+        public init(
+            id: UUID,
+            creatorUserID: UUID,
+            status: String,
+            vertical: String,
+            timerMinutes: Int,
+            radiusMeters: Int,
+            createdAt: String
+        ) {
+            self.id = id
+            self.creatorUserID = creatorUserID
+            self.status = status
+            self.vertical = vertical
+            self.timerMinutes = timerMinutes
+            self.radiusMeters = radiusMeters
+            self.createdAt = createdAt
+        }
+
         enum CodingKeys: String, CodingKey {
             case id
             case creatorUserID = "creator_user_id"
             case status
             case vertical
+            case timerMinutes = "timer_minutes"
+            case radiusMeters = "radius_meters"
             case createdAt = "created_at"
         }
     }
 
+    /// Encoded payload for the `rooms` insert. `timerMinutes` and
+    /// `radiusMeters` are `Optional<Int>` and skipped from the JSON
+    /// when `nil` so the column defaults take effect — the
+    /// `Encodable` impl below honors that.
     private struct RoomInsert: Encodable {
         let id: UUID
         let creatorUserID: UUID
         let status: String
         let vertical: String
+        let timerMinutes: Int?
+        let radiusMeters: Int?
 
         enum CodingKeys: String, CodingKey {
             case id
             case creatorUserID = "creator_user_id"
             case status
             case vertical
+            case timerMinutes = "timer_minutes"
+            case radiusMeters = "radius_meters"
+        }
+
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(id, forKey: .id)
+            try container.encode(creatorUserID, forKey: .creatorUserID)
+            try container.encode(status, forKey: .status)
+            try container.encode(vertical, forKey: .vertical)
+            // `encodeIfPresent` omits the key entirely when nil — that
+            // way the server-side column default fires for the
+            // zero-tap path. Encoding `null` explicitly would override
+            // the default with NULL and fail the `NOT NULL` constraint.
+            try container.encodeIfPresent(timerMinutes, forKey: .timerMinutes)
+            try container.encodeIfPresent(radiusMeters, forKey: .radiusMeters)
         }
     }
 
