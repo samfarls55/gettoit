@@ -120,6 +120,11 @@ export interface MemberVote {
  *  TB-09's terminal. */
 export type VerdictMethod = "manual" | "quorum" | "deadline" | "no_survivor";
 
+/** Reroll reason taxonomy (TB-10). The engine reads this to prefix the
+ *  rule_text with aggregate-rule attribution ("Cost reroll cut Pico's.").
+ *  Never names the rerolling member. */
+export type RerollReason = "cost" | "dist" | "mood" | "diet" | "avail";
+
 export interface VerdictEngineInput {
   candidates: CandidateOption[];
   votes: MemberVote[];
@@ -141,6 +146,26 @@ export interface VerdictEngineInput {
    *  (5.0 mi) — the S01 slider's ceiling. The S05 "Widen radius"
    *  CTA can push this to 16093 m (10.0 mi). */
   radius_meters_cap?: number;
+  /** TB-10 reroll: option ids that should be removed from the candidate
+   *  pool BEFORE pruning. Populated by `avail`-reason rerolls (the
+   *  user's prior verdict's option is appended). Empty / undefined
+   *  for clean runs. */
+  excluded_option_ids?: string[];
+  /** TB-10 reroll: when set, the engine prefixes the generated
+   *  rule_text with the aggregate-rule reroll attribution
+   *  ("Cost reroll cut <previous_winner_name>."). The reason taxonomy
+   *  maps to a fixed label set (cost → "Cost", dist → "Distance",
+   *  mood → "Mood", diet → "Diet", avail → "Availability"). The
+   *  member who initiated the reroll is NEVER named in this prefix —
+   *  the aggregate register is load-bearing per the PRD §"Reroll" and
+   *  verdict-screen-spec §"Name the rule, not the picker". */
+  reroll_reason?: RerollReason;
+  /** TB-10 reroll: human name of the option that the reroll replaced.
+   *  Sourced from the prior `verdicts.option_id` join with `options`.
+   *  Optional — when omitted the prefix falls back to a generic
+   *  "the prior pick" copy (defensive against handler races where the
+   *  prior verdict was already cleaned up). */
+  previous_winner_name?: string;
 }
 
 /** Receipt row surfaced on S05. One per member. */
@@ -337,7 +362,17 @@ export function computeVerdict(
   input: VerdictEngineInput,
   options: VerdictEngineOptions = {},
 ): VerdictEngineOutput {
-  const { candidates, votes } = input;
+  // TB-10 — `avail`-reason rerolls populate `excluded_option_ids`. The
+  // exclusion is a pool filter that runs BEFORE pruning, so the
+  // excluded option never makes it onto the cuts surface (it was never
+  // a candidate this run). Cleanest to filter at the engine surface so
+  // every downstream path — pruning, cascade, no-survivor terminal —
+  // sees the post-exclusion pool consistently.
+  const excludedSet = new Set(input.excluded_option_ids ?? []);
+  const candidates = excludedSet.size === 0
+    ? input.candidates
+    : input.candidates.filter((c) => !excludedSet.has(c.id));
+  const { votes } = input;
   const random = options.random ?? Math.random;
   const flatThreshold =
     options.flatRegretVarianceThreshold ?? DEFAULT_FLAT_REGRET_VARIANCE_THRESHOLD;
@@ -353,6 +388,8 @@ export function computeVerdict(
       relaxChainApplied: [],
       radiusMetersUsed: input.radius_meters ?? null,
       reasonHint: "empty_pool",
+      rerollReason: input.reroll_reason,
+      previousWinnerName: input.previous_winner_name,
     });
   }
   if (votes.length === 0) {
@@ -453,6 +490,8 @@ export function computeVerdict(
         relaxChainApplied: relaxChain,
         radiusMetersUsed: state.radiusMeters,
         reasonHint: "cascade_exhausted",
+        rerollReason: input.reroll_reason,
+        previousWinnerName: input.previous_winner_name,
       });
     }
     relaxChain.push(stepApplied);
@@ -465,6 +504,8 @@ export function computeVerdict(
       relaxChainApplied: relaxChain,
       radiusMetersUsed: state.radiusMeters,
       reasonHint: "cascade_exhausted",
+      rerollReason: input.reroll_reason,
+      previousWinnerName: input.previous_winner_name,
     });
   }
 
@@ -518,6 +559,8 @@ export function computeVerdict(
     activeRequirements,
     regretAppliedInRule,
     candidates,
+    rerollReason: input.reroll_reason,
+    previousWinnerName: input.previous_winner_name,
   });
 
   const receipts = buildReceipts(votes);
@@ -721,6 +764,11 @@ interface BuildNoSurvivorArgs {
   relaxChainApplied: RelaxStep[];
   radiusMetersUsed: number | null;
   reasonHint: "empty_pool" | "cascade_exhausted";
+  /** TB-10 — when set, prefix the no_survivor rule_text with the
+   *  aggregate-rule reroll attribution. */
+  rerollReason?: RerollReason;
+  /** TB-10 — human name of the option the reroll replaced. */
+  previousWinnerName?: string;
 }
 
 function buildNoSurvivorOutput(args: BuildNoSurvivorArgs): VerdictEngineOutput {
@@ -758,6 +806,8 @@ function buildNoSurvivorOutput(args: BuildNoSurvivorArgs): VerdictEngineOutput {
       activeRequirements,
       survivingHardNeeds,
       radiusMetersUsed,
+      rerollReason: args.rerollReason,
+      previousWinnerName: args.previousWinnerName,
     }),
     cuts: [],
     receipts: buildReceipts(votes),
@@ -801,32 +851,72 @@ function buildNoSurvivorRuleText(args: {
   activeRequirements: readonly DietaryRequirement[];
   survivingHardNeeds: readonly string[];
   radiusMetersUsed: number | null;
+  rerollReason?: RerollReason;
+  previousWinnerName?: string;
 }): string {
   const { activeRequirements, survivingHardNeeds } = args;
+  // TB-10 — reroll prefix lands first when present, then the
+  // standard no-survivor sentence.
+  const prefix = args.rerollReason
+    ? rerollPrefixSentence(args.rerollReason, args.previousWinnerName)
+    : "";
+
   // Aggregate attribution — name the constraint(s), never the
   // member. The JSX fixture in `ScreenVerdict.jsx` reads:
   //   "Vegan options left no candidates within walking distance tonight."
   // We follow the same shape: subject = constraint label(s); verb =
   // "left no candidates"; location/time tail = "within walking distance
   // tonight." for vibe / radius cases.
+  let body: string;
   if (activeRequirements.length === 1) {
     const r = activeRequirements[0];
-    return `${capitalize(r.label)} left no candidates within walking distance tonight.`;
-  }
-  if (activeRequirements.length > 1) {
+    body = `${capitalize(r.label)} left no candidates within walking distance tonight.`;
+  } else if (activeRequirements.length > 1) {
     const labels = activeRequirements.map((r) => r.label);
     const last = labels.pop()!;
     const head = labels.join(", ");
-    return `${capitalize(head)} and ${last} left no candidates within walking distance tonight.`;
-  }
-  if (survivingHardNeeds.length > 0) {
+    body = `${capitalize(head)} and ${last} left no candidates within walking distance tonight.`;
+  } else if (survivingHardNeeds.length > 0) {
     // Budget / walk only — no dietary. Surface the cap honestly.
-    return `No spot fits within ${
+    body = `No spot fits within ${
       survivingHardNeeds.join(" and ")
     } tonight.`;
+  } else {
+    // Empty pool / engine-misuse fallback.
+    body = "No spot fits the room tonight.";
   }
-  // Empty pool / engine-misuse fallback.
-  return "No spot fits the room tonight.";
+
+  return prefix ? `${prefix} ${body}` : body;
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// Reroll prefix copy (TB-10)
+// ───────────────────────────────────────────────────────────────────────
+//
+// Aggregate-rule register per PRD §"Reroll" and verdict-screen-spec
+// §"Name the rule, not the picker". The reroll reason taxonomy maps to
+// a fixed label set; the member who initiated the reroll is never
+// surfaced. The "previous winner" is the option that the reroll
+// replaced — sourced from the prior `verdicts.option_id` join with
+// `options`. The handler reads it and passes it through; if it can't
+// (e.g. the prior verdict was already cleaned up before this run),
+// the prefix falls back to "the prior pick".
+const REROLL_LABELS: Readonly<Record<RerollReason, string>> = Object.freeze({
+  cost:  "Cost",
+  dist:  "Distance",
+  mood:  "Mood",
+  diet:  "Diet",
+  avail: "Availability",
+});
+
+function rerollPrefixSentence(
+  reason: RerollReason,
+  previousWinnerName?: string,
+): string {
+  const label = REROLL_LABELS[reason];
+  const name = (previousWinnerName ?? "").trim();
+  const target = name.length > 0 ? name : "the prior pick";
+  return `${label} reroll cut ${target}.`;
 }
 
 // ───────────────────────────────────────────────────────────────────────
@@ -865,9 +955,17 @@ function buildRuleText(args: {
   activeRequirements: readonly DietaryRequirement[];
   regretAppliedInRule: boolean;
   candidates: CandidateOption[];
+  rerollReason?: RerollReason;
+  previousWinnerName?: string;
 }): string {
   const { winning, cuts, activeRequirements, regretAppliedInRule, candidates } = args;
   const parts: string[] = [];
+
+  // TB-10 reroll prefix — always lands first when present. Aggregate-
+  // rule register; never names the rerolling member.
+  if (args.rerollReason) {
+    parts.push(rerollPrefixSentence(args.rerollReason, args.previousWinnerName));
+  }
 
   // Budget cuts — surface ONE representative cut option name in the
   // rule chip, like the JSX fixture: "Budget cap cut Ren Soba."

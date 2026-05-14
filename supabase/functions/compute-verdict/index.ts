@@ -54,7 +54,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
     async fetchVotes(room_id): Promise<MemberVoteRow[]> {
       const { data, error } = await client
         .from("votes")
-        .select("user_id, q1_vetoes, q2_budget, q3_walk_minutes, q4_vibe, q5_regret")
+        .select("user_id, q1_vetoes, q1_vetoes_extra, q2_budget, q3_walk_minutes, q4_vibe, q5_regret")
         .eq("room_id", room_id);
       if (error) {
         console.warn("compute-verdict fetchVotes failed:", error.message);
@@ -70,6 +70,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         user_id: row.user_id,
         display_name: `m${(row.user_id as string).slice(0, 4)}`,
         q1_vetoes: row.q1_vetoes ?? [],
+        // TB-10 — q1_vetoes_extra are appended by the apply_reroll RPC
+        // on a diet-reason reroll. The handler merges them with
+        // q1_vetoes before feeding the engine.
+        q1_vetoes_extra: row.q1_vetoes_extra ?? [],
         q2_budget: row.q2_budget,
         q3_walk_minutes: row.q3_walk_minutes,
         q4_vibe: row.q4_vibe,
@@ -80,6 +84,59 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         // skip the cuisine_veto relax step until the column lands.
         soft_cuisine_vetoes: undefined,
       })) as MemberVoteRow[];
+    },
+    async fetchRoomRerollState(room_id) {
+      const { data, error } = await client
+        .from("rooms")
+        .select("excluded_option_ids, budget_tier_override, walk_minutes_override, last_reroll_reason")
+        .eq("id", room_id)
+        .maybeSingle();
+      if (error || !data) {
+        console.warn("compute-verdict fetchRoomRerollState failed:", error?.message ?? "no row");
+        return {
+          excluded_option_ids: [],
+          budget_tier_override: null,
+          walk_minutes_override: null,
+          last_reroll_reason: null,
+        };
+      }
+      const row = data as {
+        excluded_option_ids: string[] | null;
+        budget_tier_override: number | null;
+        walk_minutes_override: number | null;
+        last_reroll_reason: string | null;
+      };
+      const reason = row.last_reroll_reason;
+      const allowed: ReadonlySet<string> = new Set(["cost", "dist", "mood", "diet", "avail"]);
+      return {
+        excluded_option_ids: row.excluded_option_ids ?? [],
+        budget_tier_override: row.budget_tier_override,
+        walk_minutes_override: row.walk_minutes_override,
+        last_reroll_reason: reason && allowed.has(reason)
+          ? (reason as "cost" | "dist" | "mood" | "diet" | "avail")
+          : null,
+      };
+    },
+    async fetchPreviousWinnerName(room_id) {
+      // Race-tolerant: the prior verdict may have been deleted by
+      // apply_reroll already. We surface null in that case so the
+      // engine's reroll prefix falls back to "the prior pick" copy.
+      // The verdict has option_id null only for `no_survivor` — we
+      // skip those too.
+      const { data: verdictRow } = await client
+        .from("verdicts")
+        .select("option_id")
+        .eq("room_id", room_id)
+        .maybeSingle();
+      const optionId = (verdictRow as { option_id?: string | null } | null)?.option_id;
+      if (!optionId) return null;
+      const { data: optionRow } = await client
+        .from("options")
+        .select("payload")
+        .eq("id", optionId)
+        .maybeSingle();
+      const payload = (optionRow as { payload?: { name?: string } } | null)?.payload;
+      return payload?.name ?? null;
     },
     async fetchRoomRadius(room_id): Promise<number | null> {
       const { data, error } = await client
