@@ -45,20 +45,22 @@ The narrative arc — coral → magenta → indigo → midnight — IS the exper
 
 ### 1.3 Semantic roles
 
-| Role | On gradient | On white/yellow |
-|---|---|---|
-| Primary text | `#FFFFFF` | `#0E1011` |
-| Secondary text | `rgba(255,255,255,0.78)` | `rgba(14,16,17,0.7)` |
-| Tertiary text | `rgba(255,255,255,0.6)` | `rgba(14,16,17,0.5)` |
-| Glass fill | `rgba(255,255,255,0.18)` | n/a |
-| Glass fill (strong) | `rgba(255,255,255,0.28)` | n/a |
-| Glass fill (soft) | `rgba(255,255,255,0.10)` | n/a |
-| Glass fill (soft pressed) | `rgba(255,255,255,0.16)` | n/a |
-| Glass stroke | `rgba(255,255,255,0.42)` | n/a |
-| Destructive | `var(--sun)` framed in `var(--ink)` | same |
-| Success (check, ratified) | `var(--sun)` | same |
+| Role | On gradient | On bright gradient | On white/yellow |
+|---|---|---|---|
+| Primary text | `#FFFFFF` | `#FFFFFF` | `#0E1011` |
+| Secondary text | `rgba(255,255,255,0.78)` | `rgba(14,16,17,0.78)` | `rgba(14,16,17,0.7)` |
+| Tertiary text | `rgba(255,255,255,0.6)` | — | `rgba(14,16,17,0.5)` |
+| Glass fill | `rgba(255,255,255,0.18)` | — | n/a |
+| Glass fill (strong) | `rgba(255,255,255,0.28)` | — | n/a |
+| Glass fill (soft) | `rgba(255,255,255,0.10)` | — | n/a |
+| Glass fill (soft pressed) | `rgba(255,255,255,0.16)` | — | n/a |
+| Glass stroke | `rgba(255,255,255,0.42)` | — | n/a |
+| Destructive | `var(--sun)` framed in `var(--ink)` | same | same |
+| Success (check, ratified) | `var(--sun)` | same | same |
 
 **Glass fill (soft pressed)** — `--glass-fill-soft-press` — momentary press feedback for soft-glass list rows (C-23 LocationPicker suggestion row). Sits between `fill-soft` (0.10, default rest) and `fill` (0.18, hover-ish). Distinct from "selected" which always uses sun. Added 2026-05-14 for sg-04.
+
+**On bright gradient (secondary)** — `color.text.on-bright-gradient.secondary` — tinted-ink secondary text role for surfaces whose gradient reaches into the yellow/peach lightness range (initiator, Q1, Q2 yellow-bottom; verdict and checkin yellow-top). White-on-yellow secondary fails WCAG AA against the brightest stop (`#FFD23F`, ~1.3:1); ink-at-0.78 measures **7.74:1** there and **5.62:1** worst-case across the coral top of the initiator — both clear AA body-text. Primary text stays `#FFFFFF` for headline punch; only the secondary role flips. Indigo/midnight surfaces (Q3–Q5, waiting, midnight) keep `on-gradient.secondary` — flipping their secondary to ink would tank readability. SwiftUI surface: `GTIColor.TextOnBrightGradient.secondary`. Added 2026-05-14 for sg-01 (issue #45).
 
 No red. No green. Sun-yellow is the only state signal. If you reach for red, you're designing the wrong screen.
 

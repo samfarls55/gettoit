@@ -86,6 +86,13 @@ function renderSwift(t) {
   lines.push(`        public static let tertiary    = Color.white.opacity(${rgbaAlpha(t.color.text['on-gradient'].tertiary)})`);
   lines.push('    }');
   lines.push('');
+  lines.push('    /// Tinted-ink secondary text role for surfaces whose gradient reaches into the yellow/peach range');
+  lines.push('    /// (initiator, Q1, Q2 yellow-bottom; verdict, checkin yellow-top). White-on-yellow secondary fails WCAG AA;');
+  lines.push('    /// ink-at-0.78 measures 7.74:1 against the brightest stop. See tokens.json `text.on-bright-gradient`.');
+  lines.push('    public enum TextOnBrightGradient {');
+  lines.push(`        public static let secondary   = Color(gtiHex: ${hex(t.color['ink'])}, opacity: ${rgbaAlpha(t.color.text['on-bright-gradient'].secondary)})`);
+  lines.push('    }');
+  lines.push('');
   lines.push('    public enum TextOnSurface {');
   lines.push(`        public static let primary     = Color(gtiHex: ${hex(t.color['ink'])})`);
   lines.push(`        public static let secondary   = Color(gtiHex: ${hex(t.color['ink'])}, opacity: ${rgbaAlpha(t.color.text['on-surface'].secondary)})`);

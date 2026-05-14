@@ -2,7 +2,7 @@
 issue: sg-01
 title: On-gradient subheader contrast — token-level fix for white subheader on yellow gradient
 github_issue: 45
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -30,16 +30,16 @@ White subheader text on the brightest band (first, yellow-heavy stop) of the ini
 
 ## Acceptance criteria
 
-- [ ] On the home / initiator surface, white-equivalent subheader text on the brightest gradient stop measures ≥ 4.5:1 contrast (WCAG AA body text).
-- [ ] `tokens.json` updated; generated `code/tokens.css` regenerated; consumers updated.
-- [ ] `design-system/accessibility.md` contrast table reflects the new measured ratio.
-- [ ] `node design-system/scripts/verify.mjs` green — no inline hex, no orphan tokens.
-- [ ] `design-system/CHANGELOG.md` entry referencing this issue.
-- [ ] Spot-check screenshot review across every surface that uses the modified role — no regressions surfaced.
+- [x] On the home / initiator surface, white-equivalent subheader text on the brightest gradient stop measures ≥ 4.5:1 contrast (WCAG AA body text). — new role `color.text.on-bright-gradient.secondary` = `rgba(14,16,17,0.78)` measures **7.74:1** against `#FFD23F` (initiator g4) and **5.62:1** worst-case against the coral top `#FF8868`.
+- [x] `tokens.json` updated; generated `code/tokens.css` regenerated; consumers updated. — `gen-css.mjs` + `gen-swift.mjs` both regenerated; iOS consumers on `InitiatorScreen.swift` migrated (eyebrow, subhead, radius value, vertical-row meta). Shared `QuizQuestionHeader` intentionally NOT migrated — see CHANGELOG.
+- [x] `design-system/accessibility.md` contrast table reflects the new measured ratio. — §1.1 updated, new §1.1.1 added with full alpha-composited measurements per stop.
+- [x] `node design-system/scripts/verify.mjs` green — no inline hex, no orphan tokens. — confirmed locally before PR.
+- [x] `design-system/CHANGELOG.md` entry referencing this issue. — entry added, references issue #45.
+- [ ] Spot-check screenshot review across every surface that uses the modified role — no regressions surfaced. — manual founder action; the role is **new** (not a cascade), so the only surface affected is the initiator. Q1–Q5 quiz subheaders still on the white-tinted role pending a follow-up issue.
 
 ## Open questions
 
-- Whether the right answer is to tune the existing on-gradient secondary token, or to introduce a new on-bright-gradient role specifically. Tuning the existing role cascades the change to anywhere "on a gradient" lives; introducing a new role keeps the existing role intact for less-bright gradients. Recommend tuning the existing role unless the cascade regresses a different surface — flag for review at fix time.
+- ~~Whether the right answer is to tune the existing on-gradient secondary token, or to introduce a new on-bright-gradient role specifically.~~ **Resolved during sg-01:** introduced a new role. Tuning the existing role would have regressed Q3/Q4/Q5/waiting/midnight (white-tinted secondary reads fine on indigo/midnight; tinted-ink would tank). The Swift generator's `Color.white.opacity(...)` template is architecturally aligned with white-tinted alpha — cascading via the existing role would have forced generator changes anyway. New role is the cleaner separation.
 
 ## Blocked by
 

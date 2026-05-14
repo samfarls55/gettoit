@@ -221,7 +221,10 @@ public struct InitiatorScreen: View {
             Text("TONIGHT'S SESSION")
                 .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
                 .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                // sg-01: initiator gradient runs coral→yellow; tinted-ink
+                // secondary clears WCAG AA across the full vertical extent
+                // where white-on-yellow fails (7.74:1 against #FFD23F).
+                .foregroundStyle(GTIColor.TextOnBrightGradient.secondary)
                 .accessibilityIdentifier("initiator.eyebrow")
 
             Text("Figure\nit out\ntogether")
@@ -238,7 +241,9 @@ public struct InitiatorScreen: View {
 
             Text("Five quick taps each. One verdict. Sixty seconds.")
                 .font(.system(size: GTIFont.Size.body, weight: .semibold))
-                .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                // sg-01 subhead — the body-text role that triggered the issue
+                // on real device. Tinted ink reads against the yellow band.
+                .foregroundStyle(GTIColor.TextOnBrightGradient.secondary)
                 .frame(maxWidth: 280, alignment: .leading)
                 .accessibilityIdentifier("initiator.subhead")
         }
@@ -315,7 +320,9 @@ public struct InitiatorScreen: View {
                 Text(Self.formatRadiusLabel(radiusMiles))
                     .font(.system(size: GTIFont.Size.monoTag, weight: .medium, design: .monospaced))
                     .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
-                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                    // sg-01: live mono-tag value sits mid-gradient where the
+                    // yellow band starts to take over. Migrate to tinted ink.
+                    .foregroundStyle(GTIColor.TextOnBrightGradient.secondary)
                     .accessibilityIdentifier("initiator.radius.value")
             }
             .accessibilityIdentifier("initiator.radius.eyebrow")
@@ -360,7 +367,9 @@ public struct InitiatorScreen: View {
                 Text(meta.uppercased())
                     .font(.system(size: GTIFont.Size.eyebrow, weight: .semibold))
                     .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                    // sg-01: vertical-row meta sits in the lower half of the
+                    // initiator gradient — well into the yellow band.
+                    .foregroundStyle(GTIColor.TextOnBrightGradient.secondary)
             }
             Spacer()
             if selected {

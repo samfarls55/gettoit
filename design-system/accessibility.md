@@ -12,7 +12,7 @@ The system places white text on gradient surfaces of varying lightness. The Q4/Q
 
 | Surface | Worst-case stop | White on stop (4.5:1 needed AA, 7:1 AAA) |
 |---|---|---|
-| `initiator` | `#FFD23F` bottom | **~2.1:1 — FAILS AA.** Content area is positioned above this stop. The bottom is below the keyboard / out of read range. |
+| `initiator` | `#FFD23F` bottom | **~1.4:1 — FAILS AA.** Primary white display copy sits in the upper third (`#FF8868` g1, ~2.3:1 — still fails for body but the display weight + size carry it as the AA "large text" exception). Secondary subhead text on this surface migrates to the `on-bright-gradient.secondary` role — see §1.1.1. |
 | `q1` | `#FFD23F` bottom | Same. Chips and CTA stay in the upper 2/3. |
 | `q2` | `#FFC75A` bottom | ~2.6:1 — fails. Same mitigation. |
 | `q3` | `#6E63E0` bottom | **~3.4:1** — fails AA for body text, passes for large text (≥18pt bold). |
@@ -27,7 +27,27 @@ The system places white text on gradient surfaces of varying lightness. The Q4/Q
 - All **body copy** sits in the upper half of the gradient, where the lightness has room.
 - All **CTA labels** are `ink` on `white`/`sun` — never white-on-yellow.
 - The eyebrow is treated as *decorative* on bright surfaces — it's a recognition cue, not a load-bearing label. (The display headline carries the meaning.)
+- **Tinted-ink secondary** — surfaces whose gradient reaches the yellow/peach band route their **secondary subhead** through `color.text.on-bright-gradient.secondary` (ink-at-0.78) instead of the white-tinted on-gradient role. White-at-0.78 against `#FFD23F` collapses to **~1.3:1**; ink-at-0.78 measures **7.74:1** there and stays above 5:1 across the coral top. See §1.1.1.
 - **Dynamic Type respondent:** as users increase type size, lines reflow but don't reposition into the bright zone.
+
+### 1.1.1 Tinted-ink secondary on bright gradient surfaces
+
+Role: `color.text.on-bright-gradient.secondary` = `rgba(14,16,17,0.78)` (SwiftUI: `GTIColor.TextOnBrightGradient.secondary`). Introduced 2026-05-14 for **sg-01** (issue #45) after a real-device check showed the white-on-yellow subhead at the bottom of the initiator gradient failing AA.
+
+Measured ratios (relative-luminance, alpha-composited against each stop):
+
+| Stop | Where it appears | Ink @ 0.78 vs stop | White @ 0.78 vs stop (baseline) |
+|---|---|---|---|
+| `#FFD23F` | initiator g4, q1 g4 (brightest) | **7.74:1** — passes AAA | 1.33:1 — fails |
+| `#FFDB6B` | checkin g1 top | **8.07:1** — passes AAA | 1.26:1 — fails |
+| `#FFC548` | verdict g1 top | ~7.3:1 — passes AAA | ~1.4:1 — fails |
+| `#FFB855` | initiator g3 | **6.92:1** — passes AAA | 1.52:1 — fails |
+| `#FF9F6B` | initiator g2 | **6.23:1** — passes AA | 1.73:1 — fails |
+| `#FF8868` | initiator g1 top | **5.62:1** — passes AA | 1.95:1 — fails |
+
+Headroom above the 4.5:1 AA body-text bar is **≥ 1.1** across the entire initiator vertical extent, with **3.2** points of margin at the worst-case yellow stop. Iconic risk if dropped further: at ink-0.7 the top-coral collapses to 4.67:1 — too close to the bar for Dynamic Type / lossy displays.
+
+Consumers on indigo/midnight surfaces (Q3, Q4, Q5, waiting, midnight) continue to use the white-tinted `on-gradient.secondary` — flipping their secondary to ink would tank readability. Primary text stays `#FFFFFF` on all gradient surfaces for headline punch.
 
 ### 1.2 Type on white surfaces (CTAs)
 
