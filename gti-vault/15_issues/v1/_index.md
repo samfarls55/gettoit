@@ -19,7 +19,7 @@ Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
 | TB-00 | [[issues/tb-00-external-accounts\|External account setup]] | HITL | [#1](https://github.com/samfarls55/gettoit/issues/1) | — |
-| TB-01 | [[issues/tb-01-walking-skeleton\|Walking skeleton]] | AFK | [#2](https://github.com/samfarls55/gettoit/issues/2) | TB-00 |
+| TB-01 | [[issues/tb-01-walking-skeleton\|Walking skeleton]] ✅ done | AFK | [#2](https://github.com/samfarls55/gettoit/issues/2) | TB-00 |
 | TB-02 | [[issues/tb-02-room-create-deeplink-join\|Initiator creates room + invitee deep-link join]] | AFK | [#3](https://github.com/samfarls55/gettoit/issues/3) | TB-01 |
 | TB-03 | [[issues/tb-03-s01-timer-radius\|S01 timer chip + radius slider]] | AFK | [#4](https://github.com/samfarls55/gettoit/issues/4) | TB-02 |
 | TB-04 | [[issues/tb-04-full-quiz\|Full 5-question quiz]] | AFK | [#5](https://github.com/samfarls55/gettoit/issues/5) | TB-02 |
