@@ -10,6 +10,8 @@ Prefix `BREAKING:` for any change that requires code or downstream consumers to 
 
 ## 2026-05-13
 
+- Added **C-22 Auth Upgrade Chip** component (`components.md`, `code/components.jsx`) — non-blocking Sign-in-with-Apple affordance on S04. Voluntary warm-friend register: primary `"Save this taste profile"` / dismiss `"Maybe later"` / success quiet mono-tag `"Saved."`. States: `default` / `in-progress` / `success` / `dismissed` / `hidden`. iOS-only; web fallback never renders it per ADR 0007. Dismiss persists `user_preferences.auth_prompt_dismissed_at` and suppresses re-prompt for 30 days. (TB-12.)
+- **S04 Waiting:** added Auth Upgrade Chip placement to the CTA dock above "Decide now" and "Nudge", documented dismiss + suppression behavior, locked copy register. `code/screens/ScreenWaiting.jsx` renders the chip in canonical `default` state on iOS / hidden on web. (TB-12 — consumes ADR 0007.)
 - Added `scripts/gen-swift.mjs` — reads `tokens.json`, emits `ios/Sources/GTITokens.swift` (GTIColor / GTIGradient / GTIFont / GTISpacing / GTIRadii / GTIMotion / GTIVibeLabels / GTITexture). `--check` mode enforced by `scripts/verify.mjs`, so any drift between Swift output and `tokens.json` fails CI alongside the existing CSS drift gate. (TB-01.)
 
 ## 2026-05-12

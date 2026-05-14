@@ -1,8 +1,22 @@
-// Surface 08 — Waiting / coordination
+// Surface 04 — Waiting / coordination
 // Honest, calm. No spinners.
 // v1: initiator gets a "Decide now" CTA (disabled until quorum); all members see a live countdown.
+// TB-12: anonymous users on iOS get an Auth Upgrade Chip (C-22) above the
+// other CTAs. Web fallback passes `platform="web"` and the chip stays hidden.
 
-function ScreenWaiting({ onAdvance, isInitiator = true, secondsRemaining = 462 }) {
+function ScreenWaiting({
+  onAdvance,
+  isInitiator = true,
+  secondsRemaining = 462,
+  // C-22 wiring — defaults model the canonical state: anonymous iOS user
+  // who hasn't dismissed and hasn't linked yet, so the chip renders in
+  // its `default` state.
+  platform = 'ios',
+  isAnonymous = true,
+  authChipState = 'default', // 'default' | 'in-progress' | 'success' | 'dismissed' | 'hidden'
+  onSaveTasteProfile = () => {},
+  onDismissAuthChip = () => {},
+}) {
   const people = [
     { name: 'You',  color: '#FFD23F', answered: true },
     { name: 'Alex', color: '#7DDFB5', answered: true },
@@ -84,6 +98,17 @@ function ScreenWaiting({ onAdvance, isInitiator = true, secondsRemaining = 462 }
           }}>{countdownLabel}</div>
 
           <CTADock>
+            {/* C-22 Auth Upgrade Chip — iOS-only, anonymous-only. Web
+                fallback (TB-15) passes platform="web" so the chip is
+                hidden per ADR 0007 ("Web fallback voters stay anonymous
+                indefinitely"). Linked-Apple users also render `hidden`. */}
+            {platform === 'ios' && isAnonymous && (
+              <AuthUpgradeChip
+                state={authChipState}
+                onSave={onSaveTasteProfile}
+                onDismiss={onDismissAuthChip}
+              />
+            )}
             {isInitiator && (
               <PillCTA
                 label={decideLabel}

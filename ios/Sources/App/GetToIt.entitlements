@@ -6,5 +6,13 @@
 	<array>
 		<string>applinks:gettoit.app</string>
 	</array>
+	<!-- Sign in with Apple — TB-12. The native ASAuthorizationController
+	     flow requires this capability on the bundle. Supabase handles
+	     the server-side identity verification via the Services ID
+	     `app.gettoit.GetToIt.signin` + the Sign in with Apple key. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 </dict>
 </plist>

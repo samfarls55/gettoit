@@ -305,6 +305,92 @@ function RangeSlider({ value, min, max, step, onChange, valueLabel, ariaLabel })
   );
 }
 
+// ────────────────────────────────────────────────────────────
+// Auth Upgrade Chip (C-22) — Sign-in-with-Apple affordance on S04 Waiting.
+// Voluntary warm-friend register; never a gate. iOS-only — web fallback
+// passes `web` and the chip renders nothing.
+//
+// States:
+//   default     — anonymous, never dismissed (or > 30d since dismissal): full chip
+//   in-progress — user tapped; Apple sheet is up; pill disabled with spinner glyph
+//   success     — link succeeded; quiet "Saved." confirmation in mono-tag
+//   dismissed   — user tapped "Maybe later" within last 30d: render nothing
+//   hidden      — already Apple-linked OR rendering on web: render nothing
+// ────────────────────────────────────────────────────────────
+function AuthUpgradeChip({
+  state = 'default',
+  onSave = () => {},
+  onDismiss = () => {},
+}) {
+  if (state === 'dismissed' || state === 'hidden') return null;
+
+  if (state === 'success') {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          fontFamily: 'var(--ff-mono)',
+          fontSize: 11, fontWeight: 500,
+          letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.6)',
+          textAlign: 'center',
+          transition: 'opacity 320ms var(--ease-out)',
+        }}
+      >Saved.</div>
+    );
+  }
+
+  const inProgress = state === 'in-progress';
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'stretch', gap: 12,
+    }}>
+      <PillCTA
+        label="Save this taste profile"
+        fill="white"
+        disabled={inProgress}
+        onClick={onSave}
+        prefix={
+          // Apple logo glyph. Unicode  is the Apple Inc. PUA codepoint;
+          // iOS renders it as the apple silhouette in SF Pro. On platforms
+          // without SF Pro the JSX falls back to an SVG path via the
+          // generic font stack — for spec fidelity this glyph is fine.
+          // The in-progress state keeps the glyph but disables the pill;
+          // the actual Apple sheet on top of the surface is the real
+          // progress UI.
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: 18, fontWeight: 900,
+              color: 'var(--ink)', lineHeight: 1,
+            }}
+          ></span>
+        }
+      />
+      {!inProgress && (
+        <button
+          onClick={onDismiss}
+          style={{
+            appearance: 'none', border: 0, background: 'transparent',
+            // 44pt-tall hit row clearing HIG min; visible label is smaller.
+            minHeight: 44,
+            padding: '12px 16px',
+            color: 'rgba(255,255,255,0.6)',
+            fontFamily: 'var(--ff-body)',
+            fontWeight: 700, fontSize: 11,
+            letterSpacing: '0.18em', textTransform: 'uppercase',
+            cursor: 'pointer',
+            alignSelf: 'center',
+          }}
+        >Maybe later</button>
+      )}
+    </div>
+  );
+}
+
 function GTIMark({ size = 18 }) {
   return (
     <div style={{
@@ -330,5 +416,5 @@ Object.assign(window, {
   GradientSurface, TopBar, QuestionHeader,
   Chip, PillCTA, ReceiptChip, AvatarDot,
   CTADock, Eyebrow, Glass, GTIMark,
-  RangeSlider,
+  RangeSlider, AuthUpgradeChip,
 });

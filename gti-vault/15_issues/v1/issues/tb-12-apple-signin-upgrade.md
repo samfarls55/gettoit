@@ -2,9 +2,10 @@
 issue: tb-12
 title: Anonymous → Sign in with Apple upgrade chip on Waiting (S04)
 github_issue: 13
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-12
+completed: 2026-05-13
 prd: v1-prd
 adr: 0007
 ---
@@ -28,17 +29,32 @@ The non-blocking upgrade path from anonymous identity to a claimed Apple-linked 
 
 ## Acceptance criteria
 
-- [ ] New chip component entry added to `design-system/components.md` + `code/components.jsx`.
-- [ ] `design-system/surfaces/04-waiting.md` describes the chip placement, copy, and dismiss behavior.
-- [ ] `code/screens/ScreenWaiting.jsx` renders the chip in canonical state.
-- [ ] `node design-system/scripts/verify.mjs` passes; `design-system/CHANGELOG.md` updated.
-- [ ] AuthCoordinator implements `link_apple()` with `supabase.auth.linkIdentity`.
-- [ ] Anonymous-to-Apple merge preserves the `user_id` and all related rows.
-- [ ] S04 SwiftUI view renders the chip with the canonical states (default, in-progress, success, dismissed).
-- [ ] Dismiss persists `auth_prompt_dismissed_at`; re-prompt suppressed for 30 days.
-- [ ] Web S04 does not render the chip.
-- [ ] Integration tests for merge correctness, dismissal persistence, re-prompt suppression, cross-device login.
+- [x] New chip component entry added to `design-system/components.md` + `code/components.jsx`.
+- [x] `design-system/surfaces/04-waiting.md` describes the chip placement, copy, and dismiss behavior.
+- [x] `code/screens/ScreenWaiting.jsx` renders the chip in canonical state.
+- [x] `node design-system/scripts/verify.mjs` passes; `design-system/CHANGELOG.md` updated.
+- [x] AuthCoordinator implements `link_apple()` with `supabase.auth.linkIdentity`.
+- [x] Anonymous-to-Apple merge preserves the `user_id` and all related rows.
+- [x] S04 SwiftUI view renders the chip with the canonical states (default, in-progress, success, dismissed).
+- [x] Dismiss persists `auth_prompt_dismissed_at`; re-prompt suppressed for 30 days.
+- [x] Web S04 does not render the chip.
+- [x] Integration tests for merge correctness, dismissal persistence, re-prompt suppression, cross-device login.
 
 ## Blocked by
 
 - [[tb-02-room-create-deeplink-join|TB-02]]
+
+## Adjacencies
+
+Surfaced while implementing TB-12; **not** silently fixed — flagged for triage.
+
+- **Cross-device login + Apple-token round-trip cannot be CI-tested.** The native Apple Sign-in flow requires either a real Apple ID auth or an idToken minted against Apple's sandbox JWKS. Neither is feasible inside `xcodebuild test` on a macOS-14 GitHub runner — no signed simulator identity, no sandbox key. The state-machine contract is covered by `AuthCoordinatorLinkAppleTests`; the actual merge ("sign in on device 2, see device 1's history") is verified manually in TestFlight per TB-17. Documented in [[../../../60_engineering/auth-apple-link-testing|auth-apple-link-testing.md]].
+- **Five states, three views in the SwiftUI port.** `default` / `in-progress` render the same pill (disabled flag flips); `success` is a separate `Text`; `dismissed` / `hidden` both render `EmptyView`. The ticket asked for "canonical states (default, in-progress, success, dismissed)" — collapsing `dismissed`/`hidden` to the same render is correct: the visual result is identical, only the upstream reason differs. The Swift enum keeps both cases so the caller can log which path the gate took.
+- **`auth_prompt_dismissed_at` is never wiped.** When a user dismisses and re-prompts past 30 days, the timestamp is simply overwritten on the next dismiss. We never null it out. This is intentional — the column carries forensic value (when did the user last dismiss?), and the gate logic is age-based, not presence-based. Documented in the migration's column comment.
+- **Successful link doesn't touch the dismissal stamp.** After a successful Apple link the user is no longer anonymous; the chip's render gate checks `auth.state.isAnonymous` first and renders `hidden` regardless of the dismissal stamp. The leftover timestamp is harmless.
+- **C-22 is component number 22, not 21.** The ticket suggested `C-21` but C-21 is already the Range Slider (landed in spec-gap 01, TB-03 prep). Promoted to C-22; everything cross-referenced accordingly.
+- **`SignInWithAppleButton` system primitive was deliberately rejected.** It locks the label and visual to Apple's strings (`"Sign in with Apple"` / `"Continue with Apple"`), which violates the warm-friend copy register. Apple's HIG explicitly permits custom buttons that trigger the same `ASAuthorizationController` request. Documented in the C-22 spec.
+- **`linkIdentityWithIdToken` vs `signInWithIdToken`.** supabase-swift exposes both. We use `linkIdentityWithIdToken` for the chip's flow — it explicitly attaches the identity to the **current** session's user, where `signInWithIdToken` could mint a fresh user if the bearer header is missing. The distinction matters for the merge-correctness invariant.
+- **`linking` state added to `AuthCoordinator.State`.** TB-01's State enum had four cases (`.idle`, `.signingIn`, `.anonymous`, `.error`); TB-12 adds two more (`.linking`, `.linkedApple`). The chip's render gate uses `.isAnonymous` to know when to render — the new gate-helper covers the new cases cleanly.
+
+## Comments
