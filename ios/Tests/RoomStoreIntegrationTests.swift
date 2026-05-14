@@ -65,6 +65,13 @@ final class RoomStoreIntegrationTests: XCTestCase {
         let creatorID = try await signInFreshAnon(on: client)
         let store = RoomStore(client: client)
 
+        // Sanity-check the auth state right before we issue a PostgREST
+        // request, so a failure clearly attributes to schema vs. auth.
+        XCTAssertNotNil(client.auth.currentSession,
+                        "expected an active session after signInAnonymously()")
+        XCTAssertEqual(client.auth.currentUser?.id, creatorID,
+                       "expected the cached current user to match the sign-in result")
+
         let room = try await store.createRoom(as: creatorID)
 
         XCTAssertEqual(room.creatorUserID, creatorID,
