@@ -2,9 +2,10 @@
 issue: tb-15
 title: Web fallback — Next.js routes for invite, quiz, verdict (read-only)
 github_issue: 16
-status: in-progress
+status: done
 type: AFK
 created: 2026-05-12
+completed: 2026-05-14
 prd: v1-prd
 adr: 0003
 ---
