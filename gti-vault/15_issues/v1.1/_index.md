@@ -169,6 +169,7 @@ Items explicitly deferred out of v1.1 that **must land before the first non-self
 - **#10** — allergy / dietary capture (anon 6th question + persistent profile-edit surface — land as a pair)
 - **Profile-edit surface** — cuisine likes/dislikes editor (intersects #7 settings surface)
 - **Distance + time inputs** — re-enter scope when multi-geo decisions become a thing (likely tied to expanding beyond a single test cohort)
+- **`support@gettoit.app` mailbox / forwarding** — deferred 2026-05-14 from [[../v1/issues/tb-16-privacy-legal-delete|TB-16]] because the operator couldn't log into the registrar email console mid-walkthrough. PP + ToS already cite the address as the contact for deletion / CCPA / informal dispute resolution. Cheapest fix is Namecheap / Cloudflare email-forwarding rule into the operator's existing Outlook account. Must land before the App Store public listing or any non-friend invitee joins.
 
 Triage these when planning the milestone after v1.1 ships. Not appropriate to file as v1.1 issues now.
 
