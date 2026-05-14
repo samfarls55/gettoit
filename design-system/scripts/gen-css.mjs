@@ -68,6 +68,7 @@ function renderCss(t) {
   --glass-stroke: ${c.glass.stroke};
   --glass-fill-strong: ${c.glass['fill-strong']};
   --glass-fill-soft: ${c.glass['fill-soft']};
+  --glass-fill-soft-press: ${c.glass['fill-soft-press']};
 
   /* type */
   --ff-display: ${ty.families.display};
@@ -102,6 +103,7 @@ function renderCss(t) {
   --r-pill: ${r.pill}px;
   --r-hero: ${r.hero}px;
   --r-tag: ${r.tag}px;
+  --r-row: ${r.row}px;
   --r-sheet: ${r.sheet}px;
 
   /* motion */
@@ -198,6 +200,14 @@ html, body {
 @keyframes gti-shutter-bot {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+@keyframes gti-sheet-rise {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes gti-locate-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 /* ── Mobile canvas inside the device frame ─────────────── */

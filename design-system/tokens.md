@@ -52,9 +52,13 @@ The narrative arc — coral → magenta → indigo → midnight — IS the exper
 | Tertiary text | `rgba(255,255,255,0.6)` | `rgba(14,16,17,0.5)` |
 | Glass fill | `rgba(255,255,255,0.18)` | n/a |
 | Glass fill (strong) | `rgba(255,255,255,0.28)` | n/a |
+| Glass fill (soft) | `rgba(255,255,255,0.10)` | n/a |
+| Glass fill (soft pressed) | `rgba(255,255,255,0.16)` | n/a |
 | Glass stroke | `rgba(255,255,255,0.42)` | n/a |
 | Destructive | `var(--sun)` framed in `var(--ink)` | same |
 | Success (check, ratified) | `var(--sun)` | same |
+
+**Glass fill (soft pressed)** — `--glass-fill-soft-press` — momentary press feedback for soft-glass list rows (C-23 LocationPicker suggestion row). Sits between `fill-soft` (0.10, default rest) and `fill` (0.18, hover-ish). Distinct from "selected" which always uses sun. Added 2026-05-14 for sg-04.
 
 No red. No green. Sun-yellow is the only state signal. If you reach for red, you're designing the wrong screen.
 
@@ -144,11 +148,12 @@ Named tokens: `sp-1` through `sp-16` in `tokens.css`. SwiftUI: just literals (`E
 |---|---|---|
 | `r-chip` | 999 | Veto chip, single-select chip, receipt chip, reroll reason chip |
 | `r-tag` | 8 | Time badge inner, "2 LEFT" stamp, locked badge |
+| `r-row` | 12 | List-row radius (C-23 LocationPicker suggestion rows + typeahead input). Sits between `tag` (8, hard) and `card` (18, soft). Matches the in-sheet density of the Lumy reference (Refero `a18a8df8`). |
 | `r-card` | 18 | Glass regret card, vertical picker row, check-in tap |
 | `r-card-lg` | 22 | Reroll reason tile, cut row |
 | `r-hero` | 28 | (Reserved for future hero surfaces — currently unused; iOS frame's own corner radius is 48.) |
 | `r-pill` | 999 | Primary CTA — always full radius |
-| `r-sheet` | 26 | Reroll bottom sheet |
+| `r-sheet` | 26 | Reroll bottom sheet, LocationPicker sheet |
 
 ---
 

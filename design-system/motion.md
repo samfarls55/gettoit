@@ -133,6 +133,12 @@ The shutters are **dark blue-black** (`#0A0A0F`) with **sun-yellow hairline edge
 | Vibe word change | rise + blur 4→0 | 480ms | ease-out-soft |
 | Waiting countdown tick | mono-tag text swap (no animation, every 1s) | n/a | n/a |
 | Decide-now CTA quorum unlock | opacity 0.45 → 1 | 320ms | ease-out |
+| LocationPicker sheet open (C-23) | translateY + opacity | 380ms | ease-out-soft |
+| LocationPicker sheet dismiss (C-23) | reverse of open | 280ms | ease-out |
+| LocationPicker chip press (C-23) | background-color | 140ms | ease-out |
+| LocationPicker suggestion row press (C-23) | background-color | 140ms | ease-out |
+| LocationPicker typeahead focus (C-23) | border 1px → 1.5px sun | 180ms | ease-out |
+| LocationPicker chip `loading` shimmer (C-23) | opacity 0.5 ↔ 1.0 pulse | 1400ms | ease-in-out |
 
 ---
 

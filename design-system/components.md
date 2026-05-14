@@ -447,17 +447,179 @@ The register is voluntary warm-friend per ADR 0007 §"Why" — anything that fra
 
 ## C-23 · LocationPicker
 
-**STUB — full spec to be filled in by the agent picking up [[../gti-vault/15_issues/v1.1/issues/sg-04-geo-permission-and-location-selector|sg-04]].**
+Reusable location selector. Bundled **readout chip** + tap-to-open **bottom sheet** containing a **typeahead input**, a **use-current-location** affordance, and a **suggestion list**. Decision recorded in [[../gti-vault/60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]] (Path B — reusable primitive, not ad-hoc composition).
 
-Reusable location selector. Bundled chip readout + tap-to-edit typeahead sheet + suggestion list + deny-state empty + permission re-enable affordance. Decision recorded in [[../gti-vault/60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]].
+The conceptual component is single; the JSX splits into `LocationPickerChip` (the persistent readout) + `LocationPickerSheet` (the editor) for clarity, mirroring the C-22 chip+sheet relationship.
 
-Slot reserved here so the agent has a single anchor to fill in. The agent has token authority — add new tokens to `tokens.json` and document in `tokens.md` when the picker needs colors / radii / shadows not yet registered (suggestion-row press state, map-thumb border radius, typeahead caret, etc.). The agent has copy authority — draft pre-prime card body from `40_marketing_branding/` voice guide.
+**Refero anchor:** [Lumy — Changing location step 3](https://refero.design/screens/a18a8df8-e338-4339-a1d7-a93becea9ed9) (`a18a8df8-e338-4339-a1d7-a93becea9ed9`). Dark surface, yellow accent for the selected row (yellow text + yellow check), "Current Location" affordance with an arrow-paper-plane glyph, recents list grouped under a hairline rule, dismiss `×` in the upper-right. Translates to Sunset Pop with zero re-mapping: the dark surface is already our gradient idiom, the yellow accent is `var(--sun)`, no red or green anywhere.
 
-### Required surfaces on completion
+**Why a sheet and not an inline expand:** the typeahead surface needs the on-screen keyboard plus 4–6 suggestion rows visible at once; an inline expand would push the rest of S01 off the bottom. C-16 already establishes the sheet idiom for the system's secondary editor surface (reroll). The picker inherits the same primitive.
 
-- This entry filled in with full visual spec table (readout chip, sheet, typeahead input, suggestion row, empty state, deny state) following the precedent of `C-19 Vertical Picker Row` and `C-22 Auth Upgrade Chip`.
-- `code/components.jsx` exports `LocationPicker` (or sibling `LocationPickerChip` + `LocationPickerSheet` if the agent decides to split the JSX, while keeping the conceptual `C-23` single).
-- New surface doc and screen JSX for the pre-prime permission card (proposed `surfaces/00b-location-permission.md` + `code/screens/ScreenLocationPermission.jsx`).
-- Initiator surface spec updated to mention the persistent picker (auto / manual / stale states).
-- `CHANGELOG.md` entry.
-- `node scripts/verify.mjs` green.
+**Why no map thumbnail:** the original issue floated a place-typeahead + map-thumbnail composite. Dropped after Refero pass — neither Lumy nor Apple Invites earns a thumbnail in their picker, the screen is text-first, and the thumbnail would compete with the suggestion list for the same vertical real estate. Kept as a deferred option in case the multi-geo work resurfaces it.
+
+### Sub-components
+
+`C-23` ships as two JSX exports that compose into a single conceptual primitive:
+
+- **`LocationPickerChip`** — the always-visible readout on S01 (initiator) and any future surface hosting persistent location.
+- **`LocationPickerSheet`** — the typeahead editor that opens on chip tap.
+
+### States — at-a-glance
+
+| State | Trigger | Render |
+|---|---|---|
+| `auto` | iOS location permission granted AND GPS resolved a coordinate | Chip shows the GPS-derived place name (e.g. `"Mission · San Francisco"`). Sun-yellow paper-plane glyph (matching Lumy's "Current Location" affordance) signals the value came from GPS. |
+| `manual` | Permission denied OR user typed a value AND committed it | Chip shows the manually-selected place name. No paper-plane glyph (the value is user-typed, not GPS). |
+| `stale` | Permission granted but GPS unavailable / last fix > 30 min | Chip shows last-known place name, paper-plane glyph muted to white 0.45, mono-tag suffix `"· OUT OF DATE"`. Tap-to-edit still works. |
+| `empty` | Permission denied AND user has not yet selected | Chip shows placeholder `"Set your location"` in white 0.6, tap-to-edit. No glyph. |
+| `loading` | Permission granted, GPS request in flight (initial mount only) | Chip shows mono-tag `"LOCATING…"` in white 0.6. Non-interactive until resolved (~2s). |
+
+### Visual spec — `LocationPickerChip` (the readout)
+
+| Element | Spec |
+|---|---|
+| Container | full-width row, padding `12px 16px`, radius `var(--r-row)` (12), soft-glass `--glass-fill-soft` bg + `1px white 0.18` border, `backdrop-filter: blur(12px) saturate(160%)` |
+| GPS glyph | Inter 900 / 16 / `var(--sun)`, paper-plane character rotated -45deg (matches Lumy's tilt), 8px right margin. Only renders in `auto` + `stale` states. `aria-hidden`. |
+| Place name | Inter 700 / 17 / line 1.2, white, 1 line, ellipsis on overflow |
+| Sub-label | `eyebrow` (Inter 700 / 11 / tracking 0.18em UPPERCASE) white 0.6, top-margin 2. Reads `"YOUR LOCATION"` in `auto`/`manual`, `"OUT OF DATE — TAP TO REFRESH"` in `stale`, `"TAP TO SELECT"` in `empty`. |
+| Edit affordance | Trailing chevron `›` Inter 900 / 14, white 0.55, vertically centered. Indicates tap-to-edit. |
+| Tap target | Full row, min-height 56 (clears HIG 44 with breathing room) |
+| Press state | Background → `--glass-fill-soft-press` (white 0.16), 140ms `var(--ease-out)`. Same press idiom as C-19. |
+| Loading shimmer | When `state === 'loading'`, the place-name slot is replaced with `mono-tag` text `"LOCATING…"` opacity-pulse 0.5 ↔ 1.0 over 1400ms `var(--ease-in-out)`. No spinner — the system's no-spinner rule (motion.md §"What we deliberately do *not* animate") applies. |
+
+### Visual spec — `LocationPickerSheet` (the editor)
+
+The sheet inherits C-16's primitive (radius, blur, shadow, handle) verbatim so the system has one sheet idiom, not two.
+
+| Element | Spec |
+|---|---|
+| Backdrop | `rgba(0,0,0,0.32)` over the host surface (S00b or S01). Tap-to-dismiss. |
+| Sheet | inset 12 from edges, bottom 12; `rgba(20,20,30,0.92)` + 24px backdrop blur; radius `var(--r-sheet)` (26); `1px white 0.10` border; `shadow-sheet` |
+| Handle | 38×4 white 0.22 pill, top-centered, margin-bottom 18 — identical to C-16 |
+| Header | Left: dismiss `×` (Inter 900 / 22 / white 0.85, 32×32 tap target — wraps in a 44pt hit-row). Right: eyebrow `"LOCATION"` white 0.6. |
+| Open motion | translateY 100% → 0 + opacity 0 → 1, **380ms `var(--ease-out-soft)`** (matches C-16 sheet-open timing — motion.md utility table) |
+| Dismiss motion | reverse, **280ms `var(--ease-out)`** |
+
+### Visual spec — typeahead input (inside the sheet)
+
+| Element | Spec |
+|---|---|
+| Container | full-width row, padding `14px 16px`, radius `var(--r-row)` (12), `--glass-fill-soft` bg + `1px white 0.18` border |
+| Leading search glyph | Inter 900 / 14, white 0.55, `aria-hidden` |
+| Input | Inter 600 / 16 / line 1.2, white. Placeholder `"Search a city, neighborhood, or address"` in white 0.45. `appearance: none`, transparent bg, no native chrome. |
+| Caret | Native `caret-color: var(--sun)` — the sun-yellow caret is the only state signal in the input. |
+| Trailing clear `×` | Visible only when input has text. Inter 900 / 14 / white 0.6, 32×32 tap target. Clears the input, returns the sheet to its empty / recents state. |
+| Focus state | Border thickens to `1.5px var(--sun)` (sun is the only state color). No glow — the caret carries the focus signal. 180ms `var(--ease-out)`. |
+
+### Visual spec — "Use current location" affordance
+
+Renders **only** when iOS permission is granted (states `auto` / `stale`). Sits immediately below the typeahead input, before the recents / suggestion list.
+
+| Element | Spec |
+|---|---|
+| Container | full-width row, padding `12px 16px`, radius `var(--r-row)` (12), transparent bg (no glass — visually distinct from typed-suggestion rows) |
+| Paper-plane glyph | Inter 900 / 14 / `var(--sun)`, rotated -45deg, 12px right margin, `aria-hidden` |
+| Label | Inter 700 / 15, white. String: `"Use current location"`. |
+| Sub-label | `eyebrow` token, white 0.6, top-margin 2. Renders only in `stale` — string: `"Last fix {N} min ago"` |
+| Press state | Background → `--glass-fill-soft-press` (white 0.16), 140ms `var(--ease-out)` |
+| Tap target | Full row, min-height 52 |
+
+### Visual spec — suggestion row
+
+| Element | Spec |
+|---|---|
+| Container | full-width row, padding `12px 16px`, radius `var(--r-row)` (12), transparent bg by default; selected → `var(--sun)` bg + `var(--ink)` text |
+| Place name | Inter 700 / 15, white (default) / `var(--ink)` (selected), 1 line, ellipsis on overflow |
+| Sub-meta | Inter 500 / 12 / line 1.3, white 0.6 (default) / `rgba(14,16,17,0.7)` (selected). Reads the address line (e.g. `"Mission District, San Francisco, CA"`). |
+| Selected check | Right-aligned, 18×18 `var(--ink)` `✓` Inter 900 / 12, only renders in selected state |
+| Press state | Background → `--glass-fill-soft-press` (white 0.16), 140ms `var(--ease-out)`. Selected rows skip the press transition (sun is opaque, no need). |
+| Tap target | Full row, min-height 52 (clears HIG 44) |
+| Row gap | 4 between rows; section header (`"RECENT"`, `"RESULTS"`) is an `eyebrow`-token row above |
+
+**Selection behavior:** tap → row's selected state lights up for 180ms → sheet dismisses → chip readout updates → focus returns to the host surface's next CTA.
+
+### Visual spec — empty state (typeahead has no query AND no recents)
+
+| Element | Spec |
+|---|---|
+| Container | centered column, padding `48px 22px`, gap 12 |
+| Glyph | sun-yellow `◎` Inter 900 / 32 — non-figurative locator mark |
+| Headline | Inter 800 / 16 / line 1.3, white, `text-wrap: balance`. String: `"Type a place to get started."` |
+| Body | Inter 500 / 13 / line 1.4, white 0.65, max 260, `text-wrap: balance`. String: `"City, neighborhood, or street address — whatever lands quickest."` |
+
+### Visual spec — deny state (sheet opened with permission denied)
+
+The deny-state empty replaces the "Use current location" affordance with a permission re-enable card. The typeahead input above it still works — manual selection is always available.
+
+| Element | Spec |
+|---|---|
+| Container | full-width card, padding 16, radius `var(--r-card)` (18), `--glass-fill-soft` bg + `1px white 0.18` border |
+| Eyebrow | `eyebrow` token, `var(--sun)`, string `"LOCATION OFF"` |
+| Headline | Inter 800 / 15 / line 1.3, white, top-margin 6, `text-wrap: balance`. String: `"Type a place above to keep going."` |
+| Body | Inter 500 / 13 / line 1.4, white 0.7, top-margin 4. String: `"Or turn on location in Settings if you'd rather we pick it up automatically."` |
+| Settings deep-link | C-05 `ghost` PillCTA, height 48 (compact), label `"Open Settings"`, top-margin 12. iOS deep-link `URL(string: UIApplication.openSettingsURLString)` — opens the app's row in Settings, where the user toggles Location. Web fallback hides this row entirely (no equivalent affordance — manual selection is the only path). |
+
+**Why no red:** the deny-state card uses sun-yellow eyebrow + neutral body copy. Following the locked rule from `tokens.md §1.3` — sun is the only state color, there is no destructive / warning red in the system. The headline frames the denial as "type instead", not "you broke something."
+
+### Copy register (LOCKED)
+
+- **Chip empty:** `"Set your location"` — voluntary verb, not `"Add a location"` (procedural) or `"Location required"` (procedural-coercive).
+- **Chip stale suffix:** `"OUT OF DATE — TAP TO REFRESH"` — mono-tag eyebrow, tells the user the value is reusable but staler than the user might want.
+- **Typeahead placeholder:** `"Search a city, neighborhood, or address"` — names the input granularity, not the action. Avoid `"Where are you?"` (algorithm-tinted question).
+- **Current-location row:** `"Use current location"` — second-person voluntary verb. Never `"Get my location"` (extractive) or `"Use my GPS"` (technical-tinted).
+- **Deny-state headline:** `"Type a place above to keep going."` — points the user at the path they can take. Never `"Location is required"` (coercive) or `"Permission denied"` (system-register).
+- **Deny-state body:** `"Or turn on location in Settings if you'd rather we pick it up automatically."` — voluntary register, the GPS path is framed as a convenience the user can opt into.
+- **Settings deep-link:** `"Open Settings"` — neutral, matches iOS HIG's own deep-link convention.
+
+### Accessibility
+
+- Chip tap target ≥ 56 (clears 44).
+- Sheet `×` close, all suggestion rows, "Use current location" row, Settings deep-link — all ≥ 44.
+- Caret color (`var(--sun)`) gives the focus signal independent of contrast on the dark sheet.
+- VO order on sheet open: dismiss `×` → typeahead input → "Use current location" (when present) → empty/deny-state card (when present) → first suggestion row.
+- Sheet uses `role="dialog"` + `aria-modal="true"`; focus is trapped while open.
+- `aria-live="polite"` region under the input announces typeahead result count (`"5 results"`).
+- Reduced motion: skip the sheet rise; opacity fade only. Skip the `loading` opacity-pulse — show static `"LOCATING…"` until resolved.
+
+### SwiftUI primitive
+
+```swift
+// Chip — persistent readout. Renders on S01 and any future surface hosting location.
+struct LocationPickerChip: View {
+  @Binding var place: ResolvedPlace?
+  @State private var sheetOpen = false
+  let state: LocationState  // .auto | .manual | .stale | .empty | .loading
+  // ...
+  var body: some View {
+    Button { sheetOpen = true } label: { /* chip layout */ }
+      .sheet(isPresented: $sheetOpen) {
+        LocationPickerSheet(place: $place, permission: $permission)
+          .presentationDetents([.medium, .large])
+          .presentationCornerRadius(GTIRadii.sheet)
+      }
+  }
+}
+
+// Sheet — typeahead editor. Wraps `MKLocalSearchCompleter` for suggestions.
+// The data-layer service is wired in `tb-03` (iOS); the design-system spec
+// is permission-state-agnostic — the iOS port supplies `permission`, the
+// component renders the right sub-state.
+struct LocationPickerSheet: View {
+  @Binding var place: ResolvedPlace?
+  @Binding var permission: CLAuthorizationStatus
+  // ...
+}
+```
+
+The data layer is supplied by `tb-03` — `MKLocalSearchCompleter` for typeahead suggestions, `CLLocationManager` for current-location resolution, and an iOS service that bridges both to the SwiftUI `LocationPickerSheet` view. The design-system spec is data-layer-agnostic.
+
+### When NOT to use
+
+- **Anywhere the location is fixed / non-editable.** The chip's always-editable behavior is load-bearing — it's the defense against "denied = broken app." A non-editable location reads as an info row, use a plain glass row instead.
+- **Inside the quiz surfaces (Q1–Q5).** The picker is a session-context input that lives on the initiator surface, not a per-question control. Inside the quiz, location is already fixed for the session.
+
+### Re-evaluation triggers (per ADR 0009)
+
+- Picker still hosted only on S01 after pre-public-launch milestone → reconsider whether `C-23` should be folded back into a single-surface composition.
+- Multi-geo handling lands and the picker needs to render per-room rather than per-user → may force a `C-23` re-spec.
+- Map thumbnail proves needed by a future consumer → un-defer the composite, add a `composite` variant.

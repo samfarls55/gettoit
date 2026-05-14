@@ -23,6 +23,7 @@
   --glass-stroke: rgba(255,255,255,0.42);
   --glass-fill-strong: rgba(255,255,255,0.28);
   --glass-fill-soft: rgba(255,255,255,0.10);
+  --glass-fill-soft-press: rgba(255,255,255,0.16);
 
   /* type */
   --ff-display: 'Inter', system-ui, -apple-system, sans-serif;
@@ -57,6 +58,7 @@
   --r-pill: 999px;
   --r-hero: 28px;
   --r-tag: 8px;
+  --r-row: 12px;
   --r-sheet: 26px;
 
   /* motion */
@@ -153,6 +155,14 @@ html, body {
 @keyframes gti-shutter-bot {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+@keyframes gti-sheet-rise {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes gti-locate-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
 /* ── Mobile canvas inside the device frame ─────────────── */

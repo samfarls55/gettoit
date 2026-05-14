@@ -2,9 +2,10 @@
 issue: sg-04
 title: Geo permission pre-prime + persistent location selector — C-23 LocationPicker
 github_issue: 48
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-14
+closed: 2026-05-14
 prd: v1-prd
 adr: 0009-locationpicker-as-reusable-component
 ---
@@ -65,15 +66,42 @@ The original "extend `MapKitPlacesFallback`" alternative framing was a category 
 
 ## Acceptance criteria
 
-- [ ] `design-system/surfaces/00b-location-permission.md` (or chosen name) exists describing pre-prime card + grant / deny paths.
-- [ ] `design-system/code/screens/ScreenLocationPermission.jsx` exists and matches the surface doc.
-- [ ] `design-system/components.md` `C-23 LocationPicker` entry filled in with visual spec table (readout chip, sheet, typeahead input, suggestion row, empty state, deny state) following the precedent of `C-19` and `C-22`.
-- [ ] `design-system/code/components.jsx` exports the `LocationPicker` primitive(s).
-- [ ] Persistent location selector documented on the initiator-surface spec with auto / manual / stale states.
-- [ ] If new tokens were added: `tokens.json` updated, `tokens.md` documents them, `tokens.css` regenerated, all three in the same commit.
-- [ ] `design-system/README.md` code map row added for the new screen + `C-23` component.
-- [ ] `design-system/CHANGELOG.md` entry referencing this issue + ADR 0009.
-- [ ] `node design-system/scripts/verify.mjs` green.
+- [x] `design-system/surfaces/00b-location-permission.md` (or chosen name) exists describing pre-prime card + grant / deny paths.
+- [x] `design-system/code/screens/ScreenLocationPermission.jsx` exists and matches the surface doc.
+- [x] `design-system/components.md` `C-23 LocationPicker` entry filled in with visual spec table (readout chip, sheet, typeahead input, suggestion row, empty state, deny state) following the precedent of `C-19` and `C-22`.
+- [x] `design-system/code/components.jsx` exports the `LocationPicker` primitive(s).
+- [x] Persistent location selector documented on the initiator-surface spec with auto / manual / stale states.
+- [x] If new tokens were added: `tokens.json` updated, `tokens.md` documents them, `tokens.css` regenerated, all three in the same commit.
+- [x] `design-system/README.md` code map row added for the new screen + `C-23` component.
+- [x] `design-system/CHANGELOG.md` entry referencing this issue + ADR 0009.
+- [x] `node design-system/scripts/verify.mjs` green.
+
+## Resolution (2026-05-14)
+
+Spec landed. Branch: `spec/sg-04-geo-permission-and-location-selector`. Files delivered:
+
+- `design-system/components.md` — `C-23 LocationPicker` entry (full visual spec across 6 sub-component tables: chip, sheet, typeahead input, current-location affordance, suggestion row, empty state, deny state — plus copy register, accessibility, SwiftUI primitive).
+- `design-system/code/components.jsx` — `LocationPickerChip` + `LocationPickerSheet` exports (the two JSX pieces compose one conceptual `C-23` per ADR 0009).
+- `design-system/surfaces/00b-location-permission.md` + `design-system/code/screens/ScreenLocationPermission.jsx` — pre-prime card with grant / deny / skip paths.
+- `design-system/surfaces/01-initiator.md` — picker placement spec + state table (auto / manual / stale / empty / loading) + first-launch vs subsequent-launch routes.
+- `design-system/code/screens/ScreenInitiator.jsx` — chip rendered above the timer chip group; CTA disables when picker is in `empty` state.
+- `design-system/tokens.json` — registered `color.glass.fill-soft-press` (`rgba(255,255,255,0.16)`) and `radii.row` (`12`); regenerated `code/tokens.css` + `ios/Sources/GTITokens.swift`.
+- `design-system/scripts/gen-css.mjs` — emits the two new tokens + `gti-sheet-rise` and `gti-locate-pulse` keyframes.
+- `design-system/scripts/gen-swift.mjs` — emits `GTIColor.Glass.fillSoftPress` alongside the existing glass variants; `GTIRadii.row` flows in via the existing `Object.keys(t.radii)` iteration.
+- `design-system/scripts/verify.mjs` — surface filename regex generalized from `^\d{2}-` to `^\d{2}[a-z]?-` so the `00b-` pre-flow shape is recognized alongside `00-`, `00a-`, `01-`.
+- `design-system/motion.md` — six utility-motion rows added (sheet open / dismiss / chip press / suggestion row press / typeahead focus / loading shimmer).
+- `design-system/accessibility.md` — five tap-target rows added.
+- `design-system/CHANGELOG.md` — four entries.
+
+**Refero anchor:** [Lumy — Changing location step 3](https://refero.design/screens/a18a8df8-e338-4339-a1d7-a93becea9ed9) (screen `a18a8df8-e338-4339-a1d7-a93becea9ed9`). Dark surface + sun-yellow accent + paper-plane GPS glyph + recents-under-eyebrow rule — translates to Sunset Pop with zero re-mapping.
+
+**Open questions resolved:**
+- *Sheet vs inline expand:* sheet wins. Typeahead needs the on-screen keyboard plus 4–6 visible suggestion rows; inline expand would push the rest of S01 off the bottom. Inherits the C-16 sheet primitive verbatim (one sheet idiom in the system, not two).
+- *Map thumbnail:* dropped. Neither Refero anchor (Lumy nor Apple Invites) earns one; the typeahead surface is text-first. Documented as a deferred option if multi-geo work resurfaces it.
+
+**Adjacency surfaced:** the verify regex broadening (`^\d{2}-` → `^\d{2}[a-z]?-`) unblocks the parallel sg-02 / sg-03 worktrees that introduced `surfaces/00-landing.md` and `surfaces/00a-signin.md`. Coordinate on merge order — those branches must also re-run `verify.mjs` against the new regex before they land.
+
+**Blocks unblocked:** `tb-03` (#51) — iOS wiring agent can now consume the spec for `CLLocationManager`, `MKLocalSearchCompleter`, and the session-state persistence layer.
 
 ## Open questions (for the agent, not the maintainer)
 

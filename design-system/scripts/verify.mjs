@@ -135,6 +135,9 @@ if (Object.keys(webOrphansByFile).length) {
 }
 
 // ── 4. Surface ↔ JSX pairing ───────────────────────────────
+// Surface filename pattern: NN-slug.md or NN<letter>-slug.md
+// (the letter suffix lets pre-flow surfaces like 00a-signin / 00b-location-permission
+// sit before the existing 01–09 ritual arc without renumbering everything).
 const surfaceDocs = fs.existsSync(surfacesDir)
   // Surface filenames are `NN-slug.md` (numbered into the ritual arc) or
   // `NNx-slug.md` (pre-flow / out-of-arc surfaces — `00a-signin`,
