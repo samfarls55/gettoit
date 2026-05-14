@@ -227,6 +227,17 @@ public struct VerdictScreen: View {
     /// `rooms.correctability_window_seconds`. The view drives a 1-Hz
     /// countdown from this value once the user commits.
     private let correctabilityWindowSeconds: Int
+    /// TB-10 — number of rerolls already used on this room. Drives the
+    /// reroll affordance gating: when `rerollsUsed >= 3` the surface
+    /// hides the tertiary "Reroll" button. The S07 sheet enforces the
+    /// cap server-side; this is the UI-side display gate.
+    private let rerollsUsed: Int
+    /// TB-10 — fires when the user taps the tertiary "Reroll" button.
+    /// The host wires this to a sheet presentation of `RerollScreen`.
+    /// Suppressed in `.readOnly` and `.noSurvivor` per S05 §Modes.
+    /// Suppressed when `rerollsUsed >= 3` (the footer reads "No rerolls
+    /// left" instead per S07 §"Edge cases").
+    private let onReroll: () -> Void
 
     public init(
         verdict: Verdict,
@@ -236,10 +247,12 @@ public struct VerdictScreen: View {
         ratifiedCount: Int = 0,
         ratifiedTotal: Int = 0,
         correctabilityWindowSeconds: Int = 30,
+        rerollsUsed: Int = 0,
         onAdvance: @escaping () -> Void = {},
         onRatify: @escaping () -> Void = {},
         onWidenRadius: @escaping (Int) -> Void = { _ in },
-        onStartOver: @escaping () -> Void = {}
+        onStartOver: @escaping () -> Void = {},
+        onReroll: @escaping () -> Void = {}
     ) {
         self.verdict = verdict
         self.mode = mode
@@ -248,10 +261,12 @@ public struct VerdictScreen: View {
         self.ratifiedCount = ratifiedCount
         self.ratifiedTotal = ratifiedTotal
         self.correctabilityWindowSeconds = correctabilityWindowSeconds
+        self.rerollsUsed = rerollsUsed
         self.onAdvance = onAdvance
         self.onRatify = onRatify
         self.onWidenRadius = onWidenRadius
         self.onStartOver = onStartOver
+        self.onReroll = onReroll
         self._widenRadiusMiles = State(
             initialValue: VerdictScreen.widenRadiusInitialMiles(
                 currentRadiusMeters: currentRadiusMeters
@@ -593,6 +608,7 @@ public struct VerdictScreen: View {
                     .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
                     .padding(GTISpacing.step1)
                     .accessibilityIdentifier("verdict.cta.secondary")
+                rerollTertiary
                 preCheckInLine
             } else {
                 // Default mode — "I'm in" white pill.
@@ -617,6 +633,7 @@ public struct VerdictScreen: View {
                         .padding(GTISpacing.step1)
                 }
                 .accessibilityIdentifier("verdict.cta.secondary")
+                rerollTertiary
                 preCheckInLine
             }
         }
@@ -649,6 +666,33 @@ public struct VerdictScreen: View {
         )
         .accessibilityIdentifier("verdict.cta.primary")
         .accessibilityLabel(VerdictScreen.committedCtaLabel(count: ratifiedCount, total: ratifiedTotal))
+    }
+
+    /// TB-10 — tertiary "REROLL" button below the primary CTA on the
+    /// `default` and `committed` flavors. When the room has already
+    /// burned its 3-cap (`rerollsUsed >= 3`), the button is replaced
+    /// with a non-tappable `"No rerolls left"` footer per S07's
+    /// `"Edge cases"` register. Suppressed entirely in `.readOnly` and
+    /// `.noSurvivor` (those branches don't render `rerollTertiary`).
+    @ViewBuilder
+    private var rerollTertiary: some View {
+        if rerollsUsed >= 3 {
+            Text("No rerolls left")
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.55))
+                .padding(GTISpacing.step1)
+                .accessibilityIdentifier("verdict.cta.reroll.exhausted")
+        } else {
+            Button(action: onReroll) {
+                Text("REROLL")
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
+                    .padding(GTISpacing.step1)
+            }
+            .accessibilityIdentifier("verdict.cta.reroll")
+        }
     }
 
     /// TB-08 — pre-permission line surfacing the upcoming check-in.

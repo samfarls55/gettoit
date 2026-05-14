@@ -89,6 +89,41 @@ export interface ComputeVerdictDataAdapter {
    *  room. Called by the widen-radius re-run path so a fresh verdict
    *  can be inserted under the `verdicts.room_id` UNIQUE constraint. */
   deleteVerdictForRoom(room_id: string): Promise<void>;
+  /** TB-10 — fetch the reroll-state slice the engine needs:
+   *    * `excluded_option_ids` — option ids appended by `avail`-reason
+   *      rerolls. Filter the pool before pruning.
+   *    * `budget_tier_override` / `walk_minutes_override` — engine-
+   *      tightened caps written by `cost` / `dist` rerolls. Merged
+   *      into per-member caps as additional caps (engine takes
+   *      MIN(member, override)).
+   *    * `last_reroll_reason` — null on a clean run; one of
+   *      `cost|dist|mood|diet|avail` after the apply_reroll RPC ran.
+   *      The handler forwards it into `VerdictEngineInput.reroll_reason`
+   *      and stamps it onto the new `verdicts.reroll_reason` column.
+   *  Optional — tests that don't exercise the reroll path omit it; the
+   *  handler treats absence as "all defaults / no reroll." */
+  fetchRoomRerollState?(room_id: string): Promise<RoomRerollState>;
+  /** TB-10 — fetch the human name of the option that the prior
+   *  verdict named. Used to populate
+   *  `VerdictEngineInput.previous_winner_name` for the reroll prefix.
+   *  Returns null when the prior verdict was a `no_survivor` (no
+   *  option_id) or when the option lookup fails (RLS / race). */
+  fetchPreviousWinnerName?(room_id: string): Promise<string | null>;
+}
+
+/** Aggregate of the reroll-state slice the engine reads from `rooms`
+ *  and from `votes.q1_vetoes_extra`. See the apply_reroll RPC + the
+ *  `20260514000300000_rerolls.sql` migration for the column meanings. */
+export interface RoomRerollState {
+  /** Option ids removed from the candidate pool before pruning. */
+  excluded_option_ids: string[];
+  /** Engine-tightened budget tier cap. Null = no override. */
+  budget_tier_override: number | null;
+  /** Engine-tightened walk-minutes cap. Null = no override. */
+  walk_minutes_override: number | null;
+  /** Most recent reroll reason on the room. Drives the rule_text
+   *  prefix + the verdicts.reroll_reason stamp. */
+  last_reroll_reason: "cost" | "dist" | "mood" | "diet" | "avail" | null;
 }
 
 export interface ComputeVerdictDeps {
@@ -132,6 +167,10 @@ export interface MemberVoteRow {
    *  currently surface this directly; reroll (TB-10) and future
    *  taste-profile prefill (post-v1) write into it. */
   soft_cuisine_vetoes?: string[];
+  /** TB-10 — Q1 dietary chips appended after the initial vote via a
+   *  `diet`-reason reroll. The handler merges these with `q1_vetoes`
+   *  before feeding the engine so the EBA filter sees the union. */
+  q1_vetoes_extra?: string[];
 }
 
 export interface VerdictInsert {
@@ -140,6 +179,10 @@ export interface VerdictInsert {
   option_id: string | null;
   method: VerdictMethod;
   rule_text: string;
+  /** TB-10 — set when the verdict was produced after an apply_reroll
+   *  RPC call. Drives the rule_chip prefix on subsequent renders.
+   *  Null on clean runs. */
+  reroll_reason?: "cost" | "dist" | "mood" | "diet" | "avail" | null;
 }
 
 export interface VerdictRow {
@@ -182,6 +225,31 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
 function isUuid(s: unknown): s is string {
   return typeof s === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+}
+
+/** TB-10 — merge the original Q1 dietary chips with the diet-reason
+ *  reroll additions. Dedupe on lowercase token; order preserved per the
+ *  spec's "Q1 chips" + reroll-extra append rule. */
+export function mergeQ1Vetoes(
+  base: readonly string[],
+  extra: readonly string[] | undefined,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const chip of base) {
+    const key = chip.trim().toLowerCase();
+    if (key.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    out.push(chip);
+  }
+  if (!extra) return out;
+  for (const chip of extra) {
+    const key = chip.trim().toLowerCase();
+    if (key.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    out.push(chip);
+  }
+  return out;
 }
 
 export async function handleRequest(
@@ -267,14 +335,28 @@ export async function handleRequest(
 
   const data = deps.buildDataAdapter(deps.env);
 
+  // TB-10 — read the reroll-state slice up front so the idempotency
+  // check can short-circuit on reroll runs: when the room has a
+  // `last_reroll_reason` set, the apply_reroll RPC just deleted the
+  // prior verdict and tightened the room state; we must run the
+  // engine fresh and NOT return a stale "already_computed" payload.
+  const rerollState: RoomRerollState | null = data.fetchRoomRerollState
+    ? await data.fetchRoomRerollState(roomId)
+    : null;
+  const isRerollRun = (rerollState?.last_reroll_reason ?? null) !== null;
+
   // Idempotency — if a verdict already exists for this room, return it
   // with the cuts, 200. TB-07 will use ON CONFLICT to support trigger-
   // retry. The widen-radius re-run path is the one exception: when
   // the caller supplies `radius_meters_override` AND the existing
   // verdict is a `no_survivor`, drop the old verdict (cascading the
-  // option_cuts) so the engine can write a fresh row.
+  // option_cuts) so the engine can write a fresh row. TB-10 widens
+  // the exception list — when `last_reroll_reason` is set on the
+  // room, the apply_reroll RPC already deleted the prior verdict;
+  // any verdict we see now is post-reroll and must NOT be re-returned
+  // as "already_computed."
   const existing = await data.existingVerdict(roomId);
-  if (existing) {
+  if (existing && !isRerollRun) {
     if (widenOverride !== null && existing.method === "no_survivor") {
       await data.deleteVerdictForRoom(roomId);
     } else {
@@ -284,6 +366,11 @@ export async function handleRequest(
         already_computed: true,
       }, { status: 200, headers: corsHeaders() });
     }
+  } else if (existing && isRerollRun) {
+    // Race: a stale verdict slipped past the apply_reroll DELETE.
+    // Drop it so the fresh engine run can write under the UNIQUE
+    // constraint.
+    await data.deleteVerdictForRoom(roomId);
   }
 
   const room = await data.fetchRoom(roomId);
@@ -333,16 +420,40 @@ export async function handleRequest(
     vibe_signal: row.payload?.vibe_signal ?? null,
   }));
 
-  const votes: MemberVote[] = voteRows.map((row) => ({
-    user_id: row.user_id,
-    display_name: row.display_name,
-    q1_vetoes: row.q1_vetoes,
-    q2_budget: row.q2_budget,
-    q3_walk_minutes: row.q3_walk_minutes,
-    q4_vibe: row.q4_vibe,
-    q5_regret: row.q5_regret,
-    soft_cuisine_vetoes: row.soft_cuisine_vetoes,
-  }));
+  // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
+  // the union of "original quiz answer" + "diet-reason reroll add."
+  // The engine itself doesn't need the split visible — its lookup
+  // table is set-based and the dedupe in the engine handles duplicates
+  // naturally.
+  const votes: MemberVote[] = voteRows.map((row) => {
+    const mergedVetoes = mergeQ1Vetoes(row.q1_vetoes, row.q1_vetoes_extra);
+    // TB-10 — apply room-level overrides as additional caps. Each
+    // member's effective cap is MIN(member, override). Note the
+    // budget_tier_override is a hard CAP (tighter is smaller); the
+    // walk override is a hard CAP (tighter is smaller).
+    const effectiveBudget = rerollState?.budget_tier_override != null
+      ? Math.min(row.q2_budget, rerollState.budget_tier_override)
+      : row.q2_budget;
+    const effectiveWalk = rerollState?.walk_minutes_override != null
+      ? Math.min(row.q3_walk_minutes, rerollState.walk_minutes_override)
+      : row.q3_walk_minutes;
+    return {
+      user_id: row.user_id,
+      display_name: row.display_name,
+      q1_vetoes: mergedVetoes,
+      q2_budget: effectiveBudget,
+      q3_walk_minutes: effectiveWalk,
+      q4_vibe: row.q4_vibe,
+      q5_regret: row.q5_regret,
+      soft_cuisine_vetoes: row.soft_cuisine_vetoes,
+    };
+  });
+
+  // TB-10 — fetch the previous winner's display name when this run is
+  // a reroll. The aggregate-rule prefix reads "Cost reroll cut Pico's."
+  const previousWinnerName: string | undefined = (isRerollRun && data.fetchPreviousWinnerName)
+    ? ((await data.fetchPreviousWinnerName(roomId)) ?? undefined)
+    : undefined;
 
   let result: VerdictEngineOutput;
   try {
@@ -352,6 +463,9 @@ export async function handleRequest(
       method,
       radius_meters: startingRadius ?? undefined,
       radius_meters_cap: radiusCap,
+      excluded_option_ids: rerollState?.excluded_option_ids,
+      reroll_reason: rerollState?.last_reroll_reason ?? undefined,
+      previous_winner_name: previousWinnerName,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
@@ -363,12 +477,15 @@ export async function handleRequest(
   }
 
   // Persist — the no_survivor row carries `option_id = null` and no
-  // option_cuts; the manual row carries both.
+  // option_cuts; the manual row carries both. TB-10 — stamp the
+  // reroll_reason on the verdict so subsequent reads (and the iOS
+  // VerdictStore) know the surface should attribute the reroll.
   const verdict = await data.insertVerdict({
     room_id: roomId,
     option_id: result.winning_option_id,
     method: result.method,
     rule_text: result.rule_text,
+    reroll_reason: rerollState?.last_reroll_reason ?? null,
   });
 
   if (result.cuts.length > 0) {
