@@ -19,3 +19,4 @@ See `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md` for the fu
 ## Features
 
 - [[v1/_index|v1]] — v1 PRD implementation issues. Tracer-bullet build slices (`tb-00`–`tb-17`) + design-system spec-gap issues (S01 controls, S04 Decide-now, S05 read-only, S05 no-survivor, Foursquare tag research). PRD at [[../10_prds/v1-prd|10_prds/v1-prd.md]].
+- [[v1.1/_index|v1.1]] — dogfood follow-ups from 2026-05-14 TestFlight first-install. 11 issues published 2026-05-14 (GitHub #41–#51): 4 bugs (`bug-01`–`bug-04`), 4 spec-gaps (`sg-01`–`sg-04`), 3 tracer-bullets (`tb-01`–`tb-03`). Two candidates (#2b dynamic OG card, #10 allergy/dietary capture) deferred to the pre-public-launch milestone.
