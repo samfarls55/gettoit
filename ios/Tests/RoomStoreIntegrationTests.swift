@@ -29,18 +29,40 @@ final class RoomStoreIntegrationTests: XCTestCase {
         return config
     }
 
-    /// Build a fresh anonymous client. Each call gets its own session
-    /// so we can simulate distinct devices on the same Supabase project.
-    private func freshAnonClient() async throws -> (SupabaseClient, UUID) {
-        let config = try loadConfig()
-        let client = SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
+    /// Sign in as a fresh anonymous user on `client` and return their
+    /// user id. Signs out first to clear any session left behind by an
+    /// earlier test, then awaits the post-sign-in session so the
+    /// PostgREST client picks up the new JWT before the test fires its
+    /// follow-up requests.
+    @discardableResult
+    private func signInFreshAnon(on client: SupabaseClient) async throws -> UUID {
         try? await client.auth.signOut()
         let session = try await client.auth.signInAnonymously()
-        return (client, session.user.id)
+        // The Supabase Swift client's PostgREST token-provider closure
+        // reads the session via the AuthClient. Both `signOut` and
+        // `signInAnonymously` complete by returning before the storage
+        // / state-change broadcaster has settled, so the next PostgREST
+        // request can miss the new JWT. Give the auth state a brief
+        // window to propagate.
+        try await Task.sleep(nanoseconds: 200_000_000)
+        return session.user.id
+    }
+
+    /// One client per "device". Each test that needs more than one
+    /// identity creates additional clients so each has its own session
+    /// state. The Supabase default Keychain-backed storage is shared
+    /// across clients with the same project URL — that defeats the
+    /// multi-identity simulation we need for the join + RLS tests.
+    /// Tests that want isolation create a brand-new `SupabaseClient`
+    /// for each identity rather than sharing one.
+    private func makeClient() throws -> SupabaseClient {
+        let config = try loadConfig()
+        return SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
     }
 
     func testCreateRoomWritesOwnerMembershipAndIsReadableByTheCreator() async throws {
-        let (client, creatorID) = try await freshAnonClient()
+        let client = try makeClient()
+        let creatorID = try await signInFreshAnon(on: client)
         let store = RoomStore(client: client)
 
         let room = try await store.createRoom(as: creatorID)
@@ -63,45 +85,46 @@ final class RoomStoreIntegrationTests: XCTestCase {
     }
 
     func testJoinRoomWritesParticipantMembershipForADifferentUser() async throws {
-        // Device A — creator.
-        let (creatorClient, creatorID) = try await freshAnonClient()
-        let creatorStore = RoomStore(client: creatorClient)
-        let room = try await creatorStore.createRoom(as: creatorID)
-        try? await creatorClient.auth.signOut()
+        let client = try makeClient()
+        let store = RoomStore(client: client)
 
-        // Device B — invitee.
-        let (joinerClient, joinerID) = try await freshAnonClient()
-        let joinerStore = RoomStore(client: joinerClient)
+        // Device A — creator creates the room.
+        let creatorID = try await signInFreshAnon(on: client)
+        let room = try await store.createRoom(as: creatorID)
 
-        try await joinerStore.joinRoom(id: room.id, as: joinerID)
+        // Device B — sign out as A, sign in as a brand new anon user.
+        let joinerID = try await signInFreshAnon(on: client)
+        XCTAssertNotEqual(creatorID, joinerID, "expected a distinct identity for the joiner")
 
-        let role = try await joinerStore.fetchRole(roomID: room.id, userID: joinerID)
+        try await store.joinRoom(id: room.id, as: joinerID)
+
+        let role = try await store.fetchRole(roomID: room.id, userID: joinerID)
         XCTAssertEqual(role, "participant")
 
         // The joiner can now read the `rooms` row — RLS admits them
         // because they're a member.
-        let fetched = try await joinerStore.fetchRoom(id: room.id)
+        let fetched = try await store.fetchRoom(id: room.id)
         XCTAssertEqual(fetched?.id, room.id)
         XCTAssertNotEqual(fetched?.creatorUserID, joinerID,
                           "expected the room's creator to be the original owner, not the joiner")
 
-        try? await joinerClient.auth.signOut()
+        try? await client.auth.signOut()
     }
 
     func testRLSHidesARoomFromANonMember() async throws {
+        let client = try makeClient()
+        let store = RoomStore(client: client)
+
         // Device A creates a room.
-        let (creatorClient, creatorID) = try await freshAnonClient()
-        let creatorStore = RoomStore(client: creatorClient)
-        let room = try await creatorStore.createRoom(as: creatorID)
-        try? await creatorClient.auth.signOut()
+        let creatorID = try await signInFreshAnon(on: client)
+        let room = try await store.createRoom(as: creatorID)
 
         // Device C — never joined — must not see it.
-        let (outsiderClient, _) = try await freshAnonClient()
-        let outsiderStore = RoomStore(client: outsiderClient)
+        _ = try await signInFreshAnon(on: client)
 
-        let fetched = try await outsiderStore.fetchRoom(id: room.id)
+        let fetched = try await store.fetchRoom(id: room.id)
         XCTAssertNil(fetched, "expected RLS to hide the room from a non-member")
 
-        try? await outsiderClient.auth.signOut()
+        try? await client.auth.signOut()
     }
 }
