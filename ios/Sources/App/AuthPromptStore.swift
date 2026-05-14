@@ -55,7 +55,7 @@ public final class AuthPromptStore {
     public func recordDismissal(for userID: UUID, now: Date = .now) async throws {
         let payload = DismissUpsert(
             userID: userID,
-            authPromptDismissedAt: Self.iso8601.string(from: now)
+            authPromptDismissedAt: Self.formatForPostgrest(now)
         )
         try await client
             .from("user_preferences")
@@ -78,18 +78,81 @@ public final class AuthPromptStore {
         guard let raw = rows.first?.authPromptDismissedAt else {
             return nil
         }
-        return Self.iso8601.date(from: raw)
+        return Self.parsePostgrestTimestamp(raw)
     }
 
     // MARK: - wire types
 
-    /// ISO-8601 with fractional seconds — what Postgres `timestamptz`
-    /// values render as via PostgREST's default JSON shape.
-    private static let iso8601: ISO8601DateFormatter = {
+    /// Parse a `timestamptz` as PostgREST emits it. PostgREST renders
+    /// Postgres `timestamptz` values in one of these shapes depending
+    /// on whether sub-second precision is present:
+    ///
+    ///   * `2026-05-15T17:46:40+00:00`            (whole seconds)
+    ///   * `2026-05-15T17:46:40.123+00:00`        (milliseconds)
+    ///   * `2026-05-15T17:46:40.123456+00:00`     (microseconds — pg
+    ///                                             default for now())
+    ///
+    /// `ISO8601DateFormatter` with `withFractionalSeconds` rejects the
+    /// no-fraction form and only handles up to milliseconds (3 digits).
+    /// Try the fractional formatter first, fall back to the plain one,
+    /// and finally hand-truncate any microsecond tail before retrying.
+    /// Returns nil for genuinely malformed input.
+    static func parsePostgrestTimestamp(_ raw: String) -> Date? {
+        if let d = Self.iso8601Fractional.date(from: raw) { return d }
+        if let d = Self.iso8601Plain.date(from: raw) { return d }
+        // Trim microseconds (6 digits) down to milliseconds (3 digits)
+        // so the fractional formatter accepts the string. PostgREST's
+        // default emits 6-digit fractional seconds; ISO8601DateFormatter
+        // tops out at 3.
+        if let truncated = Self.truncatedToMilliseconds(raw),
+           let d = Self.iso8601Fractional.date(from: truncated) {
+            return d
+        }
+        return nil
+    }
+
+    /// Drop digits past the third fractional-second digit so an
+    /// `ISO8601DateFormatter` with `.withFractionalSeconds` can parse
+    /// the result. Returns nil if the input has no fractional part
+    /// (caller will have already tried the plain formatter).
+    private static func truncatedToMilliseconds(_ raw: String) -> String? {
+        guard let dotIdx = raw.firstIndex(of: ".") else { return nil }
+        let afterDot = raw.index(after: dotIdx)
+        // Find where the digits end (timezone offset or 'Z' starts).
+        var endOfDigits = afterDot
+        while endOfDigits < raw.endIndex, raw[endOfDigits].isNumber {
+            endOfDigits = raw.index(after: endOfDigits)
+        }
+        let digitCount = raw.distance(from: afterDot, to: endOfDigits)
+        guard digitCount > 3 else { return nil }
+        let keepUpTo = raw.index(afterDot, offsetBy: 3)
+        return String(raw[..<keepUpTo]) + String(raw[endOfDigits...])
+    }
+
+    /// ISO-8601 with fractional seconds. Used for writes (we emit
+    /// `.000` millisecond precision) and for reads when PostgREST
+    /// returns a millisecond-precision timestamp.
+    private static let iso8601Fractional: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
+
+    /// ISO-8601 without fractional seconds. PostgREST emits this shape
+    /// when the stored `timestamptz` has whole-second precision (which
+    /// is what we get back when we send `.000` and Postgres rounds it
+    /// to the column's effective precision).
+    private static let iso8601Plain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    /// Format a Date for writing to `timestamptz`. Millisecond precision
+    /// is plenty for the 30-day suppression window.
+    static func formatForPostgrest(_ date: Date) -> String {
+        Self.iso8601Fractional.string(from: date)
+    }
 
     private struct DismissUpsert: Encodable {
         let userID: UUID

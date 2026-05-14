@@ -133,28 +133,36 @@ public final class AuthCoordinator {
         }
 
         self.state = .linking(userID: priorID)
+        let newID: UUID
         do {
-            let newID = try await linker.linkApple(
+            newID = try await linker.linkApple(
                 idToken: idToken,
                 nonce: nonce,
                 currentUserID: priorID
             )
-            // Merge-correctness assertion: the same `user_id` must
-            // come back out the other side. If Supabase ever changes
-            // semantics and returns a fresh id, this assertion catches
-            // it loudly rather than the user silently losing history.
-            guard newID == priorID else {
-                self.state = .error("Apple link returned a different user_id")
-                throw LinkError.userIDChanged(before: priorID, after: newID)
-            }
-            self.state = .linkedApple(userID: newID)
-            return newID
         } catch {
+            // Linker error (network / Apple token invalid / etc.).
             // Restore the anonymous state so the chip can re-render
-            // and the user can retry or dismiss.
+            // and the user can retry or dismiss. The userIDChanged
+            // case is detected OUTSIDE the do/catch below so we don't
+            // accidentally re-enter this branch and overwrite the
+            // .error state.
             self.state = .anonymous(userID: priorID)
             throw error
         }
+
+        // Merge-correctness assertion: the same `user_id` must come
+        // back out the other side. If Supabase ever changes semantics
+        // and returns a fresh id, this assertion catches it loudly
+        // rather than the user silently losing history. Surface .error
+        // so the UI can render a hard-stop rather than masking drift
+        // as a transient anonymous-state re-render.
+        guard newID == priorID else {
+            self.state = .error("Apple link returned a different user_id")
+            throw LinkError.userIDChanged(before: priorID, after: newID)
+        }
+        self.state = .linkedApple(userID: newID)
+        return newID
     }
 
     public enum LinkError: Error, Equatable {
