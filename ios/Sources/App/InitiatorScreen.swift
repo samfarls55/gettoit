@@ -26,17 +26,71 @@ import UIKit
 public struct InitiatorScreen: View {
     @State private var phase: Phase = .ready
     @State private var pendingShare: PendingShare?
-    @State private var timerMinutes: Int = InitiatorScreen.defaultTimerMinutes
-    @State private var radiusMiles: Double = InitiatorScreen.defaultRadiusMiles
+    @State private var timerMinutes: Int
+    @State private var radiusMiles: Double
 
     private let roomStore: RoomStore
     private let userID: UUID
     private let onSharedRoom: ((UUID) -> Void)?
 
-    public init(roomStore: RoomStore, userID: UUID, onSharedRoom: ((UUID) -> Void)? = nil) {
+    public init(
+        roomStore: RoomStore,
+        userID: UUID,
+        prefilledTimerMinutes: Int? = nil,
+        prefilledRadiusMiles: Double? = nil,
+        onSharedRoom: ((UUID) -> Void)? = nil
+    ) {
         self.roomStore = roomStore
         self.userID = userID
         self.onSharedRoom = onSharedRoom
+        let resolved = InitiatorScreen.resolvedPrefill(
+            timerMinutes: prefilledTimerMinutes,
+            radiusMiles: prefilledRadiusMiles
+        )
+        self._timerMinutes = State(initialValue: resolved.timer)
+        self._radiusMiles = State(initialValue: resolved.miles)
+    }
+
+    /// Resolve a pair of optional prefill values to the actual
+    /// initial controls. Used by TB-11's read-only re-invite path —
+    /// the late-joiner taps `"Start a new decision"`, and the new
+    /// S01 surface opens with the prior room's `timer_minutes` +
+    /// `radius_meters` pre-populated (saves a tap). Out-of-range
+    /// values clamp to the S01 legal set.
+    public static func resolvedPrefill(
+        timerMinutes: Int?,
+        radiusMiles: Double?
+    ) -> (timer: Int, miles: Double) {
+        let timer: Int
+        if let raw = timerMinutes {
+            timer = clampTimerToS01(raw)
+        } else {
+            timer = defaultTimerMinutes
+        }
+        let miles: Double
+        if let raw = radiusMiles {
+            miles = min(max(raw, radiusMinMiles), radiusMaxMiles)
+        } else {
+            miles = defaultRadiusMiles
+        }
+        return (timer, miles)
+    }
+
+    /// Snap a candidate timer value to the S01 chip set `{5, 10, 15, 30}`.
+    /// Mirrors `LateJoinerStore.timerMinutesClampedToS01` — the two
+    /// paths agree so the surface always renders one of the four
+    /// canonical chips.
+    public static func clampTimerToS01(_ minutes: Int) -> Int {
+        var best = timerOptions[0]
+        var bestDistance = abs(minutes - best)
+        for option in timerOptions.dropFirst() {
+            let distance = abs(minutes - option)
+            if distance < bestDistance {
+                best = option
+                bestDistance = distance
+            }
+        }
+        return best
     }
 
     public enum Phase: Equatable {
