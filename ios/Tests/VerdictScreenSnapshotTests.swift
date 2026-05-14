@@ -1,0 +1,110 @@
+// GetToIt — VerdictScreen snapshot-style smoke tests (TB-06).
+//
+// Same shape as `QuizScreenSnapshotTests`: pixel-snapshot tooling is
+// not yet on the dependency graph, so "snapshot test for S05 default
+// state" (ticket AC) is satisfied by smoke tests that:
+//   * verify the SwiftUI body materialises without crashing in the
+//     verdict's `default` mode,
+//   * confirm spec-driven inputs (the choreography delays, the eyebrow
+//     copy, the receipts) feed through unchanged,
+//   * lock the design-system contract for the choreo timings via direct
+//     assertions on the constants the view reads.
+
+import XCTest
+import SwiftUI
+@testable import GetToIt
+
+@MainActor
+final class VerdictScreenSnapshotTests: XCTestCase {
+
+    /// Force a SwiftUI view body to materialise. Same hosting-controller
+    /// trick `QuizScreenSnapshotTests` uses.
+    @discardableResult
+    private func render<V: View>(_ view: V) -> UIView {
+        let host = UIHostingController(rootView: view)
+        host.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        return host.view
+    }
+
+    // MARK: - body materialisation
+
+    func testDefaultModeRendersWithoutCrashing() {
+        let verdict = VerdictScreen.Verdict.fixture()
+        render(VerdictScreen(verdict: verdict, mode: .default))
+    }
+
+    func testDefaultModeRendersForReducedMotion() {
+        let verdict = VerdictScreen.Verdict.fixture()
+        render(
+            VerdictScreen(verdict: verdict, mode: .default)
+                .environment(\.accessibilityReduceMotion, true)
+        )
+    }
+
+    // MARK: - choreography timings (locked, ms-exact)
+
+    func testChoreoTimingsMatchTheDesignSystemTokens() {
+        // The verdict reveal timings are canon in `design-system/motion.md`
+        // §"Verdict reveal — full choreography" and in `VERDICT_CHOREO`
+        // at the top of `design-system/code/screens/ScreenVerdict.jsx`.
+        // The GTITokens generator pulls them from `tokens.json` — so
+        // asserting against the generated values is equivalent to
+        // asserting against the canonical source. The numerical values
+        // are written into the snapshot so a silent token bump trips
+        // the test.
+        XCTAssertEqual(VerdictScreen.Choreo.eyebrowDelay,  0.080, accuracy: 0.0001)
+        XCTAssertEqual(VerdictScreen.Choreo.nameDelay,     0.280, accuracy: 0.0001)
+        XCTAssertEqual(VerdictScreen.Choreo.metaDelay,     0.700, accuracy: 0.0001)
+        XCTAssertEqual(VerdictScreen.Choreo.timeDelay,     0.820, accuracy: 0.0001)
+        XCTAssertEqual(VerdictScreen.Choreo.ruleDelay,     1.020, accuracy: 0.0001)
+        XCTAssertEqual(VerdictScreen.Choreo.receiptsDelay, 1.140, accuracy: 0.0001)
+        XCTAssertEqual(VerdictScreen.Choreo.ctaDelay,      1.380, accuracy: 0.0001)
+        XCTAssertEqual(VerdictScreen.Choreo.staggerReceipt, 0.080, accuracy: 0.0001,
+                       "receipt stagger is 80ms per chip per motion.md")
+    }
+
+    func testHeroLineIsStackedOneWordPerLine() {
+        let lines = VerdictScreen.heroLines(for: "Pico's Taqueria")
+        XCTAssertEqual(lines.count, 2, "S05 hero stacks two words / lines")
+        XCTAssertEqual(lines[0], "PICO'S")
+        XCTAssertEqual(lines[1], "TAQUERIA")
+    }
+
+    func testHeroLineWithThreeWordsCollapsesToTwoBalancedLines() {
+        // Spec rule (S05 §"Copy register"): place name UPPERCASE stacked,
+        // one word per line. When the name has 3+ tokens the rule still
+        // wants visible balance — split halves.
+        let lines = VerdictScreen.heroLines(for: "Bar Pastoral Italian")
+        XCTAssertEqual(lines.count, 2)
+        // First line carries the leading word; the rest land on the
+        // second line so the verdict reads as a hero, not a list.
+        XCTAssertEqual(lines[0], "BAR")
+        XCTAssertEqual(lines[1], "PASTORAL ITALIAN")
+    }
+
+    // MARK: - mode flags
+
+    func testDefaultModeFlagsAreLockedToTheSpec() {
+        let verdict = VerdictScreen.Verdict.fixture()
+        let snap = VerdictScreen(verdict: verdict, mode: .default).modeSnapshot
+        XCTAssertTrue(snap.showTimeBadge,    "default mode renders the time badge")
+        XCTAssertTrue(snap.showReceipts,     "default mode renders voice receipts")
+        XCTAssertTrue(snap.showCutsDrawer,   "default mode renders the cuts trigger")
+        XCTAssertFalse(snap.cutsExpanded,    "cuts drawer collapsed by default per S05 §Modes")
+        XCTAssertEqual(snap.eyebrowCopy, "Tonight, the verdict is")
+        XCTAssertEqual(snap.primaryCtaLabel, "I'm in")
+        XCTAssertEqual(snap.secondaryLabel, "Start over")
+    }
+
+    // MARK: - fixture contract
+
+    func testFixtureProducesFourReceiptsMatchingTheJSX() {
+        let fixture = VerdictScreen.Verdict.fixture()
+        XCTAssertEqual(fixture.receipts.count, 4,
+                       "JSX fixture surfaces 4 receipts on the verdict reveal")
+        XCTAssertEqual(fixture.receipts.map { $0.name }, ["you", "alex", "maya", "sam"],
+                       "receipt names mirror the JSX fixture order")
+    }
+}

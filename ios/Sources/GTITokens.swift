@@ -196,9 +196,13 @@ public enum GTIMotion {
 
     public enum ChoreoDelay {
         public static let staggerReceipt: Double = 0.080
+        public static let eyebrow: Double = 0.080
         public static let name: Double = 0.280
+        public static let meta: Double = 0.700
         public static let time: Double = 0.820
         public static let rule: Double = 1.020
+        public static let receipts: Double = 1.140
+        public static let cta: Double = 1.380
     }
 
     /// CSS cubic-bezier control points. Use with `Animation.timingCurve`.
