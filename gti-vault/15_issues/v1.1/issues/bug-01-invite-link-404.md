@@ -12,7 +12,7 @@ prd: v1-prd
 
 ## Parent
 
-[[../_index|v1.1 backlog]] candidate #1. Source: [[../../../01_raw/testflight-first-dogfood-2026-05-14|TestFlight dogfood 2026-05-14]].
+[[../_index|v1.1 backlog]] candidate #1. Source: [[../testflight-first-dogfood-2026-05-14|TestFlight dogfood 2026-05-14]].
 
 ## What's broken
 

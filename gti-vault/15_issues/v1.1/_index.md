@@ -6,7 +6,7 @@ status: 11 issues published 2026-05-14 (GitHub #41–#51)
 
 # v1.1 — Dogfood follow-ups
 
-Post-build feedback against the v1 TestFlight build, captured during the first real-device install on 2026-05-14. Source raw note: [[../../01_raw/testflight-first-dogfood-2026-05-14|testflight-first-dogfood-2026-05-14]].
+Post-build feedback against the v1 TestFlight build, captured during the first real-device install on 2026-05-14. Source raw note: [[testflight-first-dogfood-2026-05-14|testflight-first-dogfood-2026-05-14]] (lives next to this index after compile).
 
 ## Framing
 
@@ -62,7 +62,7 @@ v1.1 introduces one new artifact kind beyond v1's existing taxonomy:
 
 ## Cross-references
 
-- [[../../01_raw/testflight-first-dogfood-2026-05-14|Source raw note]] — original first-impression observations
+- [[testflight-first-dogfood-2026-05-14|Source raw note]] — original first-impression observations (moved from 01_raw/ on 2026-05-14 compile)
 - [[../v1/_index|v1 issues]] — the build these issues are against
 - [[../../10_prds/v1-prd|v1 PRD]] — context for what "shipped v1" means
 - [[../../60_engineering/adr|ADRs]] — for any decision that lands during triage

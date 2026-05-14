@@ -85,5 +85,5 @@ These questions land when the profile-edit surface is built in the pre-public-la
 ## Sources
 
 - [[../15_issues/v1.1/_index|v1.1 backlog]] §Resolutions #9, #10, #11 — the grilling session that produced this rule.
-- [[../01_raw/testflight-first-dogfood-2026-05-14|Raw dogfood note]] — the original "allergies should be on the profile" observation.
+- [[../15_issues/v1.1/testflight-first-dogfood-2026-05-14|Raw dogfood note]] — the original "allergies should be on the profile" observation (moved from 01_raw/ on 2026-05-14 compile).
 - [[v1-design-locks]] Lock 1 — the existing v1 quiz composition this split modifies.
