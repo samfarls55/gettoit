@@ -48,16 +48,49 @@ final class RoomStoreIntegrationTests: XCTestCase {
         return session.user.id
     }
 
-    /// One client per "device". Each test that needs more than one
-    /// identity creates additional clients so each has its own session
-    /// state. The Supabase default Keychain-backed storage is shared
-    /// across clients with the same project URL — that defeats the
-    /// multi-identity simulation we need for the join + RLS tests.
-    /// Tests that want isolation create a brand-new `SupabaseClient`
-    /// for each identity rather than sharing one.
+    /// Build a Supabase client backed by an *in-memory* auth storage.
+    ///
+    /// supabase-swift defaults to Keychain on Apple platforms, but
+    /// keychain writes fail silently in an unsigned simulator build
+    /// (`CODE_SIGNING_ALLOWED=NO` in our CI lane) — `signInAnonymously`
+    /// still returns a Session, but `sessionManager.update` can't
+    /// persist it, so `currentSession` is permanently nil and
+    /// PostgREST never attaches the JWT. The in-memory storage keeps
+    /// the session in heap memory where the SDK can round-trip it.
     private func makeClient() throws -> SupabaseClient {
         let config = try loadConfig()
-        return SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
+        return SupabaseClient(
+            supabaseURL: config.url,
+            supabaseKey: config.anonKey,
+            options: SupabaseClientOptions(
+                auth: SupabaseClientOptions.AuthOptions(
+                    storage: InMemoryAuthStorage()
+                )
+            )
+        )
+    }
+
+    /// Heap-backed `AuthLocalStorage` for tests. Same shape as the
+    /// upstream `KeychainLocalStorage` but without the entitlement
+    /// requirement.
+    private final class InMemoryAuthStorage: AuthLocalStorage, @unchecked Sendable {
+        private var values: [String: Data] = [:]
+        private let lock = NSLock()
+
+        func store(key: String, value: Data) throws {
+            lock.lock(); defer { lock.unlock() }
+            values[key] = value
+        }
+
+        func retrieve(key: String) throws -> Data? {
+            lock.lock(); defer { lock.unlock() }
+            return values[key]
+        }
+
+        func remove(key: String) throws {
+            lock.lock(); defer { lock.unlock() }
+            values.removeValue(forKey: key)
+        }
     }
 
     func testCreateRoomWritesOwnerMembershipAndIsReadableByTheCreator() async throws {
