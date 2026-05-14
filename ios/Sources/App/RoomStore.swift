@@ -38,24 +38,47 @@ public final class RoomStore {
     /// row with `role='owner'`. The caller is responsible for ensuring
     /// `userID` matches the active Supabase auth session — RLS rejects
     /// the insert otherwise.
+    ///
+    /// We allocate the room id client-side rather than letting Postgres
+    /// generate it. Reason: the `rooms` SELECT policy requires the
+    /// caller to be a member of the room, but the bootstrap member
+    /// row isn't written until AFTER the rooms insert succeeds — so
+    /// asking PostgREST for the inserted row back (`returning=representation`)
+    /// would fail the SELECT policy and surface as a "0 rows" error from
+    /// `.single()`. Skipping the read-back lets us return the row built
+    /// from the values we already hold.
     @discardableResult
     public func createRoom(as userID: UUID) async throws -> Room {
-        let insert = RoomInsert(creatorUserID: userID, status: "open", vertical: "food")
-        let room: Room = try await client
+        let roomID = UUID()
+        let insert = RoomInsert(id: roomID, creatorUserID: userID, status: "open", vertical: "food")
+        try await client
             .from("rooms")
-            .insert(insert, returning: .representation)
-            .select()
-            .single()
+            .insert(insert)
             .execute()
-            .value
 
-        let membership = MemberInsert(roomID: room.id, userID: userID, role: "owner")
+        let membership = MemberInsert(roomID: roomID, userID: userID, role: "owner")
         try await client
             .from("members")
             .insert(membership)
             .execute()
 
-        return room
+        // Now that the membership row exists the rooms SELECT policy
+        // admits the caller; read the row back so we surface the
+        // server-side defaults (`status`, `vertical`, `created_at`).
+        if let room = try await fetchRoom(id: roomID) {
+            return room
+        }
+
+        // Server didn't echo the row back — extremely unlikely, but
+        // construct a best-effort representation so callers don't fail
+        // silently. The id and creator are authoritative.
+        return Room(
+            id: roomID,
+            creatorUserID: userID,
+            status: "open",
+            vertical: "food",
+            createdAt: ""
+        )
     }
 
     /// Join an existing room as `role='participant'`. Idempotent in
@@ -134,11 +157,13 @@ public final class RoomStore {
     }
 
     private struct RoomInsert: Encodable {
+        let id: UUID
         let creatorUserID: UUID
         let status: String
         let vertical: String
 
         enum CodingKeys: String, CodingKey {
+            case id
             case creatorUserID = "creator_user_id"
             case status
             case vertical
