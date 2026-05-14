@@ -2,6 +2,10 @@
 //
 // Boots the AuthCoordinator + RoomStore + LateJoinerStore, then
 // routes between five surfaces:
+//   * S00a SignInScreen — TB-02 (v1.1) forced first-launch sign-in
+//     gate. Rendered when `AuthCoordinator.state == .idle` after
+//     `restoreSessionIfPresent` returns (no cached session). Closes
+//     the iOS half of ADR 0007's anonymous-default for v1.1.
 //   * S00 LandingScreen — post-sign-in entry surface (v1.1, TB-01).
 //     Every cold launch with an active auth session lands here first;
 //     the user picks Start a Decision (→ S01) or Account Settings
@@ -22,9 +26,11 @@
 //
 // State precedence (inner-most wins): `activeQuiz` → `readOnlyView`
 // → `deepLink` → settings → S01 (when `showingInitiator` is true) →
-// S00 Landing (the new default for a signed-in idle session). Once
-// the quiz is live, re-opening another deep link doesn't force-rejoin
-// mid-quiz.
+// S00 Landing (the default for a signed-in idle session). The S00a
+// gate sits outside this chain — it is the launch destination iff no
+// session exists. Once the user signs in, the gate dismisses and the
+// standard precedence chain takes over (idle landing on S00, not S01).
+// Re-opening a deep link mid-quiz doesn't force-rejoin.
 
 import SwiftUI
 import Supabase
@@ -68,7 +74,23 @@ public struct RootView: View {
                     .multilineTextAlignment(.center)
                     .padding(GTISpacing.step6)
             } else if let coordinators {
-                if showingSettings {
+                // TB-02 v1.1 — S00a forced sign-in gate. Sits ABOVE the
+                // standard state precedence chain because a missing
+                // session blocks every other route (RLS will reject
+                // any data read). After a successful sign-in the
+                // coordinator flips to `.linkedApple(userID)` and this
+                // branch falls through to the regular precedence
+                // below. The gate also re-renders after a sign-out
+                // from S09 Settings — the coordinator's `signOut +
+                // signInAnonymously` post-delete dance is the legacy
+                // path; a future cleanup may swap that for a true
+                // sign-out that re-routes back through S00a.
+                if case .idle = coordinators.auth.state {
+                    SignInScreen(
+                        auth: coordinators.auth,
+                        onSignedIn: { }
+                    )
+                } else if showingSettings {
                     // TB-16 — Settings is the inner-most route in
                     // the state precedence chain. While it's up, the
                     // host suppresses every other surface; on Done or
@@ -126,6 +148,15 @@ public struct RootView: View {
                     // prefill is carried in, so the user lands on
                     // S01 with prefill instead of being asked
                     // "what's next?" again).
+                    //
+                    // After TB-02 v1.1, the canonical iOS user is
+                    // `.linkedApple` (post-S00a). Legacy v1 installs
+                    // that hadn't yet upgraded land as `.anonymous`
+                    // until the user signs out / deletes and re-
+                    // bootstraps through S00a. Both flavors route the
+                    // same way at this layer; the chip rendering on
+                    // S04 still consults `state.isAnonymous` to gate
+                    // the C-22 upgrade prompt.
                     if showingInitiator || reInvitePrefill != nil {
                         InitiatorScreen(
                             roomStore: coordinators.roomStore,
@@ -207,7 +238,11 @@ public struct RootView: View {
         let auth = AuthCoordinator(client: client)
         let roomStore = RoomStore(client: client)
         let lateJoinerStore = LateJoinerStore(client: client)
-        await auth.ensureSignedIn()
+        // TB-02 v1.1 — restore cached session if any, otherwise leave
+        // `.idle` so the S00a sign-in gate renders. Replaces the v1
+        // `ensureSignedIn` call which would have minted an anonymous
+        // session on a fresh install.
+        await auth.restoreSessionIfPresent()
         self.coordinators = Coordinators(
             auth: auth,
             roomStore: roomStore,

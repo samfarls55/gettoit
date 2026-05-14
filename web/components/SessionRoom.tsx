@@ -42,6 +42,7 @@ import {
   type VoteSummaryRow,
 } from "../lib/verdict";
 
+import { APP_STORE_URL } from "../lib/app-store";
 import { ensureAnonSession, getSupabaseClient } from "../lib/supabase";
 
 import {
@@ -515,6 +516,20 @@ export function SessionRoom({ roomId }: { roomId: string }) {
         members={memberViews}
         secondsRemaining={secondsRemaining}
         outstandingName={undefined}
+        // sg-03 / TB-02 (v1.1): web-fallback invitees are always
+        // anonymous per ADR 0007 — `ensureAnonSession` only ever mints
+        // anonymous sessions on the browser. If/when web Apple sign-in
+        // ever lands, this flag flips off for those users and the CTA
+        // suppresses itself.
+        isAnonymous={true}
+        onDownloadApp={() => {
+          void emitDownloadCtaEvent({ roomId, userId });
+          // Open in a new tab so the user keeps their place in S04 —
+          // the verdict still computes for the room they voted in.
+          if (typeof window !== "undefined") {
+            window.open(APP_STORE_URL, "_blank", "noopener,noreferrer");
+          }
+        }}
       />
     );
   }
@@ -573,6 +588,38 @@ function FullScreenMessage({
       </div>
     </main>
   );
+}
+
+// sg-03 / TB-02 (v1.1) — emit the `waiting_download_cta_tapped` event
+// into the Supabase `events` table per ADR 0005. Fire-and-forget: a
+// telemetry write must not block the App Store navigation. Errors are
+// swallowed (a missing telemetry row is recoverable; a stuck CTA is
+// not) — Supabase logs surface the failure if it ever matters.
+//
+// Mirrors the ADR 0005 vocabulary used by iOS `TelemetryWriter`: an
+// `events` row with `event_type`, `room_id`, `user_id`, and an empty
+// `properties` payload. The web client doesn't share TelemetryWriter
+// because the iOS version is `@MainActor`-bound and consumes the
+// SwiftUI app's `SupabaseClient`; the web equivalent is a one-line
+// PostgREST insert.
+async function emitDownloadCtaEvent({
+  roomId,
+  userId,
+}: {
+  roomId: string;
+  userId: string | null;
+}): Promise<void> {
+  try {
+    const client = getSupabaseClient();
+    await client.from("events").insert({
+      event_type: "waiting_download_cta_tapped",
+      room_id: roomId,
+      user_id: userId,
+      properties: {},
+    });
+  } catch {
+    // Swallow — telemetry must never block the App Store handoff.
+  }
 }
 
 // Lightweight duplicate-key detection for the votes insert. Mirrors
