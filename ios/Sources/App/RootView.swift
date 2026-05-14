@@ -34,6 +34,7 @@
 
 import SwiftUI
 import Supabase
+import CoreLocation
 
 public struct RootView: View {
     @State private var coordinators: Coordinators?
@@ -59,6 +60,16 @@ public struct RootView: View {
     /// through the landing screen. Defaults to false so a cold,
     /// signed-in launch lands on S00 per surfaces/00-landing.md.
     @State private var showingInitiator = false
+    /// TB-03 (v1.1) — set when the user taps "Start a Decision" on the
+    /// S00 landing surface AND iOS location permission is still
+    /// `notDetermined`. While true, the host renders the S00b
+    /// LocationPermissionScreen (pre-prime). On either CTA tap the
+    /// flag clears and `showingInitiator` flips to true so S01 takes
+    /// over. Permission outcomes are observed via the shared
+    /// LocationCoordinator on `coordinators` — we don't gate the
+    /// transition on grant vs deny because the picker on S01 handles
+    /// both states.
+    @State private var showingLocationPermission = false
 
     public init() {}
 
@@ -157,10 +168,30 @@ public struct RootView: View {
                     // same way at this layer; the chip rendering on
                     // S04 still consults `state.isAnonymous` to gate
                     // the C-22 upgrade prompt.
-                    if showingInitiator || reInvitePrefill != nil {
+                    if showingLocationPermission {
+                        // TB-03 (v1.1) — S00b pre-prime sits between
+                        // landing and S01 on first launch. Either CTA
+                        // clears the flag and flips into S01; the
+                        // primary CTA additionally fires
+                        // `requestPermission()` so the iOS dialog
+                        // appears on top of this surface and resolves
+                        // before S01 mounts.
+                        LocationPermissionScreen(
+                            onShareLocation: {
+                                coordinators.locationCoordinator.requestPermission()
+                                showingLocationPermission = false
+                                showingInitiator = true
+                            },
+                            onManualEntry: {
+                                showingLocationPermission = false
+                                showingInitiator = true
+                            }
+                        )
+                    } else if showingInitiator || reInvitePrefill != nil {
                         InitiatorScreen(
                             roomStore: coordinators.roomStore,
                             userID: userID,
+                            locationCoordinator: coordinators.locationCoordinator,
                             prefilledTimerMinutes: reInvitePrefill?.timerMinutes,
                             prefilledRadiusMiles: reInvitePrefill?.radiusMiles,
                             onSharedRoom: { roomID in
@@ -192,7 +223,17 @@ public struct RootView: View {
                     } else {
                         LandingScreen(
                             onStartDecision: {
-                                showingInitiator = true
+                                // TB-03 (v1.1) — only surface the S00b
+                                // pre-prime when the user hasn't yet
+                                // answered the iOS dialog. On subsequent
+                                // launches (granted or denied) we route
+                                // straight to S01; the picker on S01
+                                // handles both states.
+                                if coordinators.locationCoordinator.authorization == .notDetermined {
+                                    showingLocationPermission = true
+                                } else {
+                                    showingInitiator = true
+                                }
                             },
                             onAccountSettings: {
                                 showingSettings = true
@@ -238,6 +279,13 @@ public struct RootView: View {
         let auth = AuthCoordinator(client: client)
         let roomStore = RoomStore(client: client)
         let lateJoinerStore = LateJoinerStore(client: client)
+        // TB-03 (v1.1) — one LocationCoordinator per session. Built
+        // here so S00b pre-prime and S01 chip both observe the same
+        // CLLocationManager. The coordinator reads the live
+        // authorization status on init, so by the time the S00
+        // landing surface mounts we already know whether to short-
+        // circuit the pre-prime on subsequent launches.
+        let locationCoordinator = LocationCoordinator()
         // TB-02 v1.1 — restore cached session if any, otherwise leave
         // `.idle` so the S00a sign-in gate renders. Replaces the v1
         // `ensureSignedIn` call which would have minted an anonymous
@@ -247,7 +295,8 @@ public struct RootView: View {
             auth: auth,
             roomStore: roomStore,
             lateJoinerStore: lateJoinerStore,
-            client: client
+            client: client,
+            locationCoordinator: locationCoordinator
         )
     }
 
@@ -320,6 +369,13 @@ public struct RootView: View {
         let roomStore: RoomStore
         let lateJoinerStore: LateJoinerStore
         let client: SupabaseClient
+        /// TB-03 (v1.1) — shared LocationCoordinator instance. The
+        /// S00b pre-prime CTA fires `requestPermission()` on this
+        /// instance; the S01 LocationPickerChip + LocationPickerSheet
+        /// observe the same instance so the permission state and the
+        /// resolved place flow from the pre-prime into the initiator
+        /// surface without re-instantiating CLLocationManager.
+        let locationCoordinator: LocationCoordinator
     }
 
     private struct QuizContext {

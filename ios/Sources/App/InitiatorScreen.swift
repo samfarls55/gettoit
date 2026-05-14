@@ -28,9 +28,18 @@ public struct InitiatorScreen: View {
     @State private var pendingShare: PendingShare?
     @State private var timerMinutes: Int
     @State private var radiusMiles: Double
+    /// TB-03 (v1.1) — flips `true` when the user taps the
+    /// LocationPickerChip. Drives a `.sheet` presentation of the
+    /// LocationPickerSheet.
+    @State private var locationSheetOpen: Bool = false
 
     private let roomStore: RoomStore
     private let userID: UUID
+    /// TB-03 (v1.1) — coordinator owning the GPS / typeahead /
+    /// permission state for the C-23 LocationPicker. Host-supplied
+    /// so the same instance is reused across the S00b pre-prime,
+    /// S01 chip, and S01 sheet — they all share one observable.
+    private let locationCoordinator: LocationCoordinator
     private let onSharedRoom: ((UUID) -> Void)?
     /// TB-13 — fires when the user opts into solo mode by tapping
     /// "Go solo" instead of the share-and-invite primary CTA. The
@@ -48,6 +57,7 @@ public struct InitiatorScreen: View {
     public init(
         roomStore: RoomStore,
         userID: UUID,
+        locationCoordinator: LocationCoordinator? = nil,
         prefilledTimerMinutes: Int? = nil,
         prefilledRadiusMiles: Double? = nil,
         onSharedRoom: ((UUID) -> Void)? = nil,
@@ -56,6 +66,11 @@ public struct InitiatorScreen: View {
     ) {
         self.roomStore = roomStore
         self.userID = userID
+        // Tests + the unit-test surfaces that don't care about
+        // location can omit the coordinator; we construct a no-op
+        // default that stays in `.empty` (the surface still renders
+        // the chip but the CTA disables — matches denied-and-no-pick).
+        self.locationCoordinator = locationCoordinator ?? LocationCoordinator()
         self.onSharedRoom = onSharedRoom
         self.onSoloRoom = onSoloRoom
         self.onSettings = onSettings
@@ -154,6 +169,16 @@ public struct InitiatorScreen: View {
                 VStack(alignment: .leading, spacing: GTISpacing.step6) {
                     header
 
+                    // TB-03 (v1.1) — C-23 LocationPicker chip. Sits
+                    // between the headline block and the timer +
+                    // radius controls per
+                    // `surfaces/01-initiator.md` §"Layout".
+                    LocationPickerChip(
+                        state: locationCoordinator.pickerState,
+                        place: locationCoordinator.place,
+                        onOpen: { locationSheetOpen = true }
+                    )
+
                     timerChipRow
 
                     radiusSliderRow
@@ -180,6 +205,12 @@ public struct InitiatorScreen: View {
                     // that don't want the auto-transition can omit it.
                     onSharedRoom?(share.id)
                 }
+        }
+        .sheet(isPresented: $locationSheetOpen) {
+            LocationPickerSheet(
+                coordinator: locationCoordinator,
+                onDismiss: { locationSheetOpen = false }
+            )
         }
     }
 
@@ -375,6 +406,7 @@ public struct InitiatorScreen: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
                         .fill(GTIColor.paper)
+                        .opacity(locationCoordinator.cannotAdvance ? 0.55 : 1.0)
                         .frame(height: 60)
                     Group {
                         if phase == .creating {
@@ -390,7 +422,10 @@ public struct InitiatorScreen: View {
                 }
             }
             .accessibilityIdentifier("initiator.cta")
-            .disabled(phase == .creating)
+            // TB-03 (v1.1) — CTA disables when LocationPicker is in
+            // `.empty` (permission denied AND no manual pick yet). The
+            // session can't fire without a location per the C-23 spec.
+            .disabled(phase == .creating || locationCoordinator.cannotAdvance)
 
             // TB-13 — solo tertiary. Voluntary register: "Go solo —
             // figure it out for myself." Quiet weight so the primary
@@ -444,12 +479,14 @@ public struct InitiatorScreen: View {
         phase = .creating
         let chosenTimer = timerMinutes
         let chosenRadiusMeters = Self.metersFromMiles(radiusMiles)
+        let chosenLocation = roomLocationFromCoordinator()
         Task {
             do {
                 let room = try await roomStore.createRoom(
                     as: userID,
                     timerMinutes: chosenTimer,
-                    radiusMeters: chosenRadiusMeters
+                    radiusMeters: chosenRadiusMeters,
+                    location: chosenLocation
                 )
                 phase = .shared(roomID: room.id)
                 onSoloRoom(room.id)
@@ -459,16 +496,35 @@ public struct InitiatorScreen: View {
         }
     }
 
+    /// TB-03 (v1.1) — pull the resolved place off the
+    /// LocationCoordinator and shape it into a `RoomStore.RoomLocation`
+    /// payload. Returns nil if no place is committed (the CTA's
+    /// `cannotAdvance` guard normally prevents this path from firing,
+    /// but the safe default keeps the column NULL — the migration
+    /// allows NULL so a partial row still inserts cleanly).
+    private func roomLocationFromCoordinator() -> RoomStore.RoomLocation? {
+        guard let place = locationCoordinator.place else { return nil }
+        let source: RoomStore.RoomLocation.Source = place.source == .gps ? .gps : .manual
+        return RoomStore.RoomLocation(
+            name: place.name,
+            lat: place.coordinate.latitude,
+            lng: place.coordinate.longitude,
+            source: source
+        )
+    }
+
     private func shareInviteLink() {
         phase = .creating
         let chosenTimer = timerMinutes
         let chosenRadiusMeters = Self.metersFromMiles(radiusMiles)
+        let chosenLocation = roomLocationFromCoordinator()
         Task {
             do {
                 let room = try await roomStore.createRoom(
                     as: userID,
                     timerMinutes: chosenTimer,
-                    radiusMeters: chosenRadiusMeters
+                    radiusMeters: chosenRadiusMeters,
+                    location: chosenLocation
                 )
                 // Token is a placeholder for v1 — TB-02 just needs the
                 // round-trip-able shape. Signed/expiring tokens land in a
