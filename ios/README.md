@@ -104,9 +104,16 @@ if you lose it, you have to generate a new key.
 3. Click **+** to generate a new key.
 4. Fill the dialog:
    - Name: `gettoit-github-actions` (any descriptive name)
-   - Access: **App Manager** (this role can manage TestFlight; the
-     more-privileged **Admin** role works too but is broader than
-     needed)
+   - Access: **Admin**. The narrower "App Manager" role can upload
+     builds but **cannot create / rotate the cloud-managed Apple
+     Distribution certificate** that `xcodebuild -exportArchive`
+     needs on a fresh CI runner. Using App Manager produces a
+     `Cloud signing permission error` from the export step. Per
+     Apple's own docs (Account Help → Cloud-Managed Certificates),
+     cloud-managed distribution cert rotation is restricted to
+     Admin / Account Holder. Pick Admin even though it's broader
+     than strictly needed for the upload itself — Admin is the
+     minimum that lets CI run unattended.
 5. Click **Generate**.
 6. The key appears in the list. Three things you need from this row:
    - **Key ID** — the short alphanumeric ID in the row (e.g. `ABC123XYZ4`).
@@ -201,7 +208,8 @@ another 5–15 min before it's installable.
 | Symptom | Likely cause |
 | --- | --- |
 | `testflight` job is skipped with "App Store Connect API key not configured" | One of the three secrets is missing or empty. Re-check Step 3. |
-| `xcodebuild archive` fails with "No signing certificate" | The API key's role is too restrictive, or `-allowProvisioningUpdates` couldn't reach App Store Connect. Re-generate the key with **App Manager** role. |
+| `xcodebuild archive` fails with "No signing certificate" | The API key's role is too restrictive, or `-allowProvisioningUpdates` couldn't reach App Store Connect. Re-generate the key with **Admin** role. |
+| `xcodebuild -exportArchive` fails with "Cloud signing permission error" or "No profiles for ..." | API key role is "App Manager" or narrower. Cloud-managed distribution cert rotation requires **Admin** or Account Holder. Revoke the key, create a fresh one with Admin role, re-run the secret-set commands. |
 | `altool` fails with "ITMS-90161: Invalid Provisioning Profile" | Bundle ID mismatch between `exportOptions.plist`, `project.yml`, and the App Store Connect record. All three must say `app.gettoit.GetToIt`. |
 | `altool` fails with "ERROR ITMS-90283: Invalid Provisioning Profile Signature" | The auto-created profile got out of sync. Delete the GetToIt distribution profile at developer.apple.com → Profiles, and the next CI run will re-create it. |
 | Build uploads fine but doesn't appear in TestFlight | Check the **Activity** tab inside App Store Connect → GetToIt — Apple may be rejecting the build for an export-compliance or missing-metadata reason. The email from `noreply@email.apple.com` has the details. |
