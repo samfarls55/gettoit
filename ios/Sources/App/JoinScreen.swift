@@ -24,17 +24,20 @@ public struct JoinScreen: View {
     private let payload: InviteLink.Payload
     private let auth: AuthCoordinator
     private let roomStore: RoomStore
+    private let onJoined: ((UUID, UUID) -> Void)?
 
     public init(
         payload: InviteLink.Payload,
         auth: AuthCoordinator,
         roomStore: RoomStore,
-        phase: Phase = .joining
+        phase: Phase = .joining,
+        onJoined: ((UUID, UUID) -> Void)? = nil
     ) {
         self.payload = payload
         self.auth = auth
         self.roomStore = roomStore
         self._phase = State(initialValue: phase)
+        self.onJoined = onJoined
     }
 
     public var body: some View {
@@ -98,6 +101,11 @@ public struct JoinScreen: View {
         do {
             try await roomStore.joinRoom(id: payload.roomID, as: userID)
             phase = .joined(roomID: payload.roomID)
+            // TB-04: after the membership row lands, transition the
+            // invitee into Q1. The callback is optional so test
+            // surfaces that don't want the auto-transition can omit
+            // it.
+            onJoined?(payload.roomID, userID)
         } catch {
             phase = .error("Couldn't join the room. \(String(describing: error))")
         }
