@@ -83,6 +83,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 - **`"You're in · 3 of 4"`** — N-of-M, no percentage.
 - **`"Start a new decision"`** (read-only) — voluntary, framed as a new round (not "re-do" or "join late"). The late-joiner becomes the initiator of the next session.
 - **`"Widen radius"`** (no-survivor) — verb-first, action-shaped. NOT `"Try again"` (implies user error).
+- **Pre-permission line** (`default` / `cuts` / `committed`) — `"We'll check in tomorrow — see if you went."` Voluntary warm-friend register. NEVER paraphrased to `"Enable notifications"`, `"Allow alerts"`, `"Turn on push"` or any system-register phrasing. The line surfaces under the CTA dock; the user's first `"I'm in"` tap fires the native iOS push permission prompt once per session (PRD user story 38–40). Suppressed in `read-only` (no ratification path) and `no-survivor` (no verdict to check in on).
 
 ## Mode-specific behavior
 

@@ -10,6 +10,7 @@ Prefix `BREAKING:` for any change that requires code or downstream consumers to 
 
 ## 2026-05-14
 
+- **S05 Verdict:** added pre-permission line below the CTA dock — `"We'll check in tomorrow — see if you went."` Voluntary warm-friend register; the line fires the native iOS push permission prompt after the first "I'm in" tap (once per session). System-register phrasing (`"Enable notifications"`, `"Allow alerts"`, `"Turn on push"`) is explicitly forbidden by PRD user story 38–40. Suppressed in `read-only` (no ratification path) and `no-survivor` (no verdict to check in on). `code/screens/ScreenVerdict.jsx` renders the line; the iOS port lives in `ios/Sources/App/VerdictScreen.swift`. (TB-08.)
 - **TB-07 consumed spec-gap 02** — `surfaces/04-waiting.md` description of Decide-now CTA, countdown timer, and the expired-no-quorum terminal landed in the iOS port (`ios/Sources/App/WaitingScreen.swift`). No spec changes — the JSX + markdown were already in place from 2026-05-12. (TB-07.)
 
 ## 2026-05-13
