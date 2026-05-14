@@ -94,43 +94,38 @@ public final class RoomStore {
             .execute()
     }
 
-    /// Read a room by id. Returns nil when RLS hides the row from the
-    /// caller (i.e. the caller isn't a member) — the test target uses
-    /// this to assert RLS rejects non-members.
+    /// Read a room by id. Returns an empty array when RLS hides the
+    /// row from the caller (i.e. the caller isn't a member) — the test
+    /// target uses this shape to assert RLS rejects non-members.
+    ///
+    /// We use `limit(1)` and decode into `[Room]` rather than `.single()`
+    /// so the "no rows" RLS-deny case decodes cleanly to an empty array
+    /// instead of throwing — `.single()` raises on zero or many rows
+    /// and the error shape is harder to distinguish from JSON decode
+    /// failures or transport errors.
     public func fetchRoom(id roomID: UUID) async throws -> Room? {
-        do {
-            let room: Room = try await client
-                .from("rooms")
-                .select()
-                .eq("id", value: roomID.uuidString.lowercased())
-                .single()
-                .execute()
-                .value
-            return room
-        } catch {
-            // `single()` raises when zero rows come back, which is the
-            // shape RLS produces for a non-member. Treating that as
-            // "not visible to me" is exactly what the test expects.
-            return nil
-        }
+        let rows: [Room] = try await client
+            .from("rooms")
+            .select()
+            .eq("id", value: roomID.uuidString.lowercased())
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
     }
 
     /// Look up the given user's role in a given room. Returns nil when
     /// no row exists for the user (either not a member, or RLS hid it).
     public func fetchRole(roomID: UUID, userID: UUID) async throws -> String? {
-        do {
-            let row: MemberRoleRow = try await client
-                .from("members")
-                .select("role")
-                .eq("room_id", value: roomID.uuidString.lowercased())
-                .eq("user_id", value: userID.uuidString.lowercased())
-                .single()
-                .execute()
-                .value
-            return row.role
-        } catch {
-            return nil
-        }
+        let rows: [MemberRoleRow] = try await client
+            .from("members")
+            .select("role")
+            .eq("room_id", value: roomID.uuidString.lowercased())
+            .eq("user_id", value: userID.uuidString.lowercased())
+            .limit(1)
+            .execute()
+            .value
+        return rows.first?.role
     }
 
     // MARK: - wire types
