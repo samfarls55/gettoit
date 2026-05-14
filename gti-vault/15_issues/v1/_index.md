@@ -28,7 +28,7 @@ Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-
 | TB-07 | [[issues/tb-07-waiting-realtime-fire-trigger\|Waiting + Realtime + fire trigger]] ✅ done | AFK | [#8](https://github.com/samfarls55/gettoit/issues/8) | TB-06 |
 | TB-08 | [[issues/tb-08-ratification-push-hard-close\|Ratification + push perm + hard close]] ✅ done | AFK | [#9](https://github.com/samfarls55/gettoit/issues/9) | TB-07 |
 | TB-09 | [[issues/tb-09-no-survivor-terminal\|Soft-pref relax + no-survivor terminal]] ✅ done | AFK | [#10](https://github.com/samfarls55/gettoit/issues/10) | TB-06 |
-| TB-10 | [[issues/tb-10-reroll\|Reroll sheet + 3-cap + reason-to-constraint]] | AFK | [#11](https://github.com/samfarls55/gettoit/issues/11) | TB-08 |
+| TB-10 | [[issues/tb-10-reroll\|Reroll sheet + 3-cap + reason-to-constraint]] ✅ done | AFK | [#11](https://github.com/samfarls55/gettoit/issues/11) | TB-08 |
 | TB-11 | [[issues/tb-11-late-joiner-read-only\|Late-joiner read-only verdict]] | AFK | [#12](https://github.com/samfarls55/gettoit/issues/12) | TB-08 |
 | TB-12 | [[issues/tb-12-apple-signin-upgrade\|Apple Sign-in upgrade chip]] ✅ done | AFK | [#13](https://github.com/samfarls55/gettoit/issues/13) | TB-02 |
 | TB-13 | [[issues/tb-13-solo-mode-variant\|Solo mode variant]] | AFK | [#14](https://github.com/samfarls55/gettoit/issues/14) | TB-08 |
