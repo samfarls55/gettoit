@@ -29,6 +29,7 @@ Every surface has a corresponding JSX file. The markdown is the **why**, the JSX
 
 | # | Surface | Doc | JSX |
 |---|---|---|---|
+| 00 | Landing | [`surfaces/00-landing.md`](./surfaces/00-landing.md) | [`code/screens/ScreenLanding.jsx`](./code/screens/ScreenLanding.jsx) |
 | 01 | Initiator landing | [`surfaces/01-initiator.md`](./surfaces/01-initiator.md) | [`code/screens/ScreenInitiator.jsx`](./code/screens/ScreenInitiator.jsx) |
 | 02a | Invite (iMessage unfurl) | [`surfaces/02-invite.md`](./surfaces/02-invite.md) | [`code/screens/ScreenInviteUnfurl.jsx`](./code/screens/ScreenInviteUnfurl.jsx) |
 | 02b | Invite (web fallback) | ↑ | [`code/screens/ScreenInviteWeb.jsx`](./code/screens/ScreenInviteWeb.jsx) |
