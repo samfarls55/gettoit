@@ -7,7 +7,9 @@
 //   2. code/tokens.css matches what gen-css.mjs would emit  (drift gate)
 //   3. Every hex color in code/components.jsx + code/screens/*.jsx is registered in tokens.json
 //      (orphan-hex sweep — proves screens don't sneak unregistered colors past the spec)
-//   4. Every surface doc (surfaces/0N-*.md) has frontmatter listing the JSX it owns, every
+//   4. Every hex color in web/ TS/TSX/CSS source is registered in tokens.json
+//      (TB-15 — mirrors the design-system sweep against the Next.js fallback)
+//   5. Every surface doc (surfaces/0N-*.md) has frontmatter listing the JSX it owns, every
 //      JSX in code/screens/ is claimed by exactly one surface doc (no orphan/double-claim)
 //
 // Exit code 0 = clean, 1 = any failure.
@@ -19,11 +21,13 @@ import { spawnSync } from 'node:child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dsRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(dsRoot, '..');
 const tokensPath = path.join(dsRoot, 'tokens.json');
 const cssPath = path.join(dsRoot, 'code', 'tokens.css');
 const componentsPath = path.join(dsRoot, 'code', 'components.jsx');
 const screensDir = path.join(dsRoot, 'code', 'screens');
 const surfacesDir = path.join(dsRoot, 'surfaces');
+const webRoot = path.join(repoRoot, 'web');
 
 const failures = [];
 const notes = [];
@@ -94,6 +98,40 @@ if (Object.keys(orphansByFile).length) {
   }
 } else {
   notes.push(`orphan-hex sweep: all JSX hex codes registered in tokens.json`);
+}
+
+// ── 3b. Orphan-hex sweep over web/ (TB-15) ────────────────
+//
+// The Next.js fallback consumes design-system/code/tokens.css directly
+// but re-implements components (no JSX import per ADR 0003). Mirror
+// the JSX sweep against the web source tree so we catch any hex
+// codes that slip past the token contract on the web side.
+const webFiles = fs.existsSync(webRoot)
+  ? listSourceFiles(webRoot, new Set(['node_modules', '.next', 'public']),
+      f => /\.(tsx?|jsx?|css|module\.css)$/.test(f))
+  : [];
+const webOrphansByFile = {};
+for (const f of webFiles) {
+  const src = fs.readFileSync(f, 'utf8');
+  // Strip CSS + JS comments — same approach as the JSX sweep, plus
+  // CSS-only `/* … */` blocks already handled by the block-comment
+  // regex. Strip single-quoted/double-quoted import paths to avoid
+  // false positives from URLs like `#anchor`. (Hex colors are 6 chars
+  // bordered by non-hex; importantly we only strip line/block comments.)
+  const stripped = src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  const matches = stripped.match(hexRe) || [];
+  const orphans = [...new Set(matches.map(h => h.toUpperCase()))]
+    .filter(h => !registered.has(h));
+  if (orphans.length) webOrphansByFile[path.relative(repoRoot, f)] = orphans;
+}
+if (Object.keys(webOrphansByFile).length) {
+  for (const [f, hexes] of Object.entries(webOrphansByFile)) {
+    failures.push(`orphan hex in ${f}: ${hexes.join(', ')}  — add to tokens.json or replace with a registered token`);
+  }
+} else if (webFiles.length > 0) {
+  notes.push(`web/ orphan-hex sweep: ${webFiles.length} source files clean against tokens.json`);
 }
 
 // ── 4. Surface ↔ JSX pairing ───────────────────────────────
@@ -170,6 +208,33 @@ function listJsx(dir) {
   return fs.readdirSync(dir)
     .filter(n => n.endsWith('.jsx'))
     .map(n => path.join(dir, n));
+}
+
+// Recursive listing for the web sweep — walks the tree, skipping
+// node_modules / build output, returning paths that match `accept`.
+function listSourceFiles(root, ignoredDirs, accept) {
+  const out = [];
+  const stack = [root];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const ent of entries) {
+      if (ent.name.startsWith('.')) continue;
+      if (ignoredDirs.has(ent.name)) continue;
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        stack.push(full);
+      } else if (ent.isFile() && accept(ent.name)) {
+        out.push(full);
+      }
+    }
+  }
+  return out.sort();
 }
 
 function finish() {
