@@ -2,9 +2,10 @@
 issue: tb-06
 title: VerdictEngine clean run + Verdict default surface
 github_issue: 7
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-12
+completed: 2026-05-13
 prd: v1-prd
 ---
 
@@ -32,12 +33,26 @@ The server-authoritative VerdictEngine for the **clean-run path only** — EBA p
 
 ## Acceptance criteria
 
-- [ ] `verdicts` and `option_cuts` migrations land with RLS.
-- [ ] VerdictEngine `compute_verdict(room_id)` RPC produces correct verdict + cuts for fixture rooms.
-- [ ] Engine fixture tests cover: clean run, single survivor, regret tiebreaker, flat-regret random, rule_text aggregate attribution, anonymized private constraints.
-- [ ] S05 SwiftUI view renders the verdict in `default` mode with the locked choreography.
-- [ ] Snapshot test for S05 default state passes.
-- [ ] iOS never recomputes the verdict — it only reads `verdicts` + `option_cuts`.
+- [x] `verdicts` and `option_cuts` migrations land with RLS.
+- [x] VerdictEngine `compute_verdict(room_id)` RPC produces correct verdict + cuts for fixture rooms. (Implemented as `compute-verdict` Edge Function — `client.functions.invoke("compute-verdict", { body: { room_id } })`; the PRD explicitly leaves the implementation choice to the engineer between SQL trigger and TS Edge Function.)
+- [x] Engine fixture tests cover: clean run, single survivor, regret tiebreaker, flat-regret random, rule_text aggregate attribution, anonymized private constraints. (10 fixture tests in `supabase/functions/_shared/verdict-engine.test.ts`; 13 handler tests in `supabase/functions/compute-verdict/index.test.ts`.)
+- [x] S05 SwiftUI view renders the verdict in `default` mode with the locked choreography. (`ios/Sources/App/VerdictScreen.swift` with ms-exact timings sourced from `GTITokens.swift`.)
+- [x] Snapshot test for S05 default state passes. (`ios/Tests/VerdictScreenSnapshotTests.swift`.)
+- [x] iOS never recomputes the verdict — it only reads `verdicts` + `option_cuts`. (`ios/Sources/App/VerdictStore.swift` — read-only over PostgREST.)
+
+## Adjacencies
+
+Flagged for separate tickets — not fixed here:
+
+- **Display-name source for receipts.** The Edge Function + iOS surface both currently emit `"m{uuid-prefix}"` placeholder names. TB-08 (ratification) or TB-12 (Apple Sign-in) introduces a stable `display_name`. Receipts are computed from `votes` at read time so the upgrade is non-breaking.
+- **Wall-clock "when" for the time badge.** JSX, engine, and iOS all hardcode `"7:00 PM"`. Real scheduling is a post-v1 candidate.
+- **`tokens.json` choreo delays extension.** The original tokens only exposed `name`, `time`, `rule`, `stagger-receipt`. TB-06 added `eyebrow`, `meta`, `receipts`, `cta` (the remaining canonical timings from `motion.md` §"Verdict reveal" and `VERDICT_CHOREO`). Verify gate green; no spec change.
+- **`options` SELECT RLS policy.** TB-05 left the SELECT policy on `options` as a TB-02-dependency follow-up; TB-06 backfilled it inline in the verdicts migration so the cuts drawer can resolve option names. The policy now lives at the bottom of `20260513220000000_verdicts_and_cuts.sql`.
+- **Engine note in vault.** `gti-vault/60_engineering/verdict-engine.md` captures the implementation-choice rationale, EBA prune order, anonymization rules, and idempotency contract for future readers.
+
+## Comments
+
+Landed in https://github.com/samfarls55/gettoit/pull/30 — merged 2026-05-14.
 
 ## Blocked by
 
