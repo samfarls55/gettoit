@@ -13,6 +13,11 @@
 #                      see the latest schema. Idempotent; appends only.
 #                      iOS lane depends on this so freshly-landed migrations
 #                      are live before the test bundle runs against them.
+#   * testflight     — macOS, archives + uploads to TestFlight on push-to-
+#                      main. Gated on the `ios` lane being green. Skips
+#                      itself when the App Store Connect API key secrets
+#                      aren't configured (so PRs and unconfigured branches
+#                      don't fail). See `ios/README.md` §TestFlight setup.
 name: ci
 
 on:
@@ -170,4 +175,170 @@ jobs:
         with:
           name: ios-test-results
           path: ios/TestResults.xcresult
+          if-no-files-found: ignore
+
+  testflight:
+    name: testflight (archive + upload)
+    # Only after the iOS test lane is green. ios already depends on
+    # supabase-db, so the chain is db push → tests → archive/upload.
+    needs: ios
+    runs-on: macos-14
+    # Push-to-main only. PRs and feature branches never upload (no
+    # build-number coordination, no review queue). workflow_dispatch
+    # is included so the user can re-trigger an upload manually if a
+    # transient ASC issue caused the first attempt to fail.
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || github.event_name == 'workflow_dispatch'
+    env:
+      SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_KEY_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate when App Store Connect credentials are missing
+        # When the API-key secrets aren't configured (e.g. a fork, or
+        # a fresh clone of this repo before the user has run through
+        # `ios/README.md` §TestFlight setup), skip the rest of this
+        # job so the workflow doesn't go red. The user only sees a
+        # green checkmark on this job once the secrets exist.
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ -z "$APP_STORE_CONNECT_API_KEY_ID" ] \
+             || [ -z "$APP_STORE_CONNECT_API_KEY_ISSUER_ID" ] \
+             || [ -z "$APP_STORE_CONNECT_API_KEY_CONTENT" ]; then
+            echo "App Store Connect API key not configured — skipping TestFlight upload."
+            echo "See ios/README.md §TestFlight setup for the one-time HITL setup."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Select highest installed Xcode
+        # Same logic as the ios lane — XcodeGen 2.45+ emits objectVersion
+        # 77 which only Xcode 16+ can open, and pinning a specific Xcode
+        # version is fragile across image refreshes.
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "No Xcode installation found on runner" >&2
+            exit 1
+          fi
+          echo "Selected: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Install XcodeGen
+        if: steps.gate.outputs.skip == 'false'
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Stage App Store Connect API key
+        # `xcodebuild -authenticationKey*` flags and `xcrun altool
+        # --apiKey/--apiIssuer` both read the `.p8` key from
+        # `~/.appstoreconnect/private_keys/AuthKey_<KEY_ID>.p8` by
+        # convention. We decode the base64-encoded secret into that
+        # path so both tools find it without further wiring.
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          KEY_DIR="$HOME/.appstoreconnect/private_keys"
+          mkdir -p "$KEY_DIR"
+          KEY_PATH="$KEY_DIR/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+          printf '%s' "$APP_STORE_CONNECT_API_KEY_CONTENT" | base64 --decode > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Archive (Release, signed)
+        # CURRENT_PROJECT_VERSION is sourced from $GITHUB_RUN_NUMBER so
+        # every push gets a unique, monotonically-increasing build
+        # number — TestFlight rejects duplicates within the same
+        # CFBundleShortVersionString. CFBundleVersion in project.yml is
+        # `$(CURRENT_PROJECT_VERSION)` so Xcode substitutes this value
+        # into the generated Info.plist at build time.
+        #
+        # `-allowProvisioningUpdates` + the ASC API key tells xcodebuild
+        # to auto-create the distribution certificate and provisioning
+        # profile on first run. Subsequent runs reuse what's already
+        # registered.
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild archive \
+            -project GetToIt.xcodeproj \
+            -scheme GetToIt \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/GetToIt.xcarchive \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_API_KEY_ISSUER_ID" \
+            -allowProvisioningUpdates \
+            SUPABASE_PROJECT_URL="$SUPABASE_PROJECT_URL" \
+            SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=WXTMNYM34A \
+            | tee xcodebuild-archive.log
+
+      - name: Export archive (App Store)
+        # exportOptions.plist pins method=app-store, team, and
+        # signingStyle=automatic. xcodebuild needs the API-key flags
+        # again here because export re-signs the .ipa.
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          xcodebuild -exportArchive \
+            -archivePath build/GetToIt.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath build/export \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$APP_STORE_CONNECT_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_API_KEY_ISSUER_ID" \
+            -allowProvisioningUpdates \
+            | tee xcodebuild-export.log
+
+      - name: Upload to TestFlight
+        # altool reads the same .p8 key from ~/.appstoreconnect via
+        # --apiKey/--apiIssuer. The build appears in the TestFlight
+        # tab a few minutes later (after Apple's automated processing).
+        # Internal testers can install once it finishes processing;
+        # external testers require beta-app-review (TB-17 HITL).
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          IPA=$(ls build/export/*.ipa 2>/dev/null | head -1)
+          if [ -z "$IPA" ]; then
+            echo "No .ipa produced by exportArchive — check xcodebuild-export.log" >&2
+            exit 1
+          fi
+          echo "Uploading: $IPA"
+          xcrun altool --upload-app \
+            --type ios \
+            --file "$IPA" \
+            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_API_KEY_ISSUER_ID"
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testflight-artifacts
+          path: |
+            ios/xcodebuild-archive.log
+            ios/xcodebuild-export.log
+            ios/build/GetToIt.xcarchive
           if-no-files-found: ignore

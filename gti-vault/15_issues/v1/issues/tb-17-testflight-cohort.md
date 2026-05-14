@@ -2,8 +2,8 @@
 issue: tb-17
 title: TestFlight external + cohort 1 recruitment
 github_issue: 18
-status: ready-for-agent
-type: HITL
+status: in-progress
+type: HITL+AFK
 created: 2026-05-12
 prd: v1-prd
 ---
@@ -40,3 +40,32 @@ The final HITL slice — get a real beta cohort running so the north-star metric
 ## Blocked by
 
 - [[tb-16-privacy-legal-delete|TB-16]]
+
+## Engineering notes
+
+### AFK scaffolding landed 2026-05-14
+
+The CI plumbing for archive + upload to TestFlight is in place
+ahead of the HITL bits above. Every push to `main` after the `ios`
+test lane goes green now runs the `testflight` job in
+`.github/workflows/ci.yml`:
+
+- `xcodegen generate` → `xcodebuild archive` with App Store Connect
+  API-key auth (no fastlane / Match) → `xcodebuild -exportArchive`
+  with `ios/exportOptions.plist` (`method=app-store`, team
+  `WXTMNYM34A`, `signingStyle=automatic`) → `xcrun altool
+  --upload-app`.
+- `CFBundleVersion = $(CURRENT_PROJECT_VERSION)` in `ios/project.yml`;
+  the CI lane overrides with `CURRENT_PROJECT_VERSION=$GITHUB_RUN_NUMBER`
+  so every upload gets a unique, monotonically-increasing build
+  number (TestFlight rejects duplicates).
+- The job self-skips when the three App Store Connect API key
+  secrets aren't set, so the workflow stays green for forks /
+  fresh clones / the period before the HITL setup below is done.
+
+The HITL setup walkthrough (App Store Connect app record, API key
+generation, the three GitHub secrets, internal-tester invite,
+TestFlight install) lives in `ios/README.md` §TestFlight setup.
+That doc is the gate that flips the `testflight` job from "skip"
+to "upload". The external-tester + beta-app-review + cohort
+recruitment pieces below all still require the HITL work.

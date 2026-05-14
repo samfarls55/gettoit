@@ -40,7 +40,12 @@ targets:
       properties:
         CFBundleDisplayName: GetToIt
         CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        # CFBundleVersion is sourced from the CURRENT_PROJECT_VERSION
+        # build setting (default "1" below). The TestFlight CI lane
+        # overrides this via `xcodebuild ... CURRENT_PROJECT_VERSION=$GITHUB_RUN_NUMBER`
+        # so each upload gets a unique, monotonically-increasing
+        # build number — TestFlight rejects duplicates.
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen:
           UIColorName: ""
         UIApplicationSceneManifest:
@@ -60,6 +65,12 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGN_IDENTITY: ""
         DEVELOPMENT_TEAM: ""
+        # Default build number. Local builds and the simulator-test CI
+        # lane use "1". The TestFlight upload lane overrides this with
+        # $GITHUB_RUN_NUMBER on the xcodebuild command line so each
+        # uploaded archive gets a unique CFBundleVersion (substituted
+        # into the Info.plist via `$(CURRENT_PROJECT_VERSION)`).
+        CURRENT_PROJECT_VERSION: "1"
         # Universal Links — `applinks:gettoit.app` is mirrored in the
         # AASA file at https://gettoit.app/.well-known/apple-app-site-association
         # (TB-00 published it; TB-02 plumbs the iOS side). Entitlement file

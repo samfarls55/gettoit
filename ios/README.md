@@ -49,3 +49,147 @@ The macOS lane in `.github/workflows/ci.yml` runs:
 
 `SUPABASE_PROJECT_URL` and `SUPABASE_ANON_KEY` are injected into the build
 via `xcodebuild` build-setting overrides from the `gh secret` store.
+
+## TestFlight setup
+
+The `testflight` job in `.github/workflows/ci.yml` archives + uploads
+the app to TestFlight on every push to `main` (after the `ios` test
+lane passes). This section is the one-time human setup that the
+automation depends on. The whole thing takes ~20 minutes.
+
+**You only do this once.** After the secrets are in place, every push
+to `main` produces a new TestFlight build with no further action.
+
+### Prerequisites
+
+- Paid Apple Developer Program membership (verified in TB-00).
+- Bundle ID `app.gettoit.GetToIt` registered to team `WXTMNYM34A`
+  (verified in TB-00 — already in your Developer account's identifiers).
+- Push access to this GitHub repo (to add secrets).
+- An iPhone running iOS 17 or later signed into your Apple ID.
+
+### Step 1 — Create the app record in App Store Connect
+
+1. Sign in to [App Store Connect](https://appstoreconnect.apple.com)
+   with the Apple ID tied to your developer team.
+2. **My Apps** → **+** (top-left) → **New App**.
+3. Fill the dialog:
+   - Platform: **iOS**
+   - Name: **GetToIt** (this is the App Store display name; you can
+     change later)
+   - Primary language: **English (U.S.)**
+   - Bundle ID: select **app.gettoit.GetToIt — GetToIt** from the
+     dropdown. If it isn't there, the bundle ID hasn't been
+     registered on the Developer side yet — go to
+     [developer.apple.com → Identifiers](https://developer.apple.com/account/resources/identifiers/list)
+     and register it first.
+   - SKU: anything unique to your account, e.g. `gettoit-ios`.
+   - User Access: **Full Access**.
+4. Click **Create**.
+
+You don't need to fill in any of the App Information / Pricing /
+metadata yet — TestFlight only requires the app record to exist.
+Internal testers can install before app review; external testers
+(TB-17 cohort) require beta-app-review which needs the metadata
+filled in.
+
+### Step 2 — Generate an App Store Connect API key
+
+This is the credential CI uses to upload builds without you logging
+in interactively. **You only get to download the `.p8` file once** —
+if you lose it, you have to generate a new key.
+
+1. App Store Connect → **Users and Access** (top nav).
+2. Click the **Integrations** tab → **App Store Connect API**.
+3. Click **+** to generate a new key.
+4. Fill the dialog:
+   - Name: `gettoit-github-actions` (any descriptive name)
+   - Access: **App Manager** (this role can manage TestFlight; the
+     more-privileged **Admin** role works too but is broader than
+     needed)
+5. Click **Generate**.
+6. The key appears in the list. Three things you need from this row:
+   - **Key ID** — the short alphanumeric ID in the row (e.g. `ABC123XYZ4`).
+     Visible in the table — copy it now.
+   - **Issuer ID** — shown above the table, applies to all keys in
+     your account (e.g. `12345678-1234-1234-1234-123456789012`).
+     Copy it now.
+   - **The `.p8` key file** — click **Download API Key** on the row.
+     This downloads `AuthKey_<KEY_ID>.p8`. **Apple lets you do this
+     exactly once.** Save it somewhere safe — a password manager
+     attachment is a good spot.
+
+### Step 3 — Add three secrets to this GitHub repo
+
+GitHub → this repo → **Settings** → **Secrets and variables** →
+**Actions** → **New repository secret**. Add three:
+
+| Secret name | Value |
+| --- | --- |
+| `APP_STORE_CONNECT_API_KEY_ID` | The Key ID from step 2 (e.g. `ABC123XYZ4`). |
+| `APP_STORE_CONNECT_API_KEY_ISSUER_ID` | The Issuer ID from step 2 (the UUID). |
+| `APP_STORE_CONNECT_API_KEY_CONTENT` | The contents of the `.p8` file, **base64-encoded**. |
+
+To generate the base64 value for the third secret, run this on your
+machine (replacing the path with where you saved the `.p8`):
+
+```sh
+base64 -i ~/Downloads/AuthKey_ABC123XYZ4.p8 | pbcopy   # macOS
+base64 -w 0 ~/Downloads/AuthKey_ABC123XYZ4.p8          # Linux
+```
+
+Paste the result into the secret value field. **No newlines, no
+extra whitespace.**
+
+> Why base64? GitHub Actions secrets are strings, but the `.p8` is a
+> PEM-encoded binary blob with newlines that get mangled in
+> environment variables. The `testflight` job decodes it back to a
+> file at the path Apple's tools expect.
+
+### Step 4 — Add yourself as an internal TestFlight tester
+
+Internal testers can install TestFlight builds immediately after
+processing (no app-review wait). You can have up to 100 internal
+testers per app, and they must all be users of your App Store
+Connect team.
+
+1. App Store Connect → **Users and Access** → **Users** tab.
+2. If your Apple ID isn't already in the list, click **+** to invite
+   yourself (it usually is, since you signed up the developer
+   account).
+3. Navigate to **My Apps** → **GetToIt** → **TestFlight** tab.
+4. In the left sidebar, under **Internal Testing**, click **+**
+   next to **Internal Testers** to create a group, name it
+   `Internal Dogfood` (or whatever).
+5. Click **Add Testers** → check your own Apple ID → **Add**.
+
+Once a build is processed (~5–15 min after CI upload), you'll get an
+email with a link to install via the TestFlight app.
+
+### Step 5 — Install TestFlight on your iPhone
+
+1. On your iPhone, open the App Store and install **TestFlight**
+   (Apple's first-party app, free).
+2. Open TestFlight, sign in with the same Apple ID that's an internal
+   tester on the GetToIt app record.
+3. When the first build finishes processing, TestFlight will show
+   GetToIt as an available beta. Tap **Install**.
+
+### Step 6 — Push to `main` and watch the workflow
+
+That's it. Every push to `main` runs `ci.yml`, and once the `ios` job
+goes green, the `testflight` job archives + uploads. You'll see the
+new build appear in App Store Connect → TestFlight → Builds within
+a few minutes of upload. Apple's automated processing then takes
+another 5–15 min before it's installable.
+
+### Troubleshooting
+
+| Symptom | Likely cause |
+| --- | --- |
+| `testflight` job is skipped with "App Store Connect API key not configured" | One of the three secrets is missing or empty. Re-check Step 3. |
+| `xcodebuild archive` fails with "No signing certificate" | The API key's role is too restrictive, or `-allowProvisioningUpdates` couldn't reach App Store Connect. Re-generate the key with **App Manager** role. |
+| `altool` fails with "ITMS-90161: Invalid Provisioning Profile" | Bundle ID mismatch between `exportOptions.plist`, `project.yml`, and the App Store Connect record. All three must say `app.gettoit.GetToIt`. |
+| `altool` fails with "ERROR ITMS-90283: Invalid Provisioning Profile Signature" | The auto-created profile got out of sync. Delete the GetToIt distribution profile at developer.apple.com → Profiles, and the next CI run will re-create it. |
+| Build uploads fine but doesn't appear in TestFlight | Check the **Activity** tab inside App Store Connect → GetToIt — Apple may be rejecting the build for an export-compliance or missing-metadata reason. The email from `noreply@email.apple.com` has the details. |
+| Two pushes land the same build number | Shouldn't happen — `$GITHUB_RUN_NUMBER` is per-repo monotonic. If it does, you can re-run the failed job from the Actions tab and a new run number bumps the build. |
