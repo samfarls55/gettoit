@@ -46,12 +46,15 @@ public struct WaitingScreen: View {
     public init(
         auth: AuthCoordinator,
         promptStore: AuthPromptStore,
-        appleProvider: AppleSignInProviding = LiveAppleSignInProvider(),
+        appleProvider: AppleSignInProviding? = nil,
         now: @escaping () -> Date = { .now }
     ) {
         self.auth = auth
         self.promptStore = promptStore
-        self.appleProvider = appleProvider
+        // Default-construct inside the init body so MainActor isolation
+        // on `LiveAppleSignInProvider` is in scope. A nonisolated default
+        // expression in the parameter list cannot call a @MainActor init.
+        self.appleProvider = appleProvider ?? LiveAppleSignInProvider()
         self.now = now
     }
 
