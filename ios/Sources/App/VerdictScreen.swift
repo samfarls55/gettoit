@@ -311,15 +311,7 @@ public struct VerdictScreen: View {
 
     @ViewBuilder
     private var hero: some View {
-        // The no-survivor hero always reads "NO SPOT / FITS" stacked
-        // one word per line per the standard rule — but the JSX
-        // fixture's three-word place name ("No spot fits") would
-        // collapse to "NO / SPOT FITS" under the generic splitter.
-        // Special-case the no-survivor mode so the spec read order
-        // ("NO SPOT" / "FITS") is preserved verbatim.
-        let lines: [String] = (mode == .noSurvivor)
-            ? ["NO SPOT", "FITS"]
-            : VerdictScreen.heroLines(for: verdict.placeName)
+        let lines = VerdictScreen.heroLinesForRender(placeName: verdict.placeName, mode: mode)
         VStack(spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 Text(line)
@@ -786,6 +778,18 @@ public struct VerdictScreen: View {
         case 2:  return tokens
         default: return [tokens[0], tokens.dropFirst().joined(separator: " ")]
         }
+    }
+
+    /// Hero stacking that honours the mode-specific layout. The
+    /// no-survivor hero always reads `NO SPOT / FITS` — the JSX
+    /// fixture's three-word place name ("No spot fits") would
+    /// otherwise collapse to `NO / SPOT FITS` under the generic
+    /// splitter. All other modes defer to `heroLines(for:)`.
+    public static func heroLinesForRender(placeName: String, mode: Mode) -> [String] {
+        if mode == .noSurvivor {
+            return ["NO SPOT", "FITS"]
+        }
+        return heroLines(for: placeName)
     }
 }
 

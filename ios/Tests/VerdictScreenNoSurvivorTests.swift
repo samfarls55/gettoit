@@ -87,13 +87,16 @@ final class VerdictScreenNoSurvivorTests: XCTestCase {
     // MARK: - hero stacking — "NO SPOT / FITS"
 
     func testNoSurvivorHeroIsStackedOneWordPerLine() {
-        let lines = VerdictScreen.heroLines(for: "No spot fits")
+        // The S05 no-survivor hero reads "NO SPOT / FITS" — the
+        // mode-aware splitter must deliver this even when the fixture
+        // ships a 3-word placeName ("No spot fits") that the generic
+        // `heroLines(for:)` would collapse to "NO / SPOT FITS".
+        let lines = VerdictScreen.heroLinesForRender(
+            placeName: "No spot fits",
+            mode: .noSurvivor
+        )
         XCTAssertEqual(lines.count, 2, "no-survivor hero stacks to two lines")
         XCTAssertEqual(lines[0], "NO SPOT", "first line carries the leading two-word phrase")
-        // The spec wants "NO SPOT / FITS" — the heroLines helper
-        // collapses 3+ tokens to the leading word + the rest, so
-        // hand-shape the no-survivor fixture to deliver the exact
-        // two-line read.
         XCTAssertEqual(lines[1], "FITS")
     }
 
