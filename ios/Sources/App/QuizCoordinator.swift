@@ -269,16 +269,17 @@ public final class QuizCoordinator {
 
     // MARK: - retry classification
 
-    /// Unique-violation detection. supabase-swift's `PostgrestError`
-    /// surfaces Postgres SQLSTATE codes in the `.code` field; 23505
-    /// is `unique_violation`. We sniff for either the SDK type's
-    /// `.code` (when present) or the canonical SQLSTATE string in
-    /// the error description so we work across SDK versions and so
-    /// the unit tests can drive this path with a synthetic error.
+    /// Unique-violation detection.
+    ///
+    /// supabase-swift surfaces Postgres SQLSTATE codes through its
+    /// PostgREST error type (whose name has shifted across the v2 SDK
+    /// minor versions — `PostgrestError` in some, `PostgrestError`
+    /// nested inside `Supabase.*` in others). To stay version-tolerant,
+    /// we string-sniff the canonical SQLSTATE token (`23505`) and the
+    /// PostgREST-emitted phrase (`duplicate key value`) from the
+    /// error's description. The unit tests drive this path with a
+    /// synthetic error whose description carries the same markers.
     static func isUniqueViolation(_ error: Error) -> Bool {
-        if let pg = error as? PostgrestError, pg.code == "23505" {
-            return true
-        }
         let desc = String(describing: error)
         if desc.contains("23505") { return true }
         if desc.contains("duplicate key value") { return true }
