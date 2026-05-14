@@ -39,11 +39,13 @@ public final class RoomStore {
     /// freshly-written row.
     @discardableResult
     public func createRoom() async throws -> Room {
-        // We can't read `auth.uid()` directly here in the Swift SDK
-        // without an extra round-trip, so we mirror what `auth.uid()`
-        // will resolve to on the server: the cached session user.
-        let session = try await client.auth.session
-        let userID = session.user.id
+        // Read the locally-cached current user rather than awaiting
+        // `client.auth.session` — the async accessor refreshes the
+        // session and throws `sessionMissing` in CI when an anon
+        // sign-in has been issued in the same test run but hasn't yet
+        // propagated through the refresh pipeline. The synchronous
+        // accessor returns the user already in memory.
+        let userID = try currentUserID()
 
         let insert = RoomInsert(creatorUserID: userID, status: "open", vertical: "food")
         let room: Room = try await client
@@ -69,8 +71,7 @@ public final class RoomStore {
     /// the conflict if they want re-join-is-a-no-op semantics. For TB-02
     /// the join surface only calls this once per deep-link tap.
     public func joinRoom(id roomID: UUID) async throws {
-        let session = try await client.auth.session
-        let userID = session.user.id
+        let userID = try currentUserID()
 
         let membership = MemberInsert(roomID: roomID, userID: userID, role: "participant")
         try await client
@@ -103,8 +104,7 @@ public final class RoomStore {
     /// Look up the caller's role in a given room. Returns nil when no
     /// row exists for the caller (either not a member, or RLS hid it).
     public func fetchOwnRole(roomID: UUID) async throws -> String? {
-        let session = try await client.auth.session
-        let userID = session.user.id
+        let userID = try currentUserID()
 
         do {
             let row: MemberRoleRow = try await client
@@ -119,6 +119,23 @@ public final class RoomStore {
         } catch {
             return nil
         }
+    }
+
+    // MARK: - errors
+
+    public enum StoreError: Error, Equatable {
+        /// No authenticated user is currently available on the client.
+        /// Callers (e.g. JoinScreen) ensure `AuthCoordinator.ensureSignedIn`
+        /// has run before invoking RoomStore writes, so this surfaces as
+        /// a misuse rather than a transient state.
+        case notAuthenticated
+    }
+
+    private func currentUserID() throws -> UUID {
+        guard let user = client.auth.currentUser else {
+            throw StoreError.notAuthenticated
+        }
+        return user.id
     }
 
     // MARK: - wire types
