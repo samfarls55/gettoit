@@ -1,0 +1,125 @@
+# GetToIt CI — single workflow, four lanes (per ADR 0004 §"One CI lane").
+#
+# Lanes:
+#   * design-system — Node 20, runs `verify.mjs` (CSS + Swift drift gate
+#                     + orphan-hex sweep + surface↔jsx pairing).
+#   * ios           — macOS, generates the Xcode project via XcodeGen
+#                     and runs the unit + integration tests on the
+#                     iOS 17 simulator.
+#   * edge          — Ubuntu, runs `deno test` over `supabase/functions/`.
+#   * web           — Ubuntu, runs `next build` over `web/`.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  design-system:
+    name: design-system (verify)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Verify design system (drift gate + orphan-hex sweep)
+        run: node design-system/scripts/verify.mjs
+
+  web:
+    name: web (next build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  edge:
+    name: supabase/functions (deno test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - name: deno test (supabase/functions)
+        working-directory: supabase/functions
+        run: deno test --allow-net --allow-env --allow-read
+
+  ios:
+    name: ios (xcodebuild test)
+    runs-on: macos-14
+    env:
+      # Pin a stable Xcode version. macOS-14 images carry Xcode 15.4 by default;
+      # the `xcode-select` step below makes the choice explicit so the build
+      # doesn't silently drift when GitHub rotates the image default.
+      DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
+      SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s "$DEVELOPER_DIR"
+
+      - name: Show Xcode + simulator info
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes | grep iOS || true
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build + test on iOS 17 simulator
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          # Pick the highest-version iOS 17 simulator runtime available on
+          # the runner. macOS-14 images may carry 17.2, 17.4, or 17.5 — we
+          # use whatever exists rather than pinning a version that may
+          # disappear at the next image refresh.
+          RUNTIME=$(xcrun simctl list runtimes | awk '/iOS 17/ {print $2}' | sort -V | tail -1)
+          if [ -z "$RUNTIME" ]; then
+            echo "No iOS 17 runtime available on this runner" >&2
+            exit 1
+          fi
+          echo "Using iOS runtime: $RUNTIME"
+
+          xcodebuild test \
+            -project GetToIt.xcodeproj \
+            -scheme GetToIt \
+            -destination "platform=iOS Simulator,name=iPhone 15,OS=$RUNTIME" \
+            -resultBundlePath TestResults.xcresult \
+            SUPABASE_PROJECT_URL="$SUPABASE_PROJECT_URL" \
+            SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log
+
+      - name: Upload xcresult bundle on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: ios/TestResults.xcresult
+          if-no-files-found: ignore
