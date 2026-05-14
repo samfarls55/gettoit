@@ -13,6 +13,7 @@
 import XCTest
 @testable import GetToIt
 
+@MainActor
 final class InitiatorScreenTests: XCTestCase {
 
     /// Spec defaults (10 min / 2.0 mi) line up with the migration
