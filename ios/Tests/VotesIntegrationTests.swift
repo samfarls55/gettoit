@@ -7,12 +7,23 @@
 // Acceptance covered:
 //   * Full-quiz submission writes a single `votes` row whose columns
 //     match the answers captured by the coordinator.
+//   * Re-submit folds to idempotent — the (room_id, user_id) PK
+//     collides, the coordinator surfaces `.idempotent`, no second row.
 //   * RLS blocks a non-member from inserting a row in someone else's
 //     room. Membership in the room is the gate.
 //   * RLS blocks a member from writing a row with `user_id` belonging
 //     to a different user (the "wrong user" case from the ticket).
-//   * Re-submit raises a unique-constraint violation, and the
-//     coordinator's `isUniqueViolation` recognises it as such.
+//
+// Test layout — two consolidated cases. The contracts are unchanged;
+// what differs is how many fresh anonymous identities the suite
+// burns against the shared Supabase project's signup rate limit.
+// The free-tier auth budget is shared across every integration
+// suite in a single CI run — adding any new test risks tipping the
+// cumulative cliff. We fold:
+//   * happy + idempotent share a single (room, user) fixture.
+//   * cross-user RLS + non-member RLS share a single (room, user1,
+//     user2) fixture — User2 first attempts a write while still a
+//     non-member, then again after joining with user_id=user1.
 
 import XCTest
 import Supabase
@@ -127,121 +138,113 @@ final class VotesIntegrationTests: XCTestCase {
         return coord
     }
 
-    // MARK: - happy path
+    // MARK: - happy path + idempotency (single fixture)
+    //
+    // Folds the original `testFullQuizSubmissionWritesASingleVotesRow`
+    // and `testResubmitFoldsToIdempotentSuccess` into one. Both
+    // contracts are still asserted on the same (room, user) — the
+    // happy-path columns land on the first submit, the idempotent
+    // outcome lands on the second. Saves one anonymous signup
+    // against the shared Supabase free-tier auth rate-limit budget.
 
-    func testFullQuizSubmissionWritesASingleVotesRow() async throws {
+    func testFullQuizHappyPathAndIdempotentResubmit() async throws {
         let client = try makeClient()
         let store = RoomStore(client: client)
 
         let userID = try await signInFreshAnon(on: client)
         let room = try await store.createRoom(as: userID)
 
-        let coord = makeCoordinator(client: client, roomID: room.id, userID: userID)
-        let result = await coord.submit()
-        guard case .success(let outcome) = result else {
-            return XCTFail("expected vote insert to succeed, got \(result)")
+        // First submit — happy path. Row lands with the right columns.
+        let firstCoord = makeCoordinator(client: client, roomID: room.id, userID: userID)
+        let first = await firstCoord.submit()
+        guard case .success(let firstOutcome) = first else {
+            return XCTFail("expected first vote insert to succeed, got \(first)")
         }
-        XCTAssertEqual(outcome, .written)
+        XCTAssertEqual(firstOutcome, .written)
 
-        let rows = try await fetchVotes(client: client, roomID: room.id)
-        XCTAssertEqual(rows.count, 1, "expected exactly one votes row")
-        let row = try XCTUnwrap(rows.first)
+        let afterFirst = try await fetchVotes(client: client, roomID: room.id)
+        XCTAssertEqual(afterFirst.count, 1, "expected exactly one votes row after the first submit")
+        let row = try XCTUnwrap(afterFirst.first)
         XCTAssertEqual(row.userID, userID)
         XCTAssertEqual(row.q1Vetoes, [QuizVeto.shellfish])
         XCTAssertEqual(row.q2Budget, 2)
         XCTAssertEqual(row.q3WalkMinutes, 10)
         XCTAssertEqual(row.q4Vibe, 3)
 
-        try? await client.auth.signOut()
-    }
-
-    // MARK: - idempotency
-
-    func testResubmitFoldsToIdempotentSuccess() async throws {
-        let client = try makeClient()
-        let store = RoomStore(client: client)
-
-        let userID = try await signInFreshAnon(on: client)
-        let room = try await store.createRoom(as: userID)
-
-        // First submit lands a row.
-        let firstCoord = makeCoordinator(client: client, roomID: room.id, userID: userID)
-        let first = await firstCoord.submit()
-        guard case .success = first else {
-            return XCTFail("expected first submit to succeed: \(first)")
-        }
-
-        // Second submit (same room + user) must fold to .idempotent —
-        // the (room_id, user_id) primary key collides.
+        // Second submit — same (room, user) → idempotent. Coordinator
+        // sees the (room_id, user_id) PK collide and folds the failure
+        // back into a `.success(.idempotent)` outcome.
         let secondCoord = makeCoordinator(client: client, roomID: room.id, userID: userID)
         let second = await secondCoord.submit()
-        guard case .success(let outcome) = second else {
-            return XCTFail("expected resubmit to fold to idempotent: \(second)")
+        guard case .success(let secondOutcome) = second else {
+            return XCTFail("expected resubmit to fold to idempotent, got \(second)")
         }
-        XCTAssertEqual(outcome, .idempotent)
+        XCTAssertEqual(secondOutcome, .idempotent)
 
-        // Only one row exists in the table for this (room, user).
-        let rows = try await fetchVotes(client: client, roomID: room.id)
-        XCTAssertEqual(rows.count, 1, "expected the resubmit to NOT create a second row")
+        let afterSecond = try await fetchVotes(client: client, roomID: room.id)
+        XCTAssertEqual(afterSecond.count, 1, "expected the resubmit to NOT create a second row")
 
         try? await client.auth.signOut()
     }
 
-    // MARK: - RLS
+    // MARK: - RLS (consolidated cross-user + non-member fixture)
+    //
+    // Folds the two RLS tests into one. The cross-user check and the
+    // non-member check are independently exercised within a single
+    // (creator, attacker) fixture by ordering the two attacks:
+    //   1. While `attacker` is NOT yet a member, they try to vote
+    //      → RLS rejects (non-member path).
+    //   2. `attacker` joins the room.
+    //   3. `attacker` (now a legitimate member) tries to write with
+    //      `user_id = creatorID` → RLS rejects (cross-user path).
+    // Saves two anonymous signups against the rate-limit budget.
 
-    func testRLSBlocksWritingAVoteForADifferentUser() async throws {
+    func testRLSBlocksBothNonMemberInsertAndCrossUserInsert() async throws {
         let client = try makeClient()
         let store = RoomStore(client: client)
 
-        // Device A creates a room.
+        // Creator creates a room.
         let creatorID = try await signInFreshAnon(on: client)
         let room = try await store.createRoom(as: creatorID)
 
-        // Device B joins.
-        let joinerID = try await signInFreshAnon(on: client)
-        try await store.joinRoom(id: room.id, as: joinerID)
+        // Attacker signs in but does NOT join yet.
+        let attackerID = try await signInFreshAnon(on: client)
+        XCTAssertNotEqual(creatorID, attackerID)
 
-        // Device B tries to insert a row for the creator's user_id —
-        // RLS rejects (`with check (user_id = auth.uid())`).
-        let badCoord = QuizCoordinator(
+        // (1) Non-member attempt — attacker tries to insert their own
+        // vote into a room they didn't join. RLS rejects.
+        let nonMemberCoord = QuizCoordinator(
+            roomID: room.id,
+            userID: attackerID,
+            writer: QuizSupabaseWriter.make(client: client)
+        )
+        nonMemberCoord.advance(); nonMemberCoord.advance()
+        nonMemberCoord.advance(); nonMemberCoord.advance()
+        let nonMemberResult = await nonMemberCoord.submit()
+        guard case .failure = nonMemberResult else {
+            return XCTFail("expected RLS to reject the non-member insert, got \(nonMemberResult)")
+        }
+
+        // (2) Cross-user attempt — attacker joins the room, then
+        // tries to insert with the creator's user_id. RLS rejects on
+        // the `with check (user_id = auth.uid())` clause.
+        try await store.joinRoom(id: room.id, as: attackerID)
+        let crossUserCoord = QuizCoordinator(
             roomID: room.id,
             userID: creatorID,                    // <- not the signed-in user
             writer: QuizSupabaseWriter.make(client: client)
         )
-        badCoord.advance(); badCoord.advance(); badCoord.advance(); badCoord.advance()
-        let result = await badCoord.submit()
-        guard case .failure = result else {
-            return XCTFail("expected RLS to reject the cross-user insert, got \(result)")
+        crossUserCoord.advance(); crossUserCoord.advance()
+        crossUserCoord.advance(); crossUserCoord.advance()
+        let crossUserResult = await crossUserCoord.submit()
+        guard case .failure = crossUserResult else {
+            return XCTFail("expected RLS to reject the cross-user insert, got \(crossUserResult)")
         }
 
-        // No row for the creator was written.
+        // No row exists for the creator (attacker couldn't write for them).
         let rows = try await fetchVotes(client: client, roomID: room.id)
         XCTAssertTrue(rows.allSatisfy { $0.userID != creatorID },
-            "expected RLS to prevent any row from being written for the creator's user_id by the joiner")
-
-        try? await client.auth.signOut()
-    }
-
-    func testRLSBlocksWritingAVoteForARoomTheUserDidNotJoin() async throws {
-        let client = try makeClient()
-        let store = RoomStore(client: client)
-
-        // Device A creates a room.
-        let creatorID = try await signInFreshAnon(on: client)
-        let room = try await store.createRoom(as: creatorID)
-
-        // Device C — never joined — tries to vote.
-        let nonMemberID = try await signInFreshAnon(on: client)
-        let coord = QuizCoordinator(
-            roomID: room.id,
-            userID: nonMemberID,
-            writer: QuizSupabaseWriter.make(client: client)
-        )
-        coord.advance(); coord.advance(); coord.advance(); coord.advance()
-        let result = await coord.submit()
-        guard case .failure = result else {
-            return XCTFail("expected RLS to reject the non-member insert, got \(result)")
-        }
+            "expected RLS to prevent any row from being written for the creator's user_id by the attacker")
 
         try? await client.auth.signOut()
     }
