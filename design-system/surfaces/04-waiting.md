@@ -20,7 +20,7 @@ The user has finished the quiz; not everyone has. Honest, calm, no anxiety.
 
 ## Components used
 
-`GradientSurface` (waiting) · `GTIMark` · `Eyebrow` · display headline (`N of M` / `ARE IN`) · `AvatarDot` × N · `PillCTA` ghost (Nudge) · `PillCTA` ghost (Decide now, initiator-only) · mono-tag countdown · `AuthUpgradeChip` (C-22, iOS-only).
+`GradientSurface` (waiting) · `GTIMark` · `Eyebrow` · display headline (`N of M` / `ARE IN`) · `AvatarDot` × N · `PillCTA` ghost (Nudge) · `PillCTA` ghost (Decide now, initiator-only) · `PillCTA` white (`"Download the app"`, web-anonymous-only) · mono-tag countdown · `AuthUpgradeChip` (C-22, iOS-only).
 
 ## Copy register
 
@@ -29,6 +29,7 @@ The user has finished the quiz; not everyone has. Honest, calm, no anxiety.
 - **`"no spinners, promise."`** — a meta-commitment. End-of-workday users are fatigued; this surface promises not to perform urgency.
 - **`"Decide now · 3 of 4 in"`** — label exposes the partial-quorum cost. Not `"Skip waiting"` (dismissive) or `"Force verdict"` (algorithm framing).
 - **`"Auto-fires in 7:42"`** — the timer is what counts down, not the group's patience.
+- **`"Download the app"`** (web-only, anonymous-only — see §"Download the app" CTA below) — voluntary verb, plain noun. The web fallback's primary post-quiz CTA, surfacing the only path the user has to a persistent identity. NEVER `"Get the app"` (sales register), NEVER `"Install GetToIt"` (transactional), NEVER `"Continue in app"` (implies a continuation that doesn't exist — installing creates a fresh anonymous identity per ADR 0007 unless they later complete S00a).
 
 ## Verdict fire trigger
 
@@ -89,6 +90,37 @@ This is the surface where the Sign-in-with-Apple upgrade lives. Per [[../gti-vau
 | On tap → cancel/error | No state change. Chip returns to the `default` state; user can retry or dismiss. |
 
 The chip exists for the post-quiz upgrade moment ADR 0007 ratified — the user has just demonstrated effort (5 quiz answers); the affordance to save it converts at this moment but pre-quiz prompts default-deny. The chip is intentionally the **only** persistent identity surface in v1; reinstall = new anonymous identity unless the user took this tap.
+
+### "Download the app" CTA (web fallback, anonymous-only)
+
+Added in v1.1 (sg-03). The web fallback ([[02-invite|S02 web]]) carries anonymous voters who answered the quiz in the browser. Once they reach S04, they have demonstrated effort but have no path to persistent identity — C-22 is hidden on web per ADR 0007 (no Sign in with Apple in browser). The "Download the app" CTA replaces it.
+
+| Property | Value |
+|---|---|
+| Component | `C-05` Pill CTA, `white` variant |
+| Visibility | Web fallback only AND user is anonymous. On iOS the CTA renders `hidden` (the user is already in the app; downloading it again is meaningless). On web for a returning user who later linked their identity, the CTA renders `hidden` (same hidden-state semantics as C-22 — once a real identity exists, the upgrade affordance disappears). |
+| Position | In the CTA dock, **above** the `"Nudge"` CTA. On web there is no `"Decide now"` CTA (only the initiator who used the iOS app sees that) and no C-22 chip, so this CTA is the dock's primary affordance. |
+| Label | `"Download the app"` — LOCKED. Sentence-case in source; the `cta` token renders it UPPERCASE. NEVER `"Get the app"`, NEVER `"Install GetToIt"`, NEVER `"Continue in app"`. |
+| Apple-glyph prefix | None. This is a download CTA, not a sign-in CTA. A glyph would imply Apple-authored content; the user is downloading an iOS app from a third-party store. The pill is type-only. |
+| On tap | Opens the iOS App Store URL (`itms-apps://itunes.apple.com/app/<id>` on iOS Safari, `https://apps.apple.com/app/<id>` elsewhere) in a new tab / system handler. The web page itself does not advance — the user remains on S04, the verdict still computes for the room they're in, and their vote still counts. |
+| Subscript line | Below the pill, `eyebrow` token treatment, white 0.6 — `"Then your votes save with you."` Single line of value framing; spells out that installing isn't just for future sessions, it makes the current session's contribution survive. |
+
+#### iOS / web cross-cut
+
+| Render context | C-22 chip | "Download the app" CTA |
+|---|---|---|
+| iOS, anonymous (legacy v1 install pre-S00a, or post-delete fresh anon) | renders `default` | hidden |
+| iOS, Apple-linked (post-S00a, the v1.1 norm) | hidden | hidden |
+| Web fallback, anonymous (the canonical web path) | hidden (per ADR 0007 — no SiwA on web) | renders |
+| Web fallback, Apple-linked (returning user) | hidden | hidden |
+
+Exactly one of the two affordances ever renders in a given context; the dock never carries both. This is enforced by the `platform` prop on `ScreenWaiting` (`"ios"` vs `"web"`) plus the `isAnonymous` prop.
+
+#### Behavior
+
+- Tap writes a telemetry event (`waiting_download_cta_tapped` per [[../../gti-vault/60_engineering/adr/0005-telemetry-supabase-event-store|ADR 0005]] event-store conventions) before opening the store URL — gives us conversion measurement.
+- On a subsequent iOS install the user hits [[00a-signin|S00a]] like any other first launch. Their web-fallback room state does NOT auto-rehydrate into the new install — per ADR 0007 §"Negative / accepted tradeoffs", web-to-iOS identity merge is a future feature, not v1.1 scope. The CTA copy ("Then your votes save with you") promises only forward-going behavior, not retroactive merge.
+- No countdown coupling. The pill does not change label or state as the timer ticks down. If the room expires while the user is mid-install, they re-open the link to find the verdict (the deep link routes them to the verdict surface as a late-joiner per [[05-verdict|S05 §read-only]]).
 
 ## Edge cases
 

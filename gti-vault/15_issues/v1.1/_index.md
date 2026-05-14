@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 follow-up issues from 2026-05-14 TestFlight dogfood — bugs against shipped v1 + missing-surface work + product decisions
-status: 11 issues published 2026-05-14 (GitHub #41–#51)
+status: 11 issues published 2026-05-14 (GitHub #41–#51); sg-03 closed 2026-05-14
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -31,7 +31,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 |---|---|---|---|---|
 | sg-01 | [[issues/sg-01-on-gradient-subheader-contrast\|On-gradient subheader contrast token fix]] | AFK | [#45](https://github.com/samfarls55/gettoit/issues/45) | — |
 | sg-02 | [[issues/sg-02-landing-page-surface\|Landing page surface (two-button)]] | AFK | [#46](https://github.com/samfarls55/gettoit/issues/46) | — |
-| sg-03 | [[issues/sg-03-account-creation-surfaces\|Forced first-launch sign-in + waiting-screen download CTA]] | AFK | [#47](https://github.com/samfarls55/gettoit/issues/47) | — |
+| sg-03 | [[issues/sg-03-account-creation-surfaces\|Forced first-launch sign-in + waiting-screen download CTA]] ✅ done | AFK | [#47](https://github.com/samfarls55/gettoit/issues/47) | — |
 | sg-04 | [[issues/sg-04-geo-permission-and-location-selector\|Geo permission + location selector — C-23 LocationPicker]] | AFK | [#48](https://github.com/samfarls55/gettoit/issues/48) | — |
 
 ### Tracer-bullet build slices

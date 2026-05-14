@@ -3,6 +3,9 @@
 // v1: initiator gets a "Decide now" CTA (disabled until quorum); all members see a live countdown.
 // TB-12: anonymous users on iOS get an Auth Upgrade Chip (C-22) above the
 // other CTAs. Web fallback passes `platform="web"` and the chip stays hidden.
+// sg-03 (v1.1): web-fallback anonymous voters get a "Download the app" CTA
+// in the dock slot C-22 leaves empty on web. Exactly one of the two
+// affordances ever renders for a given context — never both.
 
 function ScreenWaiting({
   onAdvance,
@@ -16,6 +19,11 @@ function ScreenWaiting({
   authChipState = 'default', // 'default' | 'in-progress' | 'success' | 'dismissed' | 'hidden'
   onSaveTasteProfile = () => {},
   onDismissAuthChip = () => {},
+  // sg-03 download CTA wiring — fires when the user taps "Download the
+  // app" on the web fallback. Caller routes them to the App Store URL
+  // (itms-apps:// on iOS Safari, https://apps.apple.com elsewhere) and
+  // emits the waiting_download_cta_tapped telemetry event.
+  onDownloadApp = () => {},
 }) {
   const people = [
     { name: 'You',  color: '#FFD23F', answered: true },
@@ -108,6 +116,31 @@ function ScreenWaiting({
                 onSave={onSaveTasteProfile}
                 onDismiss={onDismissAuthChip}
               />
+            )}
+            {/* sg-03 "Download the app" CTA — web fallback, anonymous-only.
+                Replaces the dock slot C-22 leaves empty on web. iOS users
+                are already in the app so this CTA is suppressed; Apple-
+                linked web users (returning) have a real identity so it is
+                also suppressed. Exactly one of {C-22, this CTA} ever
+                renders for a given context. */}
+            {platform === 'web' && isAnonymous && (
+              <div style={{
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'stretch', gap: 8,
+              }}>
+                <PillCTA
+                  label="Download the app"
+                  fill="white"
+                  onClick={onDownloadApp}
+                />
+                <div style={{
+                  fontFamily: 'var(--ff-body)',
+                  fontSize: 11, fontWeight: 700,
+                  letterSpacing: '0.18em', textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.6)',
+                  textAlign: 'center',
+                }}>Then your votes save with you</div>
+              </div>
             )}
             {isInitiator && (
               <PillCTA

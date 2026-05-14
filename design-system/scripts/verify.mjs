@@ -136,7 +136,12 @@ if (Object.keys(webOrphansByFile).length) {
 
 // ── 4. Surface ↔ JSX pairing ───────────────────────────────
 const surfaceDocs = fs.existsSync(surfacesDir)
-  ? fs.readdirSync(surfacesDir).filter(n => /^\d{2}-.*\.md$/.test(n))
+  // Surface filenames are `NN-slug.md` (numbered into the ritual arc) or
+  // `NNx-slug.md` (pre-flow / out-of-arc surfaces — `00a-signin`,
+  // `00b-location-permission`, etc.) where `x` is a single lowercase
+  // letter. The letter suffix lets multiple pre-flow surfaces share the
+  // `00` slot without renumbering the rest of the arc.
+  ? fs.readdirSync(surfacesDir).filter(n => /^\d{2}[a-z]?-.*\.md$/.test(n))
   : [];
 
 const claimedJsx = new Map();  // jsx-rel-path -> surface slug
