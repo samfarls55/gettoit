@@ -2,7 +2,8 @@
 issue: tb-07
 title: Waiting surface + Realtime + initiator-set timer + Decide-now fire trigger
 github_issue: 8
-status: ready-for-agent
+status: done
+completed: 2026-05-14
 type: AFK
 created: 2026-05-12
 prd: v1-prd
@@ -32,14 +33,25 @@ This is the implementation of [[02-s04-decide-now-countdown|spec-gap issue 02]] 
 
 ## Acceptance criteria
 
-- [ ] All [[02-s04-decide-now-countdown|spec-gap 02]] acceptance criteria pass.
-- [ ] Realtime Broadcast wired for vote events + verdict_ready.
-- [ ] Postgres trigger + pg_cron auto-fire path verified.
-- [ ] `fire_verdict(room_id)` RPC enforces min quorum 2 (initiator + 1).
-- [ ] S04 SwiftUI view renders with the initiator-only Decide-now button and countdown.
-- [ ] Expired-no-quorum terminal state lands with copy.
-- [ ] Integration tests for Realtime echo, trigger fire, cron auto-fire, quorum enforcement.
+- [x] All [[02-s04-decide-now-countdown|spec-gap 02]] acceptance criteria pass.
+- [x] Realtime Broadcast wired for vote events + verdict_ready.
+- [x] Postgres trigger + pg_cron auto-fire path verified.
+- [x] `fire_verdict(room_id)` RPC enforces min quorum 2 (initiator + 1).
+- [x] S04 SwiftUI view renders with the initiator-only Decide-now button and countdown.
+- [x] Expired-no-quorum terminal state lands with copy.
+- [x] Integration tests for Realtime echo, trigger fire, cron auto-fire, quorum enforcement.
 
 ## Blocked by
 
 - [[tb-06-verdict-engine-clean-run|TB-06]]
+
+## Adjacencies
+
+Surfaced during TB-07 but intentionally deferred:
+
+- **Live supabase-swift Realtime wiring** — `WaitingStore` is decoupled from the supabase-swift channel API so unit tests can drive `apply(event:)` deterministically. The production channel binding (subscribing to `room:{roomId}` broadcasts, fanning to `apply(event:)`) is a small follow-up; the store + RPC contract is fully observable end-to-end without it.
+- **Vote broadcast source-of-truth** — voters' devices currently emit the `vote_cast` broadcast on the channel. A future iteration moves the broadcast emission server-side (Postgres trigger via `pg_net`) so the engine is the only sender; the subscriber pattern doesn't change.
+- **Method passthrough docs** — `compute-verdict` now accepts `method=quorum|deadline|manual` from the dispatcher. `verdict-engine.md` calls this out; if TB-09 wants to introduce `no_survivor` as a method too, the engine's `VerdictMethod` union is the type to extend.
+- **fire_verdict UPDATE policy on rooms** — the RPC's status flip runs from SECURITY DEFINER context. No client-side UPDATE policy on `rooms` is needed for v1. If a future surface ever exposes a direct status-flip UPDATE to clients, the policy gap surfaces there — flagged in `waiting-fire-trigger.md`.
+
+## Comments

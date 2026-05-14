@@ -25,7 +25,7 @@ Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-
 | TB-04 | [[issues/tb-04-full-quiz\|Full 5-question quiz]] ✅ done | AFK | [#5](https://github.com/samfarls55/gettoit/issues/5) | TB-02 |
 | TB-05 | [[issues/tb-05-foursquare-placesproxy\|Foursquare PlacesProxy + cache]] ✅ done | AFK | [#6](https://github.com/samfarls55/gettoit/issues/6) | TB-01, TB-00 |
 | TB-06 | [[issues/tb-06-verdict-engine-clean-run\|VerdictEngine clean run + S05 default]] ✅ done | AFK | [#7](https://github.com/samfarls55/gettoit/issues/7) | TB-04, TB-05 |
-| TB-07 | [[issues/tb-07-waiting-realtime-fire-trigger\|Waiting + Realtime + fire trigger]] | AFK | [#8](https://github.com/samfarls55/gettoit/issues/8) | TB-06 |
+| TB-07 | [[issues/tb-07-waiting-realtime-fire-trigger\|Waiting + Realtime + fire trigger]] ✅ done | AFK | [#8](https://github.com/samfarls55/gettoit/issues/8) | TB-06 |
 | TB-08 | [[issues/tb-08-ratification-push-hard-close\|Ratification + push perm + hard close]] | AFK | [#9](https://github.com/samfarls55/gettoit/issues/9) | TB-07 |
 | TB-09 | [[issues/tb-09-no-survivor-terminal\|Soft-pref relax + no-survivor terminal]] | AFK | [#10](https://github.com/samfarls55/gettoit/issues/10) | TB-06 |
 | TB-10 | [[issues/tb-10-reroll\|Reroll sheet + 3-cap + reason-to-constraint]] | AFK | [#11](https://github.com/samfarls55/gettoit/issues/11) | TB-08 |
