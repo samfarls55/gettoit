@@ -25,6 +25,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual re-trigger surface for the `testflight` job (and any other
+  # lane that's idempotent enough to re-run safely). Useful when a
+  # transient App Store Connect upload failure needs a retry without
+  # pushing a code change.
+  workflow_dispatch:
 
 permissions:
   contents: read
