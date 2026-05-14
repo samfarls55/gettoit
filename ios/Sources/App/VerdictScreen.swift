@@ -42,6 +42,14 @@ public struct VerdictScreen: View {
         case committed
         case readOnly
         case noSurvivor
+        /// TB-13 — single-member solo flow. Surface keeps the eyebrow +
+        /// hero + meta + time badge + rule chip + `"I'm in"` + reroll;
+        /// suppresses the voice-receipt row; replaces the group-save
+        /// affordance with the C-22 save-taste-profile chip. The time
+        /// badge audience reads `"You"` (singular) rather than
+        /// `"All N of you"`. See `design-system/surfaces/05-verdict.md`
+        /// §"solo".
+        case solo
     }
 
     /// Verdict + receipts + cuts payload, sourced from `verdicts` +
@@ -91,6 +99,27 @@ public struct VerdictScreen: View {
                     Cut(name: "Café Lou",   reason: "shellfish veto"),
                     Cut(name: "Halal Cart", reason: "outside walk range"),
                 ]
+            )
+        }
+
+        /// TB-13 — JSX-fixture-shaped solo verdict. Used by the
+        /// `solo` mode snapshot tests and the design-system parity
+        /// preview. Empty receipts list (the surface suppresses the
+        /// row anyway), empty cuts (the engine still produces them for
+        /// a multi-candidate solo run, but the fixture keeps the
+        /// minimal shape). Time-badge audience is `"You"` (singular).
+        /// Rule text names the rule that produced the verdict — no
+        /// `"N of M"` framing. `// placeholder: marketing-branding pass`
+        /// applies to the strings.
+        public static func soloFixture() -> Verdict {
+            // placeholder: marketing-branding pass
+            Verdict(
+                placeName: "Pico's Taqueria",
+                metaLine: "Mexican · $$ · 8 min walk",
+                timeBadge: TimeBadge(time: "7:00 PM", audience: "You"),
+                ruleText: "Pico's was the only candidate that fit every constraint.",
+                receipts: [],
+                cuts: []
             )
         }
 
@@ -581,6 +610,8 @@ public struct VerdictScreen: View {
             if mode == .noSurvivor {
                 noSurvivorPrimary
                 noSurvivorSecondary
+            } else if mode == .solo {
+                soloCTADock
             } else if mode == .readOnly {
                 // TB-11 — read-only late-joiner CTA. Re-invite the
                 // caller to a fresh round as the new initiator;
@@ -768,6 +799,67 @@ public struct VerdictScreen: View {
         }
     }
 
+    /// TB-13 — solo CTA dock. Renders the same warm primary as
+    /// `default` ("I'm in" → committed "You're in"), the reroll tertiary,
+    /// the C-22 save-taste-profile chip in place of the group save
+    /// affordance, the pre-permission line, and the quiet "Start over"
+    /// secondary. The chip's surfaced state comes from the host's
+    /// `AuthPromptStore`; this view renders a default-idle placeholder
+    /// chip so the surface still demos in the design-system preview.
+    @ViewBuilder
+    private var soloCTADock: some View {
+        if isCommittedFlavor {
+            committedPill
+            Text(VerdictScreen.windowCountdownCopy(seconds: windowSecondsRemaining))
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
+                .padding(GTISpacing.step1)
+                .accessibilityIdentifier("verdict.cta.secondary")
+            rerollTertiary
+            soloSaveTasteProfileChip
+            preCheckInLine
+        } else {
+            Button(action: handleImInTap) {
+                Text("I'M IN")
+                    .font(.system(size: GTIFont.Size.cta, weight: .black))
+                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                    .foregroundStyle(GTIColor.ink)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .background(
+                        GTIColor.paper,
+                        in: RoundedRectangle(cornerRadius: GTIRadii.pill)
+                    )
+            }
+            .accessibilityIdentifier("verdict.cta.primary")
+
+            Button(action: onAdvance) {
+                Text("START OVER")
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
+                    .padding(GTISpacing.step1)
+            }
+            .accessibilityIdentifier("verdict.cta.secondary")
+            rerollTertiary
+            soloSaveTasteProfileChip
+            preCheckInLine
+        }
+    }
+
+    /// TB-13 — render gate for the C-22 save-taste-profile chip in the
+    /// solo CTA dock. Renders the chip in `.defaultIdle` state by
+    /// default; the host (RootView) wires the live state from
+    /// `AuthPromptStore` via the upcoming TB-13 plumbing. The view
+    /// renders an inert chip here so the design-system parity preview
+    /// and the snapshot suite have something to render.
+    @ViewBuilder
+    private var soloSaveTasteProfileChip: some View {
+        AuthUpgradeChip(state: .defaultIdle)
+            .padding(.top, GTISpacing.step1)
+            .accessibilityIdentifier("verdict.solo.saveTasteProfile")
+    }
+
     /// No-survivor secondary — ghost "Start over" returning to S01.
     /// Slightly louder than the default mode's "Start over" tertiary
     /// (12pt vs 11pt body weight 800) because in no-survivor it's
@@ -899,6 +991,11 @@ public struct VerdictScreen: View {
         /// Pre-permission line copy surfaced under the CTA dock
         /// (TB-08). Empty in modes that suppress the line.
         public let preCheckInLine: String
+        /// TB-13 — solo mode surfaces the C-22 save-taste-profile chip
+        /// in place of the group-save affordance. The flag drives the
+        /// render gate; the actual chip state is sourced from the host's
+        /// `AuthPromptStore` (hidden when the user is already linked).
+        public let showSaveTasteProfileChip: Bool
     }
 
     /// Mode-shaped flags surfaced for the snapshot tests. Mirrors the
@@ -907,12 +1004,15 @@ public struct VerdictScreen: View {
     public var modeSnapshot: ModeSnapshot {
         let isReadOnly   = mode == .readOnly
         let isNoSurvivor = mode == .noSurvivor
+        let isSolo       = mode == .solo
         let isCommitted  = (mode == .committed || committedLocally)
 
         let eyebrow: String
         switch mode {
         case .noSurvivor: eyebrow = "Tonight"
         case .readOnly:   eyebrow = "Tonight's verdict"
+        // Solo intentionally falls through to the default copy — the
+        // singular voice still produced a verdict.
         default:          eyebrow = "Tonight, the verdict is"
         }
 
@@ -947,9 +1047,17 @@ public struct VerdictScreen: View {
         // modes; everywhere else it surfaces.
         let preLine = (isReadOnly || isNoSurvivor) ? "" : VerdictScreen.preCheckInCopy
 
+        // TB-13 — solo replaces the group-save secondary with the C-22
+        // save-taste-profile chip. The flag is true ONLY for solo;
+        // group modes never surface this chip on S05 (it lives on S04
+        // for those flows per TB-12).
+        let saveChip = isSolo && !isReadOnly && !isNoSurvivor
+
         return ModeSnapshot(
             showTimeBadge: !isNoSurvivor,
-            showReceipts: !isNoSurvivor,
+            // Solo suppresses receipts — one voice doesn't need to be
+            // receipted back to itself. Otherwise the row surfaces.
+            showReceipts: !isNoSurvivor && !isSolo,
             showCutsDrawer: !isNoSurvivor,
             cutsExpanded: cutsExpanded || mode == .cuts,
             eyebrowCopy: eyebrow,
@@ -957,7 +1065,8 @@ public struct VerdictScreen: View {
             secondaryLabel: secondary,
             widenSliderOpen: widenSliderOpen,
             isCommittedFlavor: isCommitted,
-            preCheckInLine: preLine
+            preCheckInLine: preLine,
+            showSaveTasteProfileChip: saveChip
         )
     }
 
@@ -979,9 +1088,12 @@ public struct VerdictScreen: View {
 
     /// S05 §Modes — committed CTA reads `"You're in · N of M"`. We
     /// guard against `total = 0` (count snapshot hasn't loaded yet)
-    /// by falling back to `"You're in"`.
+    /// by falling back to `"You're in"`. TB-13 — for solo runs
+    /// (`total == 1`) the N-of-M denominator collapses; there's no
+    /// quorum to count to, so the label is simply `"You're in"`.
     public static func committedCtaLabel(count: Int, total: Int) -> String {
         if total <= 0 { return "You're in" }
+        if total == 1 { return "You're in" }  // solo — no denominator
         let c = max(1, count)  // a self-ratification has already landed
         return "You're in · \(c) of \(total)"
     }

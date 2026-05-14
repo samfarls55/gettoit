@@ -9,7 +9,7 @@ jsx:
 # S05 · Verdict (the hero)
 
 > **Code:** [`../code/screens/ScreenVerdict.jsx`](../code/screens/ScreenVerdict.jsx)
-> Five modes: `default` · `cuts` · `committed` · `read-only` · `no-survivor`.
+> Six modes: `default` · `cuts` · `committed` · `read-only` · `no-survivor` · `solo`.
 
 The screen this whole product exists to deliver. One verdict, where + when + who, with the rule that produced it and the receipts that prove it came from the inputs.
 
@@ -25,7 +25,7 @@ The **loser** is the rate-limiting reader. They must see, within 5 seconds:
 
 All five land within the choreo's 1.4s reveal. If you add a 6th element, something has to leave.
 
-The test applies in full to `default`, `cuts`, `committed`. It applies in **limited form** to `read-only` (steps 1–3 only — there is no ratification or reroll path for a late-joiner). It does **not apply** to `no-survivor` — there is no verdict to ratify; the rule chip becomes the load-bearing message.
+The test applies in full to `default`, `cuts`, `committed`. It applies in **limited form** to `read-only` (steps 1–3 only — there is no ratification or reroll path for a late-joiner). It does **not apply** to `no-survivor` — there is no verdict to ratify; the rule chip becomes the load-bearing message. In `solo` the test collapses to steps 1, 2, 4, 5 — there's a single voice, so step 3 ("their voice was counted") is implicit and the voice-receipt row is suppressed; the rule chip + I'm in + reroll still land within the same 1.4s reveal.
 
 ## Choreographed reveal (canon)
 
@@ -54,6 +54,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 | `committed` | CTA flipped to `"You're in · 3 of 4"`, **sun fill** with ink check prefix. Below: `"Window closes in 47s"`. |
 | `read-only` | Late-joiner mode. Eyebrow `"Tonight's verdict"` (past-tense-implicit). Hero + meta + time badge + rule chip + voice receipts (late-joiner not in receipts — they didn't contribute). Suppressed: ratification CTA, reroll affordance, `"Start over"` secondary. Primary CTA is `"Start a new decision"` (white pill). Cuts drawer remains available (informational, not actionable). |
 | `no-survivor` | Terminal — engine exited with no candidates after soft-pref relax. Eyebrow `"Tonight"`. Hero `"NO SPOT / FITS"` (one word per line). Meta line names the hard-need vetoes that survived (`"Vegan options · $$ cap · 15 min walk"`). No time badge. Rule chip is the load-bearing message in aggregate-rule register. Suppressed: voice receipts, ratification CTA, reroll, `"Start over"` (secondary). Primary CTA `"Widen radius"` (sun-fill); secondary ghost `"Start over"`. |
+| `solo` | Single-member room. Triggered when `members.length === 1` AND the initiator did not share an invite (the share sheet never opened). Eyebrow `"Tonight, the verdict is"` (same definite article as `default` — the singular voice still produced a verdict). Hero + meta + time badge + rule chip + `I'm in` CTA + reroll tertiary all present. **Suppressed:** voice-receipt row (one voice doesn't need to be receipted back to itself). **Replaced:** the `default` mode's save-group affordance is replaced with the **save-taste-profile** affordance (the C-22 Auth Upgrade Chip from TB-12, copy `"Save this taste profile"`). The chip surfaces under the primary CTA in `default-idle` state for anonymous users; suppressed for already-linked users. Cuts drawer remains available (informational). Time-badge audience reads `"You"` rather than `"All N of you"` — communal frame doesn't apply to a single voice. |
 
 ## What this surface defends against
 
@@ -71,7 +72,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 - **`"Tonight"`** (no-survivor) — bare, no verb. There's no verdict; the eyebrow shouldn't promise one.
 - **Place name UPPERCASE stacked, one word per line.** Statement of finality.
 - **`"NO SPOT / FITS"`** (no-survivor) — same one-word-per-line treatment. The hero is the absence; the rule chip carries the why.
-- **Time-badge audience: `"ALL FOUR OF YOU"`** — communal frame. NOT "Reserved for 4" / "Party of 4". Suppressed in `no-survivor` and unchanged in `read-only`.
+- **Time-badge audience: `"ALL FOUR OF YOU"`** — communal frame. NOT "Reserved for 4" / "Party of 4". Suppressed in `no-survivor` and unchanged in `read-only`. In `solo` the audience reads `"YOU"` — the communal frame doesn't apply to a single voice; `"ALL ONE OF YOU"` would be wrong-pitched.
 - **Rule sentence is active voice and names what cut what.** `"Budget cap cut Ren Soba."` The rule is the agent — never the algorithm. NEVER `"We chose Pico's"` / `"The app picked"`.
 - **No-survivor rule chip** uses aggregate attribution for shared constraints and attribute-attribution for private ones:
   - **Good:** `"Vegan options left no candidates within walking distance tonight."`
@@ -94,6 +95,17 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 - Primary CTA `"Start a new decision"` returns the user to S01 as the new initiator. Defaults are pre-populated from the prior room's `timer_minutes` + `radius_meters` (saves a tap; they're likely planning a similar outing).
 - Cuts drawer is available (informational). The "See what got cut →" trigger remains; reading the elimination chain is part of understanding what they missed.
 - VO order: eyebrow → hero → meta → time badge → rule chip → receipts (in order) → cuts trigger → re-invite CTA. Ratification path is announced as "Not available — this verdict is closed."
+
+### `solo`
+
+- Triggered when `members.length === 1` AND the initiator did NOT share an invite link (the iOS share sheet never opened). The flow skips S04 Waiting entirely — there's no quorum to wait on — and jumps directly to verdict computation followed by S05 in this variant.
+- The engine runs identically. With a single `votes` row the EBA pruning chain still produces a survivor set (the singular voice is itself the room-aggregate min budget / min walk / max vibe). The regret tiebreaker still picks the maximum across survivors. `rule_text` follows the same generator — it names the rules that produced the verdict ("Budget cap cut Ren Soba.") without any "N of M wanted X" counts. The rule_text generator has no member-count branch, so this is guaranteed by construction; verified by the engine fixture test.
+- Voice-receipt row is suppressed. Receipting a single voice back to itself reads as exposure (your one chip on screen, alone) and doesn't earn its place in the 1.4s reveal. The receipt-row step (1140ms) collapses; everything after lands at the same canonical delays.
+- Time badge surfaces with audience copy `"You"` (singular). The communal frame `"All N of you"` doesn't apply to a single voice.
+- `I'm in` CTA remains. The voice is voluntary in the same way — the user can still decline their own verdict and reroll. The 30s correctability window applies the same way; `"You're in"` reads without the N-of-M denominator when the user commits (no quorum to count to).
+- **Save-taste-profile affordance** replaces the `default` mode's save-group secondary. The C-22 Auth Upgrade Chip (TB-12) is the load-bearing affordance — its `"Save this taste profile"` copy was already designed for this moment. Surfaces under the primary CTA in `default-idle` state for anonymous users; suppressed (`hidden`) for users who already linked Apple. Solo mode is the highest-conversion moment for sign-in (the user just demonstrated effort solo — they have a taste profile worth saving and no group context to default into).
+- Reroll tertiary remains. A solo user can still discover their first verdict didn't fit (TB-10's cost / dist / mood / diet / avail taxonomy applies the same way).
+- `Start over` secondary remains (quiet, tertiary) so the user can re-enter the flow as the initiator of a fresh session.
 
 ### `no-survivor`
 

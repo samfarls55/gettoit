@@ -107,6 +107,16 @@ Per surface, the focus order ladders from top → bottom, with the primary CTA a
 3. Secondary (`"Start over"`)
    - When widen slider expands inline, VO focus moves to the slider with `aria-label="Widen walk radius"`; the CTA label updates to `"Re-run · {N} mi"` and is announced on focus return.
 
+### Verdict (`solo` mode)
+1. Eyebrow (`"Tonight, the verdict is"`) → Hero → Meta → Time badge (audience `"You"`) → Rule chip
+2. Cuts drawer trigger (informational; same affordance as `default`)
+3. Primary CTA (`"I'm in"` / `"You're in"` once committed — no N-of-M denominator)
+4. Auth Upgrade Chip (`"Save this taste profile"`) — replaces the `default` mode's group-save affordance. Hidden when the user is already linked.
+5. Reroll tertiary
+6. `"Start over"` secondary (or `"Window closes in 47s"` once committed)
+   - Voice-receipt row is suppressed — VO focus skips from rule chip directly to cuts trigger / CTA. No `"voice not counted"` announcement; the row simply isn't part of the read order.
+   - Time badge audience announces as `"Tonight at 7 PM, for you"` (singular form of the communal frame).
+
 ### Reroll sheet
 1. Eyebrow + headline (modal title)
 2. "2 LEFT" stamp (read by VO as "2 rerolls remaining")

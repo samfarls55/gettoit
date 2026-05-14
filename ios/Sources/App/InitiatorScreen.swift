@@ -32,17 +32,26 @@ public struct InitiatorScreen: View {
     private let roomStore: RoomStore
     private let userID: UUID
     private let onSharedRoom: ((UUID) -> Void)?
+    /// TB-13 — fires when the user opts into solo mode by tapping
+    /// "Go solo" instead of the share-and-invite primary CTA. The
+    /// host (RootView) takes the resulting `roomID` and routes
+    /// directly into Q1 with the local `invitedShared` flag set to
+    /// false so the post-Q5 router can skip S04 Waiting. Optional —
+    /// callers that don't surface a solo CTA pass nil.
+    private let onSoloRoom: ((UUID) -> Void)?
 
     public init(
         roomStore: RoomStore,
         userID: UUID,
         prefilledTimerMinutes: Int? = nil,
         prefilledRadiusMiles: Double? = nil,
-        onSharedRoom: ((UUID) -> Void)? = nil
+        onSharedRoom: ((UUID) -> Void)? = nil,
+        onSoloRoom: ((UUID) -> Void)? = nil
     ) {
         self.roomStore = roomStore
         self.userID = userID
         self.onSharedRoom = onSharedRoom
+        self.onSoloRoom = onSoloRoom
         let resolved = InitiatorScreen.resolvedPrefill(
             timerMinutes: prefilledTimerMinutes,
             radiusMiles: prefilledRadiusMiles
@@ -375,10 +384,54 @@ public struct InitiatorScreen: View {
             }
             .accessibilityIdentifier("initiator.cta")
             .disabled(phase == .creating)
+
+            // TB-13 — solo tertiary. Voluntary register: "Go solo —
+            // figure it out for myself." Quiet weight so the primary
+            // group-share path remains the obvious move. Hidden when
+            // the host didn't wire the `onSoloRoom` callback (e.g.
+            // unit-test surfaces that don't care about the solo path).
+            if onSoloRoom != nil {
+                Button(action: startSoloRoom) {
+                    Text("GO SOLO")
+                        .font(.system(size: GTIFont.Size.eyebrow, weight: .heavy))
+                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                        .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
+                        .padding(GTISpacing.step2)
+                }
+                .accessibilityIdentifier("initiator.cta.solo")
+                .accessibilityLabel("Go solo. Figure it out for yourself.")
+                .disabled(phase == .creating)
+            }
         }
     }
 
     // MARK: - actions
+
+    /// TB-13 — solo tertiary action. Creates the room with the same
+    /// timer + radius selections as the share path, but routes directly
+    /// into the quiz without opening the share sheet. The host's
+    /// `onSoloRoom` callback receives the new `roomID` so the post-Q5
+    /// router can pass `invitedShared=false` and trigger the solo
+    /// S05 variant.
+    private func startSoloRoom() {
+        guard let onSoloRoom else { return }
+        phase = .creating
+        let chosenTimer = timerMinutes
+        let chosenRadiusMeters = Self.metersFromMiles(radiusMiles)
+        Task {
+            do {
+                let room = try await roomStore.createRoom(
+                    as: userID,
+                    timerMinutes: chosenTimer,
+                    radiusMeters: chosenRadiusMeters
+                )
+                phase = .shared(roomID: room.id)
+                onSoloRoom(room.id)
+            } catch {
+                phase = .error("Couldn't create the session. \(String(describing: error))")
+            }
+        }
+    }
 
     private func shareInviteLink() {
         phase = .creating

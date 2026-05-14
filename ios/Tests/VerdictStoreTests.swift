@@ -96,8 +96,12 @@ final class VerdictStoreTests: XCTestCase {
     }
 
     func testAudienceCopyForSolo() {
-        XCTAssertEqual(VerdictStore.audienceCopy(forMemberCount: 1), "All one of you",
-                       "solo group is rare; the copy should still parse — TB-09 owns the solo-flow special case")
+        // TB-13 — solo audience reads bare `"You"`. The communal frame
+        // `"All N of you"` doesn't apply to a single voice. The S05
+        // solo variant time badge surfaces this copy directly. See
+        // `surfaces/05-verdict.md` §"solo".
+        XCTAssertEqual(VerdictStore.audienceCopy(forMemberCount: 1), "You",
+                       "solo time-badge audience reads 'You' (singular) — no communal frame")
     }
 
     func testAudienceCopyForLargeGroupFallsBackToNumber() {
