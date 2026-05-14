@@ -30,8 +30,7 @@ create table if not exists public.rooms (
 );
 
 comment on table public.rooms is
-    'A group decision session. Created by the initiator on S01; ' ||
-    'invitees join via Universal Link. v1 supports the food vertical only.';
+    'A group decision session. Created by the initiator on S01; invitees join via Universal Link. v1 supports the food vertical only.';
 
 -- ── members ──────────────────────────────────────────────────────────
 create table if not exists public.members (
@@ -43,8 +42,7 @@ create table if not exists public.members (
 );
 
 comment on table public.members is
-    'Members of a room. The creator is inserted with role=owner; ' ||
-    'invitees who tap the deep link land here as role=participant.';
+    'Members of a room. The creator is inserted with role=owner; invitees who tap the deep link land here as role=participant.';
 
 create index if not exists members_user_id_idx on public.members (user_id);
 
