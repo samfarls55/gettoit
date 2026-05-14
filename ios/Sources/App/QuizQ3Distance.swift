@@ -30,6 +30,12 @@ public struct QuizQ3Distance: View {
                 Spacer().frame(height: 36)
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    // 100pt is a JSX hand-tune that lands BETWEEN
+                    // display-xl (88pt) and the next tier — it's
+                    // specifically called out in surfaces/03-quiz.md
+                    // §"Q3" as "display-xl scale (100px)" to rehearse
+                    // the constraint in the user's head. Not a
+                    // tokens.json entry; matched ms-exact to the JSX.
                     Text("\(coordinator.q3WalkMinutes)")
                         .font(.system(size: 100, weight: .black))
                         .tracking(-0.04 * 100)

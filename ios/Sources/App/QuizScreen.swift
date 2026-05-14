@@ -77,7 +77,11 @@ public struct QuizScreen: View {
         HStack(alignment: .center, spacing: GTISpacing.step4) {
             Button(action: onClose) {
                 Text("×")
-                    .font(.system(size: 28, weight: .black))
+                    // `heading` (28pt) is the tokenised size that
+                    // closest matches the JSX hand-tuned 22pt × glyph;
+                    // bumped up by one scale step so the × is hit-target
+                    // friendly without breaking the design-system gate.
+                    .font(.system(size: GTIFont.Size.heading, weight: .black))
                     .foregroundStyle(GTIColor.TextOnGradient.primary)
                     .opacity(0.85)
                     .frame(width: 32, height: 32)

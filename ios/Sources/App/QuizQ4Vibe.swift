@@ -34,6 +34,11 @@ public struct QuizQ4Vibe: View {
                 Spacer().frame(height: GTISpacing.step10)
 
                 ZStack {
+                    // 96pt is a JSX hand-tune ("huge live word" per
+                    // ScreenQ4Vibe.jsx). Between display-xl (88) and
+                    // the Q3 100pt readout — sized so HUSHED..ROWDY
+                    // fit on one line without word-break. Matched
+                    // ms-exact to the JSX.
                     Text(GTIVibeLabels.all[coordinator.q4Vibe])
                         .font(.system(size: 96, weight: .black))
                         .tracking(-0.03 * 96)
