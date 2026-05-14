@@ -26,7 +26,7 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     # Tracks the v2 line. supabase-swift requires iOS 13+; we target iOS 17.
-    minVersion: "2.0.0"
+    from: "2.0.0"
 
 targets:
   GetToIt:
