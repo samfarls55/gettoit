@@ -71,6 +71,22 @@ ADR 0002 assumes 10k calls/month is enough. If `tastes` is Premium and we need i
 ## Next steps
 
 1. **HITL:** Product owner reviews the Lock 1 spec-change proposal above. If accepted, edit Lock 1 in `v1-design-locks.md` and update Q1 surface copy (`surfaces/03-quiz.md`) to surface the allergen disclaimer.
-2. **TB-00:** Foursquare API key acquisition lands. Without this, no live probe.
-3. **TB-05 step 1:** First commit on PlacesProxy is a probe script that runs the four open questions above against the beta metro and writes results back into this bundle as `live-probe-{date}.md`.
+2. **TB-00:** Foursquare API key acquisition lands. Without this, no live probe. _(Done 2026-05-13.)_
+3. **TB-05 step 1:** First commit on PlacesProxy is a probe script that runs the four open questions above against the beta metro and writes results back into this bundle as `live-probe-{date}.md`. _(Deferred — see "Implementation note" below.)_
 4. After probe results land, this report's `status:` flips from `draft-pending-live-probe` to `final` and the conditional rules above either hold or trigger their fallback.
+
+## Implementation note (2026-05-13) — TB-05 landing
+
+TB-05 landed the PlacesProxy with the Option C strategy this report recommended, **without** running the live probe first. The chip-strategy map is in `supabase/functions/_shared/foursquare.ts` (`DIETARY_CHIP_MAP`):
+
+- **Category-level filters** for `halal` (`13352`), `kosher` (`13351`), `vegan` (`13377`), `vegetarian` (`13378`) — pre-filter at the Foursquare wire via `fsq_category_ids`.
+- **`tastes` post-filter** for `gluten` — uses synonym set `["gluten-free", "gluten free", "gluten free options"]`, applied to the response (not the wire) because the free-tier `/places/search` endpoint has no server-side `tastes` filter.
+- **Disclaimer-only** for `dairy`, `shellfish`, `nuts` — no Foursquare signal exists; the chip emits a `no_*_unverified` tag on every shaped row + populates `response.disclaimers[]` so the verdict rule chip surfaces the limitation.
+
+The live probe still needs to run before beta cohort 1 to verify coverage (the four open questions in §"What couldn't be verified" — vegan venue count in beta metro, `tastes` free-tier confirmation, halal/kosher coverage vs. community sources, free-tier quota under v1 session shape). If the probe disagrees with the public-docs picture, the rules in §decision-rules trigger:
+
+- `tastes` Premium-only → drop gluten chip from Q1, keep the four category-level filters. _(Code change: remove the `gluten` entry from `DIETARY_CHIP_MAP`.)_
+- Vegan coverage < 20 venues → flip to Option A (cuisine inference). _(Code change: extend the `vegan` mapping to a broader category-id list and probably add a fallback chain.)_
+- Free-tier quota exhausted → broaden cache TTL / geo bucket. _(Code change: bump `hotZoneTtlMs` or the bucket size constant.)_
+
+Until the probe runs, the report's `status:` stays `draft-pending-live-probe`. The implementation is forward-compatible with all three fallback paths — no schema or interface change is needed to apply them.
