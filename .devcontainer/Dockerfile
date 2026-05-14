@@ -54,28 +54,41 @@ RUN ARCH=$(dpkg --print-architecture) && \
   sudo dpkg -i "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb" && \
   rm "git-delta_${GIT_DELTA_VERSION}_${ARCH}.deb"
 
+# Use bash for all remaining RUN steps that need advanced shell features
+SHELL ["/bin/bash", "-c"]
+
 # Swift toolchain (Linux) — for sourcekit-lsp, swift-format, syntax checks on non-UI code
 ARG SWIFT_VERSION=5.10
 RUN ARCH=$(dpkg --print-architecture) \
     && SWIFT_PLATFORM=ubuntu22.04 \
-    && [ "$ARCH" = "arm64" ] && SWIFT_PLATFORM=ubuntu22.04-aarch64 || true \
-    && wget -q "https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM/.*/}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_PLATFORM}.tar.gz" \
+    && SWIFT_PLATFORM_DIR=ubuntu2204 \
+    && if [ "$ARCH" = "arm64" ]; then \
+         SWIFT_PLATFORM=ubuntu22.04-aarch64; \
+         SWIFT_PLATFORM_DIR=ubuntu2204-aarch64; \
+       fi \
+    && wget -q "https://download.swift.org/swift-${SWIFT_VERSION}-release/${SWIFT_PLATFORM_DIR}/swift-${SWIFT_VERSION}-RELEASE/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_PLATFORM}.tar.gz" \
     && tar xzf "swift-${SWIFT_VERSION}-RELEASE-${SWIFT_PLATFORM}.tar.gz" -C /opt \
     && ln -s "/opt/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_PLATFORM}/usr/bin/swift" /usr/local/bin/swift \
     && ln -s "/opt/swift-${SWIFT_VERSION}-RELEASE-${SWIFT_PLATFORM}/usr/bin/sourcekit-lsp" /usr/local/bin/sourcekit-lsp \
     && rm "swift-${SWIFT_VERSION}-RELEASE-${SWIFT_PLATFORM}.tar.gz"
 
 # SwiftLint (Linux release binary)
-RUN wget -q https://github.com/realm/SwiftLint/releases/latest/download/swiftlint_linux.zip \
-    && unzip -o swiftlint_linux.zip -d /usr/local/bin \
-    && rm swiftlint_linux.zip
+RUN ARCH=$(dpkg --print-architecture) \
+    && SWIFTLINT_ARCH=amd64 \
+    && if [ "$ARCH" = "arm64" ]; then SWIFTLINT_ARCH=arm64; fi \
+    && wget -q "https://github.com/realm/SwiftLint/releases/latest/download/swiftlint_linux_${SWIFTLINT_ARCH}.zip" \
+    && unzip -o "swiftlint_linux_${SWIFTLINT_ARCH}.zip" swiftlint -d /usr/local/bin \
+    && rm "swiftlint_linux_${SWIFTLINT_ARCH}.zip"
 
 # Deno (for Supabase Edge Functions)
 RUN curl -fsSL https://deno.land/install.sh | sh -s -- --no-modify-path \
-    && mv ~/.deno/bin/deno /usr/local/bin/deno
+    && mv /root/.deno/bin/deno /usr/local/bin/deno
 
 # Supabase CLI
-RUN curl -fsSL -o /tmp/supabase.tar.gz https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
+RUN ARCH=$(dpkg --print-architecture) \
+    && SUPABASE_ARCH=amd64 \
+    && if [ "$ARCH" = "arm64" ]; then SUPABASE_ARCH=arm64; fi \
+    && curl -fsSL -o /tmp/supabase.tar.gz "https://github.com/supabase/cli/releases/latest/download/supabase_linux_${SUPABASE_ARCH}.tar.gz" \
     && tar xzf /tmp/supabase.tar.gz -C /usr/local/bin supabase \
     && rm /tmp/supabase.tar.gz
 
@@ -108,7 +121,6 @@ RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/
 
 # Install Claude
 RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
-
 
 # Copy and set up firewall script
 COPY init-firewall.sh /usr/local/bin/
