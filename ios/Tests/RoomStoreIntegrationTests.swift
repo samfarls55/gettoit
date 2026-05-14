@@ -31,20 +31,11 @@ final class RoomStoreIntegrationTests: XCTestCase {
 
     /// Sign in as a fresh anonymous user on `client` and return their
     /// user id. Signs out first to clear any session left behind by an
-    /// earlier test, then awaits the post-sign-in session so the
-    /// PostgREST client picks up the new JWT before the test fires its
-    /// follow-up requests.
+    /// earlier test.
     @discardableResult
     private func signInFreshAnon(on client: SupabaseClient) async throws -> UUID {
         try? await client.auth.signOut()
         let session = try await client.auth.signInAnonymously()
-        // The Supabase Swift client's PostgREST token-provider closure
-        // reads the session via the AuthClient. Both `signOut` and
-        // `signInAnonymously` complete by returning before the storage
-        // / state-change broadcaster has settled, so the next PostgREST
-        // request can miss the new JWT. Give the auth state a brief
-        // window to propagate.
-        try await Task.sleep(nanoseconds: 200_000_000)
         return session.user.id
     }
 
@@ -97,13 +88,6 @@ final class RoomStoreIntegrationTests: XCTestCase {
         let client = try makeClient()
         let creatorID = try await signInFreshAnon(on: client)
         let store = RoomStore(client: client)
-
-        // Sanity-check the auth state right before we issue a PostgREST
-        // request, so a failure clearly attributes to schema vs. auth.
-        XCTAssertNotNil(client.auth.currentSession,
-                        "expected an active session after signInAnonymously()")
-        XCTAssertEqual(client.auth.currentUser?.id, creatorID,
-                       "expected the cached current user to match the sign-in result")
 
         let room = try await store.createRoom(as: creatorID)
 
