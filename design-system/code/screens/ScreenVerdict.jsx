@@ -277,6 +277,20 @@ function ScreenVerdict({ mode = 'default', isInitiator = true, onAdvance }) {
                 </button>
               )
             )}
+
+            {/* TB-08 — pre-permission line. Voluntary warm-friend register; NEVER
+                "Enable notifications" / "Allow alerts" / "Turn on push". The
+                native iOS push prompt fires after the first "I'm in" tap (once
+                per session). Suppressed in read-only + no-survivor. */}
+            {!isReadOnly && !isNoSurvivor && (
+              <div style={{
+                marginTop: 8, padding: '0 8px', textAlign: 'center',
+                color: 'rgba(255,255,255,0.55)',
+                fontFamily: 'var(--ff-body)', fontSize: 11, fontWeight: 600,
+              }}>
+                We'll check in tomorrow — see if you went.
+              </div>
+            )}
           </CTADock>
         </div>
       </div>

@@ -180,6 +180,13 @@ public struct VerdictScreen: View {
     @State private var cutsExpanded: Bool = false
     @State private var widenSliderOpen: Bool = false
     @State private var widenRadiusMiles: Double = 3.0
+    /// TB-08 — local commit flag. Flipped by the "I'm in" tap, drives
+    /// the sun-fill / "You're in · N of M" CTA per S05 §Modes.
+    @State private var committedLocally: Bool = false
+    /// TB-08 — wall-clock seconds remaining in the correctability
+    /// window. The view ticks this on a 1-Hz Task while in committed
+    /// mode. Null when no commitment exists yet.
+    @State private var windowSecondsRemaining: Int? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let verdict: Verdict
@@ -195,6 +202,19 @@ public struct VerdictScreen: View {
     /// CTA non-functional in TB-06; TB-08 wires this. Kept as a closure
     /// so the call sites compile through the ratification work later.
     private let onAdvance: () -> Void
+    /// TB-08 — live ratification count. The hosting view binds this
+    /// to a `RatificationStore`'s `count`. The CTA label reads
+    /// `"You're in · {count} of {total}"` per S05 §Modes.
+    private let ratifiedCount: Int
+    /// TB-08 — total members in the room. Drives the CTA label
+    /// denominator.
+    private let ratifiedTotal: Int
+    /// TB-08 — fires when the user taps "I'm in". The hosting view
+    /// wires this to `RatificationStore.ratify(userID:)` AND to the
+    /// `PushCoordinator.requestPermissionOncePerSession(userID:)` —
+    /// the prompt fires AFTER the ratification row writes. Defaults
+    /// to no-op so existing call sites compile through.
+    private let onRatify: () -> Void
     /// Fires when the initiator commits the widen-radius slider value
     /// (passes the chosen radius in METERS). The caller wires the
     /// `compute-verdict` re-invocation. Defaults to no-op so existing
@@ -203,13 +223,21 @@ public struct VerdictScreen: View {
     /// Fires when the user taps the no-survivor secondary "Start over"
     /// ghost button. Defaults to no-op.
     private let onStartOver: () -> Void
+    /// TB-08 — correctability window in seconds. Defaults to 30 per
+    /// `rooms.correctability_window_seconds`. The view drives a 1-Hz
+    /// countdown from this value once the user commits.
+    private let correctabilityWindowSeconds: Int
 
     public init(
         verdict: Verdict,
         mode: Mode = .default,
         isInitiator: Bool = true,
         currentRadiusMeters: Int = 3219, // ~2.0 mi — S01 default
+        ratifiedCount: Int = 0,
+        ratifiedTotal: Int = 0,
+        correctabilityWindowSeconds: Int = 30,
         onAdvance: @escaping () -> Void = {},
+        onRatify: @escaping () -> Void = {},
         onWidenRadius: @escaping (Int) -> Void = { _ in },
         onStartOver: @escaping () -> Void = {}
     ) {
@@ -217,13 +245,23 @@ public struct VerdictScreen: View {
         self.mode = mode
         self.isInitiator = isInitiator
         self.currentRadiusMeters = currentRadiusMeters
+        self.ratifiedCount = ratifiedCount
+        self.ratifiedTotal = ratifiedTotal
+        self.correctabilityWindowSeconds = correctabilityWindowSeconds
         self.onAdvance = onAdvance
+        self.onRatify = onRatify
         self.onWidenRadius = onWidenRadius
         self.onStartOver = onStartOver
         self._widenRadiusMiles = State(
             initialValue: VerdictScreen.widenRadiusInitialMiles(
                 currentRadiusMeters: currentRadiusMeters
             )
+        )
+        // Pre-load the commit flag when the mode is `.committed` (used
+        // by snapshot tests + the TB-11 read-only late-joiner path).
+        self._committedLocally = State(initialValue: mode == .committed)
+        self._windowSecondsRemaining = State(
+            initialValue: mode == .committed ? correctabilityWindowSeconds : nil
         )
     }
 
@@ -292,6 +330,26 @@ public struct VerdictScreen: View {
             }
         }
         .task { await runChoreo() }
+        // TB-08 — drive the 1-Hz countdown for the correctability
+        // window. The Task is cheap; it re-runs whenever
+        // `committedLocally` flips so the ticker starts immediately
+        // after the user taps "I'm in." Cancellation propagates when
+        // the view disappears.
+        .task(id: committedLocally) {
+            guard committedLocally else { return }
+            if windowSecondsRemaining == nil {
+                windowSecondsRemaining = correctabilityWindowSeconds
+            }
+            while !Task.isCancelled {
+                let remaining = windowSecondsRemaining ?? 0
+                if remaining <= 0 { return }
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                if let cur = windowSecondsRemaining {
+                    windowSecondsRemaining = max(0, cur - 1)
+                }
+            }
+        }
     }
 
     // MARK: - subviews
@@ -508,9 +566,38 @@ public struct VerdictScreen: View {
             if mode == .noSurvivor {
                 noSurvivorPrimary
                 noSurvivorSecondary
-            } else {
+            } else if mode == .readOnly {
+                // Read-only late-joiner — re-invite CTA, no ratify
+                // path, no pre-permission line. TB-11 polish wires
+                // the navigation; TB-08 just makes the CTA tappable.
                 Button(action: onAdvance) {
-                    Text(modeSnapshot.primaryCtaLabel.uppercased())
+                    Text("START A NEW DECISION")
+                        .font(.system(size: GTIFont.Size.cta, weight: .black))
+                        .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                        .foregroundStyle(GTIColor.ink)
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                        .background(
+                            GTIColor.paper,
+                            in: RoundedRectangle(cornerRadius: GTIRadii.pill)
+                        )
+                }
+                .accessibilityIdentifier("verdict.cta.primary")
+            } else if isCommittedFlavor {
+                // Committed mode — sun-fill pill, ink check prefix,
+                // "You're in · N of M" label. Window countdown lives
+                // BELOW the CTA per S05 §Modes (`"Window closes in 47s"`).
+                committedPill
+                Text(VerdictScreen.windowCountdownCopy(seconds: windowSecondsRemaining))
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
+                    .padding(GTISpacing.step1)
+                    .accessibilityIdentifier("verdict.cta.secondary")
+                preCheckInLine
+            } else {
+                // Default mode — "I'm in" white pill.
+                Button(action: handleImInTap) {
+                    Text("I'M IN")
                         .font(.system(size: GTIFont.Size.cta, weight: .black))
                         .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
                         .foregroundStyle(GTIColor.ink)
@@ -523,17 +610,76 @@ public struct VerdictScreen: View {
                 .accessibilityIdentifier("verdict.cta.primary")
 
                 Button(action: onAdvance) {
-                    Text(modeSnapshot.secondaryLabel.uppercased())
+                    Text("START OVER")
                         .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
                         .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
                         .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
                         .padding(GTISpacing.step1)
                 }
                 .accessibilityIdentifier("verdict.cta.secondary")
+                preCheckInLine
             }
         }
         .opacity(revealStep >= 7 ? 1 : 0)
         .offset(y: revealStep >= 7 ? 0 : 8)
+    }
+
+    /// TB-08 — sun-fill ratification pill with ink check prefix and
+    /// `"You're in · N of M"` label per S05 §"committed" mode.
+    @ViewBuilder
+    private var committedPill: some View {
+        HStack(spacing: 8) {
+            ZStack {
+                Circle()
+                    .fill(GTIColor.ink)
+                    .frame(width: 22, height: 22)
+                Text("✓")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(GTIColor.sun)
+            }
+            Text(VerdictScreen.committedCtaLabel(count: ratifiedCount, total: ratifiedTotal).uppercased())
+                .font(.system(size: GTIFont.Size.cta, weight: .black))
+                .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                .foregroundStyle(GTIColor.ink)
+        }
+        .frame(maxWidth: .infinity, minHeight: 60)
+        .background(
+            GTIColor.sun,
+            in: RoundedRectangle(cornerRadius: GTIRadii.pill)
+        )
+        .accessibilityIdentifier("verdict.cta.primary")
+        .accessibilityLabel(VerdictScreen.committedCtaLabel(count: ratifiedCount, total: ratifiedTotal))
+    }
+
+    /// TB-08 — pre-permission line surfacing the upcoming check-in.
+    /// Copy is locked by PRD user story 38 + the TB-08 ticket:
+    /// `"We'll check in tomorrow — see if you went."` Voluntary
+    /// register. NEVER `"Enable notifications"`, `"Allow alerts"`,
+    /// `"Turn on push"`. Suppressed in `.readOnly` / `.noSurvivor`.
+    @ViewBuilder
+    private var preCheckInLine: some View {
+        Text(VerdictScreen.preCheckInCopy)
+            .font(.system(size: GTIFont.Size.eyebrow, weight: .semibold))
+            .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.55))
+            .multilineTextAlignment(.center)
+            .padding(.top, GTISpacing.step2)
+            .accessibilityIdentifier("verdict.preCheckIn")
+    }
+
+    /// Tap handler for the white "I'm in" pill. Fires the host's
+    /// `onRatify` (which writes the row AND requests the push
+    /// permission) and flips to the committed local state so the CTA
+    /// re-renders as the sun-fill while the live count round-trips.
+    private func handleImInTap() {
+        onRatify()
+        committedLocally = true
+        windowSecondsRemaining = correctabilityWindowSeconds
+    }
+
+    /// Test-readable: is the surface in the committed flavor (mode is
+    /// `.committed` OR the local "I'm in" tap has fired)?
+    public var isCommittedFlavor: Bool {
+        mode == .committed || committedLocally
     }
 
     /// No-survivor primary CTA — sun-filled "Widen radius" (or
@@ -687,6 +833,13 @@ public struct VerdictScreen: View {
         /// True when the no-survivor inline range slider is expanded.
         /// Drives the primary CTA's `Re-run · N.N mi` label switch.
         public let widenSliderOpen: Bool
+        /// True when the surface is in the committed flavor (TB-08).
+        /// Either the caller passed `.committed` mode or the local
+        /// "I'm in" tap has fired.
+        public let isCommittedFlavor: Bool
+        /// Pre-permission line copy surfaced under the CTA dock
+        /// (TB-08). Empty in modes that suppress the line.
+        public let preCheckInLine: String
     }
 
     /// Mode-shaped flags surfaced for the snapshot tests. Mirrors the
@@ -695,6 +848,7 @@ public struct VerdictScreen: View {
     public var modeSnapshot: ModeSnapshot {
         let isReadOnly   = mode == .readOnly
         let isNoSurvivor = mode == .noSurvivor
+        let isCommitted  = (mode == .committed || committedLocally)
 
         let eyebrow: String
         switch mode {
@@ -710,9 +864,29 @@ public struct VerdictScreen: View {
             primaryLabel = widenSliderOpen
                 ? String(format: "Re-run · %.1f mi", widenRadiusMiles)
                 : "Widen radius"
+        } else if isCommitted {
+            primaryLabel = VerdictScreen.committedCtaLabel(
+                count: ratifiedCount,
+                total: ratifiedTotal
+            )
         } else {
             primaryLabel = "I'm in"
         }
+
+        let secondary: String
+        if isReadOnly {
+            secondary = ""
+        } else if isCommitted {
+            secondary = VerdictScreen.windowCountdownCopy(
+                seconds: windowSecondsRemaining
+            )
+        } else {
+            secondary = "Start over"
+        }
+
+        // Pre-permission line is suppressed in read-only + no-survivor
+        // modes; everywhere else it surfaces.
+        let preLine = (isReadOnly || isNoSurvivor) ? "" : VerdictScreen.preCheckInCopy
 
         return ModeSnapshot(
             showTimeBadge: !isNoSurvivor,
@@ -721,9 +895,35 @@ public struct VerdictScreen: View {
             cutsExpanded: cutsExpanded || mode == .cuts,
             eyebrowCopy: eyebrow,
             primaryCtaLabel: primaryLabel,
-            secondaryLabel: isReadOnly ? "" : "Start over",
-            widenSliderOpen: widenSliderOpen
+            secondaryLabel: secondary,
+            widenSliderOpen: widenSliderOpen,
+            isCommittedFlavor: isCommitted,
+            preCheckInLine: preLine
         )
+    }
+
+    // MARK: - TB-08 pure copy formatters
+
+    /// PRD user story 38 + S05 spec lock: warm "We'll check in" line.
+    /// NEVER paraphrase to "Enable notifications" / "Allow alerts" —
+    /// the wording is voluntary register, the prompt is the call.
+    public static let preCheckInCopy = "We'll check in tomorrow — see if you went."
+
+    /// S05 §Modes — committed CTA reads `"You're in · N of M"`. We
+    /// guard against `total = 0` (count snapshot hasn't loaded yet)
+    /// by falling back to `"You're in"`.
+    public static func committedCtaLabel(count: Int, total: Int) -> String {
+        if total <= 0 { return "You're in" }
+        let c = max(1, count)  // a self-ratification has already landed
+        return "You're in · \(c) of \(total)"
+    }
+
+    /// S05 §Modes — `"Window closes in 47s"` for the active commitment.
+    /// `seconds == 0` → "Window closing…"; `seconds == nil` → blank.
+    public static func windowCountdownCopy(seconds: Int?) -> String {
+        guard let s = seconds else { return "" }
+        if s <= 0 { return "Window closing…" }
+        return "Window closes in \(s)s"
     }
 
     // MARK: - widen-radius helpers (pure, test-readable)
