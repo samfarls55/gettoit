@@ -35,12 +35,19 @@ final class VerdictScreenSnapshotTests: XCTestCase {
         render(VerdictScreen(verdict: verdict, mode: .default))
     }
 
-    func testDefaultModeRendersForReducedMotion() {
-        let verdict = VerdictScreen.Verdict.fixture()
-        render(
-            VerdictScreen(verdict: verdict, mode: .default)
-                .environment(\.accessibilityReduceMotion, true)
+    func testDefaultModeRendersWithEmptyReceiptsAndCuts() {
+        // Defensive — a verdict with zero receipts or zero cuts should
+        // still materialise without crashing (e.g. solo-flow surface or
+        // an early-trigger room where no member has answered yet).
+        let empty = VerdictScreen.Verdict(
+            placeName: "Solo Spot",
+            metaLine: "American · $ · 5 min walk",
+            timeBadge: VerdictScreen.TimeBadge(time: "7:00 PM", audience: "All one of you"),
+            ruleText: "Solo Spot was the only candidate that fit every constraint.",
+            receipts: [],
+            cuts: []
         )
+        render(VerdictScreen(verdict: empty, mode: .default))
     }
 
     // MARK: - choreography timings (locked, ms-exact)
