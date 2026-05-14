@@ -23,7 +23,7 @@ Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-
 | TB-02 | [[issues/tb-02-room-create-deeplink-join\|Initiator creates room + invitee deep-link join]] | AFK | [#3](https://github.com/samfarls55/gettoit/issues/3) | TB-01 |
 | TB-03 | [[issues/tb-03-s01-timer-radius\|S01 timer chip + radius slider]] | AFK | [#4](https://github.com/samfarls55/gettoit/issues/4) | TB-02 |
 | TB-04 | [[issues/tb-04-full-quiz\|Full 5-question quiz]] | AFK | [#5](https://github.com/samfarls55/gettoit/issues/5) | TB-02 |
-| TB-05 | [[issues/tb-05-foursquare-placesproxy\|Foursquare PlacesProxy + cache]] | AFK | [#6](https://github.com/samfarls55/gettoit/issues/6) | TB-01, TB-00 |
+| TB-05 | [[issues/tb-05-foursquare-placesproxy\|Foursquare PlacesProxy + cache]] ✅ done | AFK | [#6](https://github.com/samfarls55/gettoit/issues/6) | TB-01, TB-00 |
 | TB-06 | [[issues/tb-06-verdict-engine-clean-run\|VerdictEngine clean run + S05 default]] | AFK | [#7](https://github.com/samfarls55/gettoit/issues/7) | TB-04, TB-05 |
 | TB-07 | [[issues/tb-07-waiting-realtime-fire-trigger\|Waiting + Realtime + fire trigger]] | AFK | [#8](https://github.com/samfarls55/gettoit/issues/8) | TB-06 |
 | TB-08 | [[issues/tb-08-ratification-push-hard-close\|Ratification + push perm + hard close]] | AFK | [#9](https://github.com/samfarls55/gettoit/issues/9) | TB-07 |

@@ -41,8 +41,32 @@ Foursquare migrated from the legacy `api.foursquare.com/v3/*` Places API to a ne
 - **Base URL**: `https://places-api.foursquare.com/`
 - **Auth header**: `Authorization: Bearer <service_key>` (was `Authorization: <api_key>` on the legacy surface).
 - **Required version header**: `X-Places-Api-Version: 2025-06-17` (pin a date; bump deliberately when migrating).
-- **Field renames**: `fsq_id` → `fsq_place_id`. The `place_id` column in the `places` cache and `options` tables stores `fsq_place_id`. Other shape changes are TBD per endpoint and tracked in [[../../15_issues/v1/issues/tb-05-foursquare-placesproxy|TB-05]].
+- **Field renames**: `fsq_id` → `fsq_place_id`. The `place_id` column in the `places` cache and `options` tables stores `fsq_place_id`. Per-endpoint field shape detailed below.
 - **Key shape**: new keys use a Service Key prefix (not the legacy `fsq3…` API key format).
+
+#### `GET /places/search` — field shape (verified 2026-05-13, TB-05)
+
+Implemented in [[../../15_issues/v1/issues/tb-05-foursquare-placesproxy|TB-05]]; the Edge Function consumes these fields. Recorded fixture sits in `supabase/functions/_shared/places-proxy-core.test.ts` (`RECORDED_FOURSQUARE_RESPONSE`).
+
+| Field | Type | Notes |
+|---|---|---|
+| `results[].fsq_place_id` | string | The post-2025 identifier. Was `fsq_id`. |
+| `results[].name` | string | Display name. |
+| `results[].latitude` / `results[].longitude` | number | Top-level on each result. Was nested under `geocodes` on the v3 surface. |
+| `results[].categories[]` | object[] | Each carries `id` + `name`. `id` is the Foursquare taxonomy id (e.g. `13352` halal, `13351` kosher, `13377` vegan). |
+| `results[].location.formatted_address` | string | Pre-rendered single-line address. Other `location.*` fields (`address`, `locality`) ignored — `formatted_address` is reliable. |
+| `results[].price` | integer 1..4 | Optional. Maps directly to Q2 cap. |
+| `results[].hours.display` | string | Human-readable. |
+| `results[].hours.open_now` | boolean | Authoritative for the `open_at` filter ack — useful for the verdict surface badge. |
+| `results[].photos[]` | object[] | Each carries `prefix` + `suffix` strings; compose as `${prefix}<size>${suffix}` (e.g. `400x400` for the verdict carousel rendition). |
+| `results[].tastes[]` | string[] | Lowercased menu-callout tokens (`"gluten-free"`, `"vegan menu"`, …). Sparse coverage — see [[../research/foursquare-dietary-tags-2026-05/report|dietary-tag report]]. |
+| `results[].distance` | number (metres) | Metres from search centre. PlacesProxy converts to walk-minutes at 80 m/min. |
+
+Wire-layer:
+
+- Query params: `ll=<lat>,<lng>`, `radius=<m>`, `limit=50`, `fsq_category_ids=<csv>`, `max_price=<1..4>`, `open_at=<unix>`, `fields=<csv>`.
+- The `fields` parameter is required to actually receive the optional `tastes` / `distance` / `photos` payloads; without it the response strips to a minimal projection.
+- Cap radius at the API's 100 km limit even though PRD radius tops at 5 mi — defence in depth.
 
 Re-evaluation trigger added: **another forced migration before v1 GA**. The legacy → 2025 migration was a hard cutover with no parallel-run window — assume future Foursquare migrations will be equally abrupt and budget the MapKit-only escape hatch accordingly.
 
