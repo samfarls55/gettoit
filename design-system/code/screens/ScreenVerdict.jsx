@@ -1,4 +1,4 @@
-// Surface 09 — Verdict (hero) · 5 modes: 'default' | 'cuts' | 'committed' | 'read-only' | 'no-survivor'
+// Surface 09 — Verdict (hero) · 6 modes: 'default' | 'cuts' | 'committed' | 'read-only' | 'no-survivor' | 'solo'
 // Choreographed reveal is canon (~1.4s).  Five-second test:
 //   verdict → rule → receipts → ratify → correctability — all in priority read order.
 
@@ -12,7 +12,27 @@ const VERDICT_CHOREO = {
   cta:    1380,
 };
 
-function ScreenVerdict({ mode = 'default', isInitiator = true, onAdvance }) {
+// TB-13 — the `solo` variant is derived from the host-passed
+// `members` array length when the host doesn't pass a `mode` override.
+// The variant is also addressable explicitly via `mode='solo'`. Either
+// path produces the same suppressed-receipt-row + save-taste-profile
+// render. See `surfaces/05-verdict.md` §"solo".
+function ScreenVerdict({
+  mode = 'default',
+  isInitiator = true,
+  onAdvance,
+  members = [
+    { name: 'you'  },
+    { name: 'alex' },
+    { name: 'maya' },
+    { name: 'sam'  },
+  ],
+}) {
+  // Derive solo from `members.length === 1` when the caller didn't pass
+  // a mode override that already names a variant. Explicit mode wins so
+  // the design-system preview can force the variant for QA.
+  const derivedSolo = members.length === 1 && mode === 'default';
+  const isSolo = mode === 'solo' || derivedSolo;
   const isReadOnly = mode === 'read-only';
   const isNoSurvivor = mode === 'no-survivor';
 
@@ -34,7 +54,10 @@ function ScreenVerdict({ mode = 'default', isInitiator = true, onAdvance }) {
     animation: `gti-pop 520ms var(--ease-out-soft) ${ms}ms both`,
   });
 
-  // Late-joiner is not in receipts — they didn't contribute.
+  // Late-joiner is not in receipts — they didn't contribute. Solo
+  // mode suppresses the row entirely (one voice doesn't need to be
+  // receipted back to itself); the fixture list is unchanged so the
+  // group-default render is identical to TB-06.
   const receipts = [
     { name: 'you',  action: 'wanted lively' },
     { name: 'alex', action: 'filtered shellfish' },
@@ -61,9 +84,15 @@ function ScreenVerdict({ mode = 'default', isInitiator = true, onAdvance }) {
     :              'Budget cap cut Ren Soba. Pico’s had the lowest regret-of-omission.';
 
   const showTimeBadge = !isNoSurvivor;
-  const showReceipts = !isNoSurvivor;
+  // Solo suppresses receipts — one voice doesn't need to be receipted
+  // back to itself. The group-default still surfaces the row.
+  const showReceipts = !isNoSurvivor && !isSolo;
   const showCutsDrawer = !isNoSurvivor;
   const showStartOverSecondary = !isReadOnly; // suppressed in read-only
+  // Solo replaces the group-save affordance with the C-22 save-taste-
+  // profile chip. The chip surfaces under the primary CTA when the user
+  // is anonymous; the host hides it for already-linked users.
+  const showSoloSaveChip = isSolo && !isReadOnly && !isNoSurvivor;
 
   return (
     <GradientSurface stop="verdict">
@@ -107,7 +136,7 @@ function ScreenVerdict({ mode = 'default', isInitiator = true, onAdvance }) {
                 <div style={{
                   marginTop: 4, fontSize: 9, fontWeight: 800,
                   letterSpacing: 0.18, textTransform: 'uppercase',
-                }}>All four of you</div>
+                }}>{isSolo ? 'You' : 'All four of you'}</div>
               </div>
             </div>
           )}
@@ -276,6 +305,18 @@ function ScreenVerdict({ mode = 'default', isInitiator = true, onAdvance }) {
                   {committed ? 'Window closes in 47s' : 'Start over'}
                 </button>
               )
+            )}
+
+            {/* TB-13 — solo mode replaces the group-save affordance with
+                the C-22 save-taste-profile chip. The chip surfaces in
+                `default-idle` state for anonymous users; the host hides
+                it (state='hidden') for already-linked users. Solo is the
+                highest-conversion moment for Apple Sign-in (the user
+                just demonstrated effort solo). See `components.md` §C-22. */}
+            {showSoloSaveChip && (
+              <div style={{ marginTop: 4 }}>
+                <AuthUpgradeChip state="default" />
+              </div>
             )}
 
             {/* TB-08 — pre-permission line. Voluntary warm-friend register; NEVER

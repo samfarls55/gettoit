@@ -257,7 +257,11 @@ public final class VerdictStore {
 
     /// Build the audience copy on the time badge. PRD user story 31 +
     /// S05 §"Copy register" — `"ALL N OF YOU"` for the communal frame.
+    /// TB-13 — for the solo case (`n == 1`) the audience reads bare
+    /// `"You"`. The communal frame doesn't apply to a single voice;
+    /// `"All one of you"` would be wrong-pitched.
     public static func audienceCopy(forMemberCount n: Int) -> String {
+        if n == 1 { return "You" }
         let word = numberWord(n)
         return "All \(word) of you"
     }

@@ -100,7 +100,14 @@ public struct RootView: View {
                             // S01 entry surfaces the canonical
                             // defaults.
                             reInvitePrefill = nil
-                            startQuiz(roomID: roomID, userID: userID, client: coordinators.client)
+                            startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: true)
+                        },
+                        onSoloRoom: { roomID in
+                            // Solo path uses the same one-shot prefill
+                            // semantics — once the new room lands, the
+                            // carried defaults are spent.
+                            reInvitePrefill = nil
+                            startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: false)
                         }
                     )
                 } else {
@@ -190,13 +197,24 @@ public struct RootView: View {
     /// flow (after the share sheet drops the link — PRD user story 8)
     /// and from the join flow (after the invitee's `members` row is
     /// written).
-    private func startQuiz(roomID: UUID, userID: UUID, client: SupabaseClient) {
+    ///
+    /// `invitedShared` tracks whether the iOS share sheet was opened
+    /// for this room from this device. Drives the TB-13 solo-path
+    /// detection (`SoloPath.shouldSkipWaiting(memberCount:invitedShared:)`)
+    /// once the post-Q5 router lands. Defaults to `true` for join-flow
+    /// invitees — they wouldn't be here unless someone shared.
+    private func startQuiz(
+        roomID: UUID,
+        userID: UUID,
+        client: SupabaseClient,
+        invitedShared: Bool = true
+    ) {
         let coordinator = QuizCoordinator(
             roomID: roomID,
             userID: userID,
             writer: QuizSupabaseWriter.make(client: client)
         )
-        self.activeQuiz = QuizContext(coordinator: coordinator)
+        self.activeQuiz = QuizContext(coordinator: coordinator, invitedShared: invitedShared)
         // Clear the deep link so closing the quiz returns to the
         // initiator surface rather than re-routing back into Join.
         self.deepLink = nil
@@ -213,6 +231,12 @@ public struct RootView: View {
 
     private struct QuizContext {
         let coordinator: QuizCoordinator
+        /// TB-13 — whether the room was created via the share-and-invite
+        /// path (`true`) or the solo tertiary (`false`). The post-Q5
+        /// router consults `SoloPath.shouldSkipWaiting(memberCount:invitedShared:)`
+        /// to decide whether to skip S04 Waiting and route directly to
+        /// the S05 solo variant.
+        let invitedShared: Bool
     }
 
     /// TB-11 — payload bundled with the room id so the read-only
