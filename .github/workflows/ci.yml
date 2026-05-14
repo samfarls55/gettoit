@@ -13,6 +13,19 @@
 #                      see the latest schema. Idempotent; appends only.
 #                      iOS lane depends on this so freshly-landed migrations
 #                      are live before the test bundle runs against them.
+#   * invite-link-canary — Ubuntu, curls a canary invite URL on gettoit.app
+#                      and asserts non-404. Regression guard for bug-01
+#                      (TestFlight 2026-05-14 invite-link 404). Runs after
+#                      the `web` lane so a same-PR web break trips that
+#                      lane first; canary is the live-plumbing guard for
+#                      issues the `next build` step cannot see (Vercel
+#                      framework preset, DNS, AASA serving).
+#   * aasa-validator — Ubuntu, fetches the live AASA file from gettoit.app
+#                      and Apple's CDN, asserts JSON validity,
+#                      `application/json` content-type, and that
+#                      `/join/*` is registered in the components array.
+#                      Regression guard for bug-01 AASA half. Runs in
+#                      parallel with `invite-link-canary`.
 #   * testflight     — macOS, archives + uploads to TestFlight on push-to-
 #                      main. Gated on the `ios` lane being green. Skips
 #                      itself when the App Store Connect API key secrets
@@ -66,6 +79,137 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  invite-link-canary:
+    # Live-plumbing regression guard for bug-01 (v1.1 — TestFlight 2026-05-14
+    # invite-link 404). The bug was a Vercel framework-preset misconfig: AASA
+    # in /public/ served while every Next.js route 404'd. Unit tests + the
+    # local `next build` couldn't catch it because the failure was at the
+    # deployed-platform layer, not in the code. This canary asserts the live
+    # /join/<id> route still returns a non-404 on every PR + push to main.
+    #
+    # Canary path uses a stable, never-going-to-resolve-server-side roomId.
+    # The route is dynamic ([roomId]) so any value renders; we don't need
+    # a real session. `curl -I` is enough — we only care that the route
+    # exists, not the body.
+    #
+    # `needs: web` so a same-PR web break trips that lane's `next build`
+    # first; this canary is for issues `next build` cannot see.
+    name: invite-link-canary (curl join route)
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl https://gettoit.app/join/<canary> and assert non-404
+        run: |
+          set -euo pipefail
+          URL="https://gettoit.app/join/ci-canary-bug-01-regression-test"
+          echo "Probing: $URL"
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" -I "$URL")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" = "404" ]; then
+            echo "FAIL: invite-link canary returned 404 — bug-01 regression." >&2
+            echo "Likely causes: Vercel framework preset reverted to 'Other'," >&2
+            echo "/join/[roomId]/page.tsx removed from web/app/, or DNS broken." >&2
+            exit 1
+          fi
+          if [ "${STATUS:0:1}" = "5" ]; then
+            echo "FAIL: invite-link canary returned $STATUS (5xx)." >&2
+            exit 1
+          fi
+          echo "OK: invite-link canary returned $STATUS."
+
+  aasa-validator:
+    # Companion regression guard for bug-01. Asserts the live AASA file
+    # served at https://gettoit.app/.well-known/apple-app-site-association
+    # is (a) reachable, (b) served with content-type application/json
+    # (Universal Links won't resolve otherwise), (c) valid JSON, and
+    # (d) registers the /join/* path the iOS app's InviteLink generator
+    # produces. Also checks Apple's CDN view of the file, which is what
+    # iOS actually consults.
+    #
+    # No external validator service — Apple's official `swcutil` is
+    # macOS-only and Apple's web validator has no stable API. We do the
+    # checks ourselves with curl + jq, which keeps the lane Ubuntu-only
+    # and dependency-free.
+    name: aasa-validator (live AASA file)
+    needs: web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate https://gettoit.app/.well-known/apple-app-site-association
+        run: |
+          set -euo pipefail
+          AASA_URL="https://gettoit.app/.well-known/apple-app-site-association"
+          echo "Fetching: $AASA_URL"
+
+          # Header check: must be reachable and served as application/json.
+          # Vercel's `headers` rule in web/vercel.json enforces this; we
+          # re-assert here because a future vercel.json edit could silently
+          # break Universal Links (iOS only accepts application/json).
+          HEADERS=$(curl -sS -D - -o /dev/null "$AASA_URL")
+          STATUS=$(echo "$HEADERS" | awk 'NR==1 {print $2}')
+          if [ "$STATUS" != "200" ]; then
+            echo "FAIL: AASA returned HTTP $STATUS, expected 200." >&2
+            echo "$HEADERS" >&2
+            exit 1
+          fi
+          CT=$(echo "$HEADERS" | awk -F': ' 'tolower($1)=="content-type" {print tolower($2)}' | tr -d '\r')
+          case "$CT" in
+            application/json*) echo "OK: content-type=$CT" ;;
+            *)
+              echo "FAIL: AASA content-type is '$CT', expected application/json." >&2
+              echo "iOS Universal Links require application/json; other types are ignored." >&2
+              exit 1
+              ;;
+          esac
+
+          # Body check: must be valid JSON with the /join/* component
+          # registered for the GetToIt app ID.
+          BODY=$(curl -sS "$AASA_URL")
+          echo "$BODY" | jq -e . >/dev/null || {
+            echo "FAIL: AASA body is not valid JSON." >&2
+            echo "$BODY" >&2
+            exit 1
+          }
+          # `.applinks.details[].components[] | .["/"]` extracts the path
+          # glob from each component object. Universal Links uses the
+          # `"/"` key for the path pattern (legacy and modern AASA shape).
+          HAS_JOIN=$(echo "$BODY" | jq -r '
+            .applinks.details[]?.components[]?["/"]? // empty
+          ' | grep -F '/join/*' || true)
+          if [ -z "$HAS_JOIN" ]; then
+            echo "FAIL: AASA does not register /join/* — invite Universal Link will fall back to the browser." >&2
+            echo "Components found:" >&2
+            echo "$BODY" | jq '.applinks.details[]?.components' >&2
+            exit 1
+          fi
+          echo "OK: AASA registers /join/* for the GetToIt app ID."
+
+      - name: Validate Apple-CDN-cached copy
+        # Apple proxies the AASA file through app-site-association.cdn-apple.com
+        # for newer iOS releases; iOS consults the CDN copy rather than
+        # the origin. If Apple hasn't ingested the file (e.g. JSON was
+        # malformed at the moment Apple's fetcher ran), Universal Links
+        # silently fail even though the origin is healthy. We assert
+        # parity here.
+        run: |
+          set -euo pipefail
+          CDN_URL="https://app-site-association.cdn-apple.com/a/v1/gettoit.app"
+          echo "Fetching: $CDN_URL"
+          BODY=$(curl -sS "$CDN_URL")
+          echo "$BODY" | jq -e . >/dev/null || {
+            echo "FAIL: Apple CDN copy is not valid JSON — Apple has not ingested the file." >&2
+            echo "$BODY" >&2
+            exit 1
+          }
+          HAS_JOIN=$(echo "$BODY" | jq -r '
+            .applinks.details[]?.components[]?["/"]? // empty
+          ' | grep -F '/join/*' || true)
+          if [ -z "$HAS_JOIN" ]; then
+            echo "FAIL: Apple CDN copy does not register /join/*." >&2
+            echo "$BODY" | jq '.applinks.details[]?.components' >&2
+            exit 1
+          fi
+          echo "OK: Apple CDN copy registers /join/*."
 
   edge:
     name: supabase/functions (deno test)

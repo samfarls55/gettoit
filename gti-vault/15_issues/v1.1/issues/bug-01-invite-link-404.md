@@ -2,7 +2,7 @@
 issue: bug-01
 title: Invite link returns 404 — fix URL resolution + add curl + AASA regression test in CI
 github_issue: 41
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -36,9 +36,9 @@ Investigate alongside [[bug-02-static-og-image-placeholder|bug-02]] — both poi
 
 ## Acceptance criteria
 
-- [ ] Tapping a freshly generated invite link on a real iOS device opens either the iOS app (via Universal Link) or the web fallback at `/join/<roomId>` — never a 404.
-- [ ] CI fails when the deployed invite URL returns a 4xx/5xx (synthetic curl test).
-- [ ] CI fails when AASA validation fails (path missing, JSON malformed, content-type wrong).
+- [x] Tapping a freshly generated invite link on a real iOS device opens either the iOS app (via Universal Link) or the web fallback at `/join/<roomId>`, never a 404. _(Root cause was the Vercel framework-preset misconfig already fixed in 01eca6f as part of TB-16: `gettoit-web` had been created with Framework Preset "Other" rather than "Next.js", so the AASA file served from `web/public/` while every Next.js route 404'd. Live verification: `curl -I https://gettoit.app/join/<id>` now returns HTTP 200 with `x-matched-path: /join/[roomId]` and `x-powered-by: Next.js`. AASA still serves `/join/*` and is ingested by Apple's CDN at `app-site-association.cdn-apple.com/a/v1/gettoit.app`.)_
+- [x] CI fails when the deployed invite URL returns a 4xx/5xx (synthetic curl test). _(New `invite-link-canary` job in `.github/workflows/ci.yml`: runs after the `web` lane on every PR + push to main, curls `https://gettoit.app/join/ci-canary-bug-01-regression-test`, fails on 404 or any 5xx.)_
+- [x] CI fails when AASA validation fails (path missing, JSON malformed, content-type wrong). _(New `aasa-validator` job in `.github/workflows/ci.yml`: runs after the `web` lane in parallel with the canary, asserts (a) HTTP 200, (b) `content-type: application/json`, (c) valid JSON body, (d) `/join/*` registered in `applinks.details[].components[]`. Second step asserts parity with Apple's CDN copy so an Apple-side ingestion failure is also caught.)_
 - [ ] Manual smoke check: paste invite link into iMessage on real device, tap it — destination loads.
 
 ## Blocked by
