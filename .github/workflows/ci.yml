@@ -67,17 +67,24 @@ jobs:
     name: ios (xcodebuild test)
     runs-on: macos-14
     env:
-      # Pin a stable Xcode version. macOS-14 images carry Xcode 15.4 by default;
-      # the `xcode-select` step below makes the choice explicit so the build
-      # doesn't silently drift when GitHub rotates the image default.
-      DEVELOPER_DIR: /Applications/Xcode_15.4.app/Contents/Developer
       SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s "$DEVELOPER_DIR"
+      - name: Select highest installed Xcode
+        # XcodeGen 2.45+ emits objectVersion 77, which only Xcode 16+ can open.
+        # Pinning a specific Xcode version is fragile across image refreshes,
+        # so pick the highest /Applications/Xcode_*.app on the runner.
+        run: |
+          XCODE_APP=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$XCODE_APP" ]; then
+            echo "No Xcode installation found on runner" >&2
+            exit 1
+          fi
+          echo "Selected: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          echo "DEVELOPER_DIR=$XCODE_APP/Contents/Developer" >> "$GITHUB_ENV"
 
       - name: Show Xcode + simulator info
         run: |
