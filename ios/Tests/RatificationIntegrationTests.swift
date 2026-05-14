@@ -174,11 +174,14 @@ final class RatificationIntegrationTests: XCTestCase {
         let userID = try await signInFreshAnon(on: client)
         let store = SupabasePushDenialFlagStore(client: client)
 
-        XCTAssertFalse(try await store.wasDenied(userID: userID),
-            "fresh user has no denial flag")
+        // `XCTAssertFalse` / `XCTAssertTrue` take autoclosures that
+        // don't support `try await` — hoist the call out.
+        let preDenied = try await store.wasDenied(userID: userID)
+        XCTAssertFalse(preDenied, "fresh user has no denial flag")
 
         try await store.setDenied(userID: userID, at: Date())
-        XCTAssertTrue(try await store.wasDenied(userID: userID),
+        let postDenied = try await store.wasDenied(userID: userID)
+        XCTAssertTrue(postDenied,
             "after setDenied the flag must round-trip via wasDenied")
     }
 }
