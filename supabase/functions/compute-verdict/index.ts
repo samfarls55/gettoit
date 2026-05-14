@@ -74,7 +74,35 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         q3_walk_minutes: row.q3_walk_minutes,
         q4_vibe: row.q4_vibe,
         q5_regret: row.q5_regret ?? {},
+        // soft_cuisine_vetoes isn't currently stored on the `votes`
+        // row in v1 — reroll (TB-10) and post-v1 taste-profile work
+        // will wire this in. Returning undefined here lets the engine
+        // skip the cuisine_veto relax step until the column lands.
+        soft_cuisine_vetoes: undefined,
       })) as MemberVoteRow[];
+    },
+    async fetchRoomRadius(room_id): Promise<number | null> {
+      const { data, error } = await client
+        .from("rooms")
+        .select("radius_meters")
+        .eq("id", room_id)
+        .maybeSingle();
+      if (error || !data) {
+        console.warn("compute-verdict fetchRoomRadius failed:", error?.message ?? "no row");
+        return null;
+      }
+      return (data as { radius_meters: number | null }).radius_meters ?? null;
+    },
+    async deleteVerdictForRoom(room_id): Promise<void> {
+      // FK cascade on `option_cuts.verdict_id` drops the cuts too.
+      const { error } = await client
+        .from("verdicts")
+        .delete()
+        .eq("room_id", room_id);
+      if (error) {
+        console.error("compute-verdict deleteVerdictForRoom failed:", error.message);
+        throw error;
+      }
     },
     async insertVerdict(row: VerdictInsert): Promise<VerdictRow> {
       const { data, error } = await client

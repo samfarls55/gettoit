@@ -40,6 +40,12 @@ import {
   type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
 
+/** Hard upper bound for `radius_meters_override`. S05's widen-radius
+ *  slider exposes 1..10 mi (1609..16093 m); the handler clamps
+ *  defensively against client tampering or accidental wild values. */
+const WIDEN_RADIUS_HARD_CAP_METERS = 16093;
+const WIDEN_RADIUS_HARD_MIN_METERS = 805;
+
 export interface ComputeVerdictEnv {
   /** Supabase project URL. */
   SUPABASE_URL?: string;
@@ -75,6 +81,14 @@ export interface ComputeVerdictDataAdapter {
    *  subscribers route into S05 within the Realtime window. Optional
    *  — production wires this to supabase-js Realtime, tests omit. */
   emitVerdictReadyBroadcast?(room_id: string, verdict_id: string): Promise<void>;
+  /** Fetch the room's stored `radius_meters` so the engine can use it
+   *  as the starting radius for the cascade. Returns null when the
+   *  row doesn't carry the field (legacy / pre-TB-03 rooms). */
+  fetchRoomRadius(room_id: string): Promise<number | null>;
+  /** Drop the prior verdict + cascaded option_cuts (FK cascade) for a
+   *  room. Called by the widen-radius re-run path so a fresh verdict
+   *  can be inserted under the `verdicts.room_id` UNIQUE constraint. */
+  deleteVerdictForRoom(room_id: string): Promise<void>;
 }
 
 export interface ComputeVerdictDeps {
@@ -94,6 +108,15 @@ export interface RoomOptionRow {
     walk_minutes_estimate?: number | null;
     dietary_tags?: string[];
     categories?: string[];
+    /** Distance from the room's search centre in meters. Used by the
+     *  TB-09 radius_widen relax step. PlacesProxy populates this in
+     *  its `ShapedPlace` and the iOS / Edge writes it through the
+     *  options payload. */
+    distance_meters?: number | null;
+    /** Q4-style vibe signal carried via the option payload. Optional
+     *  — Foursquare doesn't ship a vibe field today; PlacesProxy may
+     *  emit it later. Drives the vibe_floor relax step when present. */
+    vibe_signal?: number | null;
   };
 }
 
@@ -105,11 +128,16 @@ export interface MemberVoteRow {
   q3_walk_minutes: number;
   q4_vibe: number;
   q5_regret: Record<string, number>;
+  /** Soft cuisine vetoes (TB-09). Optional — the v1 quiz does not
+   *  currently surface this directly; reroll (TB-10) and future
+   *  taste-profile prefill (post-v1) write into it. */
+  soft_cuisine_vetoes?: string[];
 }
 
 export interface VerdictInsert {
   room_id: string;
-  option_id: string;
+  /** Null for `no_survivor` — the engine emitted no winner. */
+  option_id: string | null;
   method: VerdictMethod;
   rule_text: string;
 }
@@ -117,7 +145,7 @@ export interface VerdictInsert {
 export interface VerdictRow {
   id: string;
   room_id: string;
-  option_id: string;
+  option_id: string | null;
   method: string;
   rule_text: string;
   computed_at: string;
@@ -215,19 +243,47 @@ export async function handleRequest(
     ? rawMethod
     : "manual";
 
+  // Optional widen-radius override (S05 no-survivor "Widen radius"
+  // CTA, TB-09). When supplied, the handler bypasses the standard
+  // idempotency check for prior `no_survivor` verdicts so the engine
+  // can re-run at the wider radius. Clamped to the 1..10 mi window
+  // exposed by the S05 slider.
+  const rawWiden = (body as { radius_meters_override?: unknown })?.radius_meters_override;
+  let widenOverride: number | null = null;
+  if (typeof rawWiden === "number" && Number.isFinite(rawWiden)) {
+    widenOverride = Math.max(
+      WIDEN_RADIUS_HARD_MIN_METERS,
+      Math.min(WIDEN_RADIUS_HARD_CAP_METERS, Math.round(rawWiden)),
+    );
+  } else if (rawWiden !== undefined) {
+    return jsonResponse({
+      error: "invalid_input",
+      detail: "radius_meters_override must be a number when supplied",
+    }, {
+      status: 400,
+      headers: corsHeaders(),
+    });
+  }
+
   const data = deps.buildDataAdapter(deps.env);
 
   // Idempotency — if a verdict already exists for this room, return it
   // with the cuts, 200. TB-07 will use ON CONFLICT to support trigger-
-  // retry; for TB-06 we surface the existing row so manual re-runs are
-  // safe.
+  // retry. The widen-radius re-run path is the one exception: when
+  // the caller supplies `radius_meters_override` AND the existing
+  // verdict is a `no_survivor`, drop the old verdict (cascading the
+  // option_cuts) so the engine can write a fresh row.
   const existing = await data.existingVerdict(roomId);
   if (existing) {
-    return jsonResponse({
-      verdict: existing,
-      cuts: [],
-      already_computed: true,
-    }, { status: 200, headers: corsHeaders() });
+    if (widenOverride !== null && existing.method === "no_survivor") {
+      await data.deleteVerdictForRoom(roomId);
+    } else {
+      return jsonResponse({
+        verdict: existing,
+        cuts: [],
+        already_computed: true,
+      }, { status: 200, headers: corsHeaders() });
+    }
   }
 
   const room = await data.fetchRoom(roomId);
@@ -254,6 +310,18 @@ export async function handleRequest(
     });
   }
 
+  // Start with the override when supplied; fall back to the stored
+  // room radius for the standard fire path.
+  const startingRadius = widenOverride
+    ?? (await data.fetchRoomRadius(roomId))
+    ?? null;
+  // Widen-radius re-runs lift the cap to the requested override (so
+  // the engine doesn't itself widen past where the user asked). The
+  // standard fire path keeps the engine's default 5 mi cap.
+  const radiusCap = widenOverride !== null
+    ? widenOverride
+    : undefined;
+
   const candidates: CandidateOption[] = optionRows.map((row) => ({
     id: row.id,
     name: row.payload?.name ?? "Unnamed",
@@ -261,6 +329,8 @@ export async function handleRequest(
     walk_minutes_estimate: row.payload?.walk_minutes_estimate ?? null,
     dietary_tags: row.payload?.dietary_tags ?? [],
     categories: row.payload?.categories ?? [],
+    distance_meters: row.payload?.distance_meters ?? null,
+    vibe_signal: row.payload?.vibe_signal ?? null,
   }));
 
   const votes: MemberVote[] = voteRows.map((row) => ({
@@ -271,20 +341,20 @@ export async function handleRequest(
     q3_walk_minutes: row.q3_walk_minutes,
     q4_vibe: row.q4_vibe,
     q5_regret: row.q5_regret,
+    soft_cuisine_vetoes: row.soft_cuisine_vetoes,
   }));
 
   let result: VerdictEngineOutput;
   try {
-    result = computeVerdict({ candidates, votes, method });
+    result = computeVerdict({
+      candidates,
+      votes,
+      method,
+      radius_meters: startingRadius ?? undefined,
+      radius_meters_cap: radiusCap,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    // TB-06 scope-out: empty survivor set is the TB-09 terminal.
-    if (message.includes("no survivors")) {
-      return jsonResponse({ error: "no_survivor", detail: "TB-09 will land the terminal surface" }, {
-        status: 422,
-        headers: corsHeaders(),
-      });
-    }
     console.error("compute-verdict engine error:", e);
     return jsonResponse({ error: "engine_error", detail: message }, {
       status: 500,
@@ -292,6 +362,8 @@ export async function handleRequest(
     });
   }
 
+  // Persist — the no_survivor row carries `option_id = null` and no
+  // option_cuts; the manual row carries both.
   const verdict = await data.insertVerdict({
     room_id: roomId,
     option_id: result.winning_option_id,
@@ -333,5 +405,8 @@ export async function handleRequest(
     verdict,
     cuts: result.cuts,
     receipts: result.receipts,
+    surviving_hard_needs: result.surviving_hard_needs,
+    radius_meters_used: result.radius_meters_used,
+    relax_chain_applied: result.relax_chain_applied,
   }, { status: 200, headers: corsHeaders() });
 }

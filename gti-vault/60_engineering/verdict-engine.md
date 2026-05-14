@@ -29,15 +29,16 @@ TB-07 will land the auto-fire path. Two options under consideration:
 
 Either path keeps the engine canonical in TypeScript — the trigger is the dispatcher, not the engine.
 
-## EBA pruning order — fixed for TB-06
+## EBA pruning order — fixed for TB-06 + TB-09
 
 The engine prunes candidates in this order; the first failing predicate decides the cut reason:
 
-1. **Q1 dietary (`emit_tag` membership)** — `cut_reason='dietary'`.
-2. **Q2 budget tier ≤ min member cap** — `cut_reason='budget'`.
-3. **Q3 walk minutes ≤ min member threshold** — `cut_reason='walk'`.
-
-Q4 vibe is captured for receipts but NOT a hard cut in TB-06 — the soft-pref relax order ([[../10_prds/v1-prd|v1-prd]] §"Mechanics — engine specifics" #2) lands in TB-09 alongside the no-survivor terminal.
+1. **Q1 dietary (`emit_tag` membership)** — `cut_reason='dietary'`. Hard NEED. Never relaxes.
+2. **Q2 budget tier ≤ min member cap** — `cut_reason='budget'`. Hard NEED. Never relaxes.
+3. **Q3 walk minutes ≤ min member threshold** — `cut_reason='walk'`. Hard NEED. Never relaxes.
+4. **Soft cuisine veto** (any member's `soft_cuisine_vetoes` chip matches `option.categories` by substring) — `cut_reason='cuisine_veto'`. Soft. Relaxes on the cascade's first step.
+5. **Q4 vibe floor** (`option.vibe_signal < max_member_q4_vibe - state.vibeFloorRelaxStep`) — `cut_reason='vibe_floor'`. Soft. Relaxes on the cascade's second step.
+6. **Radius** (`option.distance_meters > state.radiusMeters`) — `cut_reason='radius_widen'`. Soft. Relaxes on the cascade's third step in 805 m (0.5 mi) increments up to `radius_meters_cap`.
 
 ## Cut reason vocabulary
 
@@ -46,9 +47,10 @@ Short machine tokens emitted into `option_cuts.cut_reason`:
 - `dietary` — failed a dietary `emit_tag` requirement.
 - `budget` — `price_tier > min(q2_budget)` across members.
 - `walk` — `walk_minutes_estimate > min(q3_walk_minutes)` across members.
+- `cuisine_veto` — matched a member's soft cuisine veto chip on the option's categories before that chip was relaxed.
+- `vibe_floor` — option's `vibe_signal` fell below the effective vibe floor (max member q4_vibe minus any vibe_floor relax steps).
+- `radius_widen` — option's `distance_meters` exceeded the (possibly already-widened) radius.
 - `no_regret` — survived pruning but lost the Q5 tiebreaker (or tied on the flat-regret fallback path).
-
-TB-09 will add `cuisine_veto`, `vibe_floor`, `radius_widen` for the relax chain.
 
 ## Q5 regret tiebreaker
 
@@ -87,14 +89,39 @@ Consequences:
 
 If marketing-branding lands the final copy and wants a different register, the chip → label mapping is the only thing that needs to change — the engine's anonymization gate stays in place.
 
-## What's not in TB-06
+## Soft-pref relax cascade — locked for TB-09
 
-Tracked in subsequent tracer bullets:
+When `runPruning` returns zero survivors, the engine attempts to relax soft preferences in this canonical order before giving up:
+
+1. **`cuisine_veto`** — drop the MOST-cited cuisine veto across members. Tie among cuisines with the same citation count: lexicographic-arbitrary (Map iteration order). The dropped chip is added to `state.droppedCuisines` and the engine re-runs pruning. If more than one cuisine is active, subsequent cascade iterations drop the next most-cited.
+2. **`vibe_floor`** — increment `state.vibeFloorRelaxStep` by 1. Each step widens the gap between candidate `vibe_signal` and the room's max `q4_vibe`. After 5 increments the floor is fully open (covers the entire 0..4 scale) and further relax is a no-op.
+3. **`radius_widen`** — add 805 m (0.5 mi) to `state.radiusMeters`, capped at `radius_meters_cap`. The S01 default cap is 8047 m (5 mi); the S05 "Widen radius" CTA raises it to whatever the user picked on the inline slider (1..10 mi).
+
+Hard NEED vetoes (Q1 dietary, Q2 budget, Q3 walk) NEVER appear in `relax_chain_applied` — they are immune to the cascade. The engine surfaces the cascade trail in `VerdictEngineOutput.relax_chain_applied` for observability; the UI does not render it (silent relax).
+
+If the cascade is exhausted and survivors are still 0, the engine emits a `no_survivor` output:
+
+- `winning_option_id = null`
+- `method = "no_survivor"`
+- `cuts = []` (the S05 no-survivor surface suppresses the cuts drawer)
+- `rule_text` — aggregate-attribution copy like `"Vegan options left no candidates within walking distance tonight."`. NEVER names a person.
+- `surviving_hard_needs` — short labels for the S05 meta line (`["vegan options", "$$ cap", "15 min walk"]`).
+- `radius_meters_used` — the last radius the engine tried (helpful for the widen slider's default-next-suggestion math).
+
+## Widen-radius re-run
+
+The `compute-verdict` Edge Function accepts an optional `radius_meters_override` body field. When supplied:
+
+- Clamped to `[805, 16093]` (0.5..10 mi) defensively against client tampering.
+- The handler reads the existing verdict via `existingVerdict(room_id)`. If a prior verdict exists AND its `method === "no_survivor"`, the handler calls `deleteVerdictForRoom` (FK cascade drops `option_cuts`) so the engine can write fresh under the `verdicts.room_id` UNIQUE constraint.
+- If a prior `method = "manual"` verdict exists, the override is IGNORED — successful verdicts are never replaced by a widen request. Defends against a duplicate "Widen radius" tap after the engine has produced a winner.
+- The engine runs with `radius_meters = override` and `radius_meters_cap = override` so it doesn't itself widen past where the user asked.
+
+## What's not in TB-09 (next tracer bullets)
 
 - **TB-07** ✅ landed — `AFTER INSERT ON votes` trigger that fires the engine on full quorum + status='firing'; `pg_cron` job (`gettoit_verdict_auto_fire`) that fires on deadline expiry; Realtime Broadcast on `verdict_ready`; `fire_verdict(room_id)` RPC for the initiator's "Decide now" tap. See [[waiting-fire-trigger|waiting-fire-trigger.md]].
 - **TB-08** — `"I'm in"` ratification wiring + push permission prompt + hard-close motion.
-- **TB-09** — soft-pref silent relax (cuisine veto → vibe floor → radius widen). No-survivor terminal surface (S05 `no-survivor` mode).
-- **TB-10** — reroll sheet, 3-per-session cap, reason-to-constraint mapping.
+- **TB-10** — reroll sheet, 3-per-session cap, reason-to-constraint mapping. The reroll reason taxonomy (`cost · dist · mood · diet · avail`) writes into `votes.soft_cuisine_vetoes` for "diet" and into vibe / budget / walk fields for the others; the engine's cuisine-veto step is the consumer.
 - **TB-11** — late-joiner read-only verdict surface (S05 `read-only` mode).
 
 ## Edge cases the engine handles
@@ -105,15 +132,11 @@ Tracked in subsequent tracer bullets:
 - **`price_tier` null on a candidate** — treated as "tier unknown, passes the cap." Foursquare frequently omits price; failing-closed would over-prune.
 - **`walk_minutes_estimate` null** — same treatment as price.
 
-## Edge cases TB-06 does NOT handle (TB-09 owns)
-
-- **No survivors after pruning** — TB-06's engine throws `"no survivors"` and the Edge Function returns 422. TB-09 lands the soft-pref relax + `method='no_survivor'` terminal.
-- **Cuisine veto** — soft signal, not exercised in TB-06.
-- **Vibe floor** — soft signal, not exercised in TB-06.
-
 ## Idempotency contract
 
 The Edge Function checks `existingVerdict(room_id)` first. If a verdict exists, it returns that row + an empty cuts list with `already_computed: true`. The unique constraint on `verdicts.room_id` enforces the same shape at the DB layer — a second insert would 23505. TB-07's trigger will use `ON CONFLICT (room_id) DO NOTHING` so duplicate trigger-fires don't fight each other.
+
+TB-09's widen-radius re-run is the documented exception: when `radius_meters_override` is supplied AND the existing verdict is a `no_survivor`, the handler drops the prior row (cascading the empty `option_cuts` set) so the engine can write fresh. Successful (manual) verdicts are never replaced by a widen request.
 
 ## Choreography token note
 

@@ -2,7 +2,8 @@
 issue: tb-09
 title: VerdictEngine soft-pref relax cascade + no-survivor terminal
 github_issue: 10
-status: ready-for-agent
+status: done
+completed: 2026-05-14
 type: AFK
 created: 2026-05-12
 prd: v1-prd
@@ -32,13 +33,19 @@ This implements [[04-s05-no-survivor-terminal|spec-gap issue 04]] plus the engin
 
 ## Acceptance criteria
 
-- [ ] All [[04-s05-no-survivor-terminal|spec-gap 04]] acceptance criteria pass.
-- [ ] VerdictEngine cascade fixture tests cover soft-pref relax order, hard-need preservation, terminal no-survivor.
-- [ ] S05 SwiftUI view supports the `no-survivor` mode with all suppressed and substituted elements.
-- [ ] Widen-radius inline expansion re-runs the engine and either returns a verdict or stays in the terminal state with a wider radius reflected.
-- [ ] Engine rule_text for no_survivor uses aggregate-rule attribution with anonymized constraints.
-- [ ] Snapshot test for the no-survivor mode passes.
+- [x] All [[04-s05-no-survivor-terminal|spec-gap 04]] acceptance criteria pass (landed 2026-05-12).
+- [x] VerdictEngine cascade fixture tests cover soft-pref relax order, hard-need preservation, terminal no-survivor (`supabase/functions/_shared/verdict-engine-relax.test.ts` — 14 tests).
+- [x] S05 SwiftUI view supports the `no-survivor` mode with all suppressed and substituted elements (`ios/Sources/App/VerdictScreen.swift` — eyebrow "Tonight", hero "NO SPOT / FITS", meta line, rule chip, "Widen radius" CTA, inline 1..10 mi slider, "Start over" ghost; suppressed: time badge, receipts, cuts drawer; initiator-only widen).
+- [x] Widen-radius inline expansion re-runs the engine and either returns a verdict or stays in the terminal state with a wider radius reflected (`compute-verdict` handler accepts `radius_meters_override`; drops prior no_survivor verdict; re-runs the engine; surfaces fresh verdict or another no_survivor with the new radius).
+- [x] Engine rule_text for no_survivor uses aggregate-rule attribution with anonymized constraints (`buildNoSurvivorRuleText` — "Vegan options left no candidates within walking distance tonight."; tests assert names of voters never appear in rule_text).
+- [x] Snapshot test for the no-survivor mode passes (`ios/Tests/VerdictScreenNoSurvivorTests.swift` — 12 tests).
 
 ## Blocked by
 
 - [[tb-06-verdict-engine-clean-run|TB-06]]
+
+## Adjacencies
+
+- **`votes.soft_cuisine_vetoes` column** — the engine accepts a `soft_cuisine_vetoes: string[]` field on `MemberVote` but the v1 schema has no corresponding column. The cuisine_veto cascade step is therefore dormant in production until TB-10 (reroll) introduces a writer — the engine + Edge Function are wired for it, but `index.ts`'s real adapter passes `undefined`. Documented in `supabase/functions/compute-verdict/index.ts`.
+- **`options.payload.distance_meters` + `options.payload.vibe_signal`** — both fields are read by the engine for soft pruning but PlacesProxy doesn't yet populate them. Vibe in particular has no Foursquare source; the engine skips the vibe gate when `vibe_signal` is null, so this is graceful. Distance is computable from `lat`/`lng` against the room's search centre — a follow-up TB on PlacesProxy or the Edge fetch can populate it.
+- **`VerdictStore.survivingHardNeeds(forVotes:)` duplicates engine logic** — the iOS shaper mirrors the engine's `buildSurvivingHardNeeds` because the verdict row doesn't carry the surviving-hard-needs labels (they're not persisted; only `rule_text` is). A follow-up could persist them in `verdicts.surviving_hard_needs jsonb` to keep iOS and engine in sync without a copy.

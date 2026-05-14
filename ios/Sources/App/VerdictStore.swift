@@ -1,9 +1,15 @@
-// GetToIt — VerdictStore (TB-06).
+// GetToIt — VerdictStore (TB-06 + TB-09).
 //
 // Reads the `verdicts` + `option_cuts` rows for a room and shapes them
-// into a `VerdictScreen.Verdict` value the S05 surface can render.
-// iOS NEVER recomputes the verdict — that's the engine's job. This
-// store is read-only over PostgREST + supabase-swift.
+// into a `(VerdictScreen.Verdict, VerdictScreen.Mode)` pair the S05
+// surface can render. iOS NEVER recomputes the verdict — that's the
+// engine's job. This store is read-only over PostgREST + supabase-swift.
+//
+// TB-09 additions:
+//   * `fetchVerdict` returns `(verdict, mode)` so the caller knows
+//     when to switch to the `noSurvivor` mode.
+//   * `widenRadius(roomID:meters:)` re-invokes `compute-verdict` with
+//     the `radius_meters_override` payload field.
 //
 // Out of scope for TB-06:
 //   * Realtime subscription on `verdicts` (TB-07's auto-fire path will
@@ -36,14 +42,65 @@ public final class VerdictStore {
 
     // MARK: - public surface
 
+    /// Bundle of a verdict + its rendering mode + the surface inputs.
+    /// Returning the mode lets the caller switch to `.noSurvivor` /
+    /// `.readOnly` without re-fetching.
+    public struct VerdictView: Equatable, Sendable {
+        public let verdict: VerdictScreen.Verdict
+        public let mode: VerdictScreen.Mode
+        /// Surviving hard-needs labels for the no-survivor meta line.
+        /// Empty for non-no-survivor modes.
+        public let survivingHardNeeds: [String]
+
+        public init(
+            verdict: VerdictScreen.Verdict,
+            mode: VerdictScreen.Mode,
+            survivingHardNeeds: [String] = []
+        ) {
+            self.verdict = verdict
+            self.mode = mode
+            self.survivingHardNeeds = survivingHardNeeds
+        }
+    }
+
     /// Pull a verdict + its cuts + the matching member receipts for a
     /// room. Returns nil when no verdict exists yet (the engine hasn't
     /// fired). Throws on transport / decode errors.
-    public func fetchVerdict(roomID: UUID) async throws -> VerdictScreen.Verdict? {
+    public func fetchVerdict(roomID: UUID) async throws -> VerdictView? {
         guard let verdict = try await fetchVerdictRow(roomID: roomID) else {
             return nil
         }
-        async let optionsTask = fetchOption(id: verdict.optionID)
+
+        // TB-09 — no_survivor terminals carry no winning option and no
+        // cuts. Build a placeholder `Verdict` whose hero stacks to
+        // "NO SPOT / FITS" and whose meta line carries the surviving
+        // hard-needs surfaced by the engine.
+        if verdict.method == "no_survivor" {
+            async let votesTask = fetchVotes(roomID: roomID)
+            let voteRows = try await votesTask
+            let survivingHardNeeds = VerdictStore.survivingHardNeeds(forVotes: voteRows)
+            let metaLine = survivingHardNeeds.joined(separator: " · ")
+            return VerdictView(
+                verdict: VerdictScreen.Verdict(
+                    placeName: "No spot fits",
+                    metaLine: metaLine,
+                    timeBadge: VerdictScreen.TimeBadge(time: "", audience: ""),
+                    ruleText: verdict.ruleText,
+                    receipts: [],
+                    cuts: []
+                ),
+                mode: .noSurvivor,
+                survivingHardNeeds: survivingHardNeeds
+            )
+        }
+
+        guard let optionID = verdict.optionID else {
+            // A manual verdict with no option_id is malformed — the
+            // engine never writes this; surface nil rather than crash.
+            return nil
+        }
+
+        async let optionsTask = fetchOption(id: optionID)
         async let cutsTask    = fetchCuts(verdictID: verdict.id)
         async let votesTask   = fetchVotes(roomID: roomID)
         async let memberCountTask = fetchMemberCount(roomID: roomID)
@@ -81,16 +138,19 @@ public final class VerdictStore {
 
         let meta = VerdictStore.metaLine(for: option.payload)
 
-        return VerdictScreen.Verdict(
-            placeName: option.payload.name ?? "Unnamed",
-            metaLine: meta,
-            timeBadge: VerdictScreen.TimeBadge(
-                time: "7:00 PM",  // placeholder — scheduling lands later
-                audience: VerdictStore.audienceCopy(forMemberCount: memberCount)
+        return VerdictView(
+            verdict: VerdictScreen.Verdict(
+                placeName: option.payload.name ?? "Unnamed",
+                metaLine: meta,
+                timeBadge: VerdictScreen.TimeBadge(
+                    time: "7:00 PM",  // placeholder — scheduling lands later
+                    audience: VerdictStore.audienceCopy(forMemberCount: memberCount)
+                ),
+                ruleText: verdict.ruleText,
+                receipts: receipts,
+                cuts: cuts
             ),
-            ruleText: verdict.ruleText,
-            receipts: receipts,
-            cuts: cuts
+            mode: .default
         )
     }
 
@@ -107,6 +167,25 @@ public final class VerdictStore {
             options: FunctionInvokeOptions(
                 method: .post,
                 body: Body(room_id: roomID)
+            )
+        )
+    }
+
+    /// Re-fire the VerdictEngine for a room at a wider radius.
+    /// Called from the S05 no-survivor "Widen radius" CTA. The
+    /// handler drops the prior `no_survivor` verdict + cuts and
+    /// re-runs the engine against the new radius. Successful prior
+    /// verdicts are NOT replaced.
+    public func widenRadius(roomID: UUID, meters: Int) async throws {
+        struct Body: Encodable {
+            let room_id: UUID
+            let radius_meters_override: Int
+        }
+        try await client.functions.invoke(
+            "compute-verdict",
+            options: FunctionInvokeOptions(
+                method: .post,
+                body: Body(room_id: roomID, radius_meters_override: meters)
             )
         )
     }
@@ -226,6 +305,63 @@ public final class VerdictStore {
         return "m\(prefix)"
     }
 
+    /// Derive the surviving hard-needs meta-line labels for the no-
+    /// survivor surface from the room's votes. Mirrors the engine's
+    /// `buildSurvivingHardNeeds` logic so the iOS surface can render
+    /// the meta line without a second round-trip to the engine.
+    ///
+    /// Order: dietary chips → budget cap → walk threshold. Anonymized
+    /// labels — "vegan options" not "alex's vegan veto", "$$ cap"
+    /// not "alex capped at $$".
+    public static func survivingHardNeeds(forVotes votes: [VoteRow]) -> [String] {
+        var labels: [String] = []
+        // Dietary first — collect unique chips.
+        var dietarySeen = Set<String>()
+        for vote in votes {
+            for chip in vote.q1Vetoes {
+                let normalized = chip.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if normalized.isEmpty { continue }
+                if normalized == "nothing_tonight" || normalized == "nothing tonight"
+                   || normalized == "nothing" || normalized == "none" { continue }
+                guard let label = dietaryLabel(forChip: normalized) else { continue }
+                if dietarySeen.insert(label).inserted {
+                    labels.append(label)
+                }
+            }
+        }
+        // Budget cap — MIN tier across members.
+        if !votes.isEmpty {
+            let minBudget = votes.map(\.q2Budget).min() ?? 4
+            if minBudget < 4 {
+                labels.append("\(String(repeating: "$", count: max(1, minBudget))) cap")
+            }
+        }
+        // Walk threshold — MIN minutes across members.
+        if !votes.isEmpty {
+            let minWalk = votes.map(\.q3WalkMinutes).min() ?? 30
+            if minWalk < 30 {
+                labels.append("\(minWalk) min walk")
+            }
+        }
+        return labels
+    }
+
+    /// Q1 dietary chip → short anonymized label. Mirrors the engine's
+    /// `DIETARY_REQUIREMENTS.label` table.
+    private static func dietaryLabel(forChip chip: String) -> String? {
+        switch chip {
+        case "vegan":      return "vegan options"
+        case "vegetarian": return "vegetarian options"
+        case "halal":      return "halal options"
+        case "kosher":     return "kosher options"
+        case "gluten":     return "gluten-free options"
+        case "dairy":      return "dairy-safe options"
+        case "shellfish":  return "shellfish-safe options"
+        case "nuts":       return "nut-safe options"
+        default:           return nil
+        }
+    }
+
     private static func numberWord(_ n: Int) -> String {
         switch n {
         case 1: return "one"
@@ -245,7 +381,9 @@ public final class VerdictStore {
     public struct VerdictRow: Codable, Sendable {
         public let id: UUID
         public let roomID: UUID
-        public let optionID: UUID
+        /// Null when `method == "no_survivor"` — the engine emitted
+        /// no winning option for this run.
+        public let optionID: UUID?
         public let computedAt: String
         public let method: String
         public let ruleText: String

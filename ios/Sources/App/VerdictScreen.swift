@@ -1,30 +1,33 @@
-// GetToIt — VerdictScreen (TB-06).
+// GetToIt — VerdictScreen (TB-06 + TB-09).
 //
-// SwiftUI port of `design-system/code/screens/ScreenVerdict.jsx` in
-// `default` mode. The verdict surface is the hero — the screen this
-// whole product exists to deliver. The choreography is canon: ms-exact
-// timings from `motion.md` §"Verdict reveal — full choreography",
-// sourced through `GTIMotion.ChoreoDelay` so a token bump catches via
-// the design-system verify gate.
+// SwiftUI port of `design-system/code/screens/ScreenVerdict.jsx`.
+// The verdict surface is the hero — the screen this whole product
+// exists to deliver. The choreography is canon: ms-exact timings
+// from `motion.md` §"Verdict reveal — full choreography", sourced
+// through `GTIMotion.ChoreoDelay` so a token bump catches via the
+// design-system verify gate.
 //
-// Scope of TB-06 — strict:
-//   * `default` mode only. The other four modes (`cuts`, `committed`,
-//     `read-only`, `no-survivor`) land in TB-08 / TB-09; the `mode`
-//     parameter is wired now so the call sites compile cleanly when
-//     those land.
-//   * CTA copy "I'm in" — NON-functional in TB-06 (ratification wires
-//     in TB-08).
-//   * Cuts drawer collapsed by default; the cuts trigger renders the
-//     `option_cuts` rows on expand.
-//   * iOS does not recompute the verdict — it reads `verdicts` +
-//     `option_cuts` from Supabase and binds them to this view.
+// Modes supported here:
+//   * `.default` — clean run (TB-06). Standard reveal.
+//   * `.noSurvivor` — TB-09 terminal. Eyebrow `"Tonight"`, hero
+//     `"NO SPOT / FITS"` (one word per line per the standard rule),
+//     meta line surfaces surviving hard-needs, rule chip carries the
+//     load-bearing message, primary CTA `"Widen radius"` opens an
+//     inline range slider (1–10 mi, current+1.0 mi default), commit
+//     fires `onWidenRadius(meters:)`. Suppressed: time badge, voice
+//     receipts, cuts drawer.
+//   * `.cuts`, `.committed`, `.readOnly` — wired through the same
+//     `mode` parameter; TB-08 / TB-11 will land the full
+//     implementations.
 //
 // What the view does NOT do:
 //   * Compute anything from `votes`. The engine in
 //     `supabase/functions/_shared/verdict-engine.ts` is the single
 //     canonical implementation; iOS surfaces the engine's output.
 //   * Wire the "I'm in" CTA to the ratification path — TB-08.
-//   * Handle the no-survivor terminal — TB-09.
+//   * Spawn the widen-radius re-run network call — the view calls
+//     `onWidenRadius(meters:)` and the caller wires the
+//     `compute-verdict` re-invocation.
 //
 // Reduced motion: drops the choreographed reveal to instant per
 // `motion.md` §"Reduced motion fallback". Receipts land simultaneously.
@@ -88,6 +91,25 @@ public struct VerdictScreen: View {
                     Cut(name: "Café Lou",   reason: "shellfish veto"),
                     Cut(name: "Halal Cart", reason: "outside walk range"),
                 ]
+            )
+        }
+
+        /// JSX-fixture-shaped no-survivor verdict — drives the
+        /// `noSurvivor` mode snapshot tests + the design-system
+        /// parity preview. The hero stacks as "NO SPOT / FITS" via
+        /// the placeholder `placeName`; the engine writes the same
+        /// load-bearing rule_text in aggregate-rule register.
+        /// `// placeholder: marketing-branding pass` applies to the
+        /// strings.
+        public static func noSurvivorFixture() -> Verdict {
+            // placeholder: marketing-branding pass
+            Verdict(
+                placeName: "No spot fits",
+                metaLine: "Vegan options · $$ cap · 15 min walk",
+                timeBadge: TimeBadge(time: "", audience: ""),
+                ruleText: "Vegan options left no candidates within walking distance tonight.",
+                receipts: [],
+                cuts: []
             )
         }
     }
@@ -156,22 +178,53 @@ public struct VerdictScreen: View {
     @State private var revealStep: Int = 0
     @State private var receiptIndexShown: Int = -1
     @State private var cutsExpanded: Bool = false
+    @State private var widenSliderOpen: Bool = false
+    @State private var widenRadiusMiles: Double = 3.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let verdict: Verdict
     private let mode: Mode
+    /// Whether the current viewer initiated the room. Drives the
+    /// no-survivor "Widen radius" CTA visibility — initiator-only per
+    /// `surfaces/05-verdict.md` §"no-survivor".
+    private let isInitiator: Bool
+    /// Current room radius in meters. Drives the widen slider's
+    /// default suggestion (current + 1.0 mi) per
+    /// `surfaces/05-verdict.md` §"no-survivor".
+    private let currentRadiusMeters: Int
     /// CTA non-functional in TB-06; TB-08 wires this. Kept as a closure
     /// so the call sites compile through the ratification work later.
     private let onAdvance: () -> Void
+    /// Fires when the initiator commits the widen-radius slider value
+    /// (passes the chosen radius in METERS). The caller wires the
+    /// `compute-verdict` re-invocation. Defaults to no-op so existing
+    /// `.default` call sites compile through.
+    private let onWidenRadius: (Int) -> Void
+    /// Fires when the user taps the no-survivor secondary "Start over"
+    /// ghost button. Defaults to no-op.
+    private let onStartOver: () -> Void
 
     public init(
         verdict: Verdict,
         mode: Mode = .default,
-        onAdvance: @escaping () -> Void = {}
+        isInitiator: Bool = true,
+        currentRadiusMeters: Int = 3219, // ~2.0 mi — S01 default
+        onAdvance: @escaping () -> Void = {},
+        onWidenRadius: @escaping (Int) -> Void = { _ in },
+        onStartOver: @escaping () -> Void = {}
     ) {
         self.verdict = verdict
         self.mode = mode
+        self.isInitiator = isInitiator
+        self.currentRadiusMeters = currentRadiusMeters
         self.onAdvance = onAdvance
+        self.onWidenRadius = onWidenRadius
+        self.onStartOver = onStartOver
+        self._widenRadiusMiles = State(
+            initialValue: VerdictScreen.widenRadiusInitialMiles(
+                currentRadiusMeters: currentRadiusMeters
+            )
+        )
     }
 
     // MARK: - body
@@ -223,6 +276,13 @@ public struct VerdictScreen: View {
                         .padding(.horizontal, GTISpacing.step6)
                 }
 
+                // No-survivor inline widen-radius expansion
+                if mode == .noSurvivor && widenSliderOpen {
+                    widenRadiusExpansion
+                        .padding(.top, GTISpacing.step5)
+                        .padding(.horizontal, GTISpacing.step6)
+                }
+
                 Spacer(minLength: 0)
 
                 // CTA dock
@@ -251,7 +311,7 @@ public struct VerdictScreen: View {
 
     @ViewBuilder
     private var hero: some View {
-        let lines = VerdictScreen.heroLines(for: verdict.placeName)
+        let lines = VerdictScreen.heroLinesForRender(placeName: verdict.placeName, mode: mode)
         VStack(spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 Text(line)
@@ -266,6 +326,47 @@ public struct VerdictScreen: View {
         .offset(y: revealStep >= 2 ? 0 : 12)
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("verdict.hero")
+    }
+
+    /// Inline range-slider expansion shown when the no-survivor
+    /// primary CTA is tapped. Mirrors the JSX expansion block (sun-
+    /// filled track + ink value chip + 1..10 mi range with 0.5-mi
+    /// step). Commit happens when the user taps the primary CTA a
+    /// second time.
+    @ViewBuilder
+    private var widenRadiusExpansion: some View {
+        VStack(alignment: .leading, spacing: GTISpacing.step1) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("WIDEN TO")
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                Spacer()
+                Text(String(format: "%.1f MI", widenRadiusMiles))
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .medium, design: .monospaced))
+                    .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.88))
+            }
+            Slider(
+                value: $widenRadiusMiles,
+                in: VerdictScreen.widenRadiusMinMiles...VerdictScreen.widenRadiusMaxMiles,
+                step: VerdictScreen.widenRadiusStepMiles
+            )
+            .tint(GTIColor.sun)
+            .accessibilityLabel("Widen walk radius")
+            .accessibilityValue(String(format: "%.1f miles", widenRadiusMiles))
+        }
+        .padding(.horizontal, GTISpacing.step4)
+        .padding(.vertical, GTISpacing.step3)
+        .background(
+            GTIColor.Glass.fillSoft,
+            in: RoundedRectangle(cornerRadius: GTIRadii.card)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: GTIRadii.card)
+                .strokeBorder(GTIColor.Glass.stroke.opacity(0.76), lineWidth: 0.75)
+        )
+        .accessibilityIdentifier("verdict.widenRadius.slider")
     }
 
     @ViewBuilder
@@ -404,30 +505,86 @@ public struct VerdictScreen: View {
     @ViewBuilder
     private var ctaDock: some View {
         VStack(spacing: 14) {
-            Button(action: onAdvance) {
-                Text(modeSnapshot.primaryCtaLabel.uppercased())
+            if mode == .noSurvivor {
+                noSurvivorPrimary
+                noSurvivorSecondary
+            } else {
+                Button(action: onAdvance) {
+                    Text(modeSnapshot.primaryCtaLabel.uppercased())
+                        .font(.system(size: GTIFont.Size.cta, weight: .black))
+                        .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                        .foregroundStyle(GTIColor.ink)
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                        .background(
+                            GTIColor.paper,
+                            in: RoundedRectangle(cornerRadius: GTIRadii.pill)
+                        )
+                }
+                .accessibilityIdentifier("verdict.cta.primary")
+
+                Button(action: onAdvance) {
+                    Text(modeSnapshot.secondaryLabel.uppercased())
+                        .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                        .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
+                        .padding(GTISpacing.step1)
+                }
+                .accessibilityIdentifier("verdict.cta.secondary")
+            }
+        }
+        .opacity(revealStep >= 7 ? 1 : 0)
+        .offset(y: revealStep >= 7 ? 0 : 8)
+    }
+
+    /// No-survivor primary CTA — sun-filled "Widen radius" (or
+    /// "Re-run · N.N mi" once the slider is open). Initiator-only;
+    /// invitees see the secondary "Start over" only.
+    @ViewBuilder
+    private var noSurvivorPrimary: some View {
+        if isInitiator {
+            Button {
+                if widenSliderOpen {
+                    onWidenRadius(VerdictScreen.metersForMiles(widenRadiusMiles))
+                } else {
+                    widenSliderOpen = true
+                }
+            } label: {
+                Text(noSurvivorPrimaryLabel.uppercased())
                     .font(.system(size: GTIFont.Size.cta, weight: .black))
                     .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
                     .foregroundStyle(GTIColor.ink)
                     .frame(maxWidth: .infinity, minHeight: 60)
                     .background(
-                        GTIColor.paper,
+                        GTIColor.sun,
                         in: RoundedRectangle(cornerRadius: GTIRadii.pill)
                     )
             }
             .accessibilityIdentifier("verdict.cta.primary")
-
-            Button(action: onAdvance) {
-                Text(modeSnapshot.secondaryLabel.uppercased())
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
-                    .padding(GTISpacing.step1)
-            }
-            .accessibilityIdentifier("verdict.cta.secondary")
         }
-        .opacity(revealStep >= 7 ? 1 : 0)
-        .offset(y: revealStep >= 7 ? 0 : 8)
+    }
+
+    /// No-survivor secondary — ghost "Start over" returning to S01.
+    /// Slightly louder than the default mode's "Start over" tertiary
+    /// (12pt vs 11pt body weight 800) because in no-survivor it's
+    /// the only path for non-initiators.
+    @ViewBuilder
+    private var noSurvivorSecondary: some View {
+        Button(action: onStartOver) {
+            Text("START OVER")
+                .font(.system(size: 12, weight: .heavy))
+                .tracking(GTIFont.TrackingEm.eyebrow * 12)
+                .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.85))
+                .frame(maxWidth: .infinity)
+                .padding(GTISpacing.step3)
+        }
+        .accessibilityIdentifier("verdict.cta.secondary")
+    }
+
+    private var noSurvivorPrimaryLabel: String {
+        if widenSliderOpen {
+            return String(format: "Re-run · %.1f mi", widenRadiusMiles)
+        }
+        return "Widen radius"
     }
 
     // MARK: - choreography driver
@@ -527,12 +684,14 @@ public struct VerdictScreen: View {
         public let eyebrowCopy: String
         public let primaryCtaLabel: String
         public let secondaryLabel: String
+        /// True when the no-survivor inline range slider is expanded.
+        /// Drives the primary CTA's `Re-run · N.N mi` label switch.
+        public let widenSliderOpen: Bool
     }
 
     /// Mode-shaped flags surfaced for the snapshot tests. Mirrors the
     /// flat flags at the top of `ScreenVerdict.jsx`'s body. Reads
-    /// `cutsExpanded` state when the JSX would also be in `.cuts` mode;
-    /// TB-06 only exercises `.default`.
+    /// `cutsExpanded` state when the JSX would also be in `.cuts` mode.
     public var modeSnapshot: ModeSnapshot {
         let isReadOnly   = mode == .readOnly
         let isNoSurvivor = mode == .noSurvivor
@@ -544,17 +703,65 @@ public struct VerdictScreen: View {
         default:          eyebrow = "Tonight, the verdict is"
         }
 
+        let primaryLabel: String
+        if isReadOnly {
+            primaryLabel = "Start a new decision"
+        } else if isNoSurvivor {
+            primaryLabel = widenSliderOpen
+                ? String(format: "Re-run · %.1f mi", widenRadiusMiles)
+                : "Widen radius"
+        } else {
+            primaryLabel = "I'm in"
+        }
+
         return ModeSnapshot(
             showTimeBadge: !isNoSurvivor,
             showReceipts: !isNoSurvivor,
             showCutsDrawer: !isNoSurvivor,
             cutsExpanded: cutsExpanded || mode == .cuts,
             eyebrowCopy: eyebrow,
-            primaryCtaLabel: isReadOnly ? "Start a new decision"
-                              : isNoSurvivor ? "Widen radius"
-                              : "I'm in",
-            secondaryLabel: isReadOnly ? "" : "Start over"
+            primaryCtaLabel: primaryLabel,
+            secondaryLabel: isReadOnly ? "" : "Start over",
+            widenSliderOpen: widenSliderOpen
         )
+    }
+
+    // MARK: - widen-radius helpers (pure, test-readable)
+
+    /// Min / max / step for the widen slider on S05 `noSurvivor`.
+    /// Locked in `design-system/surfaces/05-verdict.md` §"no-survivor"
+    /// ("range `1–10 mi`, step `0.5`"). Exposed as static so tests
+    /// can assert against the canon without instantiating a view.
+    public static let widenRadiusMinMiles: Double  = 1.0
+    public static let widenRadiusMaxMiles: Double  = 10.0
+    public static let widenRadiusStepMiles: Double = 0.5
+
+    /// Initial slider value when the no-survivor "Widen radius" CTA
+    /// opens the expansion — `current + 1.0 mi`, clamped to the
+    /// 1..10 mi cap. The S01 default of 3219 m (~2.0 mi) suggests
+    /// 3.0 mi on first widen; a 15289 m current (9.5 mi) clamps to
+    /// 10.0 mi rather than overshooting.
+    public static func widenRadiusInitialMiles(currentRadiusMeters: Int) -> Double {
+        let currentMiles = milesForMeters(currentRadiusMeters)
+        let bumped = currentMiles + 1.0
+        return min(max(bumped, widenRadiusMinMiles), widenRadiusMaxMiles)
+    }
+
+    /// Conversion factor — exact international mile in meters.
+    /// Keeps slider math precise enough that the engine's
+    /// 805 m (0.5 mi) cascade step lines up with what the slider
+    /// emits.
+    public static let metersPerMile: Double = 1609.344
+
+    /// Convert miles to meters. The engine talks meters end-to-end;
+    /// the slider works in miles for the user-facing copy.
+    public static func metersForMiles(_ miles: Double) -> Int {
+        return Int(round(miles * metersPerMile))
+    }
+
+    /// Inverse of `metersForMiles` for default-suggestion math.
+    public static func milesForMeters(_ meters: Int) -> Double {
+        return Double(meters) / metersPerMile
     }
 
     // MARK: - hero stacking
@@ -571,6 +778,18 @@ public struct VerdictScreen: View {
         case 2:  return tokens
         default: return [tokens[0], tokens.dropFirst().joined(separator: " ")]
         }
+    }
+
+    /// Hero stacking that honours the mode-specific layout. The
+    /// no-survivor hero always reads `NO SPOT / FITS` — the JSX
+    /// fixture's three-word place name ("No spot fits") would
+    /// otherwise collapse to `NO / SPOT FITS` under the generic
+    /// splitter. All other modes defer to `heroLines(for:)`.
+    public static func heroLinesForRender(placeName: String, mode: Mode) -> [String] {
+        if mode == .noSurvivor {
+            return ["NO SPOT", "FITS"]
+        }
+        return heroLines(for: placeName)
     }
 }
 
