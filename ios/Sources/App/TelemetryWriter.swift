@@ -106,6 +106,22 @@ public enum TelemetryValue: Equatable, Sendable, Encodable {
     }
 }
 
+extension TelemetryValue: ExpressibleByStringLiteral {
+    public init(stringLiteral value: String) { self = .string(value) }
+}
+
+extension TelemetryValue: ExpressibleByIntegerLiteral {
+    public init(integerLiteral value: Int) { self = .int(value) }
+}
+
+extension TelemetryValue: ExpressibleByFloatLiteral {
+    public init(floatLiteral value: Double) { self = .double(value) }
+}
+
+extension TelemetryValue: ExpressibleByBooleanLiteral {
+    public init(booleanLiteral value: Bool) { self = .bool(value) }
+}
+
 /// Injectable write seam. Production binds to the Supabase adapter;
 /// tests bind to a capture spy.
 public protocol TelemetryEventSink: AnyObject, Sendable {
