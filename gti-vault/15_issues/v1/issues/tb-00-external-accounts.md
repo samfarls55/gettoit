@@ -58,3 +58,19 @@ Added after TB-00 was closed, in the same session, to clear the remaining hard b
 - **Foursquare key fanout**: `FOURSQUARE_API_KEY` also added to GitHub Actions secrets (was only in `.env`) and Supabase Edge Function secrets.
 
 Runbook updates: [[../../../60_engineering/apple-keys-setup#key-3--apns-auth-key|apple-keys-setup §Key 3]] and [[../../../60_engineering/devcontainer-setup|devcontainer-setup §Step 4]].
+
+## Post-completion addendum (2026-05-14) — Vercel framework-preset gotcha
+
+Surfaced during the TB-16 walkthrough. The DNS / AASA / cert state above all checked out, but `https://gettoit.app/` returned `x-vercel-error: NOT_FOUND` for any Next.js route (every `app/**/page.tsx`). Root cause: the `gettoit-web` Vercel project was created with **Framework Preset = "Other"** rather than "Next.js" — likely because the project was added before `web/package.json` carried a Next.js manifest, so Vercel's auto-detect fell back. With "Other", Vercel serves from `public/` or `.` and ignores `.next/`. The AASA file (under `web/public/`) served fine, masking the issue from TB-00's lightweight verification.
+
+Fix applied 2026-05-14:
+
+```
+vercel api -X PATCH "/v9/projects/<projectId>?teamId=samfarls55s-projects" \
+           -f framework=nextjs
+vercel redeploy <latest-prod-deployment-url> --target production
+```
+
+Post-fix `curl -sI https://gettoit.app/` returns `HTTP/2 200` and serves the Next.js placeholder page.
+
+Acceptance-row gap: the original DNS row above (`gettoit.app DNS pointed at a placeholder ...`) was verified only by DNS resolution + AASA content-type. A `curl -f https://gettoit.app/` returning 200 was not part of the verification. Going forward, treat "domain serving an actual app route" and "DNS resolves" as separate gates.

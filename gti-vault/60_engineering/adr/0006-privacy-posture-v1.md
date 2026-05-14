@@ -69,6 +69,16 @@ Accepted — 2026-05-12.
 
 ## Amendments
 
+### 2026-05-14 — TB-16 policy text drafted in-house (not Termly)
+
+The Decision row originally said "Template-and-edit approach (e.g., iubenda, termly). Custom legal review deferred until post-thesis." During TB-16 the operator chose to self-draft the Privacy Policy and Terms of Service text rather than route through a Termly wizard.
+
+- **Why.** App Store review gates on the Privacy Policy matching the Privacy Nutrition Labels. Self-drafting in lock-step with the nutrition-label decisions guarantees a match; the wizard would re-derive the same content from the same ADR posture and add a "Powered by Termly" attribution footer. No legal-quality improvement for a US-only beta with zero monetization and zero free-text user content.
+- **Where it lives.** `web/app/privacy/page.tsx` and `web/app/terms/page.tsx` — Next.js routes served by the existing Vercel deployment at gettoit.app. Both pages consume canonical design tokens (ink background + paper text + body Inter) for on-brand typography, but they are not registered as iOS design-system surfaces (no doc in `design-system/surfaces/`) because they are legal pages, not product UI.
+- **Governing law.** Tennessee (operator residence). Dispute resolution: informal-first email to support@gettoit.app, then state or federal courts in Tennessee, with the standard small-claims carve-out. No arbitration clause, no class-action waiver — over-engineering for cohort 1.
+- **Re-evaluate** when: any of (a) the cohort grows beyond the friend-of-founder context, (b) revenue is introduced, (c) we open to non-US users, (d) a user submits a substantive legal-text complaint. Any of those triggers a real-attorney review.
+- **Limitation-of-liability cap** is set at USD 100. This is the conventional floor for a free consumer app and is the lowest dollar amount that has survived enforceability challenges in US courts. Higher would be giveaway; "zero / max permitted by law" would be a contested clause and was avoided.
+
 ### 2026-05-14 — TB-16 implementation reconciliation
 
 When TB-16 (in-app delete + 30-day TTL) hit the schema layer, two clarifications surfaced and were applied to the rows above:

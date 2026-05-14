@@ -34,7 +34,9 @@ This is HITL because the policy text needs human review and the App Store Connec
 
 ## Acceptance criteria
 
-- [ ] **(HITL)** Privacy Policy and TOS hosted at `gettoit.app/privacy` and `gettoit.app/terms`.
+- [x] **(AFK)** Privacy Policy and TOS text drafted and built into the web fallback at `gettoit.app/privacy` and `gettoit.app/terms`. _(`web/app/privacy/page.tsx`, `web/app/terms/page.tsx`. Self-drafted in-house rather than via Termly — see [ADR 0006 amendment 2026-05-14](../../../60_engineering/adr/0006-privacy-posture-v1.md#amendments). TN governing law, support@gettoit.app contact, USD 100 LoL cap. Build green via `npm run build` — both routes prerender as static content.)_
+- [ ] **(HITL)** `gettoit.app` apex domain pointed at the Vercel deployment (DNS A/ALIAS records) and `/privacy` + `/terms` reachable from the public internet. _(Required before App Store submission can list the Privacy Policy URL.)_
+- [ ] **(HITL)** `support@gettoit.app` mailbox or forwarding rule set up so inbound user requests (deletion, complaints, legal-resolution per ToS §15) actually land somewhere the operator reads. Currently only an Outlook personal account exists.
 - [ ] **(HITL)** Privacy Nutrition Labels filled out in App Store Connect to match the policy.
 - [x] **(AFK)** In-app "Delete my data" button works end-to-end with the documented cascade — S09 Settings surface + native confirmation alert + `delete-user` Edge Function + cascade FKs + fresh anonymous re-bootstrap. _(`design-system/surfaces/09-settings.md`, `design-system/code/screens/ScreenSettings.jsx`, `ios/Sources/App/SettingsScreen.swift`, `ios/Sources/App/AuthCoordinator.swift` `deleteAndReboot()` + `SupabaseAccountDeleter` protocol + `LiveSupabaseAccountDeleter`, `supabase/functions/delete-user/{handler,index}.ts`. S01 entry point added per spec exception in `surfaces/01-initiator.md` §"Settings footer link".)_
 - [x] **(AFK)** Anonymous 30-day TTL `pg_cron` job runs and purges expired rows. _(`supabase/migrations/20260514001000000_anonymous_ttl_sweeper.sql` — hourly at minute 30, `auth.users` delete cascades through every dependent table.)_
