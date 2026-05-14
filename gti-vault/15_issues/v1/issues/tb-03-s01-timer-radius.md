@@ -2,9 +2,10 @@
 issue: tb-03
 title: S01 timer chip + radius slider controls
 github_issue: 4
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-12
+completed: 2026-05-13
 prd: v1-prd
 implements_spec_gap: 01-s01-timer-radius-controls
 ---
@@ -28,13 +29,21 @@ This is the implementation of [[01-s01-timer-radius-controls|spec-gap issue 01]]
 
 ## Acceptance criteria
 
-- [ ] `rooms.timer_minutes` and `rooms.radius_meters` columns exist with the documented defaults.
-- [ ] All [[01-s01-timer-radius-controls|spec-gap 01]] acceptance criteria pass.
-- [ ] iOS S01 SwiftUI view renders the timer chip + radius slider with the canonical defaults.
-- [ ] Selecting non-default values writes them to the `rooms` row on session create.
-- [ ] `node design-system/scripts/verify.mjs` passes.
-- [ ] Integration tests: default values persist; non-default selections persist; values round-trip through the Supabase write.
+- [x] `rooms.timer_minutes` and `rooms.radius_meters` columns exist with the documented defaults. _(2026-05-13)_
+- [x] All [[01-s01-timer-radius-controls|spec-gap 01]] acceptance criteria pass. _(2026-05-13)_
+- [x] iOS S01 SwiftUI view renders the timer chip + radius slider with the canonical defaults. _(2026-05-13)_
+- [x] Selecting non-default values writes them to the `rooms` row on session create. _(2026-05-13)_
+- [x] `node design-system/scripts/verify.mjs` passes. _(2026-05-13)_
+- [x] Integration tests: default values persist; non-default selections persist; values round-trip through the Supabase write. _(2026-05-13)_
 
 ## Blocked by
 
-- [[tb-02-room-create-deeplink-join|TB-02]]
+- [[tb-02-room-create-deeplink-join|TB-02]] _(satisfied)_
+
+## Comments
+
+### 2026-05-13 — Landed (PR #27)
+
+Landed in [PR #27](https://github.com/samfarls55/gettoit/pull/27). Agent paused mid-task waiting for a CI notification that never came; orchestrator picked up the pending CI failure and applied a one-line `@MainActor` hoist fix:
+
+- **`@MainActor` propagation in tests.** `InitiatorScreen` is `@MainActor`-annotated, which propagates to its static helpers `metersFromMiles` and `formatRadiusLabel`. The new `InitiatorScreenTests` class was nonisolated, so every call site errored with "call to main actor-isolated static method ... in a synchronous nonisolated context". Same pattern documented in `gti-vault/60_engineering/stack-patterns.md` from TB-02 — annotating the test class `@MainActor` lets all tests inherit the isolation. Five CI lanes green after the fix.
