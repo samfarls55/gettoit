@@ -34,7 +34,7 @@ Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-
 | TB-13 | [[issues/tb-13-solo-mode-variant\|Solo mode variant]] ✅ done | AFK | [#14](https://github.com/samfarls55/gettoit/issues/14) | TB-08 |
 | TB-14 | [[issues/tb-14-checkin-telemetry\|Next-day check-in + telemetry views]] ✅ done | AFK | [#15](https://github.com/samfarls55/gettoit/issues/15) | TB-08 |
 | TB-15 | [[issues/tb-15-web-fallback\|Web fallback (Next.js)]] ✅ done | AFK | [#16](https://github.com/samfarls55/gettoit/issues/16) | TB-07 |
-| TB-16 | [[issues/tb-16-privacy-legal-delete\|Privacy + TOS + Nutrition Labels + delete]] ◑ AFK done, HITL pending | HITL+AFK | [#17](https://github.com/samfarls55/gettoit/issues/17) | TB-14, TB-00 |
+| TB-16 | [[issues/tb-16-privacy-legal-delete\|Privacy + TOS + Nutrition Labels + delete]] ✅ done (`support@` forwarding deferred to pre-public-launch) | HITL+AFK | [#17](https://github.com/samfarls55/gettoit/issues/17) | TB-14, TB-00 |
 | TB-17 | [[issues/tb-17-testflight-cohort\|TestFlight external + cohort 1 recruit]] ◑ AFK scaffolding (CI archive + upload) done, HITL pending | HITL+AFK | [#18](https://github.com/samfarls55/gettoit/issues/18) | TB-16 |
 
 ### Critical path
