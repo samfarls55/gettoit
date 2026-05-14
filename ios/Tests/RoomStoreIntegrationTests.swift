@@ -15,6 +15,7 @@ import XCTest
 import Supabase
 @testable import GetToIt
 
+@MainActor
 final class RoomStoreIntegrationTests: XCTestCase {
 
     // Shared config lookup mirrors `AnonAuthIntegrationTests`.
