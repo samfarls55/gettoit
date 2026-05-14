@@ -158,56 +158,68 @@ final class FireVerdictIntegrationTests: XCTestCase {
     }
 
     func testInitiatorWithQuorumFlipsRoomToFiring() async throws {
-        let client = try makeClient()
-        let roomStore = RoomStore(client: client)
+        // Drive both the initiator and joiner identities on separate
+        // clients so we can hop between sessions without losing the
+        // initiator JWT. signInAnonymously on the same client
+        // overwrites the prior session; supabase-swift caches the
+        // session in our in-memory storage, so we use one client per
+        // identity.
+        let creatorClient = try makeClient()
+        let joinerClient = try makeClient()
+        let creatorRoomStore = RoomStore(client: creatorClient)
+        let joinerRoomStore = RoomStore(client: joinerClient)
 
-        // Initiator creates the room and votes.
-        let creatorID = try await signInFreshAnon(on: client)
-        let room = try await roomStore.createRoom(as: creatorID)
-        try await insertVoteAs(client: client, roomID: room.id, userID: creatorID)
+        // Initiator side — create room + vote.
+        let creatorID = try await signInFreshAnon(on: creatorClient)
+        let room = try await creatorRoomStore.createRoom(as: creatorID)
+        try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
 
-        // A peer joins and votes — quorum is now met.
-        let joinerID = try await signInFreshAnon(on: client)
-        try await roomStore.joinRoom(id: room.id, as: joinerID)
-        try await insertVoteAs(client: client, roomID: room.id, userID: joinerID)
+        // Joiner side — join + vote. Quorum now met (2 votes).
+        let joinerID = try await signInFreshAnon(on: joinerClient)
+        try await joinerRoomStore.joinRoom(id: room.id, as: joinerID)
+        try await insertVoteAs(client: joinerClient, roomID: room.id, userID: joinerID)
 
-        // Switch BACK to the initiator session — fire_verdict checks
-        // `creator_user_id = auth.uid()`.
-        try? await client.auth.signOut()
-        let resumed = try await client.auth.signInAnonymously().user.id
-        // Joining a NEW anon session means we lost the initiator
-        // identity. The right way to assert the initiator path is
-        // to skip if we can't re-attach to the original anon user.
-        // For TB-07, we accept this test as an "RPC contract holds"
-        // assertion against the joiner: the joiner CAN'T fire.
-        let result = try await callFireVerdict(client: client, roomID: room.id)
-        XCTAssertEqual(result["error"] as? String, "not_initiator",
-            "joiner (different anon identity) is rejected as not_initiator — confirms creator gate")
-        _ = resumed
+        // Initiator presses Decide now via their own client — RPC
+        // sees creator_user_id = auth.uid() and admits.
+        let result = try await callFireVerdict(client: creatorClient, roomID: room.id)
+        XCTAssertEqual(result["status"] as? String, "firing",
+            "expected initiator + quorum RPC to flip status to firing — got \(result)")
 
-        let status = try await fetchRoomStatus(client: client, roomID: room.id)
-        XCTAssertEqual(status, "open",
-            "non-initiator RPC must leave the room in open")
+        // Verify the row actually moved past `open` from the
+        // initiator's perspective (they're a member, RLS admits).
+        let status = try await fetchRoomStatus(client: creatorClient, roomID: room.id)
+        // Status may be `firing` if the dispatcher GUC isn't set on
+        // this project, OR `verdict_ready` if the live compute path
+        // ran. Either is a successful flip away from `open`.
+        XCTAssertNotEqual(status, "open",
+            "expected the rooms.status to move past 'open' after a successful fire")
+        XCTAssertNotEqual(status, "expired",
+            "happy-path fire must not flip the room to expired")
 
-        try? await client.auth.signOut()
+        try? await creatorClient.auth.signOut()
+        try? await joinerClient.auth.signOut()
     }
 
     func testNonInitiatorRejected() async throws {
-        let client = try makeClient()
-        let roomStore = RoomStore(client: client)
+        // Two clients so we can drive both identities cleanly.
+        let creatorClient = try makeClient()
+        let joinerClient = try makeClient()
+        let creatorRoomStore = RoomStore(client: creatorClient)
+        let joinerRoomStore = RoomStore(client: joinerClient)
 
-        let creatorID = try await signInFreshAnon(on: client)
-        let room = try await roomStore.createRoom(as: creatorID)
-        try await insertVoteAs(client: client, roomID: room.id, userID: creatorID)
+        let creatorID = try await signInFreshAnon(on: creatorClient)
+        let room = try await creatorRoomStore.createRoom(as: creatorID)
+        try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
 
-        let joinerID = try await signInFreshAnon(on: client)
-        try await roomStore.joinRoom(id: room.id, as: joinerID)
-        try await insertVoteAs(client: client, roomID: room.id, userID: joinerID)
+        let joinerID = try await signInFreshAnon(on: joinerClient)
+        try await joinerRoomStore.joinRoom(id: room.id, as: joinerID)
+        try await insertVoteAs(client: joinerClient, roomID: room.id, userID: joinerID)
 
         // Joiner attempts to fire — should be rejected.
-        let result = try await callFireVerdict(client: client, roomID: room.id)
+        let result = try await callFireVerdict(client: joinerClient, roomID: room.id)
         XCTAssertEqual(result["error"] as? String, "not_initiator")
 
-        try? await client.auth.signOut()
+        try? await creatorClient.auth.signOut()
+        try? await joinerClient.auth.signOut()
     }
 }
