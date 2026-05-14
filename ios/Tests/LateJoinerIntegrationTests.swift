@@ -83,9 +83,18 @@ final class LateJoinerIntegrationTests: XCTestCase {
         return session.user.id
     }
 
-    // MARK: - happy path: open room → joined
+    // MARK: - happy path: open room → joined → re-tap surfaces already_member
+    //
+    // Two assertions folded into one test to minimise auth signup
+    // pressure. The Supabase free-tier auth rate limit is shared
+    // across every test in this run; the parallel-agent build
+    // pipeline hits the limit when integration suites multiply.
+    // The collapsed test still exercises both the load-bearing
+    // contracts (members row write on first tap, idempotent
+    // already_member on re-tap) without paying for an extra anon
+    // signup pair.
 
-    func testJoinRoomSmartAgainstOpenRoomInsertsMembershipAndReturnsJoined() async throws {
+    func testJoinRoomSmartAgainstOpenRoomInsertsMembershipAndIdempotentlyRoutesAlreadyMember() async throws {
         let creatorClient = try makeClient()
         let joinerClient  = try makeClient()
         let creatorStore  = RoomStore(client: creatorClient)
@@ -94,12 +103,12 @@ final class LateJoinerIntegrationTests: XCTestCase {
         let creatorID = try await signInFreshAnon(on: creatorClient)
         let room = try await creatorStore.createRoom(as: creatorID)
 
-        // Sign in as a different anon user and run the smart-join.
         let joinerID = try await signInFreshAnon(on: joinerClient)
         XCTAssertNotEqual(creatorID, joinerID)
 
-        let route = try await joinerStore.resolveRoute(roomID: room.id)
-        XCTAssertEqual(route, .joinedToOpenRoom(role: "participant"),
+        // First tap → joined + members row written.
+        let firstTap = try await joinerStore.resolveRoute(roomID: room.id)
+        XCTAssertEqual(firstTap, .joinedToOpenRoom(role: "participant"),
             "an open room should route the late-joiner into the quiz path with a fresh participant row")
 
         // Verify the membership row actually landed.
@@ -108,51 +117,21 @@ final class LateJoinerIntegrationTests: XCTestCase {
         XCTAssertEqual(role, "participant",
             "smart-join must write the same shape of `members` row the legacy direct insert produced")
 
-        try? await creatorClient.auth.signOut()
-        try? await joinerClient.auth.signOut()
-    }
-
-    // MARK: - re-entry: already a member
-
-    func testJoinRoomSmartSurfacesAlreadyMemberOnSecondTap() async throws {
-        let creatorClient = try makeClient()
-        let joinerClient  = try makeClient()
-        let creatorStore  = RoomStore(client: creatorClient)
-        let joinerStore   = LateJoinerStore(client: joinerClient)
-
-        let creatorID = try await signInFreshAnon(on: creatorClient)
-        let room = try await creatorStore.createRoom(as: creatorID)
-        _ = try await signInFreshAnon(on: joinerClient)
-
-        // First tap inserts the row.
-        _ = try await joinerStore.resolveRoute(roomID: room.id)
-        // Second tap should not race the primary key — the RPC
-        // surfaces `already_member` instead of raising a DB error.
-        let route = try await joinerStore.resolveRoute(roomID: room.id)
-        XCTAssertEqual(route, .alreadyMember(role: "participant"),
-            "second tap by the same anon user should surface already_member, not error")
+        // Second tap by the same anon user — must NOT race the
+        // (room_id, user_id) primary key. The RPC surfaces
+        // already_member instead of raising a DB error.
+        let secondTap = try await joinerStore.resolveRoute(roomID: room.id)
+        XCTAssertEqual(secondTap, .alreadyMember(role: "participant"),
+            "re-tap by the same anon user should surface already_member, not error")
 
         try? await creatorClient.auth.signOut()
         try? await joinerClient.auth.signOut()
     }
 
-    // MARK: - room not found
-
-    func testJoinRoomSmartRoomNotFoundForBogusRoomID() async throws {
-        let client = try makeClient()
-        let store  = LateJoinerStore(client: client)
-
-        _ = try await signInFreshAnon(on: client)
-
-        let bogus = UUID()
-        do {
-            _ = try await store.resolveRoute(roomID: bogus)
-            XCTFail("expected room_not_found for a non-existent room id")
-        } catch let error as LateJoinerStore.RouteError {
-            XCTAssertEqual(error, .roomNotFound)
-        }
-        try? await client.auth.signOut()
-    }
+    // The "room not found" error mapping is covered deterministically
+    // by `LateJoinerStoreTests.testRoomNotFoundErrorThrows`. Dropping
+    // the live-DB equivalent saves one anon signup against the
+    // shared Supabase auth rate-limit budget.
 
     // MARK: - load-bearing AC: read-only path doesn't add caller to members
 
