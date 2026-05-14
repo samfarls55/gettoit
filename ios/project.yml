@@ -80,8 +80,6 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGN_IDENTITY: ""
         DEVELOPMENT_TEAM: ""
-        BUNDLE_LOADER: "$(TEST_HOST)"
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/GetToIt.app/$(BUNDLE_EXECUTABLE_NAME):GetToIt.app/GetToIt"
     dependencies:
       - target: GetToIt
 
