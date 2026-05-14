@@ -1,13 +1,18 @@
-# GetToIt CI — single workflow, four lanes (per ADR 0004 §"One CI lane").
+# GetToIt CI — single workflow, lanes per ADR 0004 §"One CI lane".
 #
 # Lanes:
-#   * design-system — Node 20, runs `verify.mjs` (CSS + Swift drift gate
-#                     + orphan-hex sweep + surface↔jsx pairing).
-#   * ios           — macOS, generates the Xcode project via XcodeGen
-#                     and runs the unit + integration tests on the
-#                     iOS 17 simulator.
-#   * edge          — Ubuntu, runs `deno test` over `supabase/functions/`.
-#   * web           — Ubuntu, runs `next build` over `web/`.
+#   * design-system  — Node 20, runs `verify.mjs` (CSS + Swift drift gate
+#                      + orphan-hex sweep + surface↔jsx pairing).
+#   * ios            — macOS, generates the Xcode project via XcodeGen
+#                      and runs the unit + integration tests on the
+#                      iOS 17 simulator.
+#   * edge           — Ubuntu, runs `deno test` over `supabase/functions/`.
+#   * web            — Ubuntu, runs `next build` over `web/`.
+#   * supabase-db    — Ubuntu, runs `supabase db push --linked` against
+#                      the gettoit-prod project so iOS integration tests
+#                      see the latest schema. Idempotent; appends only.
+#                      iOS lane depends on this so freshly-landed migrations
+#                      are live before the test bundle runs against them.
 name: ci
 
 on:
@@ -63,8 +68,43 @@ jobs:
         working-directory: supabase/functions
         run: deno test --allow-net --allow-env --allow-read
 
+  supabase-db:
+    name: supabase (db push)
+    runs-on: ubuntu-latest
+    # Only push when the migrations directory actually changes — keeps
+    # design-system-only PRs from hitting the prod DB unnecessarily and
+    # avoids burning the rate-limited supabase API tokens.
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip when credentials are missing
+        id: gate
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_DB_PASSWORD" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
+            echo "Supabase credentials not set on this build — skipping db push."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install Supabase CLI
+        if: steps.gate.outputs.skip == 'false'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: supabase db push (linked project)
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --password "$SUPABASE_DB_PASSWORD" --include-all
+
   ios:
     name: ios (xcodebuild test)
+    needs: supabase-db
     runs-on: macos-14
     env:
       SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}

@@ -1,84 +1,97 @@
-// GetToIt — Walking-skeleton root view.
+// GetToIt — Root view.
 //
-// Single screen for TB-01. Boots the AuthCoordinator, kicks off
-// anonymous sign-in, and renders the resulting `user_id`. Uses the
-// generated `GTITokens.swift` for color / type — no hand-coded hex.
+// Boots the AuthCoordinator + RoomStore, then routes between two
+// surfaces:
+//   * S01 InitiatorScreen — default landing for the device that
+//     opens the app cold.
+//   * JoinScreen — surfaced when a Universal Link delivers a deep
+//     link payload (TB-02).
+//
+// TB-04 onward replaces the InitiatorScreen → Q1 transition; for TB-02
+// we land back on the initiator after sharing.
 
 import SwiftUI
 import Supabase
 
 public struct RootView: View {
-    @State private var auth: AuthCoordinator?
+    @State private var coordinators: Coordinators?
     @State private var configMissing = false
+    @State private var deepLink: InviteLink.Payload?
 
     public init() {}
 
     public var body: some View {
         ZStack {
-            // Sunset Pop initiator gradient as the canvas, per design-system.
             GTIGradient.surface(.initiator)
                 .ignoresSafeArea()
 
-            VStack(spacing: GTISpacing.step4) {
-                Text("GETTOIT")
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
-
-                Text("walking skeleton")
-                    .font(.system(size: GTIFont.Size.title, weight: .semibold))
+            if configMissing {
+                Text("Supabase is not configured for this build.")
+                    .font(.system(size: GTIFont.Size.body, weight: .semibold))
                     .foregroundStyle(GTIColor.TextOnGradient.primary)
-
-                content
-                    .padding(.top, GTISpacing.step6)
+                    .multilineTextAlignment(.center)
+                    .padding(GTISpacing.step6)
+            } else if let coordinators {
+                if let payload = deepLink {
+                    JoinScreen(
+                        payload: payload,
+                        auth: coordinators.auth,
+                        roomStore: coordinators.roomStore
+                    )
+                } else if case .anonymous(let userID) = coordinators.auth.state {
+                    InitiatorScreen(roomStore: coordinators.roomStore, userID: userID)
+                } else {
+                    Text("Sign-in failed. Pull to retry.")
+                        .font(.system(size: GTIFont.Size.body, weight: .semibold))
+                        .foregroundStyle(GTIColor.TextOnGradient.primary)
+                        .multilineTextAlignment(.center)
+                        .padding(GTISpacing.step6)
+                }
+            } else {
+                ProgressView()
+                    .tint(GTIColor.TextOnGradient.primary)
             }
-            .padding(GTISpacing.step6)
         }
         .task {
             await bootstrap()
         }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        if configMissing {
-            Text("Supabase is not configured for this build.")
-                .font(.system(size: GTIFont.Size.body, weight: .semibold))
-                .foregroundStyle(GTIColor.TextOnGradient.primary)
-                .multilineTextAlignment(.center)
-        } else if let auth {
-            switch auth.state {
-            case .idle, .signingIn:
-                ProgressView()
-                    .tint(GTIColor.TextOnGradient.primary)
-            case .anonymous(let userID):
-                VStack(spacing: GTISpacing.step2) {
-                    Text("User ID")
-                        .font(.system(size: GTIFont.Size.sm, weight: .semibold))
-                        .foregroundStyle(GTIColor.TextOnGradient.secondary)
-                    Text(userID.uuidString)
-                        .font(.system(size: GTIFont.Size.body, design: .monospaced))
-                        .foregroundStyle(GTIColor.TextOnGradient.primary)
-                        .multilineTextAlignment(.center)
-                        .accessibilityIdentifier("anon.user.id")
-                }
-            case .error(let message):
-                Text("Sign-in failed: \(message)")
-                    .font(.system(size: GTIFont.Size.body))
-                    .foregroundStyle(GTIColor.TextOnGradient.primary)
-                    .multilineTextAlignment(.center)
+        // Custom URL scheme path. SwiftUI also routes Universal Link
+        // openings through here on iOS 17+, but historically the
+        // canonical hook was `.onContinueUserActivity`; we wire both so
+        // either delivery path produces the same routing.
+        .onOpenURL { url in
+            handle(url: url)
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            if let url = activity.webpageURL {
+                handle(url: url)
             }
         }
     }
 
     private func bootstrap() async {
+        guard coordinators == nil else { return }
         guard let config = SupabaseConfig.fromBundle() else {
             self.configMissing = true
             return
         }
         let client = SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
-        let coordinator = AuthCoordinator(client: client)
-        self.auth = coordinator
-        await coordinator.ensureSignedIn()
+        let auth = AuthCoordinator(client: client)
+        let roomStore = RoomStore(client: client)
+        await auth.ensureSignedIn()
+        self.coordinators = Coordinators(auth: auth, roomStore: roomStore, client: client)
+    }
+
+    private func handle(url: URL) {
+        guard let payload = InviteLink.parse(url) else { return }
+        self.deepLink = payload
+    }
+
+    // Group the live coordinators so the view body keeps a single
+    // optional for "are we configured yet."
+    private struct Coordinators {
+        let auth: AuthCoordinator
+        let roomStore: RoomStore
+        let client: SupabaseClient
     }
 }

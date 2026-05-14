@@ -27,6 +27,18 @@ Pattern:
 
 **Sign in with Apple** for explicit account creation via `signInWithIdToken` + Authentication Services. Required for cross-device account portability and for "this person is real" upgrades from anonymous.
 
+**`supabase-swift` defaults to Keychain auth storage.** Unsigned simulator builds (`CODE_SIGNING_ALLOWED=NO`, which is how our iOS CI lane runs) silently fail keychain writes — `signInAnonymously` returns a Session but `currentSession` stays nil, so PostgREST has no JWT to attach and every request lands as the `anon` role (RLS rejects). Inject `InMemoryAuthStorage` for integration tests; production keeps the keychain default and works once code-signed. See `ios/Tests/RoomStoreIntegrationTests.swift`.
+
+## RLS — schema-level recursion landmines
+
+**Don't subquery a table from inside its own SELECT policy.** Postgres trips `42P17 infinite recursion detected in policy for relation "<name>"` instantly. The same trap fires across two tables that join through each other (table A's policy queries B; B's policy queries A — recursion).
+
+For TB-02 the members SELECT policy is `user_id = auth.uid()` (own row only). The `rooms` SELECT policy joins through `members`, but only needs the caller's own member row to compute "which rooms admit me", which the self-policy admits without recursion.
+
+When wider visibility is needed (e.g. TB-07's Waiting surface — every member sees every co-member): use a SECURITY DEFINER function (`is_room_member(room_id, user_id)`) that bypasses RLS internally. Mark it `SECURITY DEFINER` + `SET search_path = ''` and grant `EXECUTE` to `authenticated` only.
+
+**RLS-aware insert-then-read order.** `client.from("X").insert(values).select().single()` does an insert then a SELECT to return the row, and the SELECT evaluates the SELECT policy. For self-bootstrap rows (room creator inserts a `rooms` row, then their own `members` row), the SELECT policy on `rooms` may require `members` membership — which doesn't exist yet. Allocate the id client-side, insert without `returning=representation`, then fetch later when the bootstrap membership exists. See `RoomStore.createRoom`.
+
 ## Invite flow
 
 - Universal Links via Associated Domains entitlement + `apple-app-site-association` file.
