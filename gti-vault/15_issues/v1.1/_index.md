@@ -38,7 +38,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| TB-01 (v1.1) | [[issues/tb-01-landing-page-wire\|Wire landing surface into iOS]] | AFK | [#49](https://github.com/samfarls55/gettoit/issues/49) | sg-02 |
+| TB-01 (v1.1) | [[issues/tb-01-landing-page-wire\|Wire landing surface into iOS]] (ready-for-human) | AFK | [#49](https://github.com/samfarls55/gettoit/issues/49) | sg-02 |
 | TB-02 (v1.1) | [[issues/tb-02-account-creation-wire\|Wire forced sign-in (iOS) + waiting-screen CTA (web)]] | AFK | [#50](https://github.com/samfarls55/gettoit/issues/50) | sg-03 |
 | TB-03 (v1.1) | [[issues/tb-03-geo-permission-and-location-selector-wire\|Wire geo permission + location selector]] | AFK | [#51](https://github.com/samfarls55/gettoit/issues/51) | sg-04 |
 

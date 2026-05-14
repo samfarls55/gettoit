@@ -1,9 +1,14 @@
 // GetToIt — Root view.
 //
 // Boots the AuthCoordinator + RoomStore + LateJoinerStore, then
-// routes between four surfaces:
-//   * S01 InitiatorScreen — default landing for the device that
-//     opens the app cold (or for the late-joiner's re-invite tap).
+// routes between five surfaces:
+//   * S00 LandingScreen — post-sign-in entry surface (v1.1, TB-01).
+//     Every cold launch with an active auth session lands here first;
+//     the user picks Start a Decision (→ S01) or Account Settings
+//     (→ S09). Idle until tap. See surfaces/00-landing.md.
+//   * S01 InitiatorScreen — the "Pick a Vertical" / timer + radius
+//     surface. Reached via the landing "Start a Decision" CTA, or
+//     directly for the late-joiner re-invite tap.
 //   * JoinScreen — surfaced when a Universal Link delivers a deep
 //     link payload (TB-02). Internally routes via
 //     `LateJoinerStore.resolveRoute` to decide whether to insert
@@ -16,8 +21,10 @@
 //     tapped an invite link AFTER the verdict was sealed (TB-11).
 //
 // State precedence (inner-most wins): `activeQuiz` → `readOnlyView`
-// → `deepLink` → cold-start initiator. Once the quiz is live,
-// re-opening another deep link doesn't force-rejoin mid-quiz.
+// → `deepLink` → settings → S01 (when `showingInitiator` is true) →
+// S00 Landing (the new default for a signed-in idle session). Once
+// the quiz is live, re-opening another deep link doesn't force-rejoin
+// mid-quiz.
 
 import SwiftUI
 import Supabase
@@ -34,10 +41,18 @@ public struct RootView: View {
     /// (saves a tap; the late-joiner is likely planning a similar
     /// outing).
     @State private var reInvitePrefill: ReInvitePrefill?
-    /// TB-16 — set when the user taps "Settings" on S01. Renders the
-    /// S09 Settings surface; the route clears on Done or after a
-    /// successful delete + re-bootstrap.
+    /// TB-16 — set when the user taps "Settings" on S01 or the S00
+    /// landing surface's "Account Settings" CTA. Renders the S09
+    /// Settings surface; the route clears on Done or after a successful
+    /// delete + re-bootstrap.
     @State private var showingSettings = false
+    /// TB-01 (v1.1) — set when the user taps "Start a Decision" on the
+    /// S00 landing surface. While true, the host renders the S01
+    /// InitiatorScreen; the late-joiner re-invite path also flips this
+    /// on so the prefilled InitiatorScreen surfaces without a detour
+    /// through the landing screen. Defaults to false so a cold,
+    /// signed-in launch lands on S00 per surfaces/00-landing.md.
+    @State private var showingInitiator = false
 
     public init() {}
 
@@ -103,32 +118,56 @@ public struct RootView: View {
                             Task { await loadReadOnly(roomID: payload.roomID, route: route, store: coordinators.lateJoinerStore) }
                         }
                     )
-                } else if case .anonymous(let userID) = coordinators.auth.state {
-                    InitiatorScreen(
-                        roomStore: coordinators.roomStore,
-                        userID: userID,
-                        prefilledTimerMinutes: reInvitePrefill?.timerMinutes,
-                        prefilledRadiusMiles: reInvitePrefill?.radiusMiles,
-                        onSharedRoom: { roomID in
-                            // The prefill was a one-shot — after the
-                            // re-invite path lands a new room, drop
-                            // the carried defaults so the next cold
-                            // S01 entry surfaces the canonical
-                            // defaults.
-                            reInvitePrefill = nil
-                            startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: true)
-                        },
-                        onSoloRoom: { roomID in
-                            // Solo path uses the same one-shot prefill
-                            // semantics — once the new room lands, the
-                            // carried defaults are spent.
-                            reInvitePrefill = nil
-                            startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: false)
-                        },
-                        onSettings: {
-                            showingSettings = true
-                        }
-                    )
+                } else if let userID = coordinators.auth.state.userID {
+                    // TB-01 (v1.1) — S00 Landing is the default
+                    // signed-in surface. The host flips
+                    // `showingInitiator` to true on the Start a
+                    // Decision tap (or when a late-joiner re-invite
+                    // prefill is carried in, so the user lands on
+                    // S01 with prefill instead of being asked
+                    // "what's next?" again).
+                    if showingInitiator || reInvitePrefill != nil {
+                        InitiatorScreen(
+                            roomStore: coordinators.roomStore,
+                            userID: userID,
+                            prefilledTimerMinutes: reInvitePrefill?.timerMinutes,
+                            prefilledRadiusMiles: reInvitePrefill?.radiusMiles,
+                            onSharedRoom: { roomID in
+                                // The prefill was a one-shot — after the
+                                // re-invite path lands a new room, drop
+                                // the carried defaults so the next cold
+                                // S01 entry surfaces the canonical
+                                // defaults. `showingInitiator` is also
+                                // cleared because `startQuiz` flips
+                                // `activeQuiz`, which sits inner-most in
+                                // the precedence chain; closing the quiz
+                                // returns to S00 Landing, not S01.
+                                reInvitePrefill = nil
+                                showingInitiator = false
+                                startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: true)
+                            },
+                            onSoloRoom: { roomID in
+                                // Solo path uses the same one-shot prefill
+                                // semantics — once the new room lands, the
+                                // carried defaults are spent.
+                                reInvitePrefill = nil
+                                showingInitiator = false
+                                startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: false)
+                            },
+                            onSettings: {
+                                showingSettings = true
+                            }
+                        )
+                    } else {
+                        LandingScreen(
+                            onStartDecision: {
+                                showingInitiator = true
+                            },
+                            onAccountSettings: {
+                                showingSettings = true
+                            }
+                        )
+                    }
                 } else {
                     Text("Sign-in failed. Pull to retry.")
                         .font(.system(size: GTIFont.Size.body, weight: .semibold))
