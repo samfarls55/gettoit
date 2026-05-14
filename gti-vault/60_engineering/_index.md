@@ -19,3 +19,4 @@ Architecture, conventions, runbooks, ADRs.
 - [[supabase-setup|supabase-setup.md]] — Runbook for provisioning the v1 Supabase project (Pro plan, extensions postgis/pg_cron/pgmq, anonymous auth, CLI link, GH Actions secret mirror).
 - [[ios-ci-setup|ios-ci-setup.md]] — Runbook for the iOS CI lane (XcodeGen-driven project generation, macOS-14 runner, Xcode 15.4 pin, Supabase env injection, no-local-Xcode constraint).
 - [[auth-apple-link-testing|auth-apple-link-testing.md]] — TB-12 testing split: what CI's state-machine + DB-integration tests cover vs. what only TestFlight (TB-17) can verify against a real Apple Sign-in round-trip.
+- [[web-fallback-setup|web-fallback-setup.md]] — TB-15 operational notes: Vercel `NEXT_PUBLIC_*` env vars, Realtime channel contract, accepted web-side gaps per ADR 0003 / 0007.
