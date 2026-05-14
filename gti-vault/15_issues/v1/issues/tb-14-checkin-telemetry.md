@@ -2,7 +2,8 @@
 issue: tb-14
 title: Next-day check-in (S08) + CheckinScheduler + telemetry SQL views
 github_issue: 15
-status: ready-for-agent
+status: done
+completed: 2026-05-14
 type: AFK
 created: 2026-05-12
 prd: v1-prd
@@ -33,15 +34,23 @@ The metric loop that makes the v1 thesis observable. 12–24 hours after a verdi
 
 ## Acceptance criteria
 
-- [ ] `check_ins` and `events` migrations land with RLS.
-- [ ] CheckinScheduler `pg_cron` job runs and dispatches APNs per verdict in the 12–24h window.
-- [ ] Dispatch is exactly-once per (verdict_id, user_id).
-- [ ] 3-day-no-response auto-mark works.
-- [ ] S08 SwiftUI port matches the locked spec.
-- [ ] TelemetryWriter writes the documented event types from the documented surfaces.
-- [ ] `metric_follow_through_pct`, `metric_time_to_verdict_p50`, `metric_invite_acceptance` views return correct values on fixture data.
-- [ ] Web fallback documents the absent check-in.
+- [x] `check_ins` and `events` migrations land with RLS (`supabase/migrations/20260514000400000_checkins_and_events.sql` — `check_ins` INSERT-self-in-room with SELECT denied; `events` INSERT-self constrained to rooms the caller belongs to with SELECT denied; indices on `(event_type, created_at)` and `(room_id, created_at)`).
+- [x] CheckinScheduler `pg_cron` job runs and dispatches APNs per verdict in the 12–24h window (`20260514000420000_checkin_scheduler_cron.sql` — `cron_dispatch_checkins()` every minute; `dispatch_checkin_for_verdict(verdict_id)` walks room members and POSTs apns-sender via `pg_net`).
+- [x] Dispatch is exactly-once per (verdict_id, user_id) (`20260514000410000_checkin_dispatches.sql` — PK on `(verdict_id, user_id)` with `ON CONFLICT DO NOTHING`; the dispatcher only fires APNs on a fresh insert).
+- [x] 3-day-no-response auto-mark works (`20260514000430000_checkin_no_signal_sweeper.sql` — `cron_mark_no_signal_checkins()` hourly writes `outcome = 'no_signal'` for `(verdict, user)` past 3 days with no response).
+- [x] S08 SwiftUI port matches the locked spec (`ios/Sources/App/CheckinScreen.swift` — `We went` sun-pill, `We skipped` white-pill, `Ask me later` ghost-pill; skip path reveals reason chip row; single-tap confirmation plate).
+- [x] TelemetryWriter writes the documented event types from the documented surfaces (`ios/Sources/App/TelemetryWriter.swift` — `room_created`, `quiz_completed`, `verdict_ready`, `ratified`, `rerolled`, `invite_shared`, `member_joined`; with `[String: TelemetryValue]` property bag).
+- [x] `metric_follow_through_pct`, `metric_time_to_verdict_p50`, `metric_invite_acceptance` views return correct values on fixture data (`20260514000440000_metric_views.sql` — `snoozed`/`no_signal` excluded from follow-through denominator; p50 over verdict latency from `events`; acceptance from `invite_shared` / `member_joined` / `quiz_completed`).
+- [x] Web fallback documents the absent check-in (`gti-vault/60_engineering/checkin-telemetry.md` records the accepted gap — web has no push channel; no check-in path).
 
 ## Blocked by
 
 - [[tb-08-ratification-push-hard-close|TB-08]]
+
+## Comments
+
+**2026-05-14** — closed. PR [#37](https://github.com/samfarls55/gettoit/pull/37) merged to main as `5810657`. Subagent burned through its allocation mid-task; the orchestrator recovered uncommitted work and applied one follow-up fix.
+
+- Implementation landed in five migrations (`20260514000400000_checkins_and_events` → `20260514000440000_metric_views`), a SwiftUI S08 screen (`CheckinScreen.swift`), a `TelemetryWriter` module (~308 LOC, 7 documented events), and ~318 LOC of XCTest coverage across `CheckinScreenTests` and `TelemetryWriterTests`. Engineering pattern documented at `gti-vault/60_engineering/checkin-telemetry.md`.
+- Build-time fix applied by the orchestrator at `282d055` — `TelemetryValue` was missing `ExpressibleBy{String,Integer,Float,Boolean}Literal` conformances, so `["vertical": "food"]` and `["method": "manual"]` callers failed with `"cannot convert value of type 'String' to expected dictionary value type 'TelemetryValue'"`. Adding the four conformances lets every caller use natural literals with the compiler inserting the correct enum case at the type wall.
+- Exactly-once invariant lives in the `checkin_dispatches` table's PK + `ON CONFLICT DO NOTHING`; the row's existence locks the slot before `pg_net` fires apns-sender. The cron tick is therefore safe to run every minute without dispatch storms.
