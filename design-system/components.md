@@ -361,3 +361,84 @@ The C-08 vibe slider already uses sun-fill for its selected stop. Continuity wit
 **SwiftUI primitive:** `Slider(value: $radius, in: 0.5...5.0, step: 0.5)` with `.tint(GTIColor.sun)` and a custom `.frame(height: 44)`. Render the value label separately above the slider so it can use `mono-tag` or similar treatment.
 
 **When NOT to use:** ordinal/cardinal-scalar inputs (vibe Q4) — use C-08 Vibe Slider; users should land on discrete labeled stops, not in-between values.
+
+---
+
+## C-22 · Auth Upgrade Chip
+
+The non-blocking Sign-in-with-Apple affordance on S04 Waiting. **Voluntary warm-friend register** — opportunistic upgrade, never a gate. The chip is secondary to the primary "N of M are in" headline; users can complete the entire decision ritual without ever touching it.
+
+Per [[../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] the chip is iOS-only. The web fallback never renders it (no Sign in with Apple in browser).
+
+### States
+
+| State | Trigger | Render |
+|---|---|---|
+| `default` | Anonymous user, never dismissed (or dismissal > 30d old) | The full chip — pill button with Apple glyph + label `"Save this taste profile"` and a ghost-text dismiss link `"Maybe later"` below it. |
+| `in-progress` | User tapped — Apple flow is on-screen | Pill renders with a small spinner glyph replacing the Apple glyph; label unchanged; disabled. The native Apple sheet is the actual progress UI; the chip just reflects it can't be re-tapped. |
+| `success` | `auth.linkIdentity` resolved | Replace the whole component with a quiet `"Saved."` confirmation (mono-tag treatment, white 0.6, no exclamation, no animation beyond a 320ms fade). Auto-hides on the next surface transition; never blocks. |
+| `dismissed` | User tapped "Maybe later" OR row already exists with `auth_prompt_dismissed_at` within 30d | Nothing renders. Empty space; the avatar row + headline carry the surface. |
+| `hidden` | User is already Apple-linked, OR the surface is being rendered in the web fallback | Nothing renders. |
+
+### Visual spec — `default` state
+
+| Element | Spec |
+|---|---|
+| Pill | `C-05` Pill CTA, `white` variant — `#FFFFFF` bg, `var(--ink)` text, height 60, radius 999, shadow `shadow-cta-white`. Same primitive as the canonical primary CTA. |
+| Apple glyph | Inter 900 / 18 / `var(--ink)`, rendered before the label with 10px gap. Glyph: `` (SF Symbols `applelogo`) on iOS; the JSX uses the Unicode  for fidelity. |
+| Label | `cta` token (Inter 800 / 14 / tracking 0.14em / UPPERCASE). String: `"Save this taste profile"`. Hand-cased: the literal copy is sentence-case `"Save this taste profile"`, the pill renders it uppercase via the `cta` token's `case: upper`. |
+| Dismiss link | `eyebrow` token, white 0.6, label `"Maybe later"`, 14px tap padding inside a 44pt-tall hit row. Centered below the pill, 12px gap. |
+| Surface position | In the CTA dock on S04, **above** the initiator-only `"Decide now"` CTA, **below** the avatar row + waiting headline. On non-initiator screens, the chip is the only CTA besides "Nudge". |
+
+### Visual spec — `in-progress` state
+
+| Element | Spec |
+|---|---|
+| Pill | Same as default, but `disabled` (opacity 0.45, not-allowed cursor). Apple glyph + label stay; the visual signal "I tapped, I'm waiting" comes from the dimmed pill. |
+| Apple sheet | The native `ASAuthorizationController` sheet renders **on top** of the surface and is the actual progress UI. We don't render an in-pill spinner — that would compete with the sheet for attention. |
+| Dismiss link | Hidden — the user is mid-flow; offering the escape competes with Apple's own sheet. |
+
+### Visual spec — `success` state
+
+| Element | Spec |
+|---|---|
+| Container | No pill, no shadow. Centered in the slot the chip used to occupy. |
+| Label | `mono-tag` (IBM Plex Mono 11 / tracking 0.18em / UPPERCASE / white 0.6). String: `"Saved."` with a trailing period. |
+| Transition | `fade` 320ms ease-out from the chip's final frame. No bounce, no celebration motion — quiet by design. |
+| Auto-dismiss | The label is informational, not a CTA. It vanishes on the next surface transition (verdict). |
+
+### Copy rules (LOCKED)
+
+- **Primary label:** `"Save this taste profile"`. NEVER `"Sign up"`, `"Create account"`, `"Sign in with Apple"`, `"Continue with Apple"`, `"Confirm identity"`.
+- **Dismiss label:** `"Maybe later"`. NEVER `"No thanks"`, `"Skip"`, `"Not now"`, `"X"`.
+- **Success label:** `"Saved."`. Period included. NEVER `"Welcome!"`, `"You're in!"`, `"All set"`, `"Account created"`.
+
+The register is voluntary warm-friend per ADR 0007 §"Why" — anything that frames the action as joining, signing up, or finishing a setup violates the design.
+
+### Dismiss + suppression
+
+- Tapping `"Maybe later"` writes `user_preferences.auth_prompt_dismissed_at = now()` for the current `auth.users.id`.
+- On every subsequent render of S04, the chip checks `now() - auth_prompt_dismissed_at`. If < 30 days, render `dismissed` (nothing). If ≥ 30 days, render `default` again — the user gets one re-prompt per month at most.
+- Successful link does NOT touch `auth_prompt_dismissed_at`. The user's identity is no longer anonymous; the chip checks the identity state first and renders `hidden`. The timestamp lingers for forensic / debug value; it's harmless once the user is linked.
+
+### Accessibility
+
+- Pill tap target ≥ 44pt (the 60-tall pill clears it natively).
+- Dismiss link tap target ≥ 44pt — the visible label is small, but the hit row pads it out to 44.
+- VoiceOver order: pill ("Save this taste profile, button") → dismiss link ("Maybe later, button"). The Apple glyph is decorative — no separate VO announcement.
+- Reduced motion: skip the success-state fade; show the `"Saved."` label immediately.
+
+### SwiftUI primitive
+
+```swift
+// Reuses the existing `PillCTA` style — no new primitive.
+// The Apple glyph is `Image(systemName: "applelogo")` in `.foregroundStyle(GTIColor.ink)`.
+// The dismiss link is a `Button("Maybe later") { ... }` with `.font(.system(size: GTIFont.Size.eyebrow, weight: .bold))`.
+// `SignInWithAppleButton` from `AuthenticationServices` is NOT used directly — Apple's HIG
+// allows custom buttons as long as the locked copy is honored. We render our own pill
+// and trigger the `ASAuthorizationAppleIDProvider().createRequest()` flow on tap.
+```
+
+**Why not the system `SignInWithAppleButton`:** that primitive locks the label to Apple's strings (`"Sign in with Apple"`, `"Continue with Apple"`) and a fixed visual treatment. We need the warm-friend label and the surface-matched white-pill style. Apple's HIG explicitly permits custom buttons that trigger the same `ASAuthorizationController` request — the constraint is on the auth API, not the visual.
+
+**When NOT to use:** anywhere outside S04 Waiting. The chip is single-surface by design — it appears at the post-quiz upgrade moment ADR 0007 ratified, and nowhere else. The success and dismiss states fold cleanly into the same surface so no follow-up screen is needed.

@@ -20,7 +20,7 @@ The user has finished the quiz; not everyone has. Honest, calm, no anxiety.
 
 ## Components used
 
-`GradientSurface` (waiting) · `GTIMark` · `Eyebrow` · display headline (`N of M` / `ARE IN`) · `AvatarDot` × N · `PillCTA` ghost (Nudge) · `PillCTA` ghost (Decide now, initiator-only) · mono-tag countdown.
+`GradientSurface` (waiting) · `GTIMark` · `Eyebrow` · display headline (`N of M` / `ARE IN`) · `AvatarDot` × N · `PillCTA` ghost (Nudge) · `PillCTA` ghost (Decide now, initiator-only) · mono-tag countdown · `AuthUpgradeChip` (C-22, iOS-only).
 
 ## Copy register
 
@@ -72,6 +72,23 @@ Conditions 2 and 3 are the new v1 escape hatches that keep a slow answerer from 
 - The `"Decide now"` CTA writes `rooms.fire_trigger = 'manual'` and immediately advances the room to verdict computation for the subset that has answered.
 - Timer expiry with ≥2 answers writes `rooms.fire_trigger = 'timer'` and advances the same way.
 - Timer expiry with <2 answers writes `rooms.status = 'expired'` and flips the surface to the no-quorum terminal (see edge cases).
+
+### Auth-upgrade chip (all members, iOS-only)
+
+This is the surface where the Sign-in-with-Apple upgrade lives. Per [[../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]], the chip is **non-blocking**, **voluntary warm-friend register**, and **iOS-only** — the web fallback ([[02-invite|S02]], TB-15) renders S04 without it.
+
+| Property | Value |
+|---|---|
+| Component | `C-22` Auth Upgrade Chip |
+| Visibility | All members on iOS. Hidden when (a) user is already Apple-linked, (b) user dismissed within the last 30 days (`user_preferences.auth_prompt_dismissed_at` within 30d), or (c) render context is the web fallback. |
+| Position | In the CTA dock, **above** the initiator-only `"Decide now"` CTA and **above** the `"Nudge"` CTA. Below the avatar row + headline. Secondary to the primary "N of M are in" state — never competing for the eye. |
+| Primary copy | `"Save this taste profile"` — LOCKED. Never `"Sign up"` / `"Create account"` / `"Confirm"` / `"Sign in with Apple"`. |
+| Dismiss copy | `"Maybe later"` — LOCKED. Never `"No thanks"` / `"Skip"` / `"X"`. |
+| On tap → success | Chip replaces itself with a quiet `"Saved."` mono-tag confirmation, white 0.6, fade 320ms. No celebration motion. |
+| On tap → dismiss | Write `user_preferences.auth_prompt_dismissed_at = now()`. Chip vanishes for 30 days. The avatar row + headline carry the surface alone. |
+| On tap → cancel/error | No state change. Chip returns to the `default` state; user can retry or dismiss. |
+
+The chip exists for the post-quiz upgrade moment ADR 0007 ratified — the user has just demonstrated effort (5 quiz answers); the affordance to save it converts at this moment but pre-quiz prompts default-deny. The chip is intentionally the **only** persistent identity surface in v1; reinstall = new anonymous identity unless the user took this tap.
 
 ## Edge cases
 
