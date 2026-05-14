@@ -80,6 +80,12 @@ public final class AuthCoordinator {
     /// launches reuse the persisted session via `supabase-swift`. If
     /// the cached session is already Apple-linked (the user upgraded
     /// in a prior run), surface that as `.linkedApple` instead.
+    ///
+    /// TB-02 v1.1: on iOS the launch path now routes through the S00a
+    /// forced sign-in gate via `restoreSessionIfPresent` + the
+    /// `SignInScreen` — `ensureSignedIn` is retained for callers (the
+    /// web fallback's iOS-side join flow, integration tests) that
+    /// still want an anonymous identity minted on demand.
     public func ensureSignedIn() async {
         if let session = try? await client.auth.session {
             // The `is_anonymous` claim in the JWT tells us whether the
@@ -104,6 +110,71 @@ public final class AuthCoordinator {
         } catch {
             self.state = .error(String(describing: error))
         }
+    }
+
+    /// TB-02 v1.1 — RootView's launch entry point. Restores a cached
+    /// supabase-swift session if one is present (Apple-linked from a
+    /// prior install, or anonymous from a v1 install that survived
+    /// the v1.1 upgrade), and otherwise leaves the coordinator in
+    /// `.idle` so RootView can present the S00a sign-in gate.
+    ///
+    /// Unlike `ensureSignedIn`, this method NEVER calls
+    /// `signInAnonymously` — fresh iOS installs go through the gate;
+    /// only the explicit `signInWithApple` call mints the first session.
+    public func restoreSessionIfPresent() async {
+        if let session = try? await client.auth.session {
+            let id = session.user.id
+            if session.user.isAnonymous == false {
+                self.state = .linkedApple(userID: id)
+            } else {
+                self.state = .anonymous(userID: id)
+            }
+            return
+        }
+        // No session cached. Stay `.idle` so RootView surfaces S00a.
+        self.state = .idle
+    }
+
+    /// TB-02 v1.1 — sign the device in with an Apple identity token.
+    /// Used by the S00a `SignInScreen` on fresh installs (and after a
+    /// sign-out from S09 Settings) where there's no existing session
+    /// to link to. Goes through `signInWithIdToken` rather than
+    /// `linkIdentityWithIdToken` because there's nothing to link onto.
+    ///
+    /// State transitions:
+    ///   * idle / .error      → .signingIn → .linkedApple(userID)
+    ///   * .anonymous(userID) → reject; callers should use `linkApple`
+    ///   * .linkedApple        → already signed in; no-op success.
+    @discardableResult
+    public func signInWithApple(idToken: String, nonce: String?) async throws -> UUID {
+        if case .linkedApple(let id) = state {
+            return id
+        }
+        if case .anonymous = state {
+            // Defensive — the S00a gate only renders when there is no
+            // anonymous session, so this branch is unreachable in
+            // production. If a future surface ever reaches here with
+            // an anon session in hand, callers should use `linkApple`
+            // to preserve the id; refusing loudly avoids a silent id
+            // swap.
+            throw SignInError.haveAnonymousSession
+        }
+        self.state = .signingIn
+        do {
+            let newID = try await linker.signInWithApple(
+                idToken: idToken,
+                nonce: nonce
+            )
+            self.state = .linkedApple(userID: newID)
+            return newID
+        } catch {
+            self.state = .error(String(describing: error))
+            throw error
+        }
+    }
+
+    public enum SignInError: Error, Equatable {
+        case haveAnonymousSession
     }
 
     /// Link the current anonymous identity to a Sign-in-with-Apple
@@ -264,6 +335,15 @@ public protocol SupabaseAuthLinker: Sendable {
         nonce: String?,
         currentUserID: UUID
     ) async throws -> UUID
+
+    /// TB-02 v1.1 — perform the Supabase Apple-sign-in (no existing
+    /// session). Returns the `user_id` minted by `signInWithIdToken`.
+    /// Distinct from `linkApple` because there's nothing to link onto:
+    /// the S00a gate fires when no session exists.
+    func signInWithApple(
+        idToken: String,
+        nonce: String?
+    ) async throws -> UUID
 }
 
 /// Live implementation backed by `supabase-swift`. Calls
@@ -339,6 +419,19 @@ public struct LiveSupabaseAuthLinker: SupabaseAuthLinker {
             nonce: nonce
         )
         let session = try await client.auth.linkIdentityWithIdToken(credentials: credentials)
+        return session.user.id
+    }
+
+    public func signInWithApple(
+        idToken: String,
+        nonce: String?
+    ) async throws -> UUID {
+        let credentials = OpenIDConnectCredentials(
+            provider: .apple,
+            idToken: idToken,
+            nonce: nonce
+        )
+        let session = try await client.auth.signInWithIdToken(credentials: credentials)
         return session.user.id
     }
 }

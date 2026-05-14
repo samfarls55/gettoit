@@ -107,12 +107,16 @@ public struct JoinScreen: View {
     }
 
     private func joinIfNeeded() async {
-        // Make sure we have an anonymous session before we attempt the
-        // membership insert — RLS rejects an unauthenticated client.
+        // Make sure we have a session before we attempt the membership
+        // insert — RLS rejects an unauthenticated client. Either flavor
+        // is acceptable: anonymous v1 invitees can still come through
+        // here on web→iOS upgrades, and Apple-linked users (the v1.1
+        // norm post-S00a) carry a real identity that's already valid
+        // against the same RLS policy.
         await auth.ensureSignedIn()
 
-        guard case .anonymous(let userID) = auth.state else {
-            phase = .error("Couldn't sign in anonymously.")
+        guard let userID = auth.state.userID else {
+            phase = .error("Couldn't sign in.")
             return
         }
 

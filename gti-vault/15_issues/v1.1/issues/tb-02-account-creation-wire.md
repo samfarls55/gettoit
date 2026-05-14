@@ -2,7 +2,7 @@
 issue: tb-02
 title: Wire forced first-launch Apple sign-in (iOS) + waiting-screen download CTA (web)
 github_issue: 50
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -43,13 +43,13 @@ An anonymous web invitee on the waiting surface sees a "Download the app" CTA. T
 
 ## Acceptance criteria
 
-- [ ] On a fresh iOS install (deleted app + reinstall), launching the app lands on the sign-in surface; no other surface is reachable without completing sign-in.
-- [ ] After sign-in, subsequent launches skip the sign-in surface and land on the existing post-sign-in destination.
-- [ ] Existing v1 quiz / verdict / reroll flows continue to work end-to-end on iOS for signed-in users.
-- [ ] On web, an anonymous invitee on the waiting surface sees the "Download the app" CTA; tapping it opens the App Store URL.
-- [ ] On web for a signed-in user on the waiting surface (rare in v1.1 since web Apple sign-in is not offered per [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]], but possible if state ever changes), the CTA is suppressed.
-- [ ] No inline hex / token bypass in either codebase. `verify.mjs` green for `web/`.
-- [ ] Manual TestFlight + web smoke check covering both flows.
+- [x] On a fresh iOS install (deleted app + reinstall), launching the app lands on the sign-in surface; no other surface is reachable without completing sign-in. *(Wired via `RootView` — when `AuthCoordinator.state == .idle` post-`restoreSessionIfPresent`, `SignInScreen` renders before every other route. Manual TestFlight smoke required.)*
+- [x] After sign-in, subsequent launches skip the sign-in surface and land on the existing post-sign-in destination. *(`restoreSessionIfPresent` flips a cached `.linkedApple` session straight to `InitiatorScreen`. Manual TestFlight smoke required.)*
+- [x] Existing v1 quiz / verdict / reroll flows continue to work end-to-end on iOS for signed-in users. *(`InitiatorScreen` route now accepts `state.userID` for both anonymous + linked flavors; no other call sites changed. Manual TestFlight smoke required.)*
+- [x] On web, an anonymous invitee on the waiting surface sees the "Download the app" CTA; tapping it opens the App Store URL. *(`SessionRoom` passes `isAnonymous={true}` + `onDownloadApp` into `WaitingScreen`; tap fires `waiting_download_cta_tapped` telemetry then `window.open(APP_STORE_URL)`. Manual web smoke required.)*
+- [x] On web for a signed-in user on the waiting surface (rare in v1.1 since web Apple sign-in is not offered per [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]], but possible if state ever changes), the CTA is suppressed. *(`isAnonymous` prop gates render; suppression covered by `WaitingScreen.test.tsx` cases 4 + 5.)*
+- [x] No inline hex / token bypass in either codebase. `verify.mjs` green for `web/`.
+- [ ] Manual TestFlight + web smoke check covering both flows. *(Pending operator — requires real-device install + ASC sandbox Apple ID.)*
 
 ## Blocked by
 

@@ -173,7 +173,12 @@ final class StubAuthLinker: SupabaseAuthLinker, @unchecked Sendable {
     }
 
     var result: Outcome = .failure(StubError.unset)
+    /// TB-02 v1.1 — separate canned outcome for `signInWithApple`, so
+    /// the link tests can stub it independently. Defaults match the
+    /// link result so existing tests keep their single-knob shape.
+    var signInResult: Outcome?
     private(set) var callCount = 0
+    private(set) var signInCallCount = 0
     private(set) var lastIdToken: String?
     private(set) var lastNonce: String?
     private(set) var lastUserID: UUID?
@@ -184,6 +189,18 @@ final class StubAuthLinker: SupabaseAuthLinker, @unchecked Sendable {
         lastNonce = nonce
         lastUserID = currentUserID
         switch result {
+        case .success(let id):
+            return id
+        case .failure(let err):
+            throw err
+        }
+    }
+
+    func signInWithApple(idToken: String, nonce: String?) async throws -> UUID {
+        signInCallCount += 1
+        lastIdToken = idToken
+        lastNonce = nonce
+        switch (signInResult ?? result) {
         case .success(let id):
             return id
         case .failure(let err):
