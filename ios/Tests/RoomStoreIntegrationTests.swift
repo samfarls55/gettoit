@@ -95,15 +95,70 @@ final class RoomStoreIntegrationTests: XCTestCase {
                        "expected creator_user_id to match the signed-in user")
         XCTAssertEqual(room.vertical, "food")
         XCTAssertEqual(room.status, "open")
+        // TB-03 — calling `createRoom` without overrides must write the
+        // canonical S01 defaults (10 min / ≈ 2.0 mi).
+        XCTAssertEqual(room.timerMinutes, 10,
+                       "expected default timer_minutes from S01 spec (10 min)")
+        XCTAssertEqual(room.radiusMeters, 3219,
+                       "expected default radius_meters from S01 spec (~ 2.0 mi)")
 
         // Reading the room back through the same auth context must work
         // — proves the RLS policy admits the creator as a member.
         let fetched = try await store.fetchRoom(id: room.id)
         XCTAssertEqual(fetched?.id, room.id)
+        XCTAssertEqual(fetched?.timerMinutes, 10)
+        XCTAssertEqual(fetched?.radiusMeters, 3219)
 
         // And the creator's `members` row carries the owner role.
         let role = try await store.fetchRole(roomID: room.id, userID: creatorID)
         XCTAssertEqual(role, "owner")
+
+        try? await client.auth.signOut()
+    }
+
+    func testCreateRoomPersistsNonDefaultTimerAndRadius() async throws {
+        let client = try makeClient()
+        let creatorID = try await signInFreshAnon(on: client)
+        let store = RoomStore(client: client)
+
+        // 30 min · 5.0 mi = 8047 m — the two extreme legal values from
+        // the S01 chip group + slider. Proves the round trip handles
+        // values at the boundary of the column CHECK constraints.
+        let room = try await store.createRoom(
+            as: creatorID,
+            timerMinutes: 30,
+            radiusMeters: 8047
+        )
+
+        XCTAssertEqual(room.timerMinutes, 30)
+        XCTAssertEqual(room.radiusMeters, 8047)
+
+        let fetched = try await store.fetchRoom(id: room.id)
+        XCTAssertEqual(fetched?.timerMinutes, 30)
+        XCTAssertEqual(fetched?.radiusMeters, 8047)
+
+        try? await client.auth.signOut()
+    }
+
+    func testCreateRoomRejectsTimerOutsideTheLegalSet() async throws {
+        let client = try makeClient()
+        let creatorID = try await signInFreshAnon(on: client)
+        let store = RoomStore(client: client)
+
+        // 7 isn't in the {5, 10, 15, 30} legal set — the CHECK
+        // constraint must reject and the call must throw.
+        do {
+            _ = try await store.createRoom(
+                as: creatorID,
+                timerMinutes: 7,
+                radiusMeters: 3219
+            )
+            XCTFail("expected CHECK constraint to reject timer_minutes=7")
+        } catch {
+            // Any Postgres / PostgREST error here is acceptable — the
+            // contract is "the row must not land," which the next
+            // assertion proves.
+        }
 
         try? await client.auth.signOut()
     }
