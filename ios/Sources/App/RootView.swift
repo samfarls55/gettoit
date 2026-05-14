@@ -34,6 +34,10 @@ public struct RootView: View {
     /// (saves a tap; the late-joiner is likely planning a similar
     /// outing).
     @State private var reInvitePrefill: ReInvitePrefill?
+    /// TB-16 — set when the user taps "Settings" on S01. Renders the
+    /// S09 Settings surface; the route clears on Done or after a
+    /// successful delete + re-bootstrap.
+    @State private var showingSettings = false
 
     public init() {}
 
@@ -49,7 +53,19 @@ public struct RootView: View {
                     .multilineTextAlignment(.center)
                     .padding(GTISpacing.step6)
             } else if let coordinators {
-                if let quizCoordinator = activeQuiz?.coordinator {
+                if showingSettings {
+                    // TB-16 — Settings is the inner-most route in
+                    // the state precedence chain. While it's up, the
+                    // host suppresses every other surface; on Done or
+                    // after a successful delete, control returns to
+                    // S01 (which may itself defer to a deep-link or
+                    // read-only landing if those arrived in the
+                    // meantime).
+                    SettingsScreen(
+                        auth: coordinators.auth,
+                        onDone: { showingSettings = false }
+                    )
+                } else if let quizCoordinator = activeQuiz?.coordinator {
                     QuizScreen(
                         coordinator: quizCoordinator,
                         onClose: { activeQuiz = nil },
@@ -108,6 +124,9 @@ public struct RootView: View {
                             // carried defaults are spent.
                             reInvitePrefill = nil
                             startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: false)
+                        },
+                        onSettings: {
+                            showingSettings = true
                         }
                     )
                 } else {

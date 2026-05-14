@@ -2,7 +2,7 @@
 // Pick a vertical, set timer + radius (sensible defaults for zero-tap path),
 // drop the invite link.
 
-function ScreenInitiator({ onAdvance }) {
+function ScreenInitiator({ onAdvance, onSettings }) {
   const [vertical, setVertical] = React.useState('food');
   const [timer, setTimer] = React.useState(10);          // minutes
   const [radius, setRadius] = React.useState(2.0);       // miles
@@ -132,6 +132,18 @@ function ScreenInitiator({ onAdvance }) {
 
         <CTADock>
           <PillCTA label="Drop the invite link" fill="white" onClick={onAdvance} />
+          {/* Settings link — spec exception, see surfaces/01-initiator.md §"Settings footer link" */}
+          <button
+            onClick={onSettings}
+            style={{
+              appearance: 'none', background: 'transparent', border: 0, cursor: 'pointer',
+              minHeight: 44, marginTop: 4,
+              fontFamily: 'var(--ff-mono)', fontSize: 11, fontWeight: 700,
+              letterSpacing: '0.18em', textTransform: 'uppercase',
+              color: 'rgba(255,255,255,0.55)',
+            }}
+            aria-label="Settings — manage your data"
+          >Settings</button>
         </CTADock>
       </div>
     </GradientSurface>

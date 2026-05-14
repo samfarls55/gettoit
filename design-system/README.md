@@ -42,6 +42,7 @@ Every surface has a corresponding JSX file. The markdown is the **why**, the JSX
 | 10 | Hard-close | [`surfaces/06-hard-close.md`](./surfaces/06-hard-close.md) | [`code/screens/ScreenLocked.jsx`](./code/screens/ScreenLocked.jsx) |
 | 11 | Reroll | [`surfaces/07-reroll.md`](./surfaces/07-reroll.md) | [`code/screens/ScreenReroll.jsx`](./code/screens/ScreenReroll.jsx) |
 | 12 | Check-in | [`surfaces/08-checkin.md`](./surfaces/08-checkin.md) | [`code/screens/ScreenCheckin.jsx`](./code/screens/ScreenCheckin.jsx) |
+| 13 | Settings | [`surfaces/09-settings.md`](./surfaces/09-settings.md) | [`code/screens/ScreenSettings.jsx`](./code/screens/ScreenSettings.jsx) |
 
 Shared: [`code/tokens.css`](./code/tokens.css), [`code/components.jsx`](./code/components.jsx), [`code/README.md`](./code/README.md).
 

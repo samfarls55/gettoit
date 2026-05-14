@@ -64,10 +64,16 @@ public final class AuthCoordinator {
 
     private let client: SupabaseClient
     private let linker: any SupabaseAuthLinker
+    private let deleter: any SupabaseAccountDeleter
 
-    public init(client: SupabaseClient, linker: (any SupabaseAuthLinker)? = nil) {
+    public init(
+        client: SupabaseClient,
+        linker: (any SupabaseAuthLinker)? = nil,
+        deleter: (any SupabaseAccountDeleter)? = nil
+    ) {
         self.client = client
         self.linker = linker ?? LiveSupabaseAuthLinker(client: client)
+        self.deleter = deleter ?? LiveSupabaseAccountDeleter(client: client)
     }
 
     /// Sign the device in as a fresh anonymous identity. Subsequent
@@ -170,6 +176,66 @@ public final class AuthCoordinator {
         case userIDChanged(before: UUID, after: UUID)
     }
 
+    /// TB-16 — delete the current user and bootstrap a fresh anonymous
+    /// session. The actual auth.users row deletion happens server-side
+    /// in the `delete-user` Edge Function (the iOS client doesn't ship
+    /// a service-role key, so it can't call `auth.admin.deleteUser`
+    /// directly). Cascade FKs in the public schema handle the rest
+    /// (per ADR 0006).
+    ///
+    /// Flow on success:
+    ///   1. Edge function validates the caller's JWT and deletes the
+    ///      auth.users row matching it.
+    ///   2. Local session storage still holds the (now-stale) JWT —
+    ///      `signOut()` clears it.
+    ///   3. `signInAnonymously()` mints a fresh anonymous identity.
+    ///   4. State transitions to `.anonymous(newUserID)`.
+    ///
+    /// Failure modes:
+    ///   * Not currently signed in → `DeleteError.notSignedIn`; state
+    ///     unchanged.
+    ///   * Edge function reachable but rejects → rethrows; state
+    ///     becomes `.error`. The Settings surface re-enables the CTA
+    ///     so the user can retry.
+    ///   * Edge function unreachable (network) → rethrows.
+    ///   * signOut / signInAnonymously fails after delete → bubbles
+    ///     up as `.error`; the local row is dead but the app may need
+    ///     a relaunch to recover.
+    @discardableResult
+    public func deleteAndReboot() async throws -> UUID {
+        guard state.userID != nil else {
+            throw DeleteError.notSignedIn
+        }
+
+        self.state = .signingIn
+        do {
+            try await deleter.deleteCurrentUser()
+        } catch {
+            self.state = .error(String(describing: error))
+            throw error
+        }
+
+        // The cached JWT now references a row that no longer exists.
+        // signOut clears the keychain entry; we use `try?` because the
+        // server-side session is already invalid and may 401 the
+        // revoke call, which we don't care about — the goal is
+        // wiping the local session.
+        try? await client.auth.signOut()
+
+        do {
+            let session = try await client.auth.signInAnonymously()
+            self.state = .anonymous(userID: session.user.id)
+            return session.user.id
+        } catch {
+            self.state = .error(String(describing: error))
+            throw error
+        }
+    }
+
+    public enum DeleteError: Error, Equatable {
+        case notSignedIn
+    }
+
     // MARK: - test seam
 
     /// Internal-only setter so unit tests can push the coordinator
@@ -212,6 +278,49 @@ public protocol SupabaseAuthLinker: Sendable {
 /// Cross-device login + history-preservation is verified end-to-end
 /// in TestFlight per TB-17 (CI can't mint a real Apple identity token
 /// against the sandbox).
+// MARK: - Account deleter dependency
+
+/// Minimal seam for the in-app delete call. Production uses
+/// `LiveSupabaseAccountDeleter`; tests substitute a stub to drive the
+/// success / failure paths without invoking the real Edge function.
+public protocol SupabaseAccountDeleter: Sendable {
+    /// Invoke the `delete-user` Edge function with the current
+    /// session's JWT. Returns on success; throws on transport,
+    /// auth, or server error.
+    func deleteCurrentUser() async throws
+}
+
+/// Live implementation backed by `supabase-swift`'s Functions API.
+/// POSTs to `/functions/v1/delete-user` with the active session's
+/// bearer token. The Edge function reads the user_id from the JWT
+/// (the request body is ignored for identity), so no payload is
+/// needed.
+public struct LiveSupabaseAccountDeleter: SupabaseAccountDeleter {
+    private let client: SupabaseClient
+
+    public init(client: SupabaseClient) {
+        self.client = client
+    }
+
+    public func deleteCurrentUser() async throws {
+        let _: DeleteUserResponse = try await client.functions.invoke(
+            "delete-user",
+            options: FunctionInvokeOptions(
+                method: .post,
+                body: EmptyBody()
+            )
+        )
+    }
+
+    private struct EmptyBody: Encodable {}
+
+    private struct DeleteUserResponse: Decodable {
+        let status: String
+        let user_id: String
+        let existed: Bool
+    }
+}
+
 public struct LiveSupabaseAuthLinker: SupabaseAuthLinker {
     private let client: SupabaseClient
 

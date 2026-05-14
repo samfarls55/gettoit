@@ -68,12 +68,39 @@ The selected radius is written to `rooms.radius_meters` (converted from miles) w
 
 **Layout:** both controls render *above* the vertical picker. The `"tonight, near me"` framing of the radius slider precedes the vertical choice and primes the food-vs-other decision.
 
+## Settings footer link (spec exception)
+
+A single mono-tag `"SETTINGS"` text button renders below the primary CTA in the `CTADock`. Tap routes the user to [[09-settings|S09 Settings]] — v1's account-management surface, which contains exactly one action (delete-my-data) per App Store guideline 5.1.1(v) + [[../../gti-vault/60_engineering/adr/0006-privacy-posture-v1|ADR 0006]].
+
+### Spec exception against "no chrome above the headline"
+
+S01 is otherwise the cleanest surface — `GTIMark` in the top-left corner is the only non-content element above the eyebrow. The Settings link is an explicit exception:
+
+- **App Store 5.1.1(v) requires the deletion affordance to be "easily discoverable."** Reviewers traversing a fresh install must reach the delete action without spelunking. S01 is the surface every user lands on first; placing the link here means the path from cold start to delete-confirm is two taps.
+- **The link's visual weight is minimal.** Same `eyebrow` token treatment as `"Maybe later"` on the [[../components#c-22-auth-upgrade-chip|C-22 Auth Upgrade Chip]] — mono-tag, white 0.55, UPPERCASE. No icon, no chrome, no chevron. Doesn't compete with the primary CTA.
+- **Anchored to the CTADock, not the top.** Keeps the eyebrow + headline + control stack untouched. The link lives below `"Drop the invite link"`, where the user's eye has already terminated.
+- **Single-purpose.** Settings is the only secondary route off S01. If a second secondary route is ever needed (e.g., "View past verdicts"), that's a spec change requiring its own justification — not a license to start growing the dock.
+
+### Treatment
+
+| Property | Value |
+|---|---|
+| Component | Plain `<button>` styled with the `eyebrow` token (Inter 700 / 11 / tracking 0.18em / UPPERCASE) |
+| Label | `"SETTINGS"` (literal upper from the eyebrow case) |
+| Color | `rgba(255,255,255,0.55)` (white 0.55 — tertiary on gradient, matches the dismiss-link convention) |
+| Tap target | 44pt min-height row (HIG conformant); visible label is small |
+| Position | Inside `CTADock`, immediately below the primary `PillCTA` with `4px` margin-top |
+| Background / border | None — pure text affordance |
+
+The selection is invariant: no selected state, no disabled state. Tap navigates to S09.
+
 ## Copy register
 
 - **`"Figure it out together"`** — warm, present-tense, plural pronoun. Not "Decide where to eat" (procedural) or "Group decision time" (formal).
 - **`"Five quick taps each. One verdict. Sixty seconds."`** — three short declarative sentences. The 60-second promise is load-bearing.
 - **`"How long"` / `"How far"`** — second-person, casual. Not "Session duration" / "Search radius" (algorithm-tinted).
 - **`"Drop the invite link"`** — voluntary verb, casual register, conveys finality.
+- **`"SETTINGS"`** — mono-tag eyebrow treatment, deliberately understated. The destination matters more than the link to it.
 
 ## v1 scope
 

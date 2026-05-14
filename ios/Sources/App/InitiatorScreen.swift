@@ -39,6 +39,11 @@ public struct InitiatorScreen: View {
     /// false so the post-Q5 router can skip S04 Waiting. Optional —
     /// callers that don't surface a solo CTA pass nil.
     private let onSoloRoom: ((UUID) -> Void)?
+    /// TB-16 — fires when the user taps the "Settings" footer link
+    /// on the CTA dock. Host routes to the S09 Settings surface.
+    /// Optional — callers that don't surface settings pass nil
+    /// (e.g. unit-test surfaces).
+    private let onSettings: (() -> Void)?
 
     public init(
         roomStore: RoomStore,
@@ -46,12 +51,14 @@ public struct InitiatorScreen: View {
         prefilledTimerMinutes: Int? = nil,
         prefilledRadiusMiles: Double? = nil,
         onSharedRoom: ((UUID) -> Void)? = nil,
-        onSoloRoom: ((UUID) -> Void)? = nil
+        onSoloRoom: ((UUID) -> Void)? = nil,
+        onSettings: (() -> Void)? = nil
     ) {
         self.roomStore = roomStore
         self.userID = userID
         self.onSharedRoom = onSharedRoom
         self.onSoloRoom = onSoloRoom
+        self.onSettings = onSettings
         let resolved = InitiatorScreen.resolvedPrefill(
             timerMinutes: prefilledTimerMinutes,
             radiusMiles: prefilledRadiusMiles
@@ -400,6 +407,25 @@ public struct InitiatorScreen: View {
                 }
                 .accessibilityIdentifier("initiator.cta.solo")
                 .accessibilityLabel("Go solo. Figure it out for yourself.")
+                .disabled(phase == .creating)
+            }
+
+            // TB-16 — Settings footer link. Spec exception per
+            // design-system/surfaces/01-initiator.md §"Settings footer
+            // link". Eyebrow-token mono-tag treatment; 44pt tap row.
+            // Hidden when the host didn't wire the callback (e.g.
+            // unit-test surfaces).
+            if onSettings != nil {
+                Button(action: { onSettings?() }) {
+                    Text("SETTINGS")
+                        .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                        .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("initiator.cta.settings")
+                .accessibilityLabel("Settings — manage your data")
                 .disabled(phase == .creating)
             }
         }

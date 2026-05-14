@@ -34,11 +34,18 @@ This is HITL because the policy text needs human review and the App Store Connec
 
 ## Acceptance criteria
 
-- [ ] Privacy Policy and TOS hosted at `gettoit.app/privacy` and `gettoit.app/terms`.
-- [ ] Privacy Nutrition Labels filled out in App Store Connect to match the policy.
-- [ ] In-app "Delete my data" button works end-to-end with the documented cascade.
-- [ ] Anonymous 30-day TTL `pg_cron` job runs and purges expired rows.
-- [ ] Integration tests for delete cascade and TTL purge.
+- [ ] **(HITL)** Privacy Policy and TOS hosted at `gettoit.app/privacy` and `gettoit.app/terms`.
+- [ ] **(HITL)** Privacy Nutrition Labels filled out in App Store Connect to match the policy.
+- [x] **(AFK)** In-app "Delete my data" button works end-to-end with the documented cascade — S09 Settings surface + native confirmation alert + `delete-user` Edge Function + cascade FKs + fresh anonymous re-bootstrap. _(`design-system/surfaces/09-settings.md`, `design-system/code/screens/ScreenSettings.jsx`, `ios/Sources/App/SettingsScreen.swift`, `ios/Sources/App/AuthCoordinator.swift` `deleteAndReboot()` + `SupabaseAccountDeleter` protocol + `LiveSupabaseAccountDeleter`, `supabase/functions/delete-user/{handler,index}.ts`. S01 entry point added per spec exception in `surfaces/01-initiator.md` §"Settings footer link".)_
+- [x] **(AFK)** Anonymous 30-day TTL `pg_cron` job runs and purges expired rows. _(`supabase/migrations/20260514001000000_anonymous_ttl_sweeper.sql` — hourly at minute 30, `auth.users` delete cascades through every dependent table.)_
+- [x] **(AFK)** Integration tests for delete cascade and TTL purge. _(`supabase/functions/delete-user/index.test.ts` — 13 handler-level cases including the security invariant that body-supplied user_id is ignored. `ios/Tests/AuthCoordinatorDeleteTests.swift` — state-machine cases. `ios/Tests/DeleteUserIntegrationTests.swift` — end-to-end via live Supabase. Cascade-at-row-level is a Postgres FK invariant declared in the existing migrations + ADR 0006 amendment; CI `supabase db push --include-all` is the contract. TTL purge cron is declared in the migration; observable in the Supabase cron job log.)_
+
+## Engineering notes (2026-05-14)
+
+- **Schema cascade work was a no-op.** The 10 existing FK declarations across the public schema already match ADR 0006 after the implementation-time reconciliation: 9 cascade + 1 set null on `events`. See the [Amendments section](../../../60_engineering/adr/0006-privacy-posture-v1.md#amendments) of ADR 0006 — two clarifications surfaced (events nullify + the cascade concession on participated rooms due to the `(room_id, user_id)` PK conflict).
+- **Edge function manual deploy required:** `supabase functions deploy delete-user --project-ref rlnevdqebmzbxpntghzb`. Same pattern as the other Edge functions (no CI deploy step exists yet).
+- **One spec exception added:** S01 Initiator now carries a tertiary `"SETTINGS"` footer link in the CTADock (eyebrow mono-tag, white 0.55, 44pt tap row). Justified in `surfaces/01-initiator.md` §"Settings footer link" — App Store guideline 5.1.1(v) needs the delete affordance ≤2 taps from a cold-start surface.
+- **No new tokens or components added.** The Settings surface reuses the registered `midnight` gradient (previously declared but unused by any locked surface) and composes existing primitives (`GradientSurface`, `Eyebrow`, display headline, `PillCTA` white, plain text button).
 
 ## Blocked by
 

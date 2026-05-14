@@ -24,9 +24,9 @@ Accepted — 2026-05-12.
 | Concern | Rule |
 |---|---|
 | Claimed accounts (linked to Sign in with Apple) | Data retained until user invokes in-app delete. |
-| Anonymous accounts | 30-day TTL from last activity. Cron job purges expired rows from `votes`, `events`, `members`, `check_ins`, and `auth.users` for the affected `user_id`. |
+| Anonymous accounts | 30-day TTL from last activity. Cron job deletes the user from `auth.users`; FK cascades purge dependent rows (same mechanism as the in-app delete button). `events.user_id` nullifies to preserve analytics. |
 | Anonymous → claim merge | All anonymous-period data attached to the new `user_id`. No orphan loss. Implemented via `auth.link_identity` + a tx that rewrites `user_id` foreign keys on linked tables. |
-| Account deletion | In-app button: hard-delete all rooms the user created (rooms they were a non-owner participant of remain, with the deleted user's `user_id` nullified on `members.user_id`, `votes.user_id`). Cascade deletes on `events` and `check_ins`. |
+| Account deletion | In-app button: hard-deletes the user from `auth.users`. Cascade FKs (every dependent table except `events`) remove the user's `members`, `votes`, `ratifications`, `rerolls`, `check_ins`, `user_preferences`, `push_tokens`, `checkin_dispatches` rows, plus all `rooms` they created. `events.user_id` is `on delete set null` so analytics rollups (event counts, funnels) survive without retaining identity. See [Amendments](#amendments) for why participated-room history cascades rather than nullifying. |
 | Third-party preference-data sharing | None. Foursquare receives geo queries only — no user identifiers, no preferences. |
 | Cross-group preference visibility | A user's preferences are visible only inside the rooms they participated in (RLS-enforced). No "see what X likes" surfaces. |
 | Geographic scope at v1 | US-only beta. Minimizes GDPR/CCPA exposure. EU launch requires a compliance pass not in v1 scope. |
@@ -51,7 +51,7 @@ Accepted — 2026-05-12.
 ### Negative / accepted tradeoffs
 
 - **No EU users at beta.** Foreclosed during v1; geofence by App Store availability (US storefront only) and TestFlight invite control.
-- **Account-deletion cascade has edge cases.** Rooms the deleted user *created* hard-delete; co-participants lose access to that room's history. Acceptable; deletion is a hard delete by design.
+- **Account deletion cascades across participated rooms.** Beyond rooms the user *created* (which hard-delete), their `members`, `votes`, `ratifications`, `rerolls` rows in rooms they joined as a non-owner *also* cascade-delete. The original ADR draft targeted `SET NULL` on `members.user_id` + `votes.user_id` to preserve co-participation history, but the `(room_id, user_id)` primary keys on those tables preclude `SET NULL` in PostgreSQL without a synthetic-id rework. Accepted at v1 cohort scale (US beta, small cohort) — rare for non-owners to delete, and verdicts are already computed + ratified by the time anyone leaves. Re-evaluation trigger added below.
 - **30-day anonymous TTL must not surprise users.** Privacy Policy and the post-vote auth-prompt copy on the Waiting surface (S04 chip — implemented in tracer bullet [[../../15_issues/v1/issues/tb-12-apple-signin-upgrade|TB-12]]) must mention it without sounding alarming.
 
 ## Re-evaluation triggers
@@ -59,9 +59,21 @@ Accepted — 2026-05-12.
 - EU launch decision.
 - DAU crosses a threshold where CCPA's "verifiable consumer requests" workflow needs operational support (typically > 50k California users).
 - Any product surface starts wanting to expose cross-group preference data.
+- Any post-verdict surface displays historical participant lists where retroactive shrinkage from a participant deletion would be user-visible (would force the synthetic-id rework to enable `SET NULL` on `members`, `votes`, `ratifications`).
 
 ## References
 
 - [[../../50_product/v1-scope|v1-scope.md]] §Open gaps
 - [[0007-auth-anonymous-default-apple-upgrade|ADR 0007]]
 - [[0005-telemetry-supabase-event-store|ADR 0005]] (event retention couples to this)
+
+## Amendments
+
+### 2026-05-14 — TB-16 implementation reconciliation
+
+When TB-16 (in-app delete + 30-day TTL) hit the schema layer, two clarifications surfaced and were applied to the rows above:
+
+1. **Account-deletion mechanism on participated rooms.** The original Decision row described co-participation history as nullified on `members.user_id` and `votes.user_id`. PostgreSQL primary-key constraints `(room_id, user_id)` preclude `SET NULL` on a PK column without a synthetic-id rework. Decision: cascade applied uniformly across all participated-room tables (`members`, `votes`, `ratifications`, `rerolls`). The "Negative / accepted tradeoffs" bullet was rewritten to document the concession, and a new re-evaluation trigger added if any future surface makes the retroactive shrinkage user-visible.
+2. **Events table semantics.** `events.user_id` was implemented as `on delete set null` in `supabase/migrations/20260514000400000_checkins_and_events.sql` so analytics rollups survive a user delete (event happened, identity is gone — zero retained PII). The original ADR row implied cascade; corrected to match deployed semantics.
+
+No reversal of overall intent. Status remains `accepted`. Schema is already correct as of `493a482` — no new migration required for cascade semantics; only the 30-day TTL cron is net-new in TB-16.
