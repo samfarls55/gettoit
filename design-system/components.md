@@ -442,3 +442,22 @@ The register is voluntary warm-friend per ADR 0007 §"Why" — anything that fra
 **Why not the system `SignInWithAppleButton`:** that primitive locks the label to Apple's strings (`"Sign in with Apple"`, `"Continue with Apple"`) and a fixed visual treatment. We need the warm-friend label and the surface-matched white-pill style. Apple's HIG explicitly permits custom buttons that trigger the same `ASAuthorizationController` request — the constraint is on the auth API, not the visual.
 
 **When NOT to use:** anywhere outside S04 Waiting. The chip is single-surface by design — it appears at the post-quiz upgrade moment ADR 0007 ratified, and nowhere else. The success and dismiss states fold cleanly into the same surface so no follow-up screen is needed.
+
+---
+
+## C-23 · LocationPicker
+
+**STUB — full spec to be filled in by the agent picking up [[../gti-vault/15_issues/v1.1/issues/sg-04-geo-permission-and-location-selector|sg-04]].**
+
+Reusable location selector. Bundled chip readout + tap-to-edit typeahead sheet + suggestion list + deny-state empty + permission re-enable affordance. Decision recorded in [[../gti-vault/60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]].
+
+Slot reserved here so the agent has a single anchor to fill in. The agent has token authority — add new tokens to `tokens.json` and document in `tokens.md` when the picker needs colors / radii / shadows not yet registered (suggestion-row press state, map-thumb border radius, typeahead caret, etc.). The agent has copy authority — draft pre-prime card body from `40_marketing_branding/` voice guide.
+
+### Required surfaces on completion
+
+- This entry filled in with full visual spec table (readout chip, sheet, typeahead input, suggestion row, empty state, deny state) following the precedent of `C-19 Vertical Picker Row` and `C-22 Auth Upgrade Chip`.
+- `code/components.jsx` exports `LocationPicker` (or sibling `LocationPickerChip` + `LocationPickerSheet` if the agent decides to split the JSX, while keeping the conceptual `C-23` single).
+- New surface doc and screen JSX for the pre-prime permission card (proposed `surfaces/00b-location-permission.md` + `code/screens/ScreenLocationPermission.jsx`).
+- Initiator surface spec updated to mention the persistent picker (auto / manual / stale states).
+- `CHANGELOG.md` entry.
+- `node scripts/verify.mjs` green.

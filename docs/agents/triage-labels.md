@@ -11,6 +11,7 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 | `ready-for-agent`          | `ready-for-agent`  | Fully specified, ready for an AFK agent  |
 | `ready-for-human`          | `ready-for-human`  | Requires human implementation            |
 | `wontfix`                  | `wontfix`          | Will not be actioned                     |
+| —                          | `deferred`         | Planned but timing deferred — not actively worked, awaiting external gate |
 
 ## Additional labels in use on this repo
 

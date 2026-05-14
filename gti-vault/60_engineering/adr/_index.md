@@ -19,3 +19,4 @@ ADRs are created lazily by `/grill-with-docs` when decisions crystallise. See `d
 - [[0006-privacy-posture-v1|0006 — Privacy posture v1]] (accepted 2026-05-12) — claimed-retained / anonymous-30d-TTL / in-app delete / no third-party preference sharing / US-only beta.
 - [[0007-auth-anonymous-default-apple-upgrade|0007 — Auth: anonymous default + post-quiz Apple upgrade]] (accepted 2026-05-12) — preserves two-tap invitee promise; upgrade chip on Waiting surface.
 - [[0008-ios-min-target-17|0008 — iOS minimum deployment target: iOS 17]] (accepted 2026-05-12) — Observable macro, stable ActivityKit, ~95% device reach.
+- [[0009-locationpicker-as-reusable-component|0009 — LocationPicker as a reusable design-system component]] (accepted 2026-05-14) — adds `C-23 LocationPicker` rather than composing existing primitives; recurrence expected across profile, multi-geo, and post-v1.1 surfaces.

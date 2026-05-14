@@ -2,7 +2,8 @@
 issue: tb-17
 title: TestFlight external + cohort 1 recruitment
 github_issue: 18
-status: in-progress
+status: deferred
+deferred_until: founder comfortable living in app + v1.1 TBs/bugs cleared
 type: HITL+AFK
 created: 2026-05-12
 prd: v1-prd

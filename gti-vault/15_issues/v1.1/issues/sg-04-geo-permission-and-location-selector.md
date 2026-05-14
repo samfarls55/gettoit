@@ -1,11 +1,12 @@
 ---
 issue: sg-04
-title: Geo permission pre-prime + persistent location selector — surface + LocationPicker component decision
+title: Geo permission pre-prime + persistent location selector — C-23 LocationPicker
 github_issue: 48
-status: needs-triage
-type: HITL
+status: ready-for-agent
+type: AFK
 created: 2026-05-14
 prd: v1-prd
+adr: 0009-locationpicker-as-reusable-component
 ---
 
 # sg-04 — Geo permission + location selector
@@ -23,14 +24,17 @@ v1 has no pre-prime surface for the iOS location permission and no persistent lo
 
 Critical UX rule: **denying location must not break the app**. Denied users still have a viable path via manual selection. v1.1's same-geo assumption still holds, but the location source can be either GPS or manually selected.
 
-## Why HITL
+## Component-architecture decision (RESOLVED 2026-05-14)
 
-There is a component-architecture decision in this issue: the manual-entry path likely needs a `LocationPicker` component that does not exist in `design-system/components.md` yet. Two paths:
+Recorded in [[../../../60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]]. **Path B: add `C-23 LocationPicker` as a reusable design-system component.** Rationale: location-picking is expected to recur on future profile-edit and multi-geo surfaces; bundling chip + sheet + typeahead + deny-state into one primitive prevents drift.
 
-1. **New component** — propose `C-NN · LocationPicker` (a place-typeahead + map-thumbnail composite). Adds a 21st component to the locked set.
-2. **Extend existing `MapKitPlacesFallback`** — reuse the iOS-side `MapKitPlacesFallback` plumbing rather than introducing a new design-system primitive. Lighter, but couples the design system to a specific iOS framework.
+The original "extend `MapKitPlacesFallback`" alternative framing was a category error — `MapKitPlacesFallback` is a pure data-layer service, not a UI primitive. The real fork was reusable component vs ad-hoc composition. Decision is the reusable component.
 
-Per [[../../../../CLAUDE|root CLAUDE.md]] rules: "Never invent components" without surfacing the gap. Surface this decision to a human (design-system maintainer) before building either path.
+## Agent autonomy granted on this issue
+
+- **Token authority.** Agent may add tokens to `tokens.json` (and document in `tokens.md`) for any new colors / radii / shadows the picker needs (suggestion-row press, map-thumb border, typeahead caret, etc.). Honor the Sunset Pop rules: no red, no green; sun is the only state color. Regen `tokens.css` in the same commit.
+- **Copy authority.** Agent drafts the pre-prime card body from `40_marketing_branding/` voice guide. Maintainer reviews on PR.
+- **Refero authority.** Agent uses the Refero MCP to browse location-picker / place-picker / address-typeahead patterns and picks the best fit for Sunset Pop. No specific reference is pre-anchored.
 
 ## Scope
 
@@ -43,38 +47,47 @@ Per [[../../../../CLAUDE|root CLAUDE.md]] rules: "Never invent components" witho
   - Denied path: proceed to Pick a Vertical with empty location; manual selector becomes the entry path.
 - **New JSX** at `design-system/code/screens/ScreenLocationPermission.jsx`.
 
-### 2. Persistent location selector UI
+### 2. Persistent location selector UI — C-23 LocationPicker
 
-- **Spec where the location selector lives in the existing flow.** Likely:
-  - On the initiator surface (S01 / "Pick a Vertical") as an inline editable chip / row showing current location.
-  - On any subsequent surface that surfaces nearby-restaurant context.
-- **Component decision (HITL):** choose between new `LocationPicker` and extending `MapKitPlacesFallback`. Document the call in [[../../../60_engineering/adr|an ADR]] if it has implementation downstream of v1.1.
+- **Fill in the `C-23` slot** in `design-system/components.md` (stub already in place pointing here).
+- **Implement** `code/components.jsx` exports for the picker (single component or sibling pieces, agent's call on JSX shape — `C-23` stays conceptually single).
+- **Document where it lives:** initiator surface (S01 / "Pick a Vertical") as an inline editable chip / row showing current location. Update the relevant `surfaces/0N-*.md` doc.
 - **States:**
   - Auto (permission granted): pre-fills from GPS; user can tap to override.
   - Manual (permission denied): empty until user taps and selects; selection persists in session state.
   - Stale (permission granted but GPS unavailable): falls back to last-known or to manual entry.
+  - Deny-state re-enable: empty-state of the typeahead surface offers an iOS Settings deep-link affordance for re-enabling permission.
 
 ### 3. Tokens
 
-- No new color / typography tokens expected; standard chip / inline-input shapes.
-- If the LocationPicker introduces a thumbnail map view, confirm whether it needs token treatment for map tile / pin styling (likely deferred to the post-component-decision spec work).
+- Use existing tokens first.
+- New tokens permitted per the autonomy clause above. Register in `tokens.json`, document in `tokens.md`, regen `tokens.css`.
 
 ## Acceptance criteria
 
-- [ ] Component-architecture decision recorded (new `LocationPicker` vs `MapKitPlacesFallback` extension), with rationale in the surface doc or a follow-on ADR.
 - [ ] `design-system/surfaces/00b-location-permission.md` (or chosen name) exists describing pre-prime card + grant / deny paths.
-- [ ] Persistent location selector documented in the initiator-surface spec (or wherever it lives) with auto / manual / stale states.
-- [ ] If a new component is introduced, `design-system/components.md` has the entry and `design-system/code/components.jsx` implements it.
-- [ ] `design-system/code/screens/ScreenLocationPermission.jsx` exists.
+- [ ] `design-system/code/screens/ScreenLocationPermission.jsx` exists and matches the surface doc.
+- [ ] `design-system/components.md` `C-23 LocationPicker` entry filled in with visual spec table (readout chip, sheet, typeahead input, suggestion row, empty state, deny state) following the precedent of `C-19` and `C-22`.
+- [ ] `design-system/code/components.jsx` exports the `LocationPicker` primitive(s).
+- [ ] Persistent location selector documented on the initiator-surface spec with auto / manual / stale states.
+- [ ] If new tokens were added: `tokens.json` updated, `tokens.md` documents them, `tokens.css` regenerated, all three in the same commit.
+- [ ] `design-system/README.md` code map row added for the new screen + `C-23` component.
+- [ ] `design-system/CHANGELOG.md` entry referencing this issue + ADR 0009.
 - [ ] `node design-system/scripts/verify.mjs` green.
-- [ ] `design-system/CHANGELOG.md` entry referencing this issue.
 
-## Open questions
+## Open questions (for the agent, not the maintainer)
 
-- **LocationPicker vs MapKitPlacesFallback extension** — flagged HITL above. Resolve before any wire work.
-- **Where exactly does the selector live?** Initiator surface only, or also above the question flow? Recommended: initiator only for v1.1; later sessions surface the selector contextually if needed.
-- **Behavior if permission was denied previously and the user wants to re-enable?** iOS Settings deep-link from the manual-entry empty state. Add to spec.
+- **Sheet vs inline expand:** Refero browse should inform whether the typeahead surface is a full bottom sheet (precedent: `C-16`) or an inline expand below the chip. Pick what feels native to Sunset Pop. Document the call in the `C-23` entry.
+- **Map thumbnail or no:** the original issue floated a "place-typeahead + map-thumbnail composite." The thumbnail is optional — drop it if it complicates the visual without adding navigational value, keep it if Refero references show it earning its space.
 
 ## Blocked by
 
-None — can start immediately. [[tb-03-geo-permission-and-location-selector-wire|tb-03]] is blocked on this issue, including its HITL component decision.
+None. [[tb-03-geo-permission-and-location-selector-wire|tb-03]] (the iOS wire job) consumes this issue's output and remains blocked on it until the spec lands.
+
+## Out of scope
+
+- iOS-side wiring of `CLLocationManager`, `MKLocalSearchCompleter`, and session-state persistence — that is `tb-03`.
+- Multi-geo / cross-geo room handling — out of v1.1 entirely; the picker's same-geo assumption still holds.
+- Profile-level "home area" saved-location editor — deferred to pre-public-launch milestone.
+- Changes to `MapKitPlacesFallback` or `PlacesService` data-layer code — both unchanged.
+- Bug-03 (Q5 placeholders) — separate issue with its own coordinate-source stopgap.

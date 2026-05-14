@@ -22,7 +22,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 |---|---|---|---|---|
 | bug-01 | [[issues/bug-01-invite-link-404\|Invite link 404 + AASA regression test]] | AFK | [#41](https://github.com/samfarls55/gettoit/issues/41) | — |
 | bug-02 | [[issues/bug-02-static-og-image-placeholder\|Static placeholder OG image + meta tags]] | AFK | [#42](https://github.com/samfarls55/gettoit/issues/42) | — |
-| bug-03 | [[issues/bug-03-q5-placeholder-no-foursquare-calls\|Q5 placeholders, zero Foursquare calls — diagnose then fix]] | HITL | [#43](https://github.com/samfarls55/gettoit/issues/43) | — |
+| bug-03 | [[issues/bug-03-q5-placeholder-no-foursquare-calls\|Q5 placeholders, zero Foursquare calls — wire PlacesService into Q5]] | AFK | [#43](https://github.com/samfarls55/gettoit/issues/43) | — |
 | bug-04 | [[issues/bug-04-question-transition-motion-lag\|Question transition motion lag]] | AFK | [#44](https://github.com/samfarls55/gettoit/issues/44) | — |
 
 ### Spec gaps
@@ -32,7 +32,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | sg-01 | [[issues/sg-01-on-gradient-subheader-contrast\|On-gradient subheader contrast token fix]] | AFK | [#45](https://github.com/samfarls55/gettoit/issues/45) | — |
 | sg-02 | [[issues/sg-02-landing-page-surface\|Landing page surface (two-button)]] | AFK | [#46](https://github.com/samfarls55/gettoit/issues/46) | — |
 | sg-03 | [[issues/sg-03-account-creation-surfaces\|Forced first-launch sign-in + waiting-screen download CTA]] | AFK | [#47](https://github.com/samfarls55/gettoit/issues/47) | — |
-| sg-04 | [[issues/sg-04-geo-permission-and-location-selector\|Geo permission + location selector + LocationPicker decision]] | HITL | [#48](https://github.com/samfarls55/gettoit/issues/48) | — |
+| sg-04 | [[issues/sg-04-geo-permission-and-location-selector\|Geo permission + location selector — C-23 LocationPicker]] | AFK | [#48](https://github.com/samfarls55/gettoit/issues/48) | — |
 
 ### Tracer-bullet build slices
 
@@ -48,7 +48,7 @@ Spec-gaps + bugs are dependency-free at the v1.1 layer — any can start immedia
 
 - `tb-01` consumes `sg-02` landing surface.
 - `tb-02` consumes `sg-03` sign-in + waiting-screen specs.
-- `tb-03` consumes `sg-04` permission + selector specs, including the HITL LocationPicker decision.
+- `tb-03` consumes `sg-04` permission + selector specs. The LocationPicker component decision was resolved 2026-05-14 (see [[../../60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]] — reusable `C-23 LocationPicker`); sg-04 is now AFK.
 
 `bug-03` (Q5 placeholders) shares root-cause space with `tb-03` (location selector) — wiring location may resolve bug-03 as a side effect, but bug-03 owns its own acceptance criteria.
 
@@ -126,7 +126,7 @@ Resolution context captured during a `/grill-me` session run on the candidate ta
 - **When prompt fires:** pre-quiz, on tapping "Start a Decision," before the Pick a Vertical screen. Pre-prime card explains *why* (restaurant recs need location), then native iOS dialog.
 - **Persistent location selector UI:** location is **always editable**. Auto-populates if permission granted, requires manual selection if denied, user can override the auto-populated value in either case.
 - **No "denied = broken app" failure mode.** Denied users still have a viable path via manual selection.
-- **Adjacency flagged:** the manual-entry path likely needs a `LocationPicker` component that may not exist in `design-system/components.md` yet. Could be new component or extension of existing `MapKitPlacesFallback` plumbing. Resolve during spec-gap work on this issue.
+- **Adjacency RESOLVED (2026-05-14):** [[../../60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]] picks Path B — reusable `C-23 LocationPicker` component, not a one-off composition. Original "extend `MapKitPlacesFallback`" framing was a category error (data-layer service, not a UI primitive). Agent has token / copy / Refero authority on this issue; see the issue body for the granted-autonomy list.
 
 ### #9 — Questions rework, profile vs session split (product-decision, RESOLVED)
 - **Decision recorded in:** `50_product/questions-profile-vs-session-split.md` (to be created — does not yet exist, must be written before `/to-issues` runs).
@@ -175,7 +175,7 @@ Triage these when planning the milestone after v1.1 ships. Not appropriate to fi
 
 ## Adjacencies surfaced during grilling
 
-- **`LocationPicker` component** — possibly missing from `design-system/components.md`. Needed for #8 manual-entry path. Resolve as part of #8 spec-gap work — could be a new component or an extension of existing `MapKitPlacesFallback`.
+- **`LocationPicker` component** — RESOLVED 2026-05-14 as `C-23 LocationPicker` per [[../../60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]]. Stub slot reserved in `design-system/components.md`; agent fills in the full spec during sg-04 work.
 - **Account Settings surface (existing)** — currently a delete-your-data page. #6 wires the landing-page button to it; #7 may extend it further in pre-public-launch milestone for the profile-edit surface.
 
 ## Completed prerequisites (2026-05-14)
