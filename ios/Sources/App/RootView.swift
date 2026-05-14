@@ -1,14 +1,17 @@
 // GetToIt — Root view.
 //
-// Boots the AuthCoordinator + RoomStore, then routes between two
+// Boots the AuthCoordinator + RoomStore, then routes between three
 // surfaces:
 //   * S01 InitiatorScreen — default landing for the device that
 //     opens the app cold.
 //   * JoinScreen — surfaced when a Universal Link delivers a deep
 //     link payload (TB-02).
+//   * QuizScreen — surfaced once the device is a member of a room,
+//     either because the initiator just shared the link (PRD user
+//     story 8) or the invitee just joined (TB-04).
 //
-// TB-04 onward replaces the InitiatorScreen → Q1 transition; for TB-02
-// we land back on the initiator after sharing.
+// `activeQuiz` is consulted before `deepLink`: once the quiz is live,
+// re-opening another deep link doesn't force-rejoin mid-quiz.
 
 import SwiftUI
 import Supabase
@@ -17,6 +20,7 @@ public struct RootView: View {
     @State private var coordinators: Coordinators?
     @State private var configMissing = false
     @State private var deepLink: InviteLink.Payload?
+    @State private var activeQuiz: QuizContext?
 
     public init() {}
 
@@ -32,14 +36,29 @@ public struct RootView: View {
                     .multilineTextAlignment(.center)
                     .padding(GTISpacing.step6)
             } else if let coordinators {
-                if let payload = deepLink {
+                if let quizCoordinator = activeQuiz?.coordinator {
+                    QuizScreen(
+                        coordinator: quizCoordinator,
+                        onClose: { activeQuiz = nil },
+                        onSubmitted: { activeQuiz = nil }
+                    )
+                } else if let payload = deepLink {
                     JoinScreen(
                         payload: payload,
                         auth: coordinators.auth,
-                        roomStore: coordinators.roomStore
+                        roomStore: coordinators.roomStore,
+                        onJoined: { roomID, userID in
+                            startQuiz(roomID: roomID, userID: userID, client: coordinators.client)
+                        }
                     )
                 } else if case .anonymous(let userID) = coordinators.auth.state {
-                    InitiatorScreen(roomStore: coordinators.roomStore, userID: userID)
+                    InitiatorScreen(
+                        roomStore: coordinators.roomStore,
+                        userID: userID,
+                        onSharedRoom: { roomID in
+                            startQuiz(roomID: roomID, userID: userID, client: coordinators.client)
+                        }
+                    )
                 } else {
                     Text("Sign-in failed. Pull to retry.")
                         .font(.system(size: GTIFont.Size.body, weight: .semibold))
@@ -87,11 +106,32 @@ public struct RootView: View {
         self.deepLink = payload
     }
 
+    /// Spin up a fresh `QuizCoordinator` bound to the current room +
+    /// user, and route into `QuizScreen`. Called from the initiator
+    /// flow (after the share sheet drops the link — PRD user story 8)
+    /// and from the join flow (after the invitee's `members` row is
+    /// written).
+    private func startQuiz(roomID: UUID, userID: UUID, client: SupabaseClient) {
+        let coordinator = QuizCoordinator(
+            roomID: roomID,
+            userID: userID,
+            writer: QuizSupabaseWriter.make(client: client)
+        )
+        self.activeQuiz = QuizContext(coordinator: coordinator)
+        // Clear the deep link so closing the quiz returns to the
+        // initiator surface rather than re-routing back into Join.
+        self.deepLink = nil
+    }
+
     // Group the live coordinators so the view body keeps a single
     // optional for "are we configured yet."
     private struct Coordinators {
         let auth: AuthCoordinator
         let roomStore: RoomStore
         let client: SupabaseClient
+    }
+
+    private struct QuizContext {
+        let coordinator: QuizCoordinator
     }
 }

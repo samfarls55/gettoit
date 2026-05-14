@@ -26,10 +26,12 @@ public struct InitiatorScreen: View {
 
     private let roomStore: RoomStore
     private let userID: UUID
+    private let onSharedRoom: ((UUID) -> Void)?
 
-    public init(roomStore: RoomStore, userID: UUID) {
+    public init(roomStore: RoomStore, userID: UUID, onSharedRoom: ((UUID) -> Void)? = nil) {
         self.roomStore = roomStore
         self.userID = userID
+        self.onSharedRoom = onSharedRoom
     }
 
     public enum Phase: Equatable {
@@ -68,6 +70,14 @@ public struct InitiatorScreen: View {
         }
         .sheet(item: $pendingShare) { share in
             ShareSheet(items: [share.url])
+                .onDisappear {
+                    // PRD user story 8: after the initiator drops the
+                    // link, transition them into their own Q1 rather
+                    // than leaving them on the idle initiator surface.
+                    // The callback is optional so existing test surfaces
+                    // that don't want the auto-transition can omit it.
+                    onSharedRoom?(share.id)
+                }
         }
     }
 
