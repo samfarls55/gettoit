@@ -85,7 +85,7 @@ jobs:
     # Only push when the migrations directory actually changes — keeps
     # design-system-only PRs from hitting the prod DB unnecessarily and
     # avoids burning the rate-limited supabase API tokens.
-    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}

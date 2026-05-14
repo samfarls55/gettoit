@@ -146,6 +146,19 @@ extra whitespace.**
 > environment variables. The `testflight` job decodes it back to a
 > file at the path Apple's tools expect.
 
+> **Sandbox gotcha** (Claude Code / WSL). If you're running `base64 ... | gh secret set ...`
+> from inside a sandboxed terminal (Claude Code's WSL session, or any
+> container that doesn't bind-mount your host's `C:\` at `/mnt/c`), the
+> `base64` command silently produces empty output and `gh secret set`
+> happily stores an *empty* secret — no loud error. The `testflight`
+> job's gate step will then skip itself as if the credentials were
+> never configured. Run the secret-set commands from a host-mounted
+> WSL terminal or from Windows PowerShell using
+> `[Convert]::ToBase64String([IO.File]::ReadAllBytes("..."))`. To verify
+> a secret is actually populated, kick a CI run and check the env
+> dump in the `Gate when App Store Connect credentials are missing`
+> step — a populated secret renders as `***`, an empty one as nothing.
+
 ### Step 4 — Add yourself as an internal TestFlight tester
 
 Internal testers can install TestFlight builds immediately after
