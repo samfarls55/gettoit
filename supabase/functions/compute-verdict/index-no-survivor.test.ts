@@ -1,0 +1,366 @@
+// HTTP-layer tests for the no-survivor terminal + widen-radius
+// re-run (TB-09). Lives alongside `index.test.ts` and shares its
+// in-memory adapter style.
+
+import {
+  assert,
+  assertEquals,
+  assertExists,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  type ComputeVerdictDataAdapter,
+  handleRequest,
+  type MemberVoteRow,
+  type OptionCutInsert,
+  type RoomOptionRow,
+  type VerdictInsert,
+  type VerdictRow,
+} from "./handler.ts";
+
+const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
+
+function envOk() {
+  return {
+    SUPABASE_URL: "https://example.supabase.co",
+    SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
+  };
+}
+
+interface AdapterSeed {
+  room?: { id: string } | null;
+  options?: RoomOptionRow[];
+  votes?: MemberVoteRow[];
+  existing?: VerdictRow | null;
+  roomMeta?: { radius_meters?: number } | null;
+}
+
+interface AdapterState {
+  adapter: ComputeVerdictDataAdapter;
+  inserts: VerdictInsert[];
+  cuts: OptionCutInsert[][];
+  deletedVerdictRoomIds: string[];
+}
+
+function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
+  const inserts: VerdictInsert[] = [];
+  const cuts: OptionCutInsert[][] = [];
+  const deletedVerdictRoomIds: string[] = [];
+  let existing = seed.existing ?? null;
+  const adapter: ComputeVerdictDataAdapter = {
+    async fetchRoom(_id) {
+      return seed.room === undefined
+        ? { id: "00000000-0000-0000-0000-000000000001" }
+        : seed.room;
+    },
+    async fetchOptions(_id) {
+      return seed.options ?? [];
+    },
+    async fetchVotes(_id) {
+      return seed.votes ?? [];
+    },
+    async existingVerdict(_id) {
+      return existing;
+    },
+    async insertVerdict(row) {
+      inserts.push(row);
+      const inserted: VerdictRow = {
+        id: `verdict-${inserts.length}`,
+        room_id: row.room_id,
+        option_id: row.option_id,
+        method: row.method,
+        rule_text: row.rule_text,
+        computed_at: "2026-05-13T00:00:00Z",
+      };
+      existing = inserted;
+      return inserted;
+    },
+    async insertOptionCuts(rows) {
+      cuts.push(rows);
+    },
+    async fetchRoomRadius(_id) {
+      return seed.roomMeta?.radius_meters ?? null;
+    },
+    async deleteVerdictForRoom(roomId) {
+      deletedVerdictRoomIds.push(roomId);
+      existing = null;
+    },
+  };
+  return { adapter, inserts, cuts, deletedVerdictRoomIds };
+}
+
+function authedPost(body: unknown): Request {
+  return new Request("https://example/compute-verdict", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer test",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// no_survivor terminal — engine cannot seat a candidate
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("compute-verdict — no-survivor exits 200 with method=no_survivor", async () => {
+  // The single candidate exceeds the member's budget cap (hard need
+  // — never relaxes). The cascade can't seat a survivor; the
+  // engine must surface `method=no_survivor` and the handler must
+  // persist the verdict row (option_id null).
+  const { adapter, inserts, cuts } = memoryAdapter({
+    options: [
+      { id: "opt-splurge", payload: { name: "Splurge", price_tier: 4 } },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 2,
+        q3_walk_minutes: 30,
+        q4_vibe: 2,
+        q5_regret: { "opt-splurge": 5 },
+      },
+    ],
+  });
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200,
+    "no_survivor must NOT be an error — the surface needs the verdict row");
+  const body = await res.json();
+  assertEquals(body.verdict.method, "no_survivor");
+  assertEquals(body.verdict.option_id, null,
+    "no_survivor verdict carries no winning option_id");
+  assertEquals(body.cuts.length, 0,
+    "no_survivor mode suppresses the cuts drawer — no cuts rows persisted");
+  // The verdict row IS persisted so the iOS surface can read it.
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].method, "no_survivor");
+  assertEquals(inserts[0].option_id, null);
+  assertEquals(cuts.length, 0,
+    "insertOptionCuts must not be called with empty cuts on the no-survivor path");
+  // The surface needs the meta line + relax chain telemetry.
+  assertExists(body.surviving_hard_needs);
+  assert(Array.isArray(body.surviving_hard_needs));
+  assert(body.surviving_hard_needs.length > 0,
+    "no_survivor body should list surviving hard-needs for the S05 meta line");
+});
+
+Deno.test("compute-verdict — no-survivor rule_text never names a person", async () => {
+  const { adapter } = memoryAdapter({
+    options: [
+      { id: "steakhouse", payload: { name: "Steakhouse", price_tier: 2, dietary_tags: [] } },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "alex",
+        q1_vetoes: ["vegan"],
+        q2_budget: 4,
+        q3_walk_minutes: 30,
+        q4_vibe: 2,
+        q5_regret: { "steakhouse": 5 },
+      },
+    ],
+  });
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.method, "no_survivor");
+  assert(!body.verdict.rule_text.toLowerCase().includes("alex"),
+    `rule_text must not name alex: ${body.verdict.rule_text}`);
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// Widen-radius re-run — bypasses idempotency, replaces existing verdict
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("compute-verdict — widen-radius re-run replaces an existing no_survivor verdict", async () => {
+  // The existing verdict is a no-survivor row at the default radius.
+  // The widen re-run posts with `radius_meters_override` and the
+  // candidate is now within reach. The handler must drop the prior
+  // verdict + cuts and compute a fresh one.
+  const existing: VerdictRow = {
+    id: "v-old",
+    room_id: VALID_ROOM_ID,
+    option_id: null,
+    method: "no_survivor",
+    rule_text: "previous no-survivor rule",
+    computed_at: "2026-05-13T00:00:00Z",
+  };
+  const { adapter, inserts, deletedVerdictRoomIds } = memoryAdapter({
+    existing,
+    options: [
+      {
+        id: "opt-stretch",
+        payload: {
+          name: "Stretch Spot",
+          price_tier: 2,
+          walk_minutes_estimate: 8,
+          // distance is part of the payload — engine reads it for the
+          // radius gate
+          distance_meters: 2414, // 1.5 mi
+        },
+      },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        q3_walk_minutes: 30,
+        q4_vibe: 2,
+        q5_regret: { "opt-stretch": 5 },
+      },
+    ],
+    roomMeta: { radius_meters: 805 }, // 0.5 mi — too tight for the candidate
+  });
+  // First widen — request 3.0 mi (4828 m).
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 4828 }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  // The prior no_survivor row should be deleted; a fresh manual
+  // verdict inserted.
+  assertEquals(deletedVerdictRoomIds, [VALID_ROOM_ID],
+    "widen re-run must drop the prior no_survivor verdict");
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].method, "manual");
+  assertEquals(inserts[0].option_id, "opt-stretch");
+  assertEquals(body.verdict.method, "manual");
+  assertEquals(body.verdict.option_id, "opt-stretch");
+});
+
+Deno.test("compute-verdict — widen-radius re-run preserves a successful verdict (idempotent on hit)", async () => {
+  // A manual verdict already exists. Even with `radius_meters_override`,
+  // the handler must NOT replace a successful verdict — only no_survivor
+  // verdicts are replaceable via widen. This defends against a duplicate
+  // "Widen radius" tap after the engine has already produced a winner.
+  const existing: VerdictRow = {
+    id: "v-old",
+    room_id: VALID_ROOM_ID,
+    option_id: "opt-pico",
+    method: "manual",
+    rule_text: "Pico's had the lowest regret-of-omission.",
+    computed_at: "2026-05-13T00:00:00Z",
+  };
+  const { adapter, inserts, deletedVerdictRoomIds } = memoryAdapter({
+    existing,
+    options: [
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        q3_walk_minutes: 30,
+        q4_vibe: 2,
+        q5_regret: { "opt-pico": 5 },
+      },
+    ],
+  });
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 4828 }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.already_computed, true);
+  assertEquals(body.verdict.id, "v-old");
+  assertEquals(deletedVerdictRoomIds.length, 0,
+    "an existing successful verdict must not be replaced by a widen request");
+  assertEquals(inserts.length, 0);
+});
+
+Deno.test("compute-verdict — widen-radius override clamped to the 10 mi product cap", async () => {
+  // The S05 slider exposes 1..10 mi. The handler must clamp absurd
+  // values defensively rather than handing the engine a 100-mi
+  // radius and surveying half the state.
+  const existing: VerdictRow = {
+    id: "v-old",
+    room_id: VALID_ROOM_ID,
+    option_id: null,
+    method: "no_survivor",
+    rule_text: "previous",
+    computed_at: "2026-05-13T00:00:00Z",
+  };
+  const { adapter, inserts } = memoryAdapter({
+    existing,
+    options: [
+      {
+        id: "opt-x",
+        payload: { name: "Edge of Earth", price_tier: 2, distance_meters: 30000 }, // 18.6 mi
+      },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        q3_walk_minutes: 30,
+        q4_vibe: 2,
+        q5_regret: { "opt-x": 5 },
+      },
+    ],
+    roomMeta: { radius_meters: 805 },
+  });
+  // Ask for 100 mi. The handler should clamp to 10 mi (16093 m),
+  // which still doesn't seat the 18.6-mi candidate.
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 160000 }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.method, "no_survivor",
+    "clamped widen still can't reach a 18.6-mi candidate — surface stays terminal");
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].method, "no_survivor");
+});
+
+Deno.test("compute-verdict — widen-radius re-run reads room radius and re-runs at the override", async () => {
+  // Defensive: when no prior verdict exists (the engine hasn't fired
+  // yet) but the caller posts with a widen override, the handler
+  // should still honour the override — not treat it as an error.
+  const { adapter, inserts } = memoryAdapter({
+    options: [
+      {
+        id: "opt-stretch",
+        payload: { name: "Stretch", price_tier: 2, distance_meters: 2414 },
+      },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        q3_walk_minutes: 30,
+        q4_vibe: 2,
+        q5_regret: { "opt-stretch": 5 },
+      },
+    ],
+    roomMeta: { radius_meters: 805 },
+  });
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 4828 }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.method, "manual");
+  assertEquals(body.verdict.option_id, "opt-stretch");
+  assertEquals(inserts.length, 1);
+});

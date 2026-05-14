@@ -79,6 +79,12 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
     async emitVerdictReadyBroadcast(room_id, verdict_id) {
       broadcasts.push({ room_id, verdict_id });
     },
+    async fetchRoomRadius(_id) {
+      return null;
+    },
+    async deleteVerdictForRoom(_id) {
+      // no-op for tests that don't exercise the widen-replace path
+    },
   };
   return { adapter, inserts, cuts, marked, broadcasts };
 }
@@ -407,8 +413,13 @@ Deno.test("compute-verdict — happy path flips rooms.status to verdict_ready an
   assertEquals(broadcasts[0].verdict_id, "verdict-1");
 });
 
-Deno.test("compute-verdict — engine no-survivor surfaces 422", async () => {
-  const { adapter } = memoryAdapter({
+Deno.test("compute-verdict — engine no-survivor exits 200 with method=no_survivor (TB-09)", async () => {
+  // TB-06 surfaced no-survivor as a 422 error. TB-09 made it a
+  // first-class terminal state — the handler persists a verdict
+  // row with `method=no_survivor` so the iOS S05 surface can read
+  // and render the terminal mode. See `index-no-survivor.test.ts`
+  // for the full TB-09 contract.
+  const { adapter, inserts } = memoryAdapter({
     options: [
       { id: "opt-splurge", payload: { name: "Splurge", price_tier: 4 } },
     ],
@@ -428,7 +439,10 @@ Deno.test("compute-verdict — engine no-survivor surfaces 422", async () => {
     authedPost({ room_id: VALID_ROOM_ID }),
     { env: envOk(), buildDataAdapter: () => adapter },
   );
-  assertEquals(res.status, 422);
+  assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.error, "no_survivor");
+  assertEquals(body.verdict.method, "no_survivor");
+  assertEquals(body.verdict.option_id, null);
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].method, "no_survivor");
 });
