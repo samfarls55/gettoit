@@ -80,9 +80,12 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.gettoit.GetToIt
         # iPhone-only for v1. iPad scope is deliberately out per the v1 PRD.
         TARGETED_DEVICE_FAMILY: "1"
-        CODE_SIGNING_ALLOWED: NO
-        CODE_SIGN_IDENTITY: ""
-        DEVELOPMENT_TEAM: ""
+        # No-signing defaults are scoped to GetToItTests only. The GetToIt
+        # app target inherits xcodegen/Xcode's automatic-signing defaults so
+        # the TestFlight archive lane can pick an identity and inject the
+        # full CODE_SIGN_ENTITLEMENTS file. The simulator-test CI lane
+        # passes CODE_SIGNING_ALLOWED=NO on its xcodebuild command line, so
+        # there is no need to bake it into the GetToIt target's base.
         # Default build number. Local builds and the simulator-test CI
         # lane use "1". The TestFlight upload lane overrides this with
         # $GITHUB_RUN_NUMBER on the xcodebuild command line so each
