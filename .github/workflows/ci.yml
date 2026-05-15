@@ -446,24 +446,32 @@ jobs:
             DEVELOPMENT_TEAM=WXTMNYM34A \
             | tee xcodebuild-archive.log
 
-      - name: Inject entitlements into .xcarchive before export
-        # WORKAROUND for the empty-CODE_SIGN_IDENTITY entitlement-skip
-        # bug (see project.yml comment block on the GetToIt target):
-        # xcodebuild's archive step does not write
-        # archived-expanded-entitlements.xcent into the .app inside the
-        # .xcarchive because ProcessProductPackaging treats the target as
-        # unsigned. When xcodebuild -exportArchive then signs the .ipa,
-        # it has no source of truth for entitlements and falls back to
-        # only the four defaults from the provisioning profile envelope
-        # (application-identifier, beta-reports-active, team-identifier,
-        # get-task-allow). Sign in with Apple and associated-domains
-        # never end up in the signed binary.
+      - name: Ad-hoc pre-sign .app inside .xcarchive with full entitlements
+        # WORKAROUND, attempt #2 (replaces the xcent-injection approach
+        # that previous run 25898933211 proved exportArchive ignores in
+        # Xcode 26): the .app inside the .xcarchive is completely
+        # unsigned (no _CodeSignature dir, no embedded.mobileprovision,
+        # no archived-expanded-entitlements.xcent — confirmed by the
+        # artifact dump from run 25898412337). When xcodebuild
+        # -exportArchive signs an unsigned .app, it falls back to the
+        # four default entitlements from the provisioning profile
+        # envelope (application-identifier, beta-reports-active,
+        # team-identifier, get-task-allow) and drops Sign in with Apple
+        # and associated-domains, even though the profile itself
+        # declares both.
         #
-        # archived-expanded-entitlements.xcent is the canonical file
-        # exportArchive reads. Writing our entitlements file into the
-        # .xcarchive's .app at that path makes export embed those
-        # entitlements during re-sign — no separate post-export resign
-        # is needed, so no .p12 / keychain plumbing either.
+        # When exportArchive re-signs an ALREADY-signed .app, however,
+        # it preserves the entitlements blob from the existing
+        # signature and just swaps the signing identity. Ad-hoc signing
+        # (codesign --sign -) needs no real identity — it produces a
+        # locally valid signature using the special "-" identifier and
+        # embeds whatever --entitlements file we pass. The empty
+        # runner keychain is fine for ad-hoc.
+        #
+        # So: ad-hoc-sign the .app with our entitlements file here.
+        # exportArchive's subsequent re-sign (via cloud signing /
+        # automatic provisioning) keeps the entitlements and replaces
+        # the ad-hoc signature with the real Apple Distribution one.
         if: steps.gate.outputs.skip == 'false'
         working-directory: ios
         run: |
@@ -474,10 +482,14 @@ jobs:
             ls -la build/GetToIt.xcarchive/Products/Applications/ >&2 || true
             exit 1
           fi
-          echo "Injecting entitlements into: $APP/archived-expanded-entitlements.xcent"
-          cp Sources/App/GetToIt.entitlements "$APP/archived-expanded-entitlements.xcent"
-          echo "Injected entitlements:"
-          plutil -p "$APP/archived-expanded-entitlements.xcent"
+          echo "Ad-hoc signing .app with full entitlements: $APP"
+          codesign --force \
+            --sign - \
+            --entitlements Sources/App/GetToIt.entitlements \
+            --generate-entitlement-der \
+            "$APP"
+          echo "Post-ad-hoc-sign entitlements (should include applesignin + associated-domains):"
+          codesign -d --entitlements :- "$APP"
 
       - name: Export archive (App Store)
         # exportOptions.plist pins method=app-store, team, and
