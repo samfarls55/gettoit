@@ -40,6 +40,24 @@ This is what reads as "the sun is going down through the quiz" — the brain acc
 
 ---
 
+## Question card cross-fade
+
+The foreground question card swaps in lockstep with the gradient between adjacent quiz surfaces. Same duration, same easing — the card and the sunset sweep move as one piece. Without the pairing the card advances instantly while the gradient is still mid-interpolation, which reads as a full second of motion lag on every question transition (bug-04).
+
+```
+duration: 1100ms  (alias of --grad-tween — never specified independently)
+easing:   ease-in-out
+property: opacity (0 ↔ 1) on the routed question content
+```
+
+**Why pair, not stagger:** the gradient is the load-bearing "time-of-day" signal. Anchoring the card to it preserves the read of "the surface changed because the sun moved" rather than "two unrelated transitions fired one-after-the-other."
+
+**SwiftUI:** the routed view is re-keyed by step and decorated with `.transition(.opacity).animation(.timingCurve(0.65, 0, 0.35, 1, duration: 1.1), value: step)` — see `ios/Sources/App/QuizScreen.swift`.
+
+**Reduced motion:** drop to 300ms linear, same fallback as the gradient — keeps the two layers paired even when shortened.
+
+---
+
 ## Verdict reveal — full choreography
 
 The verdict screen has 5 second of loser attention. The choreography is paced so the **rule** and the **receipts** arrive while the user is still looking — not after they've already scrolled.
