@@ -3,9 +3,14 @@
 // Boots the AuthCoordinator + RoomStore + LateJoinerStore, then
 // routes between five surfaces:
 //   * S00a SignInScreen — TB-02 (v1.1) forced first-launch sign-in
-//     gate. Rendered when `AuthCoordinator.state == .idle` after
-//     `restoreSessionIfPresent` returns (no cached session). Closes
-//     the iOS half of ADR 0007's anonymous-default for v1.1.
+//     gate. Rendered when `AuthCoordinator.state` is `.idle` (fresh
+//     install, no cached session) OR `.anonymous` (pre-v1.1 install
+//     with a v1 anonymous session still in Keychain — bug-06). Both
+//     branches route the same surface; the tap handler in
+//     `SignInScreen` decides between `signInWithApple` (mint a fresh
+//     Linked-Apple session) and `linkApple` (upgrade the existing
+//     anonymous session, preserving `user_id`). Closes the iOS half
+//     of ADR 0007's anonymous-default for v1.1.
 //   * S00 LandingScreen — post-sign-in entry surface (v1.1, TB-01).
 //     Every cold launch with an active auth session lands here first;
 //     the user picks Start a Decision (→ S01) or Account Settings
@@ -87,16 +92,27 @@ public struct RootView: View {
             } else if let coordinators {
                 // TB-02 v1.1 — S00a forced sign-in gate. Sits ABOVE the
                 // standard state precedence chain because a missing
-                // session blocks every other route (RLS will reject
-                // any data read). After a successful sign-in the
-                // coordinator flips to `.linkedApple(userID)` and this
-                // branch falls through to the regular precedence
-                // below. The gate also re-renders after a sign-out
-                // from S09 Settings — the coordinator's `signOut +
-                // signInAnonymously` post-delete dance is the legacy
-                // path; a future cleanup may swap that for a true
-                // sign-out that re-routes back through S00a.
-                if case .idle = coordinators.auth.state {
+                // Apple identity blocks the iOS post-v1.1 invariant
+                // ("every iOS session on screen is Linked-Apple").
+                // Two starting states route here:
+                //   * .idle      — fresh install, no cached session.
+                //                  Tap mints a new Linked-Apple session
+                //                  via `signInWithApple`.
+                //   * .anonymous — bug-06: a pre-v1.1 install left a
+                //                  v1 anonymous session in Keychain.
+                //                  Tap upgrades it via `linkApple`,
+                //                  preserving the existing `user_id`
+                //                  and every owned row (rooms, votes,
+                //                  members, events).
+                // After a successful sign-in the coordinator flips to
+                // `.linkedApple(userID)` and this branch falls through
+                // to the regular precedence below. The gate also
+                // re-renders after a sign-out from S09 Settings — the
+                // coordinator's `signOut + signInAnonymously` post-
+                // delete dance now lands on `.anonymous`, which this
+                // widened gate also catches (the user is sent right
+                // back through S00a).
+                if shouldRenderSignInGate(coordinators.auth.state) {
                     SignInScreen(
                         auth: coordinators.auth,
                         onSignedIn: { }
@@ -266,6 +282,22 @@ public struct RootView: View {
             if let url = activity.webpageURL {
                 handle(url: url)
             }
+        }
+    }
+
+    /// bug-06 (v1.1) — render gate for the S00a sign-in surface.
+    /// Returns `true` for any state where the iOS post-v1.1 invariant
+    /// is not yet satisfied: a fresh install with no session
+    /// (`.idle`) OR a pre-v1.1 install whose v1 anonymous session is
+    /// still in Keychain (`.anonymous`). Both flavors converge on
+    /// S00a; the tap handler in `SignInScreen` picks `signInWithApple`
+    /// vs `linkApple` from the same state at tap time.
+    private func shouldRenderSignInGate(_ state: AuthCoordinator.State) -> Bool {
+        switch state {
+        case .idle, .anonymous:
+            return true
+        case .signingIn, .linking, .linkedApple, .error:
+            return false
         }
     }
 

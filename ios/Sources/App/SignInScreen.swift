@@ -7,9 +7,11 @@
 // anonymous-default for v1.1.
 //
 // Render gate: `RootView` mounts this view iff
-// `AuthCoordinator.state == .idle` after `restoreSessionIfPresent()`
-// returns. A cached Apple session bypasses the surface entirely; a
-// fresh install with no session lands here.
+// `AuthCoordinator.state` is `.idle` (fresh install, no cached
+// session) OR `.anonymous` (pre-v1.1 install with a v1 anonymous
+// session still in Keychain — bug-06). A cached `.linkedApple`
+// session bypasses the surface entirely; both gate-eligible states
+// resolve to a Linked-Apple session by the time S00a dismisses.
 //
 // Tokens consumed: GTIColor / GTIGradient / GTIFont / GTISpacing /
 // GTIRadii / GTIMotion. Per repo CLAUDE.md no inline hex / px / easing.
@@ -169,23 +171,45 @@ public struct SignInScreen: View {
     // MARK: - actions
 
     /// Trigger the Apple sheet, then hand the resulting credential to
-    /// `AuthCoordinator.signInWithApple`. Three terminal outcomes:
+    /// the coordinator. Three terminal outcomes:
     ///   * success     — coordinator state becomes `.linkedApple(userID)`;
     ///                   onSignedIn fires; RootView routes to S01.
     ///   * user-cancel — sheet dismisses; phase returns to .idle; no
     ///                   error toast (cancel is a valid choice).
     ///   * error       — phase returns to .idle; non-blocking inline
     ///                   error line renders below the body sub copy.
-    private func onSaveTapped() async {
+    ///
+    /// bug-06 (v1.1) — the coordinator method depends on the starting
+    /// state, captured at tap time:
+    ///   * `.anonymous` — a legacy v1 anonymous session is in
+    ///                    Keychain. Use `linkApple` so the Apple
+    ///                    identity attaches to the existing `user_id`
+    ///                    (rooms, votes, members, events all survive).
+    ///   * otherwise    — fresh install / post-sign-out. Use
+    ///                    `signInWithApple` to mint a brand-new
+    ///                    Linked-Apple session.
+    /// Both methods take the same Apple credential shape; only the
+    /// dispatch differs.
+    /// Internal (not `private`) so unit tests can drive the dispatch
+    /// directly via `@testable import GetToIt`. The `pillCTA` button
+    /// is still the only production caller.
+    func onSaveTapped() async {
         guard phase == .idle else { return }
         phase = .linking
         errorMessage = nil
         do {
             let credential = try await appleProvider.requestAppleCredential()
-            _ = try await auth.signInWithApple(
-                idToken: credential.idToken,
-                nonce: credential.nonce
-            )
+            if case .anonymous = auth.state {
+                _ = try await auth.linkApple(
+                    idToken: credential.idToken,
+                    nonce: credential.nonce
+                )
+            } else {
+                _ = try await auth.signInWithApple(
+                    idToken: credential.idToken,
+                    nonce: credential.nonce
+                )
+            }
             // Successful: pop the gate. RootView observes the auth
             // state change and routes to S01 on the next render pass.
             onSignedIn()

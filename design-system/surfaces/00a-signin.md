@@ -23,14 +23,15 @@ This is the v1.1 closure of the iOS half of [[../../gti-vault/60_engineering/adr
 
 ## Two-launch boundary
 
-| Launch | Surface shown |
-|---|---|
-| Fresh install (no Apple identity on file for the device) | S00a — this surface |
-| Subsequent launch (session restored from Keychain) | App routes straight to S01 — S00a is skipped |
-| Sign-out / data delete via S09 | Next launch routes back through S00a |
-| Re-install over an existing Apple identity | S00a renders, the user taps once, Apple's flow returns the prior identity, app routes to S01 with prior data intact |
+| Launch | Surface shown | Tap-time auth call |
+|---|---|---|
+| Fresh install (no Apple identity on file for the device) | S00a — this surface | `signInWithApple` (mint a new Linked-Apple session) |
+| Subsequent launch (session restored from Keychain) | App routes straight to S01 — S00a is skipped | — |
+| Sign-out / data delete via S09 | Next launch routes back through S00a | `signInWithApple` (post-delete reboot lands in `.anonymous` then re-routes through the gate; legacy-anon row covers the dispatch) |
+| Re-install over an existing Apple identity | S00a renders, the user taps once, Apple's flow returns the prior identity, app routes to S01 with prior data intact | `signInWithApple` |
+| **Legacy v1 anonymous session in Keychain** (pre-v1.1 TestFlight install carried over) | S00a — gate renders even though `Auth.currentSession != nil`, because the cached session is anonymous and the iOS post-v1.1 invariant ("every iOS session is Linked-Apple") is not yet satisfied | `linkApple` (upgrade the existing anonymous session — preserves `user_id` and every owned `rooms` / `votes` / `members` / `events` row per [[../../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] §"the userID before and after linkApple is the same") |
 
-The boundary is enforced at the app router level — S00a is the launch destination iff `Auth.currentSession == nil`. It is **not** part of the Sunset Pop ritual arc; the user passes through it once per install (or once after a delete) and never sees it again.
+The boundary is enforced at the app router level — S00a is the launch destination iff the current session is missing OR anonymous. It is **not** part of the Sunset Pop ritual arc; the user passes through it once per install (or once after a delete, or once at the v1 → v1.1 upgrade) and never sees it again.
 
 ## iOS / web asymmetry
 
@@ -74,9 +75,9 @@ The Apple glyph (`` PUA codepoint, SF Pro rendering on iOS — same as C-22's `d
 
 ## Behavior
 
-1. **Mount:** app router lands on S00a iff `Auth.currentSession == nil` on cold start. Otherwise router goes straight to S01.
-2. **CTA tap:** trigger `ASAuthorizationAppleIDProvider().createRequest()` flow. The system Apple sheet renders on top of S00a. Pill renders `disabled` (opacity 0.45, same as C-22 `in-progress`) while the sheet is presented.
-3. **Apple flow success:** `signInWithIdToken` → Supabase row created (new install) or matched (re-install, same Apple identity). Route to S01.
+1. **Mount:** app router lands on S00a iff the auth coordinator is in `.idle` (no cached session) OR `.anonymous` (legacy v1 anonymous session in Keychain — see Two-launch boundary row above). Otherwise router goes straight to S01.
+2. **CTA tap:** trigger `ASAuthorizationAppleIDProvider().createRequest()` flow. The system Apple sheet renders on top of S00a. Pill renders `disabled` (opacity 0.45, same as C-22 `in-progress`) while the sheet is presented. The screen captures the coordinator's state at tap time and dispatches accordingly — `.idle` → `signInWithApple`, `.anonymous` → `linkApple`. Both methods take the same Apple credential shape; only the dispatch differs.
+3. **Apple flow success:** `signInWithIdToken` → Supabase row created (new install) or matched (re-install, same Apple identity), OR `linkIdentityWithIdToken` → Apple identity attached to the existing anonymous `user_id` (legacy-anon path; merge invariant: `user_id` before == `user_id` after). Route to S01.
 4. **Apple flow user-cancel:** sheet dismisses; pill returns to `default`. Surface does not advance. No error toast (cancel is a valid user choice, not a failure).
 5. **Apple flow error (network, rejection, etc.):** sheet dismisses; pill returns to `default`. Surface presents a non-blocking inline error line below the body sub: `"Couldn't reach Apple. Try again."` (Inter 600 / 13 / white 0.7). User taps the pill again to retry.
 

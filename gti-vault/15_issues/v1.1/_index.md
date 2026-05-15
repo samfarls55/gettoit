@@ -25,6 +25,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | bug-03 | [[issues/bug-03-q5-placeholder-no-foursquare-calls\|Q5 placeholders, zero Foursquare calls — wire PlacesService into Q5]] (ready-for-human) | AFK | [#43](https://github.com/samfarls55/gettoit/issues/43) | — |
 | bug-04 | [[issues/bug-04-question-transition-motion-lag\|Question transition motion lag]] ⏳ ready-for-human | AFK | [#44](https://github.com/samfarls55/gettoit/issues/44) | — |
 | bug-05 | [[issues/bug-05-info-plist-missing-location-purpose-string\|Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125]] | AFK | — | — |
+| bug-06 | [[issues/bug-06-legacy-anon-bypasses-s00a-gate\|Legacy v1 anonymous session bypasses S00a sign-in gate on launch]] ⏳ ready-for-human | AFK | [#63](https://github.com/samfarls55/gettoit/issues/63) | — |
 
 ### Spec gaps
 
