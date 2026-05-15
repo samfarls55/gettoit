@@ -27,6 +27,7 @@
 //     site. The view publishes the ready bit via `WaitingStore.verdictReady`.
 
 import SwiftUI
+import UIKit
 import AuthenticationServices
 import CryptoKit
 
@@ -710,7 +711,20 @@ private final class AppleAuthDelegate: NSObject,
     func presentationAnchor(
         for controller: ASAuthorizationController
     ) -> ASPresentationAnchor {
-        ASPresentationAnchor()
+        // `ASAuthorizationController` requires a real on-screen anchor
+        // — handing back a freshly-constructed `ASPresentationAnchor`
+        // (= a detached `UIWindow`) makes the controller bail with an
+        // `ASAuthorizationError` BEFORE the Apple sheet renders, which
+        // surfaces in the UI as "Couldn't reach Apple. Try again."
+        // with no sheet shown. Reach into the live scene graph for
+        // the active key window instead. The empty fallback is only
+        // hit if the app has no foreground scene at all (impossible
+        // when this delegate is fired from a user tap).
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)
+            ?? ASPresentationAnchor()
     }
 }
 
