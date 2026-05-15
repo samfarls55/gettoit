@@ -102,6 +102,18 @@ targets:
         # skips itself in that case.
         SUPABASE_PROJECT_URL: ""
         SUPABASE_ANON_KEY: ""
+      configs:
+        # Release-only: pin the app target to the Apple Distribution
+        # identity so the TestFlight archive lane gets a distribution
+        # provisioning profile from the ASC API and so the entitlements
+        # step has a non-empty identity (which is what gates whether
+        # CODE_SIGN_ENTITLEMENTS gets applied — see fix in b83acd5).
+        # Scoping this via xcodegen configs (not via an xcodebuild CLI
+        # flag) keeps the override on the GetToIt target only — SwiftPM
+        # dependency targets keep their automatic-for-development
+        # signing and don't conflict.
+        Release:
+          CODE_SIGN_IDENTITY: "Apple Distribution"
     dependencies:
       - package: Supabase
         product: Supabase

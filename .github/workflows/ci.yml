@@ -444,7 +444,6 @@ jobs:
             CODE_SIGNING_ALLOWED=YES \
             CODE_SIGN_STYLE=Automatic \
             DEVELOPMENT_TEAM=WXTMNYM34A \
-            "CODE_SIGN_IDENTITY=Apple Distribution" \
             | tee xcodebuild-archive.log
 
       - name: Export archive (App Store)
