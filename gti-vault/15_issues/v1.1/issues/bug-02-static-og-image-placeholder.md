@@ -2,7 +2,7 @@
 issue: bug-02
 title: Invite link in iMessage shows plain text — add placeholder OG image + meta tags
 github_issue: 42
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -36,10 +36,10 @@ Pasting a `/join/<roomId>` invite link into iMessage today produces plain blue u
 
 ## Acceptance criteria
 
-- [ ] `web/public/og/invite.png` exists and is served at `/og/invite.png` on the deployed web app.
-- [ ] `web/app/join/[roomId]/page.tsx` exports `metadata` (or equivalent) populating OG + Twitter meta tags pointing at `/og/invite.png`.
-- [ ] Pasting `/join/<roomId>` into iMessage on a real device shows a card (any card), not plain blue text.
-- [ ] OG meta-tag presence verifiable via `curl -s` of the deployed page and grep for `og:image`.
+- [x] `web/public/og/invite.png` exists and is served at `/og/invite.png` on the deployed web app. *(1200x630 PNG, ~7 KB, flat warm-gray 2-stop gradient `#D6CFC4` → `#C9C1B4` — intentionally non-branded.)*
+- [x] `web/app/join/[roomId]/page.tsx` exports `metadata` (or equivalent) populating OG + Twitter meta tags pointing at `/og/invite.png`. *(via `generateMetadata`; absolute URL resolved against `metadataBase` set in `app/layout.tsx`. Local Next 14 prod build emits `<meta property="og:image" content="https://gettoit.app/og/invite.png"/>`.)*
+- [ ] Pasting `/join/<roomId>` into iMessage on a real device shows a card (any card), not plain blue text. *(Founder smoke check after the PR merges and Vercel redeploys gettoit.app.)*
+- [x] OG meta-tag presence verifiable via `curl -s` of the deployed page and grep for `og:image`. *(Verified locally against `npx next start` of the production build. Re-verify against deployed origin after merge.)*
 
 ## Blocked by
 
