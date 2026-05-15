@@ -80,12 +80,27 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.gettoit.GetToIt
         # iPhone-only for v1. iPad scope is deliberately out per the v1 PRD.
         TARGETED_DEVICE_FAMILY: "1"
-        # No-signing defaults are scoped to GetToItTests only. The GetToIt
-        # app target inherits xcodegen/Xcode's automatic-signing defaults so
-        # the TestFlight archive lane can pick an identity and inject the
-        # full CODE_SIGN_ENTITLEMENTS file. The simulator-test CI lane
-        # passes CODE_SIGNING_ALLOWED=NO on its xcodebuild command line, so
-        # there is no need to bake it into the GetToIt target's base.
+        # Empty-string signing defaults below. xcodebuild Release archives
+        # via the TestFlight CI lane override CODE_SIGNING_ALLOWED=YES on
+        # the command line; the empty CODE_SIGN_IDENTITY lets automatic
+        # signing pick whatever identity the ASC API returns (for this
+        # team that is the iOS Team Store distribution profile). This
+        # combo is the only one we have found that survives xcodebuild's
+        # archive-time signing decisions; explicit "Apple Distribution"
+        # pins conflict with automatic signing's internal "development"
+        # default for the CLI (Xcode-26 quirk — confirmed via the
+        # b83acd5 -> a929754 iteration loop).
+        #
+        # Side-effect of empty identity: the ProcessProductPackaging
+        # step skips applying CODE_SIGN_ENTITLEMENTS because it treats
+        # the target as unsigned at that point. The custom entitlements
+        # (Sign in with Apple, associated-domains) get re-injected by a
+        # dedicated `codesign --force --entitlements` step in CI after
+        # `Export archive` — see the "Re-sign with full entitlements"
+        # step in .github/workflows/ci.yml.
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGN_IDENTITY: ""
+        DEVELOPMENT_TEAM: ""
         # Default build number. Local builds and the simulator-test CI
         # lane use "1". The TestFlight upload lane overrides this with
         # $GITHUB_RUN_NUMBER on the xcodebuild command line so each
@@ -102,18 +117,6 @@ targets:
         # skips itself in that case.
         SUPABASE_PROJECT_URL: ""
         SUPABASE_ANON_KEY: ""
-      configs:
-        # Release-only: pin the app target to the Apple Distribution
-        # identity so the TestFlight archive lane gets a distribution
-        # provisioning profile from the ASC API and so the entitlements
-        # step has a non-empty identity (which is what gates whether
-        # CODE_SIGN_ENTITLEMENTS gets applied — see fix in b83acd5).
-        # Scoping this via xcodegen configs (not via an xcodebuild CLI
-        # flag) keeps the override on the GetToIt target only — SwiftPM
-        # dependency targets keep their automatic-for-development
-        # signing and don't conflict.
-        Release:
-          CODE_SIGN_IDENTITY: "Apple Distribution"
     dependencies:
       - package: Supabase
         product: Supabase

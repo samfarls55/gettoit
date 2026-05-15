@@ -464,6 +464,80 @@ jobs:
             -allowProvisioningUpdates \
             | tee xcodebuild-export.log
 
+      - name: Re-sign .app with full entitlements
+        # WORKAROUND: xcodebuild archive runs ProcessProductPackaging
+        # before automatic signing has finalized an identity. Because
+        # the GetToIt target's base settings carry CODE_SIGN_IDENTITY=""
+        # (the only configuration we have found that lets xcodebuild
+        # archive + Release + automatic + -allowProvisioningUpdates
+        # actually produce a distribution-signed .ipa — see project.yml
+        # comment block), xcodebuild logs:
+        #
+        #   warning: GetToIt isn't code signed but requires entitlements.
+        #
+        # ...and skips applying Sources/App/GetToIt.entitlements. The
+        # resulting binary ends up with only the four default entitlements
+        # from the provisioning profile (application-identifier,
+        # beta-reports-active, team-identifier, get-task-allow). The
+        # provisioning profile itself already declares the full set
+        # (Sign in with Apple, associated-domains, aps-environment,
+        # keychain-access-groups), but the binary has them stripped.
+        # On-device this surfaces as ASAuthorizationError.unknown (#1000)
+        # for SIWA before any UI presents.
+        #
+        # This step re-signs the .app inside the exported .ipa using
+        # codesign with --entitlements pointing at our entitlements
+        # file. The distribution identity is already in the keychain
+        # (placed there by the archive step), and the new entitlements
+        # are a strict subset of what the provisioning profile allows,
+        # so the re-sign succeeds and the resulting .ipa passes
+        # App Store ingest.
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          IPA=$(ls build/export/*.ipa 2>/dev/null | head -1)
+          if [ -z "$IPA" ]; then
+            echo "No .ipa produced by exportArchive — cannot re-sign" >&2
+            exit 1
+          fi
+          IDENTITY=$(security find-identity -v -p codesigning \
+            | grep -E "Apple Distribution|iPhone Distribution" \
+            | head -1 \
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"([^"]+)".*$/\1/')
+          if [ -z "$IDENTITY" ]; then
+            echo "No distribution code-signing identity found in keychain:" >&2
+            security find-identity -v -p codesigning >&2
+            exit 1
+          fi
+          echo "Re-signing with identity: $IDENTITY"
+          WORK=build/resign
+          rm -rf "$WORK"
+          mkdir -p "$WORK"
+          (cd "$WORK" && unzip -q "../../$IPA")
+          APP=$(ls -d "$WORK"/Payload/*.app | head -1)
+          if [ -z "$APP" ] || [ ! -d "$APP" ]; then
+            echo "Could not locate .app inside extracted IPA" >&2
+            exit 1
+          fi
+          # Force re-sign with full entitlements file. --preserve-metadata
+          # keeps the bundle identifier and designated requirements; the
+          # entitlements blob is fully replaced from our file.
+          codesign --force \
+            --sign "$IDENTITY" \
+            --entitlements Sources/App/GetToIt.entitlements \
+            --generate-entitlement-der \
+            --preserve-metadata=identifier,requirements \
+            --timestamp=none \
+            "$APP"
+          echo "Post-resign entitlements:"
+          codesign -d --entitlements :- "$APP"
+          # Re-pack into the same .ipa path so the existing upload
+          # step picks it up unchanged.
+          rm -f "$IPA"
+          (cd "$WORK" && zip -qry "../../$IPA" Payload)
+          echo "Re-signed and re-packed: $IPA"
+
       - name: Dump embedded entitlements + provisioning profile (diag)
         # DIAGNOSTIC (temp): unpack the .ipa and print the embedded
         # entitlements + the embedded.mobileprovision capabilities to
