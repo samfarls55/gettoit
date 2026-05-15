@@ -464,6 +464,37 @@ jobs:
             -allowProvisioningUpdates \
             | tee xcodebuild-export.log
 
+      - name: Dump embedded entitlements + provisioning profile (diag)
+        # DIAGNOSTIC (temp): unpack the .ipa and print the embedded
+        # entitlements + the embedded.mobileprovision capabilities to
+        # the CI log. Used to diagnose the post-bug-06 SIWA #1000
+        # failure on TestFlight build 128 — symptoms suggest the
+        # automatic-signing profile may not carry
+        # com.apple.developer.applesignin even though the entitlement
+        # file declares it. Remove this step once root cause is known.
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          IPA=$(ls build/export/*.ipa 2>/dev/null | head -1)
+          if [ -z "$IPA" ]; then
+            echo "No .ipa to inspect — export step failed" >&2
+            exit 1
+          fi
+          WORK=$(mktemp -d)
+          unzip -q "$IPA" -d "$WORK"
+          APP=$(ls -d "$WORK"/Payload/*.app | head -1)
+          echo "=== EMBEDDED ENTITLEMENTS (from binary) ==="
+          codesign -d --entitlements :- "$APP" || true
+          echo ""
+          echo "=== EMBEDDED PROVISIONING PROFILE ==="
+          security cms -D -i "$APP/embedded.mobileprovision" || true
+          echo ""
+          echo "=== PROFILE ENTITLEMENT KEYS ONLY ==="
+          security cms -D -i "$APP/embedded.mobileprovision" \
+            | plutil -extract Entitlements xml1 -o - - \
+            | grep -E "<key>" || true
+
       - name: Upload to TestFlight
         # altool reads the same .p8 key from ~/.appstoreconnect via
         # --apiKey/--apiIssuer. The build appears in the TestFlight
