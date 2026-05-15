@@ -495,19 +495,60 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         working-directory: ios
         run: |
-          set -euo pipefail
-          IPA=$(ls build/export/*.ipa 2>/dev/null | head -1)
+          # Intentionally NOT using `set -e` until after diagnostics —
+          # an early failure here was silent in the previous run because
+          # pipefail aborted before any echo could fire. Print everything
+          # first, then enforce strictness once we know what is around.
+          set -u
+          echo "=== Working directory ==="
+          pwd
+          echo
+          echo "=== Exported IPA(s) ==="
+          ls -la build/export/ || true
+          echo
+          echo "=== Default keychain ==="
+          security default-keychain || true
+          echo
+          echo "=== All keychains in search list ==="
+          security list-keychains -d user || true
+          security list-keychains -d system || true
+          echo
+          echo "=== Codesigning identities (default keychain search list) ==="
+          security find-identity -v -p codesigning || true
+          echo
+          echo "=== ALL codesigning identities across every visible keychain ==="
+          for kc in $(security list-keychains -d user | tr -d ' "'); do
+            echo "--- keychain: $kc ---"
+            security find-identity -v -p codesigning "$kc" || true
+          done
+          echo
+          echo "=== Any keychain in ~/Library/Keychains ==="
+          ls -la ~/Library/Keychains 2>/dev/null || true
+          echo
+          echo "=== Installed provisioning profiles ==="
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || true
+
+          # End of pure diagnostics. Now turn on strict mode and continue.
+          set -eo pipefail
+
+          IPA=$(ls build/export/*.ipa 2>/dev/null | head -1 || true)
           if [ -z "$IPA" ]; then
             echo "No .ipa produced by exportArchive — cannot re-sign" >&2
             exit 1
           fi
-          IDENTITY=$(security find-identity -v -p codesigning \
+          echo
+          echo "Working IPA: $IPA"
+
+          IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
             | grep -E "Apple Distribution|iPhone Distribution" \
             | head -1 \
-            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"([^"]+)".*$/\1/')
+            | sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[A-F0-9]+[[:space:]]+"([^"]+)".*$/\1/' \
+            || true)
           if [ -z "$IDENTITY" ]; then
-            echo "No distribution code-signing identity found in keychain:" >&2
-            security find-identity -v -p codesigning >&2
+            echo "No distribution code-signing identity found in default keychain search list." >&2
+            echo "The diagnostics above should show where Xcode put the identity." >&2
+            echo "If nothing is anywhere — xcodebuild signed via a transient keychain and" >&2
+            echo "a pre-staged .p12 distribution certificate will need to be installed." >&2
             exit 1
           fi
           echo "Re-signing with identity: $IDENTITY"
