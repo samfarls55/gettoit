@@ -2,7 +2,7 @@
 issue: tb-03
 title: Wire geo permission pre-prime + persistent location selector
 github_issue: 51
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -36,12 +36,12 @@ End-to-end behavior:
 
 ## Acceptance criteria
 
-- [ ] Tapping "Start a Decision" on the landing surface fires the pre-prime card, then on CTA tap, the native iOS permission dialog.
-- [ ] Granted path: location auto-populates in the persistent selector; user can edit; quiz proceeds.
-- [ ] Denied path: persistent selector is empty; quiz cannot proceed until a location is selected; selecting manually proceeds.
-- [ ] Settings deep-link works from the manual-entry empty state on a denied account.
-- [ ] `PlacesService.fetch()` is invoked with the selected location in both granted and denied paths.
-- [ ] No raw hex / px / easing in the new SwiftUI code — tokens only.
+- [x] Tapping "Start a Decision" on the landing surface fires the pre-prime card, then on CTA tap, the native iOS permission dialog.
+- [x] Granted path: location auto-populates in the persistent selector; user can edit; quiz proceeds.
+- [x] Denied path: persistent selector is empty; quiz cannot proceed until a location is selected; selecting manually proceeds.
+- [x] Settings deep-link works from the manual-entry empty state on a denied account.
+- [ ] `PlacesService.fetch()` is invoked with the selected location in both granted and denied paths. (Spec gap flagged for orchestrator — see Notes below: PlacesService has no production call sites yet, this is bug-03 territory. The room write side IS wired: both GPS and manual paths produce identical `rooms.location_*` payloads via `RoomLocation.source`.)
+- [x] No raw hex / px / easing in the new SwiftUI code — tokens only.
 - [ ] Manual TestFlight smoke check covering: granted-and-auto, granted-then-override, denied-then-manual, denied-then-settings-deeplink.
 
 ## Blocked by

@@ -59,7 +59,8 @@ public final class RoomStore {
     public func createRoom(
         as userID: UUID,
         timerMinutes: Int? = nil,
-        radiusMeters: Int? = nil
+        radiusMeters: Int? = nil,
+        location: RoomLocation? = nil
     ) async throws -> Room {
         let roomID = UUID()
         let insert = RoomInsert(
@@ -68,7 +69,8 @@ public final class RoomStore {
             status: "open",
             vertical: "food",
             timerMinutes: timerMinutes,
-            radiusMeters: radiusMeters
+            radiusMeters: radiusMeters,
+            location: location
         )
         try await client
             .from("rooms")
@@ -101,8 +103,35 @@ public final class RoomStore {
             vertical: "food",
             timerMinutes: timerMinutes ?? RoomStore.defaultTimerMinutes,
             radiusMeters: radiusMeters ?? RoomStore.defaultRadiusMeters,
+            location: location,
             createdAt: ""
         )
+    }
+
+    /// TB-03 (v1.1) — value type for the rooms.location_* columns.
+    /// Carried through `createRoom` and decoded back on the returned
+    /// `Room`. `source` records whether the coordinate came from
+    /// CLLocationManager (`gps`) or the user's typeahead-committed
+    /// pick (`manual`); either path produces an identical downstream
+    /// payload to PlacesProxy / MapKit, but the source attribution is
+    /// useful for debugging the zero-Foursquare-calls failure mode
+    /// owned by bug-03.
+    public struct RoomLocation: Codable, Equatable, Sendable {
+        public enum Source: String, Codable, Sendable {
+            case gps
+            case manual
+        }
+        public let name: String
+        public let lat: Double
+        public let lng: Double
+        public let source: Source
+
+        public init(name: String, lat: Double, lng: Double, source: Source) {
+            self.name = name
+            self.lat = lat
+            self.lng = lng
+            self.source = source
+        }
     }
 
     /// Canonical S01 defaults. Source of truth is the column default in
@@ -174,6 +203,10 @@ public final class RoomStore {
         /// TB-03). Column default `3219` (≈ 2.0 mi). Stored in meters
         /// because the PlacesProxy (TB-05) speaks meters to Foursquare.
         public let radiusMeters: Int
+        /// TB-03 (v1.1) — initiator-selected location. NULL on rows
+        /// inserted by clients that don't yet wire the LocationPicker
+        /// (debug RPCs etc); the iOS S01 surface always supplies it.
+        public let location: RoomLocation?
         // Keep `created_at` as a string for now. The Postgres timestamp
         // shape (with microseconds and a timezone offset) doesn't decode
         // cleanly via the default supabase-swift JSON decoder, and v1's
@@ -188,6 +221,7 @@ public final class RoomStore {
             vertical: String,
             timerMinutes: Int,
             radiusMeters: Int,
+            location: RoomLocation?,
             createdAt: String
         ) {
             self.id = id
@@ -196,6 +230,7 @@ public final class RoomStore {
             self.vertical = vertical
             self.timerMinutes = timerMinutes
             self.radiusMeters = radiusMeters
+            self.location = location
             self.createdAt = createdAt
         }
 
@@ -206,7 +241,47 @@ public final class RoomStore {
             case vertical
             case timerMinutes = "timer_minutes"
             case radiusMeters = "radius_meters"
+            case locationName = "location_name"
+            case locationLat = "location_lat"
+            case locationLng = "location_lng"
+            case locationSource = "location_source"
             case createdAt = "created_at"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = try c.decode(UUID.self, forKey: .id)
+            self.creatorUserID = try c.decode(UUID.self, forKey: .creatorUserID)
+            self.status = try c.decode(String.self, forKey: .status)
+            self.vertical = try c.decode(String.self, forKey: .vertical)
+            self.timerMinutes = try c.decode(Int.self, forKey: .timerMinutes)
+            self.radiusMeters = try c.decode(Int.self, forKey: .radiusMeters)
+            self.createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? ""
+            let name = try c.decodeIfPresent(String.self, forKey: .locationName)
+            let lat = try c.decodeIfPresent(Double.self, forKey: .locationLat)
+            let lng = try c.decodeIfPresent(Double.self, forKey: .locationLng)
+            let sourceRaw = try c.decodeIfPresent(String.self, forKey: .locationSource)
+            if let name, let lat, let lng,
+               let sourceRaw, let source = RoomLocation.Source(rawValue: sourceRaw) {
+                self.location = RoomLocation(name: name, lat: lat, lng: lng, source: source)
+            } else {
+                self.location = nil
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(id, forKey: .id)
+            try c.encode(creatorUserID, forKey: .creatorUserID)
+            try c.encode(status, forKey: .status)
+            try c.encode(vertical, forKey: .vertical)
+            try c.encode(timerMinutes, forKey: .timerMinutes)
+            try c.encode(radiusMeters, forKey: .radiusMeters)
+            try c.encode(createdAt, forKey: .createdAt)
+            try c.encodeIfPresent(location?.name, forKey: .locationName)
+            try c.encodeIfPresent(location?.lat, forKey: .locationLat)
+            try c.encodeIfPresent(location?.lng, forKey: .locationLng)
+            try c.encodeIfPresent(location?.source.rawValue, forKey: .locationSource)
         }
     }
 
@@ -221,6 +296,7 @@ public final class RoomStore {
         let vertical: String
         let timerMinutes: Int?
         let radiusMeters: Int?
+        let location: RoomLocation?
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -229,6 +305,10 @@ public final class RoomStore {
             case vertical
             case timerMinutes = "timer_minutes"
             case radiusMeters = "radius_meters"
+            case locationName = "location_name"
+            case locationLat = "location_lat"
+            case locationLng = "location_lng"
+            case locationSource = "location_source"
         }
 
         func encode(to encoder: Encoder) throws {
@@ -243,6 +323,14 @@ public final class RoomStore {
             // the default with NULL and fail the `NOT NULL` constraint.
             try container.encodeIfPresent(timerMinutes, forKey: .timerMinutes)
             try container.encodeIfPresent(radiusMeters, forKey: .radiusMeters)
+            // TB-03 (v1.1) — location columns are nullable so the
+            // happy-path "no location yet" insert (debug RPCs etc) still
+            // works. iOS S01 always supplies a RoomLocation via the
+            // C-23 LocationPicker gate.
+            try container.encodeIfPresent(location?.name, forKey: .locationName)
+            try container.encodeIfPresent(location?.lat, forKey: .locationLat)
+            try container.encodeIfPresent(location?.lng, forKey: .locationLng)
+            try container.encodeIfPresent(location?.source.rawValue, forKey: .locationSource)
         }
     }
 
