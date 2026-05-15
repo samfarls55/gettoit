@@ -45,6 +45,13 @@ public enum GTIColor {
         public static let tertiary    = Color.white.opacity(0.6)
     }
 
+    /// Tinted-ink secondary text role for surfaces whose gradient reaches into the yellow/peach range
+    /// (initiator, Q1, Q2 yellow-bottom; verdict, checkin yellow-top). White-on-yellow secondary fails WCAG AA;
+    /// ink-at-0.78 measures 7.74:1 against the brightest stop. See tokens.json `text.on-bright-gradient`.
+    public enum TextOnBrightGradient {
+        public static let secondary   = Color(gtiHex: 0x0E1011, opacity: 0.78)
+    }
+
     public enum TextOnSurface {
         public static let primary     = Color(gtiHex: 0x0E1011)
         public static let secondary   = Color(gtiHex: 0x0E1011, opacity: 0.7)
