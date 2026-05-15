@@ -7,7 +7,13 @@
 import type { Metadata } from "next";
 import "../../design-system/code/tokens.css";
 
+// `metadataBase` anchors every relative URL emitted into <meta> tags
+// (og:image, twitter:image, canonical, etc.) to the production origin.
+// Apple iMessage's rich-link parser rejects relative paths, so anchoring
+// here is what lets `/og/invite.png` resolve to the absolute
+// `https://gettoit.app/og/invite.png` URL it expects.
 export const metadata: Metadata = {
+  metadataBase: new URL("https://gettoit.app"),
   title: "GetToIt",
   description: "Group decision-paralysis killer. Food vertical v1.",
 };

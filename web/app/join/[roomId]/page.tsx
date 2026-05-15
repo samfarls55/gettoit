@@ -18,15 +18,28 @@ export const dynamic = "force-dynamic";
 // Build OG/Twitter metadata at render time so iMessage and other
 // unfurlers see a card. The roomId is opaque so we don't leak
 // any session content into the unfurl preview.
+//
+// bug-02 (v1.1) — the og:image is a static placeholder PNG served
+// from `web/public/og/invite.png`. Two deliberate choices here:
+//   1. The path has NO query string. Apple iMessage's rich-link
+//      cache is strict and prefers a clean static URL; query
+//      params can cause it to fall back to plain-text rendering.
+//   2. The image is intentionally generic (flat warm gray). The
+//      branded version is deferred to the pre-public-launch
+//      milestone — see bug-02 issue notes.
+// Relative paths resolve against `metadata.metadataBase` (set in
+// `app/layout.tsx`) to a fully-qualified `https://gettoit.app/...`
+// URL, which iMessage requires.
 export async function generateMetadata({
   params,
 }: {
   params: { roomId: string };
 }): Promise<Metadata> {
-  const short = params.roomId.split("-")[0] ?? params.roomId;
   const title = "GetToIt — Where we're eating tonight";
-  const description = "Answer 5 questions. The verdict drops when everyone's in.";
+  const description =
+    "Answer 5 questions. The verdict drops when everyone's in.";
   const canonical = `https://gettoit.app/join/${params.roomId}`;
+  const ogImage = "/og/invite.png";
   return {
     title,
     description,
@@ -35,12 +48,23 @@ export async function generateMetadata({
       description,
       url: canonical,
       type: "website",
-      images: [`/og/invite.png?room=${short}`],
+      images: [
+        {
+          url: ogImage,
+          width: 1200,
+          height: 630,
+          alt: "GetToIt invite",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [ogImage],
+    },
+    appleWebApp: {
+      title: "GetToIt",
     },
   };
 }
