@@ -46,6 +46,7 @@ The pre-prime is a soft prompt — the user gets a one-tap path to keep moving w
 - **Body:** `"We'll line up restaurants close enough to walk to, instead of asking your neighborhood every time. Sharing your location is optional — type it in if you'd rather."` — three short clauses, second-person, voluntary register. The "optional" disclosure is load-bearing — it's the explicit signal that denying is survivable.
 - **Primary CTA:** `"Share my location"` — voluntary verb (`"Share"`), not `"Allow"` (matches iOS system register) or `"Enable"` (procedural). The user is *sharing*, not toggling a setting.
 - **Secondary:** `"Pick a place manually"` — eyebrow-style text link, second-person, signals that the user is in control of *how* they tell us where they are.
+- **System dialog purpose string (`NSLocationWhenInUseUsageDescription`):** `"So we can line up restaurants close enough to walk to, instead of asking your neighborhood every time."` — appears inside the native iOS "Allow GetToIt to use your location?" alert that fires after the primary CTA. Voice continuity with the pre-prime body copy (same use-case framing, same conversational register) so the system dialog reads as a continuation of this surface, not a regression to system-procedural language. Plist key lives in `ios/project.yml` `info.properties` (XcodeGen generates `Sources/App/Info.plist` from it).
 
 ## Visual
 

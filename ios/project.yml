@@ -61,6 +61,14 @@ targets:
         # App Store Connect requires this key to be present for iOS apps.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
+        # Location-permission purpose string. PlacesService.swift +
+        # MapKitPlacesFallback.swift both import CoreLocation, which makes
+        # this key mandatory at App Store ingest (ITMS-90683 warning on
+        # build 125, 2026-05-14). String voice matches surface S00b
+        # pre-prime body copy for continuity across pre-prime -> system
+        # dialog -> S01. Locked copy registered in
+        # design-system/surfaces/00b-location-permission.md.
+        NSLocationWhenInUseUsageDescription: "So we can line up restaurants close enough to walk to, instead of asking your neighborhood every time."
         # Supabase project URL + anon key are injected at build time via
         # build settings (SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY). On the
         # macOS CI runner these come from GitHub secrets; locally they come

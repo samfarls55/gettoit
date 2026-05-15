@@ -24,6 +24,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | bug-02 | [[issues/bug-02-static-og-image-placeholder\|Static placeholder OG image + meta tags]] (ready-for-human) | AFK | [#42](https://github.com/samfarls55/gettoit/issues/42) | — |
 | bug-03 | [[issues/bug-03-q5-placeholder-no-foursquare-calls\|Q5 placeholders, zero Foursquare calls — wire PlacesService into Q5]] (ready-for-human) | AFK | [#43](https://github.com/samfarls55/gettoit/issues/43) | — |
 | bug-04 | [[issues/bug-04-question-transition-motion-lag\|Question transition motion lag]] ⏳ ready-for-human | AFK | [#44](https://github.com/samfarls55/gettoit/issues/44) | — |
+| bug-05 | [[issues/bug-05-info-plist-missing-location-purpose-string\|Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125]] | AFK | — | — |
 
 ### Spec gaps
 
