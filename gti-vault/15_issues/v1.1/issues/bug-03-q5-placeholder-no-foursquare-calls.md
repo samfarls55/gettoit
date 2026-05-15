@@ -2,7 +2,7 @@
 issue: bug-03
 title: Q5 (Regret?) shows placeholder options — diagnose why PlacesService never calls Foursquare
 github_issue: 43
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -43,11 +43,11 @@ Wire `PlacesService` output into the Q5 options view-model. Concrete shape depen
 
 ## Acceptance criteria
 
-- [ ] Foursquare API dashboard shows a non-zero call count during a session that reaches Q5.
-- [ ] Q5 renders option strings sourced from `PlacesService` results filtered by prior answers — no hardcoded sample strings.
-- [ ] **Unit test** on the Q5 view-model: feed canned `PlacesService` output, assert rendered options match the canned data; placeholder strings absent.
-- [ ] **Boundary assertion** in a session-level integration test: `PlacesService.fetch()` is invoked at least once during a session that reaches the quiz. (Silent no-call is the exact failure mode here; this test would have caught it.)
-- [ ] Manual TestFlight smoke check: complete a session on real device, confirm Q5 lists real nearby restaurants.
+- [ ] Foursquare API dashboard shows a non-zero call count during a session that reaches Q5. *(founder check post-deploy)*
+- [x] Q5 renders option strings sourced from `PlacesService` results filtered by prior answers — no hardcoded sample strings.
+- [x] **Unit test** on the Q5 view-model: feed canned `PlacesService` output, assert rendered options match the canned data; placeholder strings absent. *(`ios/Tests/Q5CandidatesLoaderTests.swift`)*
+- [x] **Boundary assertion** in a session-level integration test: `PlacesService.fetch()` is invoked at least once during a session that reaches the quiz. (Silent no-call is the exact failure mode here; this test would have caught it.) *(`ios/Tests/QuizSessionAssemblerTests.swift`)*
+- [ ] Manual TestFlight smoke check: complete a session on real device, confirm Q5 lists real nearby restaurants. *(founder manual step)*
 
 ## Blocked by
 
@@ -56,3 +56,24 @@ None — can start immediately.
 ## Adjacencies
 
 - The same code path also surfaces results to the verdict engine. If Q5 was unwired, the verdict may also be using placeholder data. Confirm during diagnosis whether the verdict surface is affected; if yes, expand fix scope or file a follow-on.
+
+## Resolution (2026-05-14)
+
+**Diagnosis:** root cause was option (1) — stub never replaced. `PlacesService` had zero production call sites; `QuizCoordinator` was always constructed with the hardcoded `QuizDummyCandidates.all` fixture. The Foursquare API was never called because no code path called `fetchPlaces`.
+
+**Call-graph trace (pre-fix):**
+- `RootView.startQuiz` → `QuizCoordinator(roomID:, userID:, writer:)` (no `candidates:` arg, defaulted to dummy fixture)
+- `QuizCoordinator.allCandidates` → `QuizDummyCandidates.all`
+- `QuizQ5Regret.body` → iterates `coordinator.allCandidates` → renders three hardcoded placeholder rows.
+- `PlacesService.fetchPlaces` was never on the path.
+
+**Fix shape:**
+- New `Q5CandidatesLoader` (Swift): wraps `PlacesService.fetchPlaces`, shapes `[ShapedPlace]` → `[QuizCandidate]` (truncated to 3, meta `Category - $$ - N min`), falls back to dummy fixture if both proxy + MapKit return empty.
+- New `QuizSessionAssembler.assembleCoordinator`: the static seam that fires the loader and constructs the `QuizCoordinator` with the resulting candidates. Pulled out of `RootView.startQuiz` so the boundary assertion can test the real wire-up without mounting the SwiftUI host.
+- `RootView.startQuiz` now: resolves the session's location (initiator via `LocationCoordinator.place`, joiner hydrated from `rooms.location_*`) → builds the `PlacesService` graph → awaits `QuizSessionAssembler` → routes to `QuizScreen`.
+
+**Location source:** single — `LocationCoordinator.place`. Joiner path hydrates the coordinator with `commit(place:)` from the room's `location_*` columns before fetch, so both initiator and joiner consult the same coordinator. No dual-path on location.
+
+**Tests:**
+- `ios/Tests/Q5CandidatesLoaderTests.swift` — feeds canned PlacesService output through the loader, asserts the rendered `[QuizCandidate]` matches; asserts placeholder fixture names never leak.
+- `ios/Tests/QuizSessionAssemblerTests.swift` — the boundary assertion. A recording `PlacesProxyClient` records every call to `search`; the test asserts `observed.count >= 1` for the happy path (would fail loudly on a revert of the wire-up) and asserts the assembler forwards the coordinate / radius intact.

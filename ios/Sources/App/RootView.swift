@@ -345,21 +345,101 @@ public struct RootView: View {
     /// detection (`SoloPath.shouldSkipWaiting(memberCount:invitedShared:)`)
     /// once the post-Q5 router lands. Defaults to `true` for join-flow
     /// invitees — they wouldn't be here unless someone shared.
+    ///
+    /// bug-03 (v1.1) — startQuiz is the canonical seam where
+    /// `PlacesService.fetchPlaces` fires for the session. Before
+    /// bug-03 the QuizCoordinator was always constructed with the
+    /// hardcoded `QuizDummyCandidates.all` fixture and Foursquare
+    /// was never asked. The wire-up now reads the session's location
+    /// from the shared LocationCoordinator (hydrated for the joiner
+    /// from `rooms.location_*` so a single source — the coordinator —
+    /// answers for both initiator and joiner) and awaits the loader
+    /// before instantiating the coordinator with the shaped candidate
+    /// list. Q5 then renders real nearby restaurants.
     private func startQuiz(
         roomID: UUID,
         userID: UUID,
         client: SupabaseClient,
         invitedShared: Bool = true
     ) {
-        let coordinator = QuizCoordinator(
-            roomID: roomID,
-            userID: userID,
-            writer: QuizSupabaseWriter.make(client: client)
-        )
-        self.activeQuiz = QuizContext(coordinator: coordinator, invitedShared: invitedShared)
-        // Clear the deep link so closing the quiz returns to the
-        // initiator surface rather than re-routing back into Join.
-        self.deepLink = nil
+        guard let coordinators else { return }
+        Task {
+            let resolved = await resolvePlacesQuery(
+                roomID: roomID,
+                coordinators: coordinators
+            )
+            let proxy = SupabaseFunctionsPlacesProxyClient(client: client)
+            let places = PlacesService(
+                proxy: proxy,
+                mapKitFallback: MapKitPlacesFallback()
+            )
+            let assembled = await QuizSessionAssembler.assembleCoordinator(
+                roomID: roomID,
+                userID: userID,
+                coordinate: resolved?.coordinate,
+                radiusMeters: resolved?.radiusMeters ?? RoomStore.defaultRadiusMeters,
+                places: places,
+                writer: QuizSupabaseWriter.make(client: client)
+            )
+            self.activeQuiz = QuizContext(
+                coordinator: assembled.coordinator,
+                invitedShared: invitedShared
+            )
+            // Clear the deep link so closing the quiz returns to the
+            // initiator surface rather than re-routing back into Join.
+            self.deepLink = nil
+        }
+    }
+
+    /// Resolve the `(coordinate, radiusMeters)` pair PlacesService
+    /// needs for the session. Both paths funnel through the shared
+    /// `LocationCoordinator` (one location source for both initiator
+    /// and joiner, per the bug-03 hard rule):
+    ///   * Initiator: `place` is already committed via the S01
+    ///     LocationPicker; the CTA's `cannotAdvance` guard ensured a
+    ///     non-nil value before the share fired.
+    ///   * Joiner: arrives via deep link with no committed place, so
+    ///     we fetch the room row and hydrate the coordinator from
+    ///     `rooms.location_*`. The room's `radius_meters` is used in
+    ///     both paths because the migration always echoes the value
+    ///     the initiator picked.
+    /// Returns nil only when the room row is missing or unreadable
+    /// (RLS deny on a stale routing) - the caller falls back to dummy
+    /// candidates rather than block the user mid-flow.
+    private func resolvePlacesQuery(
+        roomID: UUID,
+        coordinators: Coordinators
+    ) async -> (coordinate: CLLocationCoordinate2D, radiusMeters: Int)? {
+        let room: RoomStore.Room?
+        do {
+            room = try await coordinators.roomStore.fetchRoom(id: roomID)
+        } catch {
+            room = nil
+        }
+        let radiusMeters = room?.radiusMeters ?? RoomStore.defaultRadiusMeters
+
+        if let place = coordinators.locationCoordinator.place {
+            return (place.coordinate, radiusMeters)
+        }
+        if let location = room?.location {
+            // Joiner path: hydrate the coordinator from the initiator's
+            // pick so downstream surfaces (and a future re-fetch) see
+            // the same place.
+            let coordinate = CLLocationCoordinate2D(
+                latitude: location.lat,
+                longitude: location.lng
+            )
+            let resolved = ResolvedPlace(
+                id: "room:\(roomID.uuidString)",
+                name: location.name,
+                sub: "",
+                coordinate: coordinate,
+                source: location.source == .gps ? .gps : .manual
+            )
+            coordinators.locationCoordinator.commit(place: resolved)
+            return (coordinate, radiusMeters)
+        }
+        return nil
     }
 
     // Group the live coordinators so the view body keeps a single
