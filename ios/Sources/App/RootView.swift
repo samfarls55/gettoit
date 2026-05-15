@@ -211,25 +211,18 @@ public struct RootView: View {
                             prefilledTimerMinutes: reInvitePrefill?.timerMinutes,
                             prefilledRadiusMiles: reInvitePrefill?.radiusMiles,
                             onSharedRoom: { roomID in
-                                // The prefill was a one-shot — after the
-                                // re-invite path lands a new room, drop
-                                // the carried defaults so the next cold
-                                // S01 entry surfaces the canonical
-                                // defaults. `showingInitiator` is also
-                                // cleared because `startQuiz` flips
-                                // `activeQuiz`, which sits inner-most in
-                                // the precedence chain; closing the quiz
-                                // returns to S00 Landing, not S01.
-                                reInvitePrefill = nil
-                                showingInitiator = false
+                                // Clearing `reInvitePrefill` /
+                                // `showingInitiator` is deferred into
+                                // `startQuiz` so the swap to QuizScreen
+                                // is atomic — otherwise the async places
+                                // fetch leaves a window where the
+                                // precedence chain falls through to S00
+                                // Landing and the user sees a flash of
+                                // the landing surface between S01 and
+                                // the quiz.
                                 startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: true)
                             },
                             onSoloRoom: { roomID in
-                                // Solo path uses the same one-shot prefill
-                                // semantics — once the new room lands, the
-                                // carried defaults are spent.
-                                reInvitePrefill = nil
-                                showingInitiator = false
                                 startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: false)
                             },
                             onSettings: {
@@ -413,12 +406,18 @@ public struct RootView: View {
                 places: places,
                 writer: QuizSupabaseWriter.make(client: client)
             )
+            // Flip into the quiz and tear down S01 routing state in
+            // the same scope so SwiftUI batches the updates and the
+            // precedence chain never momentarily falls through to S00
+            // Landing between InitiatorScreen and QuizScreen.
+            self.reInvitePrefill = nil
+            self.showingInitiator = false
             self.activeQuiz = QuizContext(
                 coordinator: assembled.coordinator,
                 invitedShared: invitedShared
             )
-            // Clear the deep link so closing the quiz returns to the
-            // initiator surface rather than re-routing back into Join.
+            // Clear the deep link so closing the quiz returns to S00
+            // Landing rather than re-routing back into Join.
             self.deepLink = nil
         }
     }
