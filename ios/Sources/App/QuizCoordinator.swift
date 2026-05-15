@@ -76,7 +76,11 @@ public final class QuizCoordinator {
 
     /// Active question the user is on. Advances forward only — there's
     /// no back arrow per S03 invariants.
-    public enum Step: Equatable, Sendable {
+    ///
+    /// `Hashable` so SwiftUI can use the step as a stable `.id(...)` on
+    /// the content router in `QuizScreen` (drives the bug-04 card
+    /// cross-fade — see `motion.md` §"Question card cross-fade").
+    public enum Step: Hashable, Sendable {
         case q1, q2, q3, q4, q5
         case submitting
         case submitted    // user landed past Q5

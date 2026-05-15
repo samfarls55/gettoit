@@ -2,7 +2,7 @@
 issue: bug-04
 title: Question transition motion lag — gradient ~1s behind card on every transition
 github_issue: 44
-status: ready-for-agent
+status: ready-for-human
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -33,9 +33,17 @@ If verification (below) surfaces another offender, fold into the same fix. This 
 ## Acceptance criteria
 
 - [ ] On a real iOS device, walking the quiz from Q1 through the final question shows no perceptible lag between card transition and gradient interpolation on any transition.
-- [ ] `node design-system/scripts/verify.mjs` green.
-- [ ] `design-system/CHANGELOG.md` entry referencing this issue.
-- [ ] If a new motion token was introduced (rather than tuning an existing one), `design-system/motion.md` updated.
+- [x] `node design-system/scripts/verify.mjs` green.
+- [x] `design-system/CHANGELOG.md` entry referencing this issue.
+- [x] If a new motion token was introduced (rather than tuning an existing one), `design-system/motion.md` updated. *(No new motion token introduced — aliased the existing `--grad-tween` token (1100ms ease-in-out) onto the iOS content router. `motion.md` was still updated with a new §"Question card cross-fade" section documenting the pairing so future readers see why the card matches the gradient duration exactly.)*
+
+## Resolution
+
+Root cause: the iOS `QuizScreen.swift` content router relied on SwiftUI's default no-animation transition between routed question views, while the background gradient ran a 1100ms ease-in-out tween. The card swapped instantly, the gradient kept moving for another second — that's the "~1s lag" the user reported.
+
+Fix: pair the card cross-fade with the gradient ms-exact. `QuizScreen.swift` now re-keys the routed content on `coordinator.step` and applies `.transition(.opacity).animation(...)` with the same `GTIMotion.Duration.gradTween` (1100ms) + `GTIMotion.Easing.inOut` already powering the gradient. Reduced motion drops both layers to 300ms linear in lockstep.
+
+Strategy: **(b) tune card up to match gradient.** The gradient duration is locked in `motion.md` §"Gradient surface tween" as the load-bearing "time-of-day" read — shortening it would break the narrative the gradient does. Tuning the card up to match keeps both load-bearing behaviors intact. No new motion token (the card aliases `--grad-tween`).
 
 ## Blocked by
 

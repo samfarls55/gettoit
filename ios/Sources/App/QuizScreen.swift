@@ -8,7 +8,13 @@
 //     `GTIMotion.Easing.inOut`).
 //   * The top bar (× + 5-segment progress).
 //   * Routing between QuizQ1Vetoes / QuizQ2Budget / QuizQ3Distance /
-//     QuizQ4Vibe / QuizQ5Regret based on `coordinator.step`.
+//     QuizQ4Vibe / QuizQ5Regret based on `coordinator.step`. The
+//     content swap cross-fades in lockstep with the gradient tween
+//     (same `gradTween` duration + `inOut` easing) per
+//     `design-system/motion.md` §"Question card cross-fade" — without
+//     this pairing the foreground card advances instantly while the
+//     background gradient is still mid-interpolation, which reads as
+//     ~1s of motion lag on every question transition (bug-04).
 //
 // The tween is implemented by holding `@State` color stops and
 // re-assigning them inside `withAnimation(...)` whenever the active
@@ -64,6 +70,17 @@ public struct QuizScreen: View {
 
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    // Re-key on the routed step so SwiftUI treats each
+                    // question as a distinct view identity and the
+                    // `.transition(.opacity)` actually fires on swap.
+                    .id(coordinator.step)
+                    .transition(.opacity)
+                    // Pair the card cross-fade with the gradient tween
+                    // ms-exact (same duration + easing) so the
+                    // foreground question and the background sunset
+                    // sweep move as one piece — `design-system/motion.md`
+                    // §"Question card cross-fade" (bug-04).
+                    .animation(cardTweenAnimation, value: coordinator.step)
             }
         }
         .onChange(of: coordinator.step) { _, newStep in
@@ -182,6 +199,25 @@ public struct QuizScreen: View {
     }
 
     // MARK: - tween
+
+    /// Animation used by the content cross-fade on step change.
+    /// Pinned to the same `gradTween` duration + `inOut` easing as the
+    /// gradient surface tween so the card and the gradient move in
+    /// lockstep — see file header + `motion.md` §"Question card
+    /// cross-fade" (bug-04). Reduced motion mirrors the gradient's
+    /// 300ms linear fallback.
+    private var cardTweenAnimation: Animation {
+        if reduceMotion {
+            return .linear(duration: 0.300)
+        }
+        return .timingCurve(
+            GTIMotion.Easing.inOut.0,
+            GTIMotion.Easing.inOut.1,
+            GTIMotion.Easing.inOut.2,
+            GTIMotion.Easing.inOut.3,
+            duration: GTIMotion.Duration.gradTween
+        )
+    }
 
     /// Run the 1100ms gradient-stop interpolation for a step change.
     /// Reduced motion drops the duration to 300ms linear (per
