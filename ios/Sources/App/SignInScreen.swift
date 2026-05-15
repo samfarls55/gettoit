@@ -218,11 +218,7 @@ public struct SignInScreen: View {
             phase = .idle
         } catch {
             phase = .idle
-            // DIAGNOSTIC (temp): surface raw error so TestFlight users
-            // can read the underlying Apple/Supabase failure off-screen.
-            // Revert to the generic string once root cause is known.
-            let ns = error as NSError
-            errorMessage = "Apple err: \(ns.domain) #\(ns.code) - \(ns.localizedDescription)"
+            errorMessage = "Couldn't reach Apple. Try again."
         }
     }
 }
