@@ -92,17 +92,38 @@ public struct PlacesFilters: Codable, Equatable, Sendable {
     public var dietary: [String]?
     public var priceTier: Int?
     public var openAt: String?
+    /// TB-07 (v1.1) — the craved cuisine this per-member fetch call is
+    /// tagged for (a `QuizCuisine` id, e.g. `"mexican"`). Set on the N
+    /// per-cuisine calls of an N+1 fetch; `nil` on the mandatory
+    /// general call.
+    ///
+    /// This is an **advisory** tag, NOT a strict filter. research-01
+    /// §3.2 fixes that cuisine must never strict-filter the fetch — a
+    /// craved cuisine narrows nothing on the wire; it only records
+    /// which cuisine motivated the call so the running-union pool
+    /// manager (tb-10) and the verdict engine can read the intent.
+    /// The general call (no `cuisine`) supplies non-craved breadth so
+    /// the Q5 factorial keeps its variety. It is deliberately kept out
+    /// of `dietary` (which IS a hard category filter).
+    public var cuisine: String?
 
-    public init(dietary: [String]? = nil, priceTier: Int? = nil, openAt: String? = nil) {
+    public init(
+        dietary: [String]? = nil,
+        priceTier: Int? = nil,
+        openAt: String? = nil,
+        cuisine: String? = nil
+    ) {
         self.dietary = dietary
         self.priceTier = priceTier
         self.openAt = openAt
+        self.cuisine = cuisine
     }
 
     enum CodingKeys: String, CodingKey {
         case dietary
         case priceTier = "price_tier"
         case openAt = "open_at"
+        case cuisine
     }
 }
 
