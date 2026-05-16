@@ -101,6 +101,8 @@ Build order: tb-14, tb-15, tb-17 can start immediately; tb-16 after tb-15. tb-15
 
 **Adjacency flagged, not filed.** `RunningUnionPoolManager` (tb-10) shows the same not-wired-in smell on the *verdict* side — see [[verdict-pipeline-pool-manager-unwired|verdict-pipeline-pool-manager-unwired]]. Out of scope for the Q5 fix; needs its own diagnosis pass before it becomes an issue.
 
+**Follow-up surfaced by tb-14 (2026-05-16).** tb-14 closed the deploy gap — the `places-proxy` Edge Function is now deployed and configured (live invocation returns HTTP 200, not `404` / `places_proxy_misconfigured`). But the deployed function returns an *empty* `places` array: Foursquare data still does not flow. Filed as [[placesproxy-empty-foursquare-results|placesproxy-empty-foursquare-results]] — a bad/expired key or a stale API-version pin, outside tb-14's deploy-only scope, needs a diagnosis pass with the Edge Function runtime logs.
+
 ## Cross-references
 
 - [[testflight-first-dogfood-2026-05-14|Source raw note]] — original first-impression observations (moved from 01_raw/ on 2026-05-14 compile)
