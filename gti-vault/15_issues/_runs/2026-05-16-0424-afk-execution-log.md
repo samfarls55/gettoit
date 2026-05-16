@@ -38,8 +38,8 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 | tb-07 | #68 | merged | afk/tb-07 | [#81](https://github.com/samfarls55/gettoit/pull/81) | + tracker PR #82; adjacency: Edge fn cuisine->category mapping deferred to tb-10 |
 | tb-08 | #69 | merged | afk/tb-08 | [#83](https://github.com/samfarls55/gettoit/pull/83) | Q5 copy reframed regret->excitement; adjacency: live quiz wiring deferred to tb-09 |
 | tb-09 | #70 | merged | afk/tb-09 | [#84](https://github.com/samfarls55/gettoit/pull/84) | adjacency: ShapedPlace->Q5VenueProfile classifier deferred to tb-10/tb-11 |
-| tb-10 | #71 | queued | afk/tb-10 | — | unblocked (tb-07, tb-09 merged) |
-| tb-11 | #72 | waiting | afk/tb-11 | — | blocked by tb-04, tb-10 |
+| tb-10 | #71 | merged | afk/tb-10 | [#85](https://github.com/samfarls55/gettoit/pull/85) | + tracker PR #86; adjacency: live-session wiring deferred to tb-11/tb-13 |
+| tb-11 | #72 | queued | afk/tb-11 | — | unblocked (tb-04, tb-10 merged) |
 | tb-12 | #73 | waiting | afk/tb-12 | — | blocked by tb-11 |
 | tb-13 | #74 | waiting | afk/tb-13 | — | blocked by tb-08, tb-11 |
 
@@ -58,3 +58,4 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 - 06:05 — tb-07 MERGED via PR #81 (+ tracker PR #82). Synced main to 7854922. Wave 4 ready: tb-08 only. Spawning tb-08.
 - 06:25 — tb-08 MERGED via PR #83 (bd1e31e). Synced main. Wave 5 ready: tb-09 only. Spawning tb-09.
 - 06:43 — tb-09 MERGED via PR #84 (011a690). Synced main. Wave 6 ready: tb-10 only. Spawning tb-10.
+- 07:00 — tb-10 MERGED via PR #85 (+ tracker PR #86). Synced main to db9a2bf. Wave 7 ready: tb-11 only. Spawning tb-11.
