@@ -1,0 +1,55 @@
+---
+run: 2026-05-16-0424
+status: running
+---
+
+# AFK Execution Run — 2026-05-16-0424
+
+Goal: execute all open AFK issues not blocked by a HITL issue.
+
+Concurrency cap: 2 subagents (default — no override given at invocation).
+
+## Work set
+
+- Ready (wave 1): bug-06, research-01, tb-04
+- Waiting (blocked by open AFK):
+  - tb-05 <- tb-04
+  - tb-06 <- tb-04
+  - tb-07 <- research-01, tb-04, tb-06
+  - tb-08 <- research-01, tb-04, tb-07
+  - tb-09 <- research-01, tb-08
+  - tb-10 <- tb-07, tb-09
+  - tb-11 <- tb-04, tb-10
+  - tb-12 <- tb-11
+  - tb-13 <- tb-08, tb-11
+- Excluded (HITL-blocked): none
+- Skipped (needs-info / unparseable): none
+- Dropped (already closed on GitHub before run): bug-01 (#41), bug-02 (#42), bug-03 (#43), bug-04 (#44), sg-01 (#45), sg-02 (#46), tb-01 (#49), tb-02 (#50), tb-03 (#51). Vault still labels these `ready-*` — stale frontmatter, GitHub is authoritative; treated as done.
+
+## Issue ledger
+
+| Issue | GitHub | State | Branch | PR | Notes |
+|---|---|---|---|---|---|
+| bug-06 | #63 | merged | afk/bug-06 | [#77](https://github.com/samfarls55/gettoit/pull/77) | code fix already in main (7a95412); PR #77 was tracker reconciliation only |
+| research-01 | #64 | merged | afk/research-01 | [#75](https://github.com/samfarls55/gettoit/pull/75) | research bundle in 60_engineering/research/ |
+| tb-04 | #65 | merged | afk/tb-04 | [#76](https://github.com/samfarls55/gettoit/pull/76) | PR also published the b04ea12 backlog commit; re-cut reroll + read-only-verdict RPCs for jsonb shape |
+| tb-05 | #66 | queued | afk/tb-05 | — | unblocked by tb-04 |
+| tb-06 | #67 | merged | afk/tb-06 | [#78](https://github.com/samfarls55/gettoit/pull/78) | adjacency: tb-11 must add cuisine_craving + reputation to votes-schema QUESTION_KINDS |
+| tb-07 | #68 | waiting | afk/tb-07 | — | blocked by research-01, tb-04, tb-06 |
+| tb-08 | #69 | waiting | afk/tb-08 | — | blocked by research-01, tb-04, tb-07 |
+| tb-09 | #70 | waiting | afk/tb-09 | — | blocked by research-01, tb-08 |
+| tb-10 | #71 | waiting | afk/tb-10 | — | blocked by tb-07, tb-09 |
+| tb-11 | #72 | waiting | afk/tb-11 | — | blocked by tb-04, tb-10 |
+| tb-12 | #73 | waiting | afk/tb-12 | — | blocked by tb-11 |
+| tb-13 | #74 | waiting | afk/tb-13 | — | blocked by tb-08, tb-11 |
+
+## Event log
+- 04:24 — Run opened. Preflight passed after committing the v1.1 vault backlog to main (commit b04ea12). Work set: 3 ready, 9 waiting, 9 dropped as already-closed.
+- 04:24 — Wave 1 batch 1 (cap 2): spawning tb-04 and research-01.
+- 04:47 — tb-04 MERGED via PR #76. Subagent rebased onto local main, so PR #76 also carried backlog commit b04ea12 (v1.1 PRD + issue files now on origin/main). Subagent re-cut apply_reroll + fetch_read_only_verdict RPCs for the jsonb shape (TB-10/TB-11 referenced the old typed columns) — flagged for review. ADR 0010 added.
+- 04:47 — research-01 MERGED via PR #75. Research bundle filed at 60_engineering/research/foursquare-filter-surface-2026-05/. Subagent could not set vault status (file absent from its branch); orchestrator flipped research-01 frontmatter to done + _index row.
+- 04:48 — Local main synced to origin/main (1493950). Re-running ready-issues for wave 2.
+- 04:49 — Wave 2 ready (GitHub-reconciled): bug-06, tb-05, tb-06. Batch 1 (cap 2): spawning tb-06 (critical path) and bug-06. tb-05 fills next free slot.
+- 05:12 — tb-06 MERGED via PR #78 (e2c8650). C-08 renamed Vibe Energy Scale; vibe-labels token set updated. Adjacency: tb-11 must extend votes-schema QUESTION_KINDS with cuisine_craving + reputation.
+- 05:12 — bug-06 MERGED via PR #77 (b38fe33). Code fix was already on main (7a95412); PR #77 reconciled the tracker only.
+- 05:13 — Local main synced to origin/main (e2c8650). Re-applied research-01 tracker reconciliation (lost in an earlier reset) and committed orchestrator state to main. Wave 2 batch 2: spawning tb-05.

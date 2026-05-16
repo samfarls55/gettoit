@@ -69,7 +69,7 @@ Build slices decomposed from [[../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Re
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| research-01 | [[issues/research-01-foursquare-filter-surface\|Foursquare filter-surface + venue-metadata research]] | AFK | [#64](https://github.com/samfarls55/gettoit/issues/64) | — |
+| research-01 | [[issues/research-01-foursquare-filter-surface\|Foursquare filter-surface + venue-metadata research]] ✅ done | AFK | [#64](https://github.com/samfarls55/gettoit/issues/64) | — |
 | tb-04 | [[issues/tb-04-votes-jsonb-schema\|Generic votes Q1..Q5 jsonb schema + engine mapping layer]] ✅ done | AFK | [#65](https://github.com/samfarls55/gettoit/issues/65) | — |
 | tb-05 | [[issues/tb-05-pre-quiz-parameters-surface\|Pre-quiz parameters setup surface]] | AFK | [#66](https://github.com/samfarls55/gettoit/issues/66) | tb-04 |
 | tb-06 | [[issues/tb-06-quiz-q1-q4-rework\|Quiz Q1-Q4 rework — four new input surfaces]] ✅ done | AFK | [#67](https://github.com/samfarls55/gettoit/issues/67) | tb-04 |

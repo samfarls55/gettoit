@@ -1,7 +1,7 @@
 ---
 issue: research-01
 title: Foursquare Places API filter-surface + venue-metadata research
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 64
 prd: v1.1-quiz-redesign-prd
@@ -34,3 +34,7 @@ The output doc fixes the metadata mapping that PRD module (E) axis scorers consu
 ## Blocked by
 
 None — can start immediately. This is the top-priority issue: tb-07, tb-08, and tb-09 all block on it.
+
+## Comments
+
+- 2026-05-16 — Done via PR #75 (squash-merged as `c253430`). Research bundle filed at `60_engineering/research/foursquare-filter-surface-2026-05/` (`report.md` + `_index.md`). GitHub #64 closed. Status flipped to `done` by the AFK run orchestrator — the subagent's worktree predated this file on `main` so it could not set the frontmatter itself. Run log: [[../../_runs/2026-05-16-0424-afk-execution-log]].
