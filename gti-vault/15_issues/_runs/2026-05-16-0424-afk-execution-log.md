@@ -33,9 +33,9 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 | bug-06 | #63 | merged | afk/bug-06 | [#77](https://github.com/samfarls55/gettoit/pull/77) | code fix already in main (7a95412); PR #77 was tracker reconciliation only |
 | research-01 | #64 | merged | afk/research-01 | [#75](https://github.com/samfarls55/gettoit/pull/75) | research bundle in 60_engineering/research/ |
 | tb-04 | #65 | merged | afk/tb-04 | [#76](https://github.com/samfarls55/gettoit/pull/76) | PR also published the b04ea12 backlog commit; re-cut reroll + read-only-verdict RPCs for jsonb shape |
-| tb-05 | #66 | queued | afk/tb-05 | — | unblocked by tb-04 |
+| tb-05 | #66 | merged | afk/tb-05 | [#79](https://github.com/samfarls55/gettoit/pull/79) | + tracker PR #80; added rooms_update_creator RLS policy (orig migration shipped no UPDATE) |
 | tb-06 | #67 | merged | afk/tb-06 | [#78](https://github.com/samfarls55/gettoit/pull/78) | adjacency: tb-11 must add cuisine_craving + reputation to votes-schema QUESTION_KINDS |
-| tb-07 | #68 | waiting | afk/tb-07 | — | blocked by research-01, tb-04, tb-06 |
+| tb-07 | #68 | queued | afk/tb-07 | — | unblocked (research-01, tb-04, tb-06 all merged) |
 | tb-08 | #69 | waiting | afk/tb-08 | — | blocked by research-01, tb-04, tb-07 |
 | tb-09 | #70 | waiting | afk/tb-09 | — | blocked by research-01, tb-08 |
 | tb-10 | #71 | waiting | afk/tb-10 | — | blocked by tb-07, tb-09 |
@@ -53,3 +53,5 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 - 05:12 — tb-06 MERGED via PR #78 (e2c8650). C-08 renamed Vibe Energy Scale; vibe-labels token set updated. Adjacency: tb-11 must extend votes-schema QUESTION_KINDS with cuisine_craving + reputation.
 - 05:12 — bug-06 MERGED via PR #77 (b38fe33). Code fix was already on main (7a95412); PR #77 reconciled the tracker only.
 - 05:13 — Local main synced to origin/main (e2c8650). Re-applied research-01 tracker reconciliation (lost in an earlier reset) and committed orchestrator state to main. Wave 2 batch 2: spawning tb-05.
+- 05:40 — tb-05 MERGED via PR #79 (+ tracker PR #80). Wave 2 complete (bug-06, tb-05, tb-06).
+- 05:41 — Local main synced to origin/main (b884844). Wave 3 ready: tb-07 only — remaining chain (tb-08..tb-13) is strictly linear. Spawning tb-07.
