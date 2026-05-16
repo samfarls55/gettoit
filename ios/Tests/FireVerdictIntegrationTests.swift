@@ -111,28 +111,22 @@ final class FireVerdictIntegrationTests: XCTestCase {
     }
 
     private func insertVoteAs(client: SupabaseClient, roomID: UUID, userID: UUID) async throws {
-        // Direct PostgREST insert into votes. We mirror the shape
-        // QuizSupabaseWriter would produce.
-        struct VoteInsert: Encodable {
-            let room_id: UUID
-            let user_id: UUID
-            let q1_vetoes: [String]
-            let q2_budget: Int
-            let q3_walk_minutes: Int
-            let q4_vibe: Int
-            let q5_regret: [String: Int]
-        }
+        // Direct PostgREST insert into votes, through the real
+        // `QuizCoordinator.VoteRow` so the wire shape (TB-04 generic
+        // jsonb `{ meta, answer }` slots) tracks the production writer
+        // automatically.
+        let row = QuizCoordinator.VoteRow(
+            roomID: roomID,
+            userID: userID,
+            q1Vetoes: [],
+            q2Budget: 4,
+            q3WalkMinutes: 30,
+            q4Vibe: 2,
+            q5Regret: [:]
+        )
         try await client
             .from("votes")
-            .insert(VoteInsert(
-                room_id: roomID,
-                user_id: userID,
-                q1_vetoes: [],
-                q2_budget: 4,
-                q3_walk_minutes: 30,
-                q4_vibe: 2,
-                q5_regret: [:]
-            ))
+            .insert(row)
             .execute()
     }
 

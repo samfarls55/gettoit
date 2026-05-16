@@ -84,6 +84,12 @@ final class VotesIntegrationTests: XCTestCase {
 
     /// Read back a votes row through the live client. Returns nil
     /// when RLS hides the row from the caller.
+    ///
+    /// TB-04 (v1.1): `votes` stores answers in five generic jsonb
+    /// slots (`q1`..`q5`), each a `{ meta, answer }` envelope. The
+    /// readback decodes the envelopes and re-exposes the typed values
+    /// (`q1Vetoes`, `q2Budget`, …) so the assertions below stay
+    /// unchanged.
     private struct VoteRowReadback: Decodable {
         let roomID: UUID
         let userID: UUID
@@ -92,20 +98,36 @@ final class VotesIntegrationTests: XCTestCase {
         let q3WalkMinutes: Int
         let q4Vibe: Int
 
+        /// One generic `{ meta, answer }` slot.
+        private struct Slot<Answer: Decodable>: Decodable {
+            let answer: Answer
+        }
+        private struct VetoesAnswer: Decodable { let vetoes: [String] }
+        private struct TierAnswer: Decodable { let tier: Int }
+        private struct MinutesAnswer: Decodable { let minutes: Int }
+        private struct LevelAnswer: Decodable { let level: Int }
+
         enum CodingKeys: String, CodingKey {
             case roomID = "room_id"
             case userID = "user_id"
-            case q1Vetoes = "q1_vetoes"
-            case q2Budget = "q2_budget"
-            case q3WalkMinutes = "q3_walk_minutes"
-            case q4Vibe = "q4_vibe"
+            case q1, q2, q3, q4
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            roomID = try c.decode(UUID.self, forKey: .roomID)
+            userID = try c.decode(UUID.self, forKey: .userID)
+            q1Vetoes = try c.decode(Slot<VetoesAnswer>.self, forKey: .q1).answer.vetoes
+            q2Budget = try c.decode(Slot<TierAnswer>.self, forKey: .q2).answer.tier
+            q3WalkMinutes = try c.decode(Slot<MinutesAnswer>.self, forKey: .q3).answer.minutes
+            q4Vibe = try c.decode(Slot<LevelAnswer>.self, forKey: .q4).answer.level
         }
     }
 
     private func fetchVotes(client: SupabaseClient, roomID: UUID) async throws -> [VoteRowReadback] {
         let rows: [VoteRowReadback] = try await client
             .from("votes")
-            .select("room_id,user_id,q1_vetoes,q2_budget,q3_walk_minutes,q4_vibe")
+            .select("room_id,user_id,q1,q2,q3,q4")
             .eq("room_id", value: roomID.uuidString.lowercased())
             .execute()
             .value

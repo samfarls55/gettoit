@@ -217,7 +217,12 @@ final class QuizCoordinatorTests: XCTestCase {
 
     // MARK: - sanity
 
-    func testVoteRowEncodesToSnakeCaseKeys() throws {
+    /// TB-04 (v1.1) — the `votes` table now stores answers in five
+    /// generic jsonb slots (`q1`..`q5`), each a `{ meta, answer }`
+    /// envelope. `meta.question_kind` is the discriminator the
+    /// verdict-engine mapping layer dispatches on. The wire row must
+    /// emit that envelope shape, not the old typed columns.
+    func testVoteRowEncodesGenericQuestionSlotEnvelopes() throws {
         let row = QuizCoordinator.VoteRow(
             roomID: UUID(),
             userID: UUID(),
@@ -229,12 +234,49 @@ final class QuizCoordinatorTests: XCTestCase {
         )
         let data = try JSONEncoder().encode(row)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
         XCTAssertNotNil(json["room_id"], "expected snake_case room_id")
         XCTAssertNotNil(json["user_id"], "expected snake_case user_id")
-        XCTAssertNotNil(json["q1_vetoes"])
-        XCTAssertNotNil(json["q2_budget"])
-        XCTAssertNotNil(json["q3_walk_minutes"])
-        XCTAssertNotNil(json["q4_vibe"])
-        XCTAssertNotNil(json["q5_regret"])
+
+        // Five generic slots, each a { meta, answer } envelope.
+        for slot in ["q1", "q2", "q3", "q4", "q5"] {
+            let envelope = try XCTUnwrap(json[slot] as? [String: Any], "expected slot \(slot)")
+            let meta = try XCTUnwrap(envelope["meta"] as? [String: Any], "\(slot) needs meta")
+            XCTAssertNotNil(meta["question_kind"], "\(slot).meta needs a question_kind")
+            XCTAssertNotNil(envelope["answer"], "\(slot) needs an answer")
+        }
+
+        // Each slot carries the kind discriminator the engine maps on.
+        let kindOf: (String) throws -> String = { slot in
+            let env = try XCTUnwrap(json[slot] as? [String: Any])
+            let meta = try XCTUnwrap(env["meta"] as? [String: Any])
+            return try XCTUnwrap(meta["question_kind"] as? String)
+        }
+        XCTAssertEqual(try kindOf("q1"), "dietary_veto")
+        XCTAssertEqual(try kindOf("q2"), "budget_cap")
+        XCTAssertEqual(try kindOf("q3"), "walk_minutes")
+        XCTAssertEqual(try kindOf("q4"), "vibe")
+        XCTAssertEqual(try kindOf("q5"), "regret")
+
+        // The answer payloads carry the actual responses.
+        let q2Answer = try XCTUnwrap((json["q2"] as? [String: Any])?["answer"] as? [String: Any])
+        XCTAssertEqual(q2Answer["tier"] as? Int, 2)
+        let q3Answer = try XCTUnwrap((json["q3"] as? [String: Any])?["answer"] as? [String: Any])
+        XCTAssertEqual(q3Answer["minutes"] as? Int, 10)
+        let q4Answer = try XCTUnwrap((json["q4"] as? [String: Any])?["answer"] as? [String: Any])
+        XCTAssertEqual(q4Answer["level"] as? Int, 3)
+        let q1Answer = try XCTUnwrap((json["q1"] as? [String: Any])?["answer"] as? [String: Any])
+        let vetoes = try XCTUnwrap(q1Answer["vetoes"] as? [String])
+        XCTAssertEqual(Set(vetoes), Set([QuizVeto.shellfish, QuizVeto.dairy]))
+        let q5Answer = try XCTUnwrap((json["q5"] as? [String: Any])?["answer"] as? [String: Any])
+        let scores = try XCTUnwrap(q5Answer["scores"] as? [String: Any])
+        XCTAssertEqual(scores["dummy-pico"] as? Int, 5)
+
+        // The old typed columns must NOT appear on the wire.
+        XCTAssertNil(json["q1_vetoes"], "typed columns are gone in the v1.1 jsonb schema")
+        XCTAssertNil(json["q2_budget"])
+        XCTAssertNil(json["q3_walk_minutes"])
+        XCTAssertNil(json["q4_vibe"])
+        XCTAssertNil(json["q5_regret"])
     }
 }

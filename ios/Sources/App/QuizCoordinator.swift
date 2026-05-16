@@ -235,9 +235,20 @@ public final class QuizCoordinator {
         }
     }
 
-    /// The wire shape for the `votes` row. Public because the
-    /// integration test asserts the payload contents.
-    public struct VoteRow: Codable, Equatable, Sendable {
+    /// The wire shape for the `votes` row.
+    ///
+    /// TB-04 (v1.1): the `votes` table stores answers in five generic
+    /// jsonb slots (`q1`..`q5`), each a `{ meta, answer }` envelope.
+    /// `meta.question_kind` is the discriminator the verdict-engine
+    /// mapping layer (`supabase/functions/_shared/votes-schema.ts`)
+    /// dispatches on — so quiz content can change without a migration.
+    ///
+    /// The typed Swift properties below remain the in-memory shape the
+    /// coordinator and the unit tests work with; only the encoded wire
+    /// JSON is the generic envelope. `Encodable` only — the row is
+    /// write-only (reads go through a separate `Decodable` readback
+    /// shape).
+    public struct VoteRow: Encodable, Equatable, Sendable {
         public let roomID: UUID
         public let userID: UUID
         public let q1Vetoes: [String]
@@ -246,14 +257,91 @@ public final class QuizCoordinator {
         public let q4Vibe: Int
         public let q5Regret: [String: Int]
 
-        public enum CodingKeys: String, CodingKey {
+        public init(
+            roomID: UUID,
+            userID: UUID,
+            q1Vetoes: [String],
+            q2Budget: Int,
+            q3WalkMinutes: Int,
+            q4Vibe: Int,
+            q5Regret: [String: Int]
+        ) {
+            self.roomID = roomID
+            self.userID = userID
+            self.q1Vetoes = q1Vetoes
+            self.q2Budget = q2Budget
+            self.q3WalkMinutes = q3WalkMinutes
+            self.q4Vibe = q4Vibe
+            self.q5Regret = q5Regret
+        }
+
+        private enum RowKey: String, CodingKey {
             case roomID = "room_id"
             case userID = "user_id"
-            case q1Vetoes = "q1_vetoes"
-            case q2Budget = "q2_budget"
-            case q3WalkMinutes = "q3_walk_minutes"
-            case q4Vibe = "q4_vibe"
-            case q5Regret = "q5_regret"
+            case q1, q2, q3, q4, q5
+        }
+
+        private enum SlotKey: String, CodingKey {
+            case meta, answer
+        }
+
+        private enum MetaKey: String, CodingKey {
+            case questionKind = "question_kind"
+            case prompt
+        }
+
+        /// Encode one generic `{ meta, answer }` slot. The `prompt`
+        /// strings are the v1 quiz copy — carried for audit, never
+        /// read by the engine's mapping layer.
+        private func encodeSlot<A: Encodable>(
+            into container: inout KeyedEncodingContainer<RowKey>,
+            key: RowKey,
+            questionKind: String,
+            prompt: String,
+            answer: A
+        ) throws {
+            var slot = container.nestedContainer(keyedBy: SlotKey.self, forKey: key)
+            var meta = slot.nestedContainer(keyedBy: MetaKey.self, forKey: .meta)
+            try meta.encode(questionKind, forKey: .questionKind)
+            try meta.encode(prompt, forKey: .prompt)
+            try slot.encode(answer, forKey: .answer)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: RowKey.self)
+            try container.encode(roomID, forKey: .roomID)
+            try container.encode(userID, forKey: .userID)
+
+            try encodeSlot(
+                into: &container, key: .q1,
+                questionKind: "dietary_veto",
+                prompt: "Anything off the menu tonight?",
+                answer: ["vetoes": q1Vetoes]
+            )
+            try encodeSlot(
+                into: &container, key: .q2,
+                questionKind: "budget_cap",
+                prompt: "Where's the ceiling tonight?",
+                answer: ["tier": q2Budget]
+            )
+            try encodeSlot(
+                into: &container, key: .q3,
+                questionKind: "walk_minutes",
+                prompt: "How far are you willing to walk?",
+                answer: ["minutes": q3WalkMinutes]
+            )
+            try encodeSlot(
+                into: &container, key: .q4,
+                questionKind: "vibe",
+                prompt: "What's the energy you're after?",
+                answer: ["level": q4Vibe]
+            )
+            try encodeSlot(
+                into: &container, key: .q5,
+                questionKind: "regret",
+                prompt: "Which would you most regret missing?",
+                answer: ["scores": q5Regret]
+            )
         }
     }
 
