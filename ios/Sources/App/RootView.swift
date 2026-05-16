@@ -409,16 +409,20 @@ public struct RootView: View {
     /// once the post-Q5 router lands. Defaults to `true` for join-flow
     /// invitees — they wouldn't be here unless someone shared.
     ///
-    /// bug-03 (v1.1) — startQuiz is the canonical seam where
-    /// `PlacesService.fetchPlaces` fires for the session. Before
-    /// bug-03 the QuizCoordinator was always constructed with the
-    /// hardcoded `QuizDummyCandidates.all` fixture and Foursquare
-    /// was never asked. The wire-up now reads the session's location
-    /// from the shared LocationCoordinator (hydrated for the joiner
-    /// from `rooms.location_*` so a single source — the coordinator —
-    /// answers for both initiator and joiner) and awaits the loader
-    /// before instantiating the coordinator with the shaped candidate
-    /// list. Q5 then renders real nearby restaurants.
+    /// TB-15 (v1.1) — startQuiz builds the QuizCoordinator with the
+    /// session's resolved location and a live per-member Foursquare
+    /// fetch. It does NOT fetch candidates here: before TB-15 the
+    /// assembler ran the bug-03 bridge (`Q5CandidatesLoader` — one
+    /// `PlacesService.fetchPlaces` with empty filters, before any quiz
+    /// answer existed). That early fetch is gone. The coordinator's
+    /// step machine now fires the answer-tailored N+1 calls when the
+    /// member completes Q4, so Q5 renders venues that reflect the
+    /// member's Q1 cuisines and Q2 spend cap.
+    ///
+    /// The session's location is read from the shared
+    /// LocationCoordinator (hydrated for the joiner from
+    /// `rooms.location_*` so a single source answers for both
+    /// initiator and joiner).
     private func startQuiz(
         roomID: UUID,
         userID: UUID,
@@ -436,7 +440,7 @@ public struct RootView: View {
                 proxy: proxy,
                 mapKitFallback: MapKitPlacesFallback()
             )
-            let assembled = await QuizSessionAssembler.assembleCoordinator(
+            let assembled = QuizSessionAssembler.assembleCoordinator(
                 roomID: roomID,
                 userID: userID,
                 coordinate: resolved?.coordinate,

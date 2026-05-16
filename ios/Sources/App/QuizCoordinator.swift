@@ -30,6 +30,17 @@
 // Foursquare fetch — the coordinator's `submit(...)` interface stays
 // the same; only the source of `Candidate.id` strings changes.
 //
+// TB-15 (v1.1) — the per-member Foursquare fetch now fires from the
+// coordinator's quiz step machine: when the member advances Q4 -> Q5,
+// `advance()` kicks off `QuizCandidateFetch.fetchCandidates(...)` with
+// the member's REAL Q1 cuisines + Q2 spend cap + session parameters.
+// The candidate list starts empty and is populated when the fetch
+// resolves; `q5CandidatesState` tracks the in-flight / ready / fallback
+// status so Q5 can render a loading state until the answer-tailored
+// pool lands. The pre-quiz empty-filter fetch (the bug-03 bridge) is
+// gone — no PlacesProxy / Foursquare call fires before Q1-Q4 are
+// answered.
+//
 // All visual code lives in `QuizQ{1..5}*.swift`. The coordinator is
 // intentionally view-free so it can be tested without SwiftUI.
 
@@ -98,6 +109,26 @@ public final class QuizCoordinator {
 
     public private(set) var step: Step = .q1
 
+    /// TB-15 (v1.1) — the per-member candidate fetch lifecycle. The
+    /// fetch fires once, on the Q4 -> Q5 transition; Q5 reads this to
+    /// decide between a loading state and the rendered card list.
+    public enum Q5CandidatesState: Equatable, Sendable {
+        /// The member has not yet reached Q5 — no fetch attempted.
+        case idle
+        /// The per-member fetch is in flight (Q4 -> Q5 transition fired
+        /// it). Q5 renders a loading state.
+        case loading
+        /// The fetch resolved with real venues from the executor's
+        /// unioned pool.
+        case ready
+        /// The fetch resolved to the dummy fixture — genuine pool
+        /// starvation, or no session coordinate. Q5 still renders three
+        /// rateable rows; the member is never stranded.
+        case fallbackDummy
+    }
+
+    public private(set) var q5CandidatesState: Q5CandidatesState = .idle
+
     /// The cuisine-craving cap. Q1 allows at most this many cuisine
     /// picks before further selections are prevented (PRD user story
     /// 13 — "be prevented from selecting more than 3 cuisines").
@@ -121,8 +152,24 @@ public final class QuizCoordinator {
 
     private let roomID: UUID
     private let userID: UUID
-    private let candidates: [QuizCandidate]
+    /// Q5 candidate list. TB-15: mutable — when a `candidateFetch` is
+    /// supplied this starts empty and is populated by the per-member
+    /// fetch on the Q4 -> Q5 transition. The legacy `candidates:` init
+    /// path (unit tests, snapshot harness) seeds this directly and
+    /// leaves `candidateFetch` nil, so the fetch never fires.
+    private var candidates: [QuizCandidate]
     private let writer: QuizVoteWriter
+
+    /// TB-15 (v1.1) — the per-member Foursquare fetch. Non-nil on the
+    /// live quiz path (`QuizSessionAssembler` injects a
+    /// `FoursquareQuizCandidateFetch`); nil on the legacy explicit-
+    /// `candidates:` path so the unit tests stay fetch-free.
+    private let candidateFetch: QuizCandidateFetch?
+
+    /// In-flight per-member fetch task, so a re-entrant Q4 -> Q5
+    /// transition (or a defensive double-`advance()`) folds into the
+    /// already-running fetch instead of firing the N+1 calls twice.
+    private var fetchTask: Task<Void, Never>?
 
     /// TB-05 (v1.1) — the session-wide *parameters* bucket (meal time,
     /// group context, service shape, transport mode). Set once by the
@@ -142,6 +189,9 @@ public final class QuizCoordinator {
     /// but a wasted round-trip we can avoid cheaply.
     private var inflight: Task<QuizSubmitOutcome, Error>?
 
+    /// Legacy init — Q5 candidates are supplied up front. Used by the
+    /// unit tests and the snapshot harness; the per-member fetch never
+    /// fires on this path (`candidateFetch` is nil).
     public init(
         roomID: UUID,
         userID: UUID,
@@ -153,13 +203,43 @@ public final class QuizCoordinator {
         self.userID = userID
         self.candidates = candidates
         self.sessionParameters = sessionParameters
+        self.candidateFetch = nil
         self.writer = writer
         // Seed Q5 ratings at the spec'd default (3 — middle of the
         // 1–5 scale) so the surface renders with a chosen state per
         // card and the user can submit without touching every card.
+        self.q5Ratings = QuizCoordinator.seededRatings(for: candidates)
+    }
+
+    /// TB-15 (v1.1) — the live-quiz init. Q5 candidates are NOT supplied
+    /// up front; the candidate list starts empty and the per-member
+    /// Foursquare fetch (`candidateFetch`) fires on the Q4 -> Q5
+    /// transition with the member's real Q1-Q4 answers. This is the
+    /// init `QuizSessionAssembler` uses for the running quiz — no
+    /// PlacesProxy / Foursquare call fires before Q1-Q4 are answered.
+    public init(
+        roomID: UUID,
+        userID: UUID,
+        candidateFetch: QuizCandidateFetch,
+        sessionParameters: SessionParameters = .default,
+        writer: @escaping QuizVoteWriter
+    ) {
+        self.roomID = roomID
+        self.userID = userID
+        self.candidates = []
+        self.sessionParameters = sessionParameters
+        self.candidateFetch = candidateFetch
+        self.writer = writer
+        self.q5Ratings = [:]
+    }
+
+    /// Seed Q5 ratings at the spec'd default (3 — middle of the 1…5
+    /// scale) so every card renders with a chosen state and the user
+    /// can submit without touching every card.
+    private static func seededRatings(for candidates: [QuizCandidate]) -> [String: Int] {
         var seed: [String: Int] = [:]
         for c in candidates { seed[c.id] = 3 }
-        self.q5Ratings = seed
+        return seed
     }
 
     public var allCandidates: [QuizCandidate] { candidates }
@@ -246,10 +326,67 @@ public final class QuizCoordinator {
         case .q1: step = .q2
         case .q2: step = .q3
         case .q3: step = .q4
-        case .q4: step = .q5
+        case .q4:
+            step = .q5
+            // TB-15 (v1.1) — completing Q4 is the trigger for the
+            // per-member Foursquare fetch. The member has now answered
+            // Q1 (cuisines) and Q2 (spend cap); fire the answer-tailored
+            // N+1 calls. No PlacesProxy / Foursquare call fires before
+            // this point.
+            startCandidateFetchIfNeeded()
         case .q5, .submitting, .submitted, .failed:
             break  // submit is a separate explicit call
         }
+    }
+
+    // MARK: - Q5 candidate fetch (TB-15)
+
+    /// Fire the per-member Foursquare fetch, once, on the Q4 -> Q5
+    /// transition. No-op when the coordinator was built via the legacy
+    /// explicit-`candidates:` init (`candidateFetch` is nil) or when a
+    /// fetch is already in flight / complete.
+    ///
+    /// The fetch forwards the member's REAL Q1 craved cuisines + Q2
+    /// spend cap + the shared session parameters through
+    /// `FoursquareFetchExecutor` — never an empty `PlacesFilters()`.
+    private func startCandidateFetchIfNeeded() {
+        guard let candidateFetch else { return }
+        guard q5CandidatesState == .idle, fetchTask == nil else { return }
+
+        q5CandidatesState = .loading
+        let cuisines = q1NoPreference ? [] : q1Cuisines.sorted()
+        let budgetTier = q2Budget
+        let parameters = sessionParameters
+
+        fetchTask = Task { [weak self] in
+            let result = await candidateFetch.fetchCandidates(
+                cuisines: cuisines,
+                budgetTier: budgetTier,
+                parameters: parameters
+            )
+            guard let self else { return }
+            self.applyFetchResult(result)
+        }
+    }
+
+    /// Fold a resolved per-member fetch into the coordinator: install
+    /// the candidate list, seed the Q5 ratings, and flip
+    /// `q5CandidatesState` so Q5 swaps the loading state for the cards.
+    private func applyFetchResult(_ result: QuizCandidateFetchResult) {
+        candidates = result.candidates
+        q5Ratings = QuizCoordinator.seededRatings(for: result.candidates)
+        switch result.source {
+        case .fetched:        q5CandidatesState = .ready
+        case .fallbackDummy:  q5CandidatesState = .fallbackDummy
+        }
+        fetchTask = nil
+    }
+
+    /// Await the in-flight per-member fetch, if any. Exposed so the
+    /// boundary tests can deterministically observe the post-fetch
+    /// candidate list without polling. A no-op when no fetch is running.
+    public func awaitCandidateFetch() async {
+        await fetchTask?.value
     }
 
     /// Submit the assembled vote row. Idempotent on retry — a unique-
