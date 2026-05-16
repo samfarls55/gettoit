@@ -1,7 +1,7 @@
 ---
 issue: tb-07
 title: Per-member real Foursquare fetch + Q1-Q4 completion trigger
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 68
 prd: v1.1-quiz-redesign-prd
@@ -36,3 +36,55 @@ When a member completes Q1-Q4, fire a Foursquare fetch tailored to their answers
 - [[research-01-foursquare-filter-surface|research-01]] — fetch filter surface must be fixed first.
 - [[tb-04-votes-jsonb-schema|tb-04]] — reads answers from the jsonb slots.
 - [[tb-06-quiz-q1-q4-rework|tb-06]] — needs the real Q1 cuisines and Q2 price.
+
+## Comments
+
+**2026-05-16 — done (AFK, PR #81 / branch `afk/tb-07`, squash-merged as `8ba1903`).**
+Built the per-member fetch planner (PRD module D) and fetch executor
+(module F) on the iOS side.
+
+- **`FoursquareFetchPlanner`** — pure, no I/O. Takes a member's Q1
+  craved cuisines + Q2 spend cap, the shared `SessionParameters`, and
+  the session geo / radius; emits N+1 `PlacesProxyRequest` specs — one
+  cuisine-tagged call per craved cuisine (N = 0…3, order-preservingly
+  de-duped and capped at 3) plus one mandatory general call. The
+  general call always fires, even when Q1 was "No preference" (N = 0),
+  so the fetch is never zero calls — the planner-level bug-03 guard.
+  Hard filters apply to every spec: geo (`ll`), radius, Q2 price →
+  `max_price`, meal-time → `open_at` (each meal resolves to a
+  representative local hour, emitted as an ISO-8601 instant the
+  PlacesProxy converts to unix-seconds).
+- **`FoursquareFetchExecutor`** — runs the N+1 specs in parallel
+  through `PlacesService` (so each call inherits ADR-0002's
+  thin-response → MapKit-fallback behaviour), unions and dedupes venue
+  results by `fsq_place_id`, carries disclaimers forward.
+- **`PlacesFilters.cuisine`** — new optional advisory tag. Carries the
+  craved cuisine (a `QuizCuisine` id string) on each per-cuisine call.
+  Per research-01 §3.2 it is **never** a strict filter and is
+  deliberately kept out of `dietary` (which IS a hard category
+  filter) — cuisine must not strict-filter or the Q5 factorial loses
+  its pool variety.
+- **Tests.** Pure planner unit tests (N+1 call count, per-cuisine tag,
+  the mandatory general call, hard filters applied, cuisine never
+  enters the dietary hard filter, cap + dedupe) and a recording-proxy
+  boundary test following the `QuizSessionAssemblerTests`
+  `PlacesProxyClient` pattern — the explicit bug-03 regression guard
+  that the N+1 calls actually fire with the correct count and the
+  planner specs forward intact. `ios` CI lane green.
+
+**Adjacency flagged — Edge Function does not yet consume the `cuisine`
+tag.** The iOS request body now carries `cuisine`, but the Edge
+Function's `PlacesProxyFilters` interface ignores the unknown key
+(structural decode — no breakage). Mapping the cuisine token to a
+Foursquare category id belongs server-side next to `DIETARY_CHIP_MAP`
+in `supabase/functions/_shared/foursquare.ts`; tb-10 (running-union
+pool manager) is the natural home. The iOS client deliberately does
+not hardcode unverified Foursquare taxonomy ids — research-01 did not
+pin cuisine→category-id mappings.
+
+**Note on the Q1-Q4 completion trigger.** The planner + executor are
+built and unit/boundary-tested. Wiring the trigger into the live quiz
+step machine (firing the executor when `QuizCoordinator` reaches Q5)
+is consumed by the Q5 factorial probe — tb-08 — which owns the
+candidate-set assembly the fetch feeds; this issue ships the planner
+and executor it depends on.
