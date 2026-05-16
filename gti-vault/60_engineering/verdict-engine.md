@@ -117,6 +117,29 @@ The `compute-verdict` Edge Function accepts an optional `radius_meters_override`
 - If a prior `method = "manual"` verdict exists, the override is IGNORED — successful verdicts are never replaced by a widen request. Defends against a duplicate "Widen radius" tap after the engine has produced a winner.
 - The engine runs with `radius_meters = override` and `radius_meters_cap = override` so it doesn't itself widen past where the user asked.
 
+## v1.1 firing — Q5-complete signal, no timer (TB-13)
+
+The TB-07 timer firing path below is **superseded by TB-13** for the
+v1.1 quiz redesign. The v1.1 quiz has no shot clock (PRD module H,
+user stories 33-36); the verdict fires on exactly two signals:
+
+- **All participants completed Q5** — the `AFTER INSERT ON votes`
+  trigger auto-fires the moment every *current* room member has a
+  `regret`-kind votes slot (`count_q5_complete_members(room) = count(members)`).
+  No `deadline_at` channel, no minimum quorum.
+- **Initiator closed voting** — the `fire_verdict(room_id)` RPC, with
+  the v1 two-vote quorum gate removed, produces the verdict on demand.
+  A solo session (initiator alone) resolves; the initiator never waits
+  on a straggler.
+
+The `gettoit_verdict_auto_fire` per-minute timer cron is unscheduled
+(a timer cron would expire a live v1.1 room mid-quiz). The canonical,
+fixture-tested statement of the firing contract is the pure predicate
+`supabase/functions/_shared/verdict-firing.ts` (`decideFiring`); the
+SQL trigger / RPC in `20260515020000000_verdict_fire_on_q5_complete.sql`
+mirror it. `rooms.timer_minutes` / `rooms.deadline_at` are left in
+place as inert columns.
+
 ## What's not in TB-09 (next tracer bullets)
 
 - **TB-07** ✅ landed — `AFTER INSERT ON votes` trigger that fires the engine on full quorum + status='firing'; `pg_cron` job (`gettoit_verdict_auto_fire`) that fires on deadline expiry; Realtime Broadcast on `verdict_ready`; `fire_verdict(room_id)` RPC for the initiator's "Decide now" tap. See [[waiting-fire-trigger|waiting-fire-trigger.md]].

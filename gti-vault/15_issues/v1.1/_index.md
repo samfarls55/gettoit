@@ -79,7 +79,7 @@ Build slices decomposed from [[../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Re
 | tb-10 | [[issues/tb-10-running-union-pool-manager\|Running-union candidate pool manager]] ✅ done | AFK | [#71](https://github.com/samfarls55/gettoit/issues/71) | tb-07, tb-09 |
 | tb-11 | [[issues/tb-11-verdict-engine-rewrite\|Worst-off-protecting verdict engine rewrite]] ✅ done | AFK | [#72](https://github.com/samfarls55/gettoit/issues/72) | tb-04, tb-10 |
 | tb-12 | [[issues/tb-12-profile-vetoes\|Profile vetoes — account allergy/dietary/NEVERS storage]] ✅ done | AFK | [#73](https://github.com/samfarls55/gettoit/issues/73) | tb-11 |
-| tb-13 | [[issues/tb-13-verdict-firing-q5-complete\|Verdict firing on the new Q5-complete signal]] | AFK | [#74](https://github.com/samfarls55/gettoit/issues/74) | tb-08, tb-11 |
+| tb-13 | [[issues/tb-13-verdict-firing-q5-complete\|Verdict firing on the new Q5-complete signal]] ✅ done | AFK | [#74](https://github.com/samfarls55/gettoit/issues/74) | tb-08, tb-11 |
 
 Build order: research-01 first (blocks all Foursquare work), then tb-04 → tb-13 along the dependency graph above.
 
