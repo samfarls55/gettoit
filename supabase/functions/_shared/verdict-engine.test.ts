@@ -1,24 +1,23 @@
-// VerdictEngine fixture tests (TB-06).
+// VerdictEngine fixture tests (TB-11 — worst-off-protecting rewrite).
 //
 // Pure-logic tests against the engine's public interface. No Supabase
 // round-trip, no Edge runtime — just `(VerdictEngineInput) → VerdictEngineOutput`.
 //
-// Scope of TB-06: clean-run path only. Soft-pref relax, hard-need
-// terminal, and no-survivor handling are TB-09 and not exercised here.
+// The TB-11 pipeline replaces the TB-06 EBA-with-relax-cascade with:
+//   1. EBA prune       — drop venues failing ANY member's hard vetoes
+//                        (profile dietary / allergies / NEVERS, parameter
+//                        geo / meal-time, Q2 spend cap).
+//   2. Per-member score — each member's injected `prefFn` scores 1..5.
+//   3. Satisficing floor — keep venues every member scores >= T.
+//   4. Maximin tiebreak  — highest minimum member score wins; a
+//                          polarizing higher-sum pick LOSES to a
+//                          worst-off-protecting pick.
+//   5. Final tiebreak    — highest sum, then injected random.
+//   6. Empty-floor cascade — relax T, then widen radius, then a
+//                          terminal `no_survivor` screen.
 //
-// Fixtures shape the public contract of the engine:
-//   * Q1 dietary vetoes prune candidates whose `dietary_tags` lack
-//     the corresponding `emit_tag` (menu-compliance filter per PRD).
-//   * Q2 budget tier prunes candidates with `price_tier` above the
-//     MAX member cap … actually MIN. Each member's tier is a cap;
-//     a candidate survives only if it satisfies every member's cap.
-//   * Q3 walk-minutes prunes candidates with `walk_minutes_estimate`
-//     above the MIN member threshold (every member's "willing to walk"
-//     must be satisfied).
-//   * Q4 vibe is currently a soft signal (not exercised in TB-06's
-//     hard-veto chain — it lands in TB-09's relax logic).
-//   * Q5 regret sums per-candidate scores across members; max wins.
-//   * Flat-regret variance below threshold → random within survivors.
+// A good test asserts external behavior through the public interface,
+// never internals — feed defined inputs, assert the observable output.
 
 import {
   assert,
@@ -27,10 +26,9 @@ import {
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   type CandidateOption,
-  type MemberVote,
   computeVerdict,
+  type MemberVote,
   type VerdictEngineInput,
-  type VerdictEngineOutput,
 } from "./verdict-engine.ts";
 
 // ───────────────────────────────────────────────────────────────────────
@@ -42,9 +40,9 @@ function makeCandidate(overrides: Partial<CandidateOption> = {}): CandidateOptio
     id: overrides.id ?? "opt-a",
     name: overrides.name ?? "Generic Spot",
     price_tier: overrides.price_tier ?? 2,
-    walk_minutes_estimate: overrides.walk_minutes_estimate ?? 8,
     dietary_tags: overrides.dietary_tags ?? [],
     categories: overrides.categories ?? ["Restaurant"],
+    distance_meters: overrides.distance_meters,
   };
 }
 
@@ -54,298 +52,389 @@ function makeVote(overrides: Partial<MemberVote> = {}): MemberVote {
     display_name: overrides.display_name ?? "alex",
     q1_vetoes: overrides.q1_vetoes ?? [],
     q2_budget: overrides.q2_budget ?? 4,
-    q3_walk_minutes: overrides.q3_walk_minutes ?? 30,
-    q4_vibe: overrides.q4_vibe ?? 2,
-    q5_regret: overrides.q5_regret ?? {},
+    hard_vetoes: overrides.hard_vetoes ?? [],
+    scores: overrides.scores ?? {},
+    prefFn: overrides.prefFn,
   };
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Clean-run path — no vetoes apply, multi-survivor Q5 tiebreaker picks max
-// ───────────────────────────────────────────────────────────────────────
+/** Build a member whose `prefFn` reads a fixed per-candidate score map.
+ *  Any candidate not in the map scores `fallback` (default 3 = exactly
+ *  at the cohort-zero threshold T). */
+function scoredVote(
+  user_id: string,
+  scores: Record<string, number>,
+  fallback = 3,
+  overrides: Partial<MemberVote> = {},
+): MemberVote {
+  return makeVote({
+    user_id,
+    display_name: overrides.display_name ?? user_id,
+    q1_vetoes: overrides.q1_vetoes,
+    q2_budget: overrides.q2_budget,
+    hard_vetoes: overrides.hard_vetoes,
+    scores: { __fallback: fallback, ...scores },
+  });
+}
 
-Deno.test("clean run returns the candidate with the highest Q5 regret sum", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "pico",     name: "Pico's Taqueria" }),
-    makeCandidate({ id: "ren",      name: "Ren Soba" }),
-    makeCandidate({ id: "pastoral", name: "Bar Pastoral" }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({
-      user_id: "u1",
-      display_name: "you",
-      q5_regret: { pico: 5, ren: 3, pastoral: 2 },
-    }),
-    makeVote({
-      user_id: "u2",
-      display_name: "alex",
-      q5_regret: { pico: 4, ren: 4, pastoral: 1 },
-    }),
-    makeVote({
-      user_id: "u3",
-      display_name: "maya",
-      q5_regret: { pico: 5, ren: 2, pastoral: 1 },
-    }),
-  ];
-
-  const out = computeVerdict({ candidates, votes });
-  assertEquals(out.method, "manual");
-  assertEquals(out.winning_option_id, "pico", "Pico totals 14 — highest of the survivors");
-  assertEquals(out.cuts.length, 2, "the two non-winners are cuts");
-  const cutIds = out.cuts.map((c) => c.option_id).sort();
-  assertEquals(cutIds, ["pastoral", "ren"]);
-});
+function run(input: VerdictEngineInput, opts = {}) {
+  return computeVerdict(input, opts);
+}
 
 // ───────────────────────────────────────────────────────────────────────
-// Single survivor short-circuit
+// 1. EBA prune — hard vetoes
 // ───────────────────────────────────────────────────────────────────────
 
-Deno.test("single survivor short-circuits the Q5 tiebreaker", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "pico",   price_tier: 2 }),
-    makeCandidate({ id: "splurge", price_tier: 4 }),
-    makeCandidate({ id: "cheap",  walk_minutes_estimate: 60 }),
-  ];
-
-  // Member caps push price ≤ 3 and walk ≤ 15.
-  // splurge cut by price; cheap cut by walk; pico survives.
-  const votes: MemberVote[] = [
-    makeVote({
-      user_id: "u1",
-      q2_budget: 3,
-      q3_walk_minutes: 15,
-      q5_regret: { pico: 1, splurge: 1, cheap: 1 }, // flat — but only one survives, so irrelevant
-    }),
-  ];
-
-  const out = computeVerdict({ candidates, votes });
-  assertEquals(out.method, "manual");
-  assertEquals(out.winning_option_id, "pico");
-  // Cuts: splurge (budget), cheap (walk)
-  assertEquals(out.cuts.length, 2);
-  const splurgeCut = out.cuts.find((c) => c.option_id === "splurge");
-  assertExists(splurgeCut);
-  assertEquals(splurgeCut!.cut_reason, "budget");
-  const cheapCut = out.cuts.find((c) => c.option_id === "cheap");
-  assertExists(cheapCut);
-  assertEquals(cheapCut!.cut_reason, "walk");
-});
-
-// ───────────────────────────────────────────────────────────────────────
-// Q5 regret tiebreaker — max-sum wins
-// ───────────────────────────────────────────────────────────────────────
-
-Deno.test("Q5 regret tiebreaker picks the maximum sum", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "a" }),
-    makeCandidate({ id: "b" }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({ user_id: "u1", q5_regret: { a: 2, b: 5 } }),
-    makeVote({ user_id: "u2", q5_regret: { a: 2, b: 5 } }),
-  ];
-
-  const out = computeVerdict({ candidates, votes });
-  assertEquals(out.winning_option_id, "b");
-});
-
-// ───────────────────────────────────────────────────────────────────────
-// Flat regret falls back to random within survivors
-// ───────────────────────────────────────────────────────────────────────
-
-Deno.test("flat regret variance falls back to deterministic random within survivors", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "a" }),
-    makeCandidate({ id: "b" }),
-    makeCandidate({ id: "c" }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({ user_id: "u1", q5_regret: { a: 3, b: 3, c: 3 } }),
-    makeVote({ user_id: "u2", q5_regret: { a: 3, b: 3, c: 3 } }),
-  ];
-
-  // Inject a deterministic random so the test is stable. Picks index 1 (b).
-  const out = computeVerdict({ candidates, votes }, { random: () => 0.5 });
-  assertEquals(out.winning_option_id, "b");
-  assertEquals(out.flat_regret_fallback, true);
-});
-
-Deno.test("flat regret fallback respects the survivor set order for determinism", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "a" }),
-    makeCandidate({ id: "b" }),
-    makeCandidate({ id: "c" }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({ user_id: "u1", q5_regret: { a: 3, b: 3, c: 3 } }),
-    makeVote({ user_id: "u2", q5_regret: { a: 3, b: 3, c: 3 } }),
-  ];
-
-  // random() = 0.0 → index 0 = "a"; random() = 0.999 → last survivor.
-  const first = computeVerdict({ candidates, votes }, { random: () => 0.0 });
-  assertEquals(first.winning_option_id, "a");
-  const last = computeVerdict({ candidates, votes }, { random: () => 0.999 });
-  assertEquals(last.winning_option_id, "c");
-});
-
-// ───────────────────────────────────────────────────────────────────────
-// Q1 dietary EBA pruning — menu-compliance filter
-// ───────────────────────────────────────────────────────────────────────
-
-Deno.test("Q1 vegan veto cuts candidates without vegan_friendly tag", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "steakhouse", dietary_tags: [] }),
-    makeCandidate({ id: "plant",      dietary_tags: ["vegan_friendly"] }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({ user_id: "u1", q1_vetoes: ["vegan"], q5_regret: { steakhouse: 5, plant: 1 } }),
-  ];
-
-  const out = computeVerdict({ candidates, votes });
-  assertEquals(out.winning_option_id, "plant", "vegan veto excludes steakhouse even though its regret is higher");
-  const steakCut = out.cuts.find((c) => c.option_id === "steakhouse");
-  assertExists(steakCut);
-  assertEquals(steakCut!.cut_reason, "dietary");
-});
-
-// ───────────────────────────────────────────────────────────────────────
-// Rule text generation — aggregate-rule attribution, never names a person
-// ───────────────────────────────────────────────────────────────────────
-
-Deno.test("rule_text uses aggregate attribution and never names a person", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "pico",  name: "Pico's Taqueria" }),
-    makeCandidate({ id: "ren",   name: "Ren Soba",       price_tier: 4 }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({
-      user_id: "u1",
-      display_name: "alex",
-      q2_budget: 2,
-      q5_regret: { pico: 5, ren: 1 },
-    }),
-    makeVote({
-      user_id: "u2",
-      display_name: "maya",
-      q2_budget: 2,
-      q5_regret: { pico: 5, ren: 1 },
-    }),
-  ];
-
-  const out = computeVerdict({ candidates, votes });
-  assertEquals(out.winning_option_id, "pico");
-  // Aggregate attribution: "Budget cap cut Ren Soba." — never "Alex's cap" / "Maya's cap".
-  assert(out.rule_text.includes("Budget cap"), `rule_text should reference Budget cap: ${out.rule_text}`);
-  assert(out.rule_text.includes("Ren Soba"),    `rule_text should name the cut option: ${out.rule_text}`);
-  assert(!out.rule_text.toLowerCase().includes("alex"), "rule_text must not name alex");
-  assert(!out.rule_text.toLowerCase().includes("maya"), "rule_text must not name maya");
-});
-
-Deno.test("rule_text mentions regret tiebreaker when multiple options survived", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "pico", name: "Pico's Taqueria" }),
-    makeCandidate({ id: "ren",  name: "Ren Soba" }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({ user_id: "u1", q5_regret: { pico: 5, ren: 2 } }),
-    makeVote({ user_id: "u2", q5_regret: { pico: 5, ren: 2 } }),
-  ];
-
-  const out = computeVerdict({ candidates, votes });
-  assertEquals(out.winning_option_id, "pico");
+Deno.test("EBA prune — Q2 spend cap drops candidates over the MIN member cap", () => {
+  const cheap = makeCandidate({ id: "cheap", name: "Cheap Eats", price_tier: 1 });
+  const pricey = makeCandidate({ id: "pricey", name: "Pricey Place", price_tier: 4 });
+  const out = run({
+    candidates: [cheap, pricey],
+    votes: [
+      scoredVote("u1", { cheap: 5, pricey: 5 }, 5, { q2_budget: 2 }),
+      scoredVote("u2", { cheap: 5, pricey: 5 }, 5, { q2_budget: 3 }),
+    ],
+  });
+  // pricey (tier 4) exceeds the MIN member cap (2) — it is EBA-pruned.
+  assertEquals(out.winning_option_id, "cheap");
   assert(
-    out.rule_text.toLowerCase().includes("regret"),
-    `rule_text should describe the regret-of-omission tiebreaker: ${out.rule_text}`,
+    out.cuts.some((c) => c.option_id === "pricey" && c.cut_reason === "budget"),
+    "pricey should be cut for budget",
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// Private constraint anonymization — attribute-level, not person-level
-// ───────────────────────────────────────────────────────────────────────
+Deno.test("EBA prune — a profile/dietary hard veto drops the violating venue", () => {
+  const veganOk = makeCandidate({
+    id: "vegan-ok",
+    name: "Green Bowl",
+    dietary_tags: ["vegan_friendly"],
+  });
+  const noVegan = makeCandidate({ id: "no-vegan", name: "Steakhouse" });
+  const out = run({
+    candidates: [veganOk, noVegan],
+    votes: [
+      scoredVote("u1", { "vegan-ok": 5, "no-vegan": 5 }, 5, {
+        q1_vetoes: ["vegan"],
+      }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "vegan-ok");
+  assert(
+    out.cuts.some((c) => c.option_id === "no-vegan" && c.cut_reason === "dietary"),
+  );
+});
 
-Deno.test("anonymized private constraint cuts emit attribute-level text, not a person", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({ id: "shellfish-only", dietary_tags: [] }),
-    makeCandidate({ id: "safe",           dietary_tags: ["no_shellfish_unverified"] }),
-  ];
-
-  const votes: MemberVote[] = [
-    makeVote({
-      user_id: "u1",
-      display_name: "alex",
-      q1_vetoes: ["shellfish"],
-      q5_regret: { "shellfish-only": 5, safe: 1 },
-    }),
-  ];
-
-  const out = computeVerdict({ candidates, votes });
+Deno.test("EBA prune — a generic hard_veto entry drops a candidate by tag", () => {
+  // `hard_vetoes` is the schema-driven generic veto channel: TB-12
+  // profile allergies / NEVERS feed it. A candidate is pruned when it
+  // carries (or, for a cuisine NEVER, matches a category of) a vetoed
+  // tag.
+  const safe = makeCandidate({ id: "safe", name: "Safe Spot", categories: ["Taco Stand"] });
+  const sushi = makeCandidate({
+    id: "sushi",
+    name: "Sushi Bar",
+    categories: ["Sushi Restaurant"],
+  });
+  const out = run({
+    candidates: [safe, sushi],
+    votes: [
+      scoredVote("u1", { safe: 5, sushi: 5 }, 5, {
+        hard_vetoes: [{ kind: "cuisine_never", token: "sushi" }],
+      }),
+    ],
+  });
   assertEquals(out.winning_option_id, "safe");
-
-  // Cut row for the eliminated option carries attribute attribution.
-  const cut = out.cuts.find((c) => c.option_id === "shellfish-only");
-  assertExists(cut);
-  // Anonymized — "filtered shellfish" / "shellfish veto" style, never "alex".
-  assert(
-    !cut!.cut_text.toLowerCase().includes("alex"),
-    `cut text must not name a person: ${cut!.cut_text}`,
-  );
-  assert(
-    cut!.cut_text.toLowerCase().includes("shellfish"),
-    `cut text should attribute the cut to the attribute: ${cut!.cut_text}`,
-  );
+  assert(out.cuts.some((c) => c.option_id === "sushi" && c.cut_reason === "veto"));
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// Receipts shape — every member with a contributing answer gets one chip
+// 2 + 3. Per-member scoring + satisficing floor
 // ───────────────────────────────────────────────────────────────────────
 
-Deno.test("receipts emit one chip per member with the loudest contributing input", () => {
-  const candidates: CandidateOption[] = [
-    makeCandidate({
-      id: "pico",
-      name: "Pico's",
-      dietary_tags: ["no_shellfish_unverified"],
-    }),
-  ];
+Deno.test("satisficing floor — keeps only venues every member scores >= T", () => {
+  // venue-a: both members score it >= 3. venue-b: member u2 scores it
+  // 2 (below T=3) — venue-b never clears the floor.
+  const a = makeCandidate({ id: "venue-a", name: "Venue A" });
+  const b = makeCandidate({ id: "venue-b", name: "Venue B" });
+  const out = run({
+    candidates: [a, b],
+    votes: [
+      scoredVote("u1", { "venue-a": 4, "venue-b": 5 }),
+      scoredVote("u2", { "venue-a": 4, "venue-b": 2 }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "venue-a");
+});
 
-  const votes: MemberVote[] = [
-    makeVote({
-      user_id: "u1",
-      display_name: "you",
-      q4_vibe: 3, // LOUD — `wanted lively`
-      q5_regret: { pico: 5 },
-    }),
-    makeVote({
-      user_id: "u2",
-      display_name: "alex",
-      q1_vetoes: ["shellfish"],
-      q5_regret: { pico: 4 },
-    }),
-    makeVote({
-      user_id: "u3",
-      display_name: "maya",
-      q2_budget: 2,
-      q5_regret: { pico: 5 },
-    }),
-    makeVote({
-      user_id: "u4",
-      display_name: "sam",
-      q3_walk_minutes: 15,
-      q5_regret: { pico: 5 },
-    }),
-  ];
+Deno.test("satisficing floor — T is inclusive (a member exactly at T passes)", () => {
+  const a = makeCandidate({ id: "venue-a", name: "Venue A" });
+  const out = run({
+    candidates: [a],
+    votes: [
+      scoredVote("u1", { "venue-a": 3 }),
+      scoredVote("u2", { "venue-a": 5 }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "venue-a");
+});
 
-  const out = computeVerdict({ candidates, votes });
-  assertEquals(out.receipts.length, 4);
-  // Lowercase first names, no caps.
-  for (const r of out.receipts) {
-    assertEquals(r.name, r.name.toLowerCase());
+// ───────────────────────────────────────────────────────────────────────
+// 4. Maximin tiebreak — the load-bearing acceptance criterion
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("maximin — a worst-off-protecting pick beats a polarizing higher-sum pick", () => {
+  // polarizing: scores 5 + 5 + 3  → sum 13, min 3.
+  // balanced:   scores 4 + 4 + 4  → sum 12, min 4.
+  // A pure-sum engine picks `polarizing`. The maximin engine picks
+  // `balanced` — it protects the worst-off member (min 4 > min 3).
+  const polarizing = makeCandidate({ id: "polarizing", name: "Polarizing Pick" });
+  const balanced = makeCandidate({ id: "balanced", name: "Balanced Pick" });
+  const out = run({
+    candidates: [polarizing, balanced],
+    votes: [
+      scoredVote("u1", { polarizing: 5, balanced: 4 }),
+      scoredVote("u2", { polarizing: 5, balanced: 4 }),
+      scoredVote("u3", { polarizing: 3, balanced: 4 }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "balanced");
+});
+
+Deno.test("maximin — among floor survivors the highest minimum score wins", () => {
+  // Three survivors, all clear T=3 for both members. Maximin minimums:
+  //   low   → min(3, 4) = 3
+  //   mid   → min(4, 4) = 4
+  //   high  → min(5, 3) = 3
+  // `mid` wins on the highest minimum.
+  const low = makeCandidate({ id: "low", name: "Low" });
+  const mid = makeCandidate({ id: "mid", name: "Mid" });
+  const high = makeCandidate({ id: "high", name: "High" });
+  const out = run({
+    candidates: [low, mid, high],
+    votes: [
+      scoredVote("u1", { low: 3, mid: 4, high: 5 }),
+      scoredVote("u2", { low: 4, mid: 4, high: 3 }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "mid");
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// 5. Final tiebreak — highest sum, then random
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("final tiebreak — equal minimums break on the higher sum", () => {
+  // both survivors have min 3, but `bigsum` totals more.
+  const bigsum = makeCandidate({ id: "bigsum", name: "Big Sum" });
+  const small = makeCandidate({ id: "small", name: "Small Sum" });
+  const out = run({
+    candidates: [bigsum, small],
+    votes: [
+      scoredVote("u1", { bigsum: 5, small: 3 }),
+      scoredVote("u2", { bigsum: 3, small: 3 }),
+    ],
+  });
+  // both: min 3. sums: bigsum 8, small 6 → bigsum wins.
+  assertEquals(out.winning_option_id, "bigsum");
+});
+
+Deno.test("final tiebreak — fully-tied survivors break on the injected random", () => {
+  // two survivors identical on both min and sum → random decides.
+  const a = makeCandidate({ id: "a", name: "A" });
+  const b = makeCandidate({ id: "b", name: "B" });
+  const input: VerdictEngineInput = {
+    candidates: [a, b],
+    votes: [
+      scoredVote("u1", { a: 4, b: 4 }),
+      scoredVote("u2", { a: 4, b: 4 }),
+    ],
+  };
+  const first = run(input, { random: () => 0.0 });
+  const second = run(input, { random: () => 0.99 });
+  assertEquals(first.winning_option_id, "a");
+  assertEquals(second.winning_option_id, "b");
+  assert(first.flat_tiebreak_fallback);
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// 6. Empty-floor cascade
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("empty-floor cascade — relaxes T when no venue clears the floor", () => {
+  // At T=3 nothing clears: every member scores the venue 2. The
+  // cascade relaxes T downward until the venue clears.
+  const only = makeCandidate({ id: "only", name: "Only Spot" });
+  const out = run({
+    candidates: [only],
+    votes: [
+      scoredVote("u1", { only: 2 }),
+      scoredVote("u2", { only: 2 }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "only");
+  assert(
+    out.relax_chain_applied.includes("threshold"),
+    "the threshold-relax step should have fired",
+  );
+});
+
+Deno.test("empty-floor cascade — widens radius after the threshold relax is exhausted", () => {
+  // The only in-radius venue is hard-vetoed (over the spend cap) so no
+  // amount of T relaxation can recover it — a hard-veto cut never
+  // relaxes. A second venue is loved by everyone but sits outside the
+  // start radius. The cascade exhausts the threshold relax (no effect)
+  // then widens the radius to admit the loved venue.
+  const near = makeCandidate({
+    id: "near",
+    name: "Near But Pricey",
+    price_tier: 4,
+    distance_meters: 500,
+  });
+  const far = makeCandidate({
+    id: "far",
+    name: "Far Gem",
+    price_tier: 1,
+    distance_meters: 6000,
+  });
+  const out = run({
+    candidates: [near, far],
+    votes: [
+      scoredVote("u1", { near: 5, far: 5 }, 5, { q2_budget: 1 }),
+      scoredVote("u2", { near: 5, far: 5 }, 5, { q2_budget: 1 }),
+    ],
+    radius_meters: 3219,
+    radius_meters_cap: 8047,
+  });
+  assertEquals(out.winning_option_id, "far");
+  assert(out.relax_chain_applied.includes("radius_widen"));
+  assertExists(out.radius_meters_used);
+  assert((out.radius_meters_used ?? 0) >= 6000);
+});
+
+Deno.test("empty-floor cascade — exhausted cascade yields a no_survivor terminal", () => {
+  // A single candidate every member hard-vetoes. No relax step can
+  // recover a hard-veto cut → terminal no-spot screen.
+  const only = makeCandidate({ id: "only", name: "Only Spot", price_tier: 4 });
+  const out = run({
+    candidates: [only],
+    votes: [
+      scoredVote("u1", { only: 5 }, 5, { q2_budget: 1 }),
+      scoredVote("u2", { only: 5 }, 5, { q2_budget: 1 }),
+    ],
+  });
+  assertEquals(out.winning_option_id, null);
+  assertEquals(out.method, "no_survivor");
+  assert(out.rule_text.length > 0);
+  assertEquals(out.cuts.length, 0);
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// Determinism / server-side identical-verdict guarantee
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("the verdict is identical across repeated runs (deterministic, server-side)", () => {
+  const a = makeCandidate({ id: "a", name: "A" });
+  const b = makeCandidate({ id: "b", name: "B" });
+  const c = makeCandidate({ id: "c", name: "C" });
+  const input: VerdictEngineInput = {
+    candidates: [a, b, c],
+    votes: [
+      scoredVote("u1", { a: 5, b: 4, c: 3 }),
+      scoredVote("u2", { a: 3, b: 4, c: 5 }),
+      scoredVote("u3", { a: 4, b: 4, c: 4 }),
+    ],
+  };
+  const first = run(input);
+  const second = run(input);
+  const third = run(input);
+  assertEquals(first.winning_option_id, second.winning_option_id);
+  assertEquals(second.winning_option_id, third.winning_option_id);
+  // b has the highest minimum (4 across all three members).
+  assertEquals(first.winning_option_id, "b");
+});
+
+Deno.test("rule_text uses aggregate attribution and never names a member", () => {
+  const a = makeCandidate({ id: "a", name: "Pico's" });
+  const b = makeCandidate({ id: "b", name: "Ren Soba", price_tier: 4 });
+  const out = run({
+    candidates: [a, b],
+    votes: [
+      scoredVote("u1", { a: 4, b: 4 }, 4, { display_name: "samuel", q2_budget: 2 }),
+      scoredVote("u2", { a: 4, b: 4 }, 4, { display_name: "alex" }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "a");
+  assert(!out.rule_text.toLowerCase().includes("samuel"));
+  assert(!out.rule_text.toLowerCase().includes("alex"));
+});
+
+Deno.test("single-member room still resolves (initiator alone)", () => {
+  const a = makeCandidate({ id: "a", name: "Solo Pick" });
+  const b = makeCandidate({ id: "b", name: "Other" });
+  const out = run({
+    candidates: [a, b],
+    votes: [scoredVote("u1", { a: 5, b: 3 })],
+  });
+  assertEquals(out.winning_option_id, "a");
+});
+
+Deno.test("empty candidate pool returns a no_survivor terminal, not a throw", () => {
+  const out = run({ candidates: [], votes: [scoredVote("u1", {})] });
+  assertEquals(out.winning_option_id, null);
+  assertEquals(out.method, "no_survivor");
+});
+
+Deno.test("no votes throws — the engine needs at least one member", () => {
+  let threw = false;
+  try {
+    run({ candidates: [makeCandidate()], votes: [] });
+  } catch (_e) {
+    threw = true;
   }
+  assert(threw, "computeVerdict should throw with zero votes");
+});
+
+Deno.test("method passthrough — caller-supplied quorum/deadline is preserved on a win", () => {
+  const a = makeCandidate({ id: "a", name: "A" });
+  const out = run({
+    candidates: [a],
+    votes: [scoredVote("u1", { a: 4 })],
+    method: "quorum",
+  });
+  assertEquals(out.method, "quorum");
+});
+
+Deno.test("excluded_option_ids removes a venue from the pool before pruning", () => {
+  const a = makeCandidate({ id: "a", name: "Excluded" });
+  const b = makeCandidate({ id: "b", name: "Kept" });
+  const out = run({
+    candidates: [a, b],
+    votes: [scoredVote("u1", { a: 5, b: 4 })],
+    excluded_option_ids: ["a"],
+  });
+  // `a` scored higher but was excluded → `b` wins.
+  assertEquals(out.winning_option_id, "b");
+  assert(!out.cuts.some((c) => c.option_id === "a"));
+});
+
+Deno.test("prefFn — an injected preference function is honoured over the score map", () => {
+  // When a member supplies a `prefFn`, the engine uses it instead of
+  // the static `scores` map. This is the live path: the pool manager
+  // hands the engine each member's cached `prefFn`.
+  const a = makeCandidate({ id: "a", name: "A" });
+  const b = makeCandidate({ id: "b", name: "B" });
+  const out = run({
+    candidates: [a, b],
+    votes: [
+      makeVote({
+        user_id: "u1",
+        prefFn: (cand) => (cand.id === "a" ? 5 : 4),
+      }),
+      makeVote({
+        user_id: "u2",
+        prefFn: (cand) => (cand.id === "a" ? 5 : 4),
+      }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "a");
 });

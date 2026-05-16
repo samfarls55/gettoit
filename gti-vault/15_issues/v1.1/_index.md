@@ -77,7 +77,7 @@ Build slices decomposed from [[../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Re
 | tb-08 | [[issues/tb-08-q5-factorial-probe\|Q5 factorial preference probe over real venues]] ✅ done | AFK | [#69](https://github.com/samfarls55/gettoit/issues/69) | research-01, tb-04, tb-07 |
 | tb-09 | [[issues/tb-09-preference-function-axis-scorers\|Preference function + axis scorers]] ✅ done | AFK | [#70](https://github.com/samfarls55/gettoit/issues/70) | research-01, tb-08 |
 | tb-10 | [[issues/tb-10-running-union-pool-manager\|Running-union candidate pool manager]] ✅ done | AFK | [#71](https://github.com/samfarls55/gettoit/issues/71) | tb-07, tb-09 |
-| tb-11 | [[issues/tb-11-verdict-engine-rewrite\|Worst-off-protecting verdict engine rewrite]] | AFK | [#72](https://github.com/samfarls55/gettoit/issues/72) | tb-04, tb-10 |
+| tb-11 | [[issues/tb-11-verdict-engine-rewrite\|Worst-off-protecting verdict engine rewrite]] ✅ done | AFK | [#72](https://github.com/samfarls55/gettoit/issues/72) | tb-04, tb-10 |
 | tb-12 | [[issues/tb-12-profile-vetoes\|Profile vetoes — account allergy/dietary/NEVERS storage]] | AFK | [#73](https://github.com/samfarls55/gettoit/issues/73) | tb-11 |
 | tb-13 | [[issues/tb-13-verdict-firing-q5-complete\|Verdict firing on the new Q5-complete signal]] | AFK | [#74](https://github.com/samfarls55/gettoit/issues/74) | tb-08, tb-11 |
 

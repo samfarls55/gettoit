@@ -1,7 +1,7 @@
 ---
 issue: tb-11
 title: Worst-off-protecting verdict engine rewrite (EBA + satisficing + maximin)
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 72
 prd: v1.1-quiz-redesign-prd
@@ -41,3 +41,40 @@ The engine consumes inputs through the schema-driven mapping layer from [[tb-04-
 
 - [[tb-04-votes-jsonb-schema|tb-04]] — engine consumes inputs through the mapping layer.
 - [[tb-10-running-union-pool-manager|tb-10]] — scoring consumes the pool and cached per-member scores.
+
+## Comments
+
+**2026-05-15 — done (AFK, branch `afk/tb-11`).** Full rewrite of the
+server-side verdict engine (`supabase/functions/_shared/verdict-engine.ts`).
+
+- **New pipeline.** `computeVerdict` now runs: EBA prune → per-member
+  scoring → satisficing floor → maximin tiebreak → final tiebreak →
+  empty-floor cascade. The TB-06 EBA-with-relax-cascade
+  (regret-of-omission sum tiebreak, cuisine-veto / vibe-floor relax
+  steps) is gone.
+- **EBA prune** — three hard-veto channels, none of which relax: Q2
+  spend cap (binding cap is the MIN member tier), Q1-era dietary chips,
+  and a new generic `hard_vetoes` channel (`{ kind, token }` entries)
+  that TB-12 profile allergies / dietary restrictions / cuisine NEVERS
+  feed through the schema mapping layer.
+- **Maximin** — among satisficing-floor survivors the venue with the
+  highest *minimum* member score wins. A polarizing higher-sum pick
+  loses to a worst-off-protecting pick — the load-bearing
+  anti-defection mechanic.
+- **Empty-floor cascade** — relaxes T (cohort-zero 3) down to 1, then
+  widens the radius in 805 m steps to the cap, then emits the terminal
+  `no_survivor` screen.
+- **Mapping-layer adjacency (TB-06 flag) cleared.** `votes-schema.ts`
+  `QUESTION_KINDS` gained `cuisine_craving`, `reputation` and
+  `profile_veto` — the verdict engine can now map a v1.1-quiz vote
+  without throwing. Cuisine / reputation / vibe are soft preferences;
+  they are carried by the per-member score map, not the EBA prune.
+- **Tests.** 21 pure unit tests in `verdict-engine.test.ts` cover EBA
+  prune, the satisficing floor, maximin-over-higher-sum, the
+  empty-floor cascade, and determinism. The full `edge` lane is green
+  (156 `deno test` cases). The three obsolete old-pipeline test files
+  (`verdict-engine-relax/-reroll/-solo.test.ts`) were removed — their
+  acceptance-level coverage is subsumed by the new suite.
+
+See [[../../../60_engineering/adr/0011-worst-off-protecting-verdict-engine|ADR 0011]]
+for the rewrite decision and the rejected alternatives.

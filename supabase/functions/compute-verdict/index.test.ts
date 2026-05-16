@@ -242,8 +242,8 @@ Deno.test("compute-verdict — no votes returns 404", async () => {
 Deno.test("compute-verdict — happy path writes verdict + cuts and returns 200", async () => {
   const { adapter, inserts, cuts } = memoryAdapter({
     options: [
-      { id: "opt-pico", payload: { name: "Pico's Taqueria", price_tier: 2, walk_minutes_estimate: 8 } },
-      { id: "opt-ren",  payload: { name: "Ren Soba",        price_tier: 3, walk_minutes_estimate: 12 } },
+      { id: "opt-pico", payload: { name: "Pico's Taqueria", price_tier: 2 } },
+      { id: "opt-ren",  payload: { name: "Ren Soba",        price_tier: 3 } },
     ],
     votes: [
       {
@@ -251,18 +251,14 @@ Deno.test("compute-verdict — happy path writes verdict + cuts and returns 200"
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-ren": 2 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 },
       },
       {
         user_id: "u2",
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-ren": 2 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 },
       },
     ],
   });
@@ -291,8 +287,8 @@ Deno.test("compute-verdict — happy path writes verdict + cuts and returns 200"
 Deno.test("compute-verdict — single-survivor path writes one verdict and the cuts", async () => {
   const { adapter, inserts, cuts } = memoryAdapter({
     options: [
-      { id: "opt-pico",   payload: { name: "Pico's",  price_tier: 2, walk_minutes_estimate: 8 } },
-      { id: "opt-splurge", payload: { name: "Splurge", price_tier: 4, walk_minutes_estimate: 8 } },
+      { id: "opt-pico",   payload: { name: "Pico's",  price_tier: 2 } },
+      { id: "opt-splurge", payload: { name: "Splurge", price_tier: 4 } },
     ],
     votes: [
       {
@@ -300,9 +296,7 @@ Deno.test("compute-verdict — single-survivor path writes one verdict and the c
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 2,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-splurge": 5 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-splurge": 5 },
       },
     ],
   });
@@ -327,12 +321,12 @@ Deno.test("compute-verdict — single-survivor path writes one verdict and the c
 Deno.test("compute-verdict — quorum method passes through to the verdict row", async () => {
   const { adapter, inserts } = memoryAdapter({
     options: [
-      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
-      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3, walk_minutes_estimate: 12 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
+      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
-      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
+      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
     ],
   });
 
@@ -350,12 +344,12 @@ Deno.test("compute-verdict — quorum method passes through to the verdict row",
 Deno.test("compute-verdict — deadline method passes through to the verdict row", async () => {
   const { adapter, inserts } = memoryAdapter({
     options: [
-      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
-      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3, walk_minutes_estimate: 12 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
+      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
-      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5, "opt-ren": 2 } },
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
+      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
     ],
   });
 
@@ -372,10 +366,10 @@ Deno.test("compute-verdict — deadline method passes through to the verdict row
 Deno.test("compute-verdict — unknown method falls back to manual", async () => {
   const { adapter, inserts } = memoryAdapter({
     options: [
-      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5 } },
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5 } },
     ],
   });
 
@@ -392,10 +386,10 @@ Deno.test("compute-verdict — unknown method falls back to manual", async () =>
 Deno.test("compute-verdict — happy path flips rooms.status to verdict_ready and emits a broadcast", async () => {
   const { adapter, marked, broadcasts } = memoryAdapter({
     options: [
-      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, q3_walk_minutes: 30, q4_vibe: 2, q5_regret: { "opt-pico": 5 } },
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5 } },
     ],
   });
 
@@ -429,9 +423,7 @@ Deno.test("compute-verdict — engine no-survivor exits 200 with method=no_survi
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 2,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-splurge": 5 },
+        hard_vetoes: [], scores: { "opt-splurge": 5 },
       },
     ],
   });

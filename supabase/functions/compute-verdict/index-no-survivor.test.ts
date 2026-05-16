@@ -118,9 +118,7 @@ Deno.test("compute-verdict — no-survivor exits 200 with method=no_survivor", a
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 2,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-splurge": 5 },
+        hard_vetoes: [], scores: { "opt-splurge": 5 },
       },
     ],
   });
@@ -160,9 +158,7 @@ Deno.test("compute-verdict — no-survivor rule_text never names a person", asyn
         display_name: "alex",
         q1_vetoes: ["vegan"],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "steakhouse": 5 },
+        hard_vetoes: [], scores: { "steakhouse": 5 },
       },
     ],
   });
@@ -202,7 +198,6 @@ Deno.test("compute-verdict — widen-radius re-run replaces an existing no_survi
         payload: {
           name: "Stretch Spot",
           price_tier: 2,
-          walk_minutes_estimate: 8,
           // distance is part of the payload — engine reads it for the
           // radius gate
           distance_meters: 2414, // 1.5 mi
@@ -215,9 +210,7 @@ Deno.test("compute-verdict — widen-radius re-run replaces an existing no_survi
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-stretch": 5 },
+        hard_vetoes: [], scores: { "opt-stretch": 5 },
       },
     ],
     roomMeta: { radius_meters: 805 }, // 0.5 mi — too tight for the candidate
@@ -264,9 +257,7 @@ Deno.test("compute-verdict — widen-radius re-run preserves a successful verdic
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5 },
+        hard_vetoes: [], scores: { "opt-pico": 5 },
       },
     ],
   });
@@ -309,9 +300,7 @@ Deno.test("compute-verdict — widen-radius override clamped to the 10 mi produc
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-x": 5 },
+        hard_vetoes: [], scores: { "opt-x": 5 },
       },
     ],
     roomMeta: { radius_meters: 805 },
@@ -347,9 +336,7 @@ Deno.test("compute-verdict — widen-radius re-run reads room radius and re-runs
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-stretch": 5 },
+        hard_vetoes: [], scores: { "opt-stretch": 5 },
       },
     ],
     roomMeta: { radius_meters: 805 },
