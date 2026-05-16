@@ -39,9 +39,9 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 | tb-08 | #69 | merged | afk/tb-08 | [#83](https://github.com/samfarls55/gettoit/pull/83) | Q5 copy reframed regret->excitement; adjacency: live quiz wiring deferred to tb-09 |
 | tb-09 | #70 | merged | afk/tb-09 | [#84](https://github.com/samfarls55/gettoit/pull/84) | adjacency: ShapedPlace->Q5VenueProfile classifier deferred to tb-10/tb-11 |
 | tb-10 | #71 | merged | afk/tb-10 | [#85](https://github.com/samfarls55/gettoit/pull/85) | + tracker PR #86; adjacency: live-session wiring deferred to tb-11/tb-13 |
-| tb-11 | #72 | queued | afk/tb-11 | — | unblocked (tb-04, tb-10 merged) |
-| tb-12 | #73 | waiting | afk/tb-12 | — | blocked by tb-11 |
-| tb-13 | #74 | waiting | afk/tb-13 | — | blocked by tb-08, tb-11 |
+| tb-11 | #72 | merged | afk/tb-11 | [#87](https://github.com/samfarls55/gettoit/pull/87) | resolved tb-06 schema adjacency; ADR 0011 added |
+| tb-12 | #73 | queued | afk/tb-12 | — | unblocked (tb-11 merged) |
+| tb-13 | #74 | queued | afk/tb-13 | — | unblocked (tb-08, tb-11 merged) |
 
 ## Event log
 - 04:24 — Run opened. Preflight passed after committing the v1.1 vault backlog to main (commit b04ea12). Work set: 3 ready, 9 waiting, 9 dropped as already-closed.
@@ -59,3 +59,4 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 - 06:25 — tb-08 MERGED via PR #83 (bd1e31e). Synced main. Wave 5 ready: tb-09 only. Spawning tb-09.
 - 06:43 — tb-09 MERGED via PR #84 (011a690). Synced main. Wave 6 ready: tb-10 only. Spawning tb-10.
 - 07:00 — tb-10 MERGED via PR #85 (+ tracker PR #86). Synced main to db9a2bf. Wave 7 ready: tb-11 only. Spawning tb-11.
+- 07:22 — tb-11 MERGED via PR #87 (362ad29). Synced main. Final wave: tb-12 + tb-13 both unblocked — spawning both in parallel (cap 2).
