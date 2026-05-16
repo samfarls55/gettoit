@@ -1,7 +1,7 @@
 ---
 issue: tb-16
 title: Q5 factorial card selection in the live quiz
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 93
 prd: v1.1-quiz-redesign-prd
@@ -36,3 +36,52 @@ Wire the factorial pipeline into the running quiz:
 ## Blocked by
 
 [[tb-15-wire-answer-tailored-fetch|TB-15 (v1.1)]] — the factorial generator consumes the answer-tailored venue pool that slice delivers.
+
+## Comments
+
+**2026-05-16 — done (AFK, branch `afk/tb-16`).** Wired the v1.1 Q5
+factorial probe into the live quiz. TB-15 shipped Q5 with a *flat*
+presentation — the raw fetched pool shaped first-3 into the Q5 rows.
+TB-16 routes the pool through the strict factorial instead.
+
+- **`Q5VenueClassifier`** (new, `ios/Sources/App/Q5VenueClassifier.swift`)
+  — the `ShapedPlace -> Q5VenueProfile` axis classification tb-09
+  explicitly deferred. Cuisine from `categories[]` keyword match; vibe
+  from a category-archetype baseline table (research §5) with a bounded
+  one-step `priceTier` tie-break; reputation pool-relatively bucketed
+  over `rating` / `totalRatings` / `dateCreated` (research §4 — the
+  volume terciles are computed within the fetched pool, not against a
+  global constant). Pure, deterministic, no group state.
+- **`FoursquareQuizCandidateFetch` rewired** — `fetchCandidates` now
+  classifies the unioned pool, runs `Q5FactorialCardGenerator.generate`
+  against the member's stated Q1-Q4 `Q5MemberProfile`, and shapes the
+  three factorial cards (one cuisine-drop / one reputation-drop / one
+  vibe-drop, never a perfect match) into the `[QuizCandidate]` list Q5
+  renders, each carrying a real `fsq_place_id`.
+- **`QuizCandidateFetch` protocol widened** — the per-member fetch now
+  forwards the full Q1-Q4 answer set (`QuizFetchAnswers`), not just
+  Q1+Q2; the factorial needs Q3 reputation + Q4 vibe to build the
+  member's profile. The coordinator forwards them on the Q4 -> Q5
+  transition.
+- **Pool-starvation fallback preserved** — an empty union, or a union
+  too thin / too uniform for the factorial to furnish three
+  one-axis-deviation cards (`generate` returns `nil`), surfaces as the
+  dummy fixture at the `FoursquareQuizCandidateFetch` boundary. Q5
+  still renders three rateable rows; no placeholder venue is invented
+  mid-pool (the bug-03 hard rule).
+- **`ShapedPlace` extended** — three optional reputation fields
+  (`rating`, `totalRatings`, `dateCreated`) added to the iOS struct
+  and the Edge Function `ShapedPlace` / shaper / `fields` request, all
+  additive and nullable. Without them every venue would classify to one
+  reputation bucket and a member who states a Q3 preference would
+  always hit the fallback. See the PR Decisions section.
+- **Tests.** `Q5VenueClassifierTests` (cuisine / vibe / pool-relative
+  reputation), `FactorialCardSelectionTests` (the pool -> factorial
+  seam — three cards, one-axis deviation, real ids, starvation
+  fallback), updated `QuizSessionAssemblerTests` (the live
+  `QuizSessionAssembler` -> proxy -> factorial integration path with a
+  canned varied pool), `QuizCandidateFetchTests` (Q3/Q4 forwarding).
+  The Edge Function reputation projection is covered in
+  `supabase/functions/_shared/foursquare.test.ts`; that suite runs
+  green locally (207 passed). The `ios` CI lane runs the full
+  `xcodebuild test`.

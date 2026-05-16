@@ -267,6 +267,10 @@ const SAMPLE_RESULT: FoursquareSearchResult = Object.freeze({
   photos: [{ prefix: "https://img.fsq.com/", suffix: "/abc.jpg" }],
   tastes: ["vegan menu", "plant-based"],
   distance: 240,
+  // TB-16 — reputation-axis metadata.
+  rating: 8.4,
+  stats: { total_ratings: 312, total_tips: 18 },
+  date_created: "2019-06-01",
 });
 
 Deno.test("shapeFoursquareResult — maps the documented fields", () => {
@@ -283,6 +287,49 @@ Deno.test("shapeFoursquareResult — maps the documented fields", () => {
   assertEquals(shaped.hours?.display, "Open until 10pm");
   assertEquals(shaped.hours?.open_now, true);
   assertEquals(shaped.photos[0], "https://img.fsq.com/400x400/abc.jpg");
+});
+
+Deno.test("shapeFoursquareResult — projects the reputation-axis metadata", () => {
+  // TB-16: rating / stats.total_ratings / date_created pass through for
+  // the iOS Q5VenueClassifier's reputation axis.
+  const shaped = shapeFoursquareResult(SAMPLE_RESULT, []);
+  assertExists(shaped);
+  assertEquals(shaped.rating, 8.4);
+  assertEquals(shaped.total_ratings, 312);
+  assertEquals(shaped.date_created, "2019-06-01");
+});
+
+Deno.test("shapeFoursquareResult — reputation fields shape as null when absent", () => {
+  // Coverage is uneven across venues — a venue Foursquare returns no
+  // rating / stats / date_created for shapes those fields as null
+  // rather than dropping the whole row.
+  const shaped = shapeFoursquareResult(
+    {
+      ...SAMPLE_RESULT,
+      rating: undefined,
+      stats: undefined,
+      date_created: undefined,
+    },
+    [],
+  );
+  assertExists(shaped);
+  assertEquals(shaped.rating, null);
+  assertEquals(shaped.total_ratings, null);
+  assertEquals(shaped.date_created, null);
+});
+
+Deno.test("buildFoursquareQuery — requests the reputation-axis fields", () => {
+  // TB-16: the fields param must ask Foursquare for rating / stats /
+  // date_created or the reputation axis has nothing to classify on.
+  const plan = buildFoursquareQuery({
+    lat: 40.7,
+    lng: -74.0,
+    radius_meters: 1000,
+  });
+  const fields = plan.query.get("fields") ?? "";
+  assertEquals(fields.includes("rating"), true);
+  assertEquals(fields.includes("stats"), true);
+  assertEquals(fields.includes("date_created"), true);
 });
 
 Deno.test("shapeFoursquareResult — skips rows missing required fields", () => {

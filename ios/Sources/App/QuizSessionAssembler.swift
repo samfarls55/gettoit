@@ -104,22 +104,3 @@ public enum QuizSessionAssembler {
         return Assembled(coordinator: coordinator, candidateSource: candidateSource)
     }
 }
-
-/// A `QuizCandidateFetch` that always resolves to the dummy fixture
-/// without touching `PlacesService`. Used when the session has no
-/// coordinate to fetch against — Q5 still renders three rateable rows
-/// so the member is never stranded mid-flow.
-public struct DummyQuizCandidateFetch: QuizCandidateFetch {
-    public init() {}
-
-    public func fetchCandidates(
-        cuisines: [String],
-        budgetTier: Int,
-        parameters: SessionParameters
-    ) async -> QuizCandidateFetchResult {
-        QuizCandidateFetchResult(
-            candidates: QuizDummyCandidates.all,
-            source: .fallbackDummy
-        )
-    }
-}
