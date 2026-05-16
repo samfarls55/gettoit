@@ -144,6 +144,44 @@ See [[devcontainer-setup#step-4--set-github-actions-secrets|devcontainer-setup �
 - **Anonymous users count toward MAU billing.** Pro plan includes 100k MAU; the v1 anonymous-default path makes every visitor a MAU. Watch the [Auth dashboard usage panel] once the app is live — if MAU growth outpaces conversion, consider rate-limiting anon signup at the Edge.
 - **Pooler vs direct connection**: `supabase link` uses the transaction-pooler URL (port 6543) by default; CI migrations need the direct connection (port 5432). The `supabase db push` CLI handles the switch; raw `psql` callers don't.
 
+## Edge Function deploy (CI lane `edge-deploy`)
+
+Added 2026-05-16 for [[../15_issues/v1.1/issues/tb-14-restore-placesproxy-foursquare-path|tb-14]].
+
+**Root cause tb-14 closed.** The `places-proxy` Edge Function was written,
+unit-tested, and merged in v1's TB-05 — but nothing ever deployed it. CI
+had an `edge` lane (`deno test` over `supabase/functions/`) and a
+`supabase-db` lane (`supabase db push`), but **no lane ever ran
+`supabase functions deploy`**. The function stayed dark on the live
+project, so every quiz session fell through to the on-device MapKit
+fallback and Foursquare was never reached.
+
+**The fix** is the `edge-deploy` job in `.github/workflows/ci.yml`:
+
+- Runs `supabase secrets set FOURSQUARE_API_KEY=…` so the function
+  runtime has the upstream key. A missing key makes the handler return
+  `places_proxy_misconfigured`. `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`
+  are injected automatically by the Supabase platform — they do **not**
+  need to be set as function secrets.
+- Runs `supabase functions deploy places-proxy` plus the companion
+  functions (`apns-sender`, `compute-verdict`, `delete-user`).
+- `needs: supabase-db` — deploys only after the migration push, so the
+  `places` cache table the handler upserts into already exists.
+- Gated to `push` on `refs/heads/main` (or `workflow_dispatch`).
+  Deploying on a PR would race the migration push and could ship a
+  function ahead of its schema. Skips itself when the Supabase
+  credentials are absent (fork / unconfigured clone) — the same gate
+  shape `supabase-db` and `testflight` use.
+- Final step runs `places-proxy/live-integration.test.ts` against the
+  just-deployed function: invokes it with a known dense-urban coordinate
+  and asserts a Foursquare-sourced response (non-empty `places`,
+  `is_thin: false`, no `mapkit:`-prefixed ids). This fails the lane
+  loudly if the deployment is still dark.
+
+**Founder check still open** — tb-14 acceptance criterion #5 (a non-zero
+call count on the Foursquare developer dashboard after a real Q5 session)
+is a human verification step, not an AFK gate.
+
 ## Rotation
 
 - **`SUPABASE_DB_PASSWORD`** — rotate via dashboard → Settings → Database → Reset password. Update `.env` and `gh secret set SUPABASE_DB_PASSWORD --body "$NEW"` atomically.

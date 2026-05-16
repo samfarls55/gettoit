@@ -1,7 +1,7 @@
 ---
 issue: tb-14
 title: Restore the PlacesProxy Foursquare path — deploy + secrets
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 91
 prd: v1.1-quiz-redesign-prd
@@ -37,3 +37,34 @@ End state: a real quiz session reaches Foursquare and Q5 candidates come from Fo
 ## Blocked by
 
 None — can start immediately.
+
+## Comments
+
+**2026-05-16 — closed (afk/tb-14, PR #95).**
+
+Root cause confirmed: the `places-proxy` Edge Function was never
+deployed. CI had an `edge` lane (`deno test`) and a `supabase-db` lane
+(`supabase db push`) but **no lane ran `supabase functions deploy`** —
+so the function stayed dark and every quiz session fell through to the
+on-device MapKit fallback.
+
+Fix: added an `edge-deploy` job to `.github/workflows/ci.yml`. It runs
+`supabase secrets set FOURSQUARE_API_KEY=…` then
+`supabase functions deploy places-proxy` (plus the companion
+functions), `needs: supabase-db` so the `places` cache table exists
+first, and is gated to push-on-main with a credential-skip gate. A
+final step runs a credential-gated live integration test
+(`places-proxy/live-integration.test.ts`) against the deployed
+function — invokes a known dense-urban coordinate and asserts a
+Foursquare-sourced response (non-empty `places`, `is_thin: false`, no
+`mapkit:`-prefixed ids), failing the lane loudly if the deployment is
+still dark.
+
+The actual live deploy happens on the merge of this PR to `main`
+(which triggers the `edge-deploy` lane). The AFK worktree has no
+Supabase credentials, so the deploy itself could not be run from here
+— the durable CI fix is the deliverable. Acceptance criterion #5
+(Foursquare dashboard non-zero call count after a real Q5 session)
+remains a founder check.
+
+Decision recorded in [[../../../60_engineering/supabase-setup#edge-function-deploy-ci-lane-edge-deploy|supabase-setup.md §Edge Function deploy]].

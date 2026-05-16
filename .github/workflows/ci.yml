@@ -257,6 +257,105 @@ jobs:
           supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
           supabase db push --password "$SUPABASE_DB_PASSWORD" --include-all
 
+  edge-deploy:
+    name: supabase (functions deploy)
+    # tb-14: closes the deploy gap. The `edge` lane only deno-tests the
+    # Edge Function source; the `supabase-db` lane only pushes
+    # migrations. Nothing ever ran `supabase functions deploy`, so
+    # `places-proxy` (and the other functions) stayed dark on the live
+    # project — every quiz session fell through to the on-device MapKit
+    # fallback because the proxy never reached Foursquare.
+    #
+    # This lane deploys the functions and pushes their server-side
+    # secrets after the migration push, so the `places` cache table the
+    # `places-proxy` handler upserts into already exists.
+    #
+    # push-to-main only: deploying on a PR would race the supabase-db
+    # push and could ship a function ahead of the migration it depends
+    # on. workflow_dispatch is allowed so a transient deploy failure can
+    # be retried without a code change. The lane skips itself when the
+    # Supabase credentials are absent (fork / unconfigured clone), the
+    # same gate shape the supabase-db and testflight lanes use.
+    needs: supabase-db
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+      || github.event_name == 'workflow_dispatch'
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      FOURSQUARE_API_KEY: ${{ secrets.FOURSQUARE_API_KEY }}
+      SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip when credentials are missing
+        id: gate
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
+            echo "Supabase credentials not set on this build — skipping functions deploy."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install Supabase CLI
+        if: steps.gate.outputs.skip == 'false'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: supabase secrets set (Edge Function runtime secrets)
+        # The places-proxy handler reads FOURSQUARE_API_KEY from the
+        # function runtime environment; a missing key makes it return
+        # `places_proxy_misconfigured`. SUPABASE_URL and
+        # SUPABASE_SERVICE_ROLE_KEY are injected automatically by the
+        # Supabase platform on every function — they do not need to be
+        # set here. We push the Foursquare key before the deploy so the
+        # function is live and configured in one CI run.
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          if [ -z "${FOURSQUARE_API_KEY:-}" ]; then
+            echo "FOURSQUARE_API_KEY secret is not set — places-proxy would" >&2
+            echo "return places_proxy_misconfigured. Set the repo secret." >&2
+            exit 1
+          fi
+          supabase secrets set \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            FOURSQUARE_API_KEY="$FOURSQUARE_API_KEY"
+      - name: supabase functions deploy (places-proxy + companions)
+        # Deploy every Edge Function in supabase/functions/. `_shared`
+        # and `_smoke_test.ts` are not functions (no own directory with
+        # an index.ts) and are skipped by the CLI. places-proxy is
+        # named explicitly first so the log makes the tb-14 fix obvious.
+        if: steps.gate.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          supabase functions deploy places-proxy \
+            --project-ref "$SUPABASE_PROJECT_REF"
+          for fn in apns-sender compute-verdict delete-user; do
+            echo "Deploying $fn"
+            supabase functions deploy "$fn" \
+              --project-ref "$SUPABASE_PROJECT_REF"
+          done
+      - name: Verify places-proxy reaches Foursquare (live)
+        # tb-14 acceptance criterion #4 — post-deploy smoke test. The
+        # live integration test invokes the just-deployed function with
+        # a known dense-urban coordinate and asserts a Foursquare-sourced
+        # response (non-empty places, is_thin:false, no mapkit:-prefixed
+        # ids). It is credential-gated and self-skips when
+        # SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY are absent — here they
+        # are present, so the assertion runs for real and fails the lane
+        # if the deployed function is still dark.
+        if: steps.gate.outputs.skip == 'false'
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - name: deno test (places-proxy live integration)
+        if: steps.gate.outputs.skip == 'false'
+        working-directory: supabase/functions
+        run: deno test --allow-net --allow-env --allow-read places-proxy/live-integration.test.ts
+
   ios:
     name: ios (xcodebuild test)
     needs: supabase-db

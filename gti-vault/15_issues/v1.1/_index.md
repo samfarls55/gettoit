@@ -92,7 +92,7 @@ Decomposed via `/to-issues` after a Q5 diagnosis session. Symptom: Q5 rendered l
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| TB-14 (v1.1) | [[issues/tb-14-restore-placesproxy-foursquare-path\|Restore the PlacesProxy Foursquare path — deploy + secrets]] | AFK | [#91](https://github.com/samfarls55/gettoit/issues/91) | — |
+| TB-14 (v1.1) | [[issues/tb-14-restore-placesproxy-foursquare-path\|Restore the PlacesProxy Foursquare path — deploy + secrets]] ✅ done | AFK | [#91](https://github.com/samfarls55/gettoit/issues/91) | — |
 | TB-15 (v1.1) | [[issues/tb-15-wire-answer-tailored-fetch\|Wire the answer-tailored Foursquare fetch into the live quiz]] | AFK | [#92](https://github.com/samfarls55/gettoit/issues/92) | — |
 | TB-16 (v1.1) | [[issues/tb-16-q5-factorial-card-selection\|Q5 factorial card selection in the live quiz]] | AFK | [#93](https://github.com/samfarls55/gettoit/issues/93) | TB-15 |
 | TB-17 (v1.1) | [[issues/tb-17-edge-function-cuisine-tag\|Edge Function honors the cuisine advisory tag]] | AFK | [#94](https://github.com/samfarls55/gettoit/issues/94) | — |
