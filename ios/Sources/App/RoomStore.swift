@@ -60,7 +60,8 @@ public final class RoomStore {
         as userID: UUID,
         timerMinutes: Int? = nil,
         radiusMeters: Int? = nil,
-        location: RoomLocation? = nil
+        location: RoomLocation? = nil,
+        sessionParameters: SessionParameters? = nil
     ) async throws -> Room {
         let roomID = UUID()
         let insert = RoomInsert(
@@ -70,7 +71,8 @@ public final class RoomStore {
             vertical: "food",
             timerMinutes: timerMinutes,
             radiusMeters: radiusMeters,
-            location: location
+            location: location,
+            sessionParameters: sessionParameters
         )
         try await client
             .from("rooms")
@@ -104,8 +106,41 @@ public final class RoomStore {
             timerMinutes: timerMinutes ?? RoomStore.defaultTimerMinutes,
             radiusMeters: radiusMeters ?? RoomStore.defaultRadiusMeters,
             location: location,
+            sessionParameters: sessionParameters,
             createdAt: ""
         )
+    }
+
+    /// TB-05 (v1.1) — persist the initiator's pre-quiz S01b parameter
+    /// selections onto the room. The parameters are the session-wide
+    /// *parameters* bucket (meal time, group context, service shape,
+    /// transport mode) — set once by the initiator, read back by every
+    /// joiner without re-prompting.
+    ///
+    /// Split out from `createRoom` because the S01b surface is shown
+    /// AFTER the room is created on S01 (the share link / quiz route
+    /// already needs a `roomID`). RLS on the `rooms` UPDATE policy
+    /// only admits the room creator, so a joiner can never overwrite
+    /// the shared parameters — which is the whole point of the bucket.
+    public func updateSessionParameters(
+        roomID: UUID,
+        parameters: SessionParameters
+    ) async throws {
+        try await client
+            .from("rooms")
+            .update(SessionParametersUpdate(sessionParameters: parameters))
+            .eq("id", value: roomID.uuidString.lowercased())
+            .execute()
+    }
+
+    /// TB-05 (v1.1) — read the session parameters back for a joiner.
+    /// Returns `SessionParameters.default` when the column is NULL
+    /// (room created by a pre-S01b client / debug RPC) or the room
+    /// is unreadable — a missing parameter set never strands a
+    /// joiner mid-quiz.
+    public func fetchSessionParameters(roomID: UUID) async throws -> SessionParameters {
+        let room = try await fetchRoom(id: roomID)
+        return room?.sessionParameters ?? SessionParameters.default
     }
 
     /// TB-03 (v1.1) — value type for the rooms.location_* columns.
@@ -207,6 +242,11 @@ public final class RoomStore {
         /// inserted by clients that don't yet wire the LocationPicker
         /// (debug RPCs etc); the iOS S01 surface always supplies it.
         public let location: RoomLocation?
+        /// TB-05 (v1.1) — initiator-set session parameters bucket
+        /// (meal time, group context, service shape, transport mode).
+        /// NULL on rows created before the S01b surface; readers fall
+        /// back to `SessionParameters.default`.
+        public let sessionParameters: SessionParameters?
         // Keep `created_at` as a string for now. The Postgres timestamp
         // shape (with microseconds and a timezone offset) doesn't decode
         // cleanly via the default supabase-swift JSON decoder, and v1's
@@ -222,6 +262,7 @@ public final class RoomStore {
             timerMinutes: Int,
             radiusMeters: Int,
             location: RoomLocation?,
+            sessionParameters: SessionParameters? = nil,
             createdAt: String
         ) {
             self.id = id
@@ -231,6 +272,7 @@ public final class RoomStore {
             self.timerMinutes = timerMinutes
             self.radiusMeters = radiusMeters
             self.location = location
+            self.sessionParameters = sessionParameters
             self.createdAt = createdAt
         }
 
@@ -245,6 +287,7 @@ public final class RoomStore {
             case locationLat = "location_lat"
             case locationLng = "location_lng"
             case locationSource = "location_source"
+            case sessionParameters = "session_params"
             case createdAt = "created_at"
         }
 
@@ -267,6 +310,14 @@ public final class RoomStore {
             } else {
                 self.location = nil
             }
+            // TB-05 — `session_params` is a NULLABLE jsonb column. A
+            // present-but-malformed payload decodes tolerantly inside
+            // `SessionParameters` (unknown fields fall to defaults);
+            // an absent column leaves `sessionParameters` nil so the
+            // reader falls back to `SessionParameters.default`.
+            self.sessionParameters = try c.decodeIfPresent(
+                SessionParameters.self, forKey: .sessionParameters
+            )
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -282,6 +333,7 @@ public final class RoomStore {
             try c.encodeIfPresent(location?.lat, forKey: .locationLat)
             try c.encodeIfPresent(location?.lng, forKey: .locationLng)
             try c.encodeIfPresent(location?.source.rawValue, forKey: .locationSource)
+            try c.encodeIfPresent(sessionParameters, forKey: .sessionParameters)
         }
     }
 
@@ -297,6 +349,7 @@ public final class RoomStore {
         let timerMinutes: Int?
         let radiusMeters: Int?
         let location: RoomLocation?
+        let sessionParameters: SessionParameters?
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -309,6 +362,7 @@ public final class RoomStore {
             case locationLat = "location_lat"
             case locationLng = "location_lng"
             case locationSource = "location_source"
+            case sessionParameters = "session_params"
         }
 
         func encode(to encoder: Encoder) throws {
@@ -331,6 +385,25 @@ public final class RoomStore {
             try container.encodeIfPresent(location?.lat, forKey: .locationLat)
             try container.encodeIfPresent(location?.lng, forKey: .locationLng)
             try container.encodeIfPresent(location?.source.rawValue, forKey: .locationSource)
+            // TB-05 (v1.1) — `session_params` is a nullable jsonb
+            // column. Omit the key when nil so a room created before
+            // the S01b surface lands with a NULL column (readers fall
+            // back to `SessionParameters.default`). The S01b flow
+            // normally writes parameters via `updateSessionParameters`
+            // after the room exists, but `createRoom` accepts them too
+            // for a future fused create-and-set path.
+            try container.encodeIfPresent(sessionParameters, forKey: .sessionParameters)
+        }
+    }
+
+    /// TB-05 (v1.1) — encoded payload for the `rooms.session_params`
+    /// UPDATE issued by `updateSessionParameters`. Touches only the
+    /// one column so the room's other fields are left untouched.
+    private struct SessionParametersUpdate: Encodable {
+        let sessionParameters: SessionParameters
+
+        enum CodingKeys: String, CodingKey {
+            case sessionParameters = "session_params"
         }
     }
 

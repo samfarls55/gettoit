@@ -124,6 +124,17 @@ public final class QuizCoordinator {
     private let candidates: [QuizCandidate]
     private let writer: QuizVoteWriter
 
+    /// TB-05 (v1.1) — the session-wide *parameters* bucket (meal time,
+    /// group context, service shape, transport mode). Set once by the
+    /// initiator on the S01b surface and persisted on the room; the
+    /// joiner path hydrates it off `rooms.session_params` so every
+    /// member's quiz runs against the SAME parameters without the
+    /// joiner re-prompting. Carried on the coordinator so the
+    /// downstream Foursquare fetch planner and verdict engine
+    /// (later tracer bullets — PRD modules D / B) can consume it
+    /// without re-fetching the room.
+    public let sessionParameters: SessionParameters
+
     /// In-flight submit task so a rapid-tap on "Drop the verdict" can
     /// fold into the already-running write instead of issuing a second
     /// one. Without this, the rapid-tap case fires a second insert that
@@ -135,11 +146,13 @@ public final class QuizCoordinator {
         roomID: UUID,
         userID: UUID,
         candidates: [QuizCandidate] = QuizDummyCandidates.all,
+        sessionParameters: SessionParameters = .default,
         writer: @escaping QuizVoteWriter
     ) {
         self.roomID = roomID
         self.userID = userID
         self.candidates = candidates
+        self.sessionParameters = sessionParameters
         self.writer = writer
         // Seed Q5 ratings at the spec'd default (3 — middle of the
         // 1–5 scale) so the surface renders with a chosen state per

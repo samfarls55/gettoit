@@ -33,6 +33,7 @@ Every surface has a corresponding JSX file. The markdown is the **why**, the JSX
 | 00a | Forced sign-in gate (iOS, first launch) | [`surfaces/00a-signin.md`](./surfaces/00a-signin.md) | [`code/screens/ScreenSignIn.jsx`](./code/screens/ScreenSignIn.jsx) |
 | 00b | Location permission pre-prime | [`surfaces/00b-location-permission.md`](./surfaces/00b-location-permission.md) | [`code/screens/ScreenLocationPermission.jsx`](./code/screens/ScreenLocationPermission.jsx) |
 | 01 | Initiator landing | [`surfaces/01-initiator.md`](./surfaces/01-initiator.md) | [`code/screens/ScreenInitiator.jsx`](./code/screens/ScreenInitiator.jsx) |
+| 01b | Pre-quiz parameters setup (initiator) | [`surfaces/01b-parameters.md`](./surfaces/01b-parameters.md) | [`code/screens/ScreenParameters.jsx`](./code/screens/ScreenParameters.jsx) |
 | 02a | Invite (iMessage unfurl) | [`surfaces/02-invite.md`](./surfaces/02-invite.md) | [`code/screens/ScreenInviteUnfurl.jsx`](./code/screens/ScreenInviteUnfurl.jsx) |
 | 02b | Invite (web fallback) | ↑ | [`code/screens/ScreenInviteWeb.jsx`](./code/screens/ScreenInviteWeb.jsx) |
 | 03 | Quiz Q1 · Vetoes | [`surfaces/03-quiz.md`](./surfaces/03-quiz.md) | [`code/screens/ScreenQ1Vetoes.jsx`](./code/screens/ScreenQ1Vetoes.jsx) |
