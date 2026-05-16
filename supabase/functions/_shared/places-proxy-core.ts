@@ -126,9 +126,16 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const open_at = typeof filters.open_at === "string"
     ? filters.open_at
     : undefined;
+  // Cuisine advisory tag (tb-17) — a `QuizCuisine` id on a per-cuisine
+  // call, absent on the general call. A non-string / missing value
+  // drops to undefined: decode stays tolerant, the call degrades to
+  // the general query rather than erroring.
+  const cuisine = typeof filters.cuisine === "string"
+    ? filters.cuisine
+    : undefined;
   return {
     lat, lng, radius_meters: radius,
-    filters: { dietary, price_tier, open_at },
+    filters: { dietary, price_tier, open_at, cuisine },
   };
 }
 

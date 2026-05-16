@@ -279,6 +279,71 @@ Deno.test("dietary filter — shellfish chip surfaces as disclaimer in the respo
 });
 
 // ---------------------------------------------------------------------------
+// Cuisine advisory tag (tb-17) — per-call category scoping.
+// ---------------------------------------------------------------------------
+
+Deno.test("cuisine tag — per-cuisine call puts the mapped category on the Foursquare wire", async () => {
+  const { fetchCalls, deps } = buildDeps();
+  await handlePlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { cuisine: "italian" },
+  }, deps);
+  const url = new URL(fetchCalls[0].url);
+  // Italian Restaurant maps to Foursquare category 13236.
+  assertEquals(url.searchParams.get("fsq_category_ids"), "13236");
+});
+
+Deno.test("cuisine tag — mandatory general call is NOT category-scoped", async () => {
+  const { fetchCalls, deps } = buildDeps();
+  await handlePlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: {},
+  }, deps);
+  const url = new URL(fetchCalls[0].url);
+  assertEquals(url.searchParams.has("fsq_category_ids"), false);
+});
+
+Deno.test("cuisine tag — unknown cuisine degrades to the general query without error", async () => {
+  const { fetchCalls, deps } = buildDeps();
+  const result = await handlePlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { cuisine: "klingon" },
+  }, deps);
+  const url = new URL(fetchCalls[0].url);
+  assertEquals(url.searchParams.has("fsq_category_ids"), false);
+  // Degrades gracefully — full result set, no error surfaced.
+  assertEquals(result.places.length, 3);
+});
+
+Deno.test("cuisine tag — per-cuisine and general calls occupy distinct cache rows", async () => {
+  const { cache, fetchCalls, deps } = buildDeps();
+  await handlePlacesProxy({ ...TYPICAL_INPUT, filters: {} }, deps);
+  await handlePlacesProxy({ ...TYPICAL_INPUT, filters: { cuisine: "thai" } }, deps);
+  assertEquals(fetchCalls.length, 2);
+  assertEquals(cache.size(), 2);
+});
+
+Deno.test("validateInput — keeps a valid cuisine tag on the filters", () => {
+  const v = validateInput({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { cuisine: "mexican" },
+  });
+  assertEquals(v.filters?.cuisine, "mexican");
+});
+
+Deno.test("validateInput — tolerates a missing / non-string cuisine key", () => {
+  // The general call omits `cuisine` entirely; a malformed value must
+  // not throw — it simply drops to undefined.
+  const noKey = validateInput({ lat: 0, lng: 0, radius_meters: 100, filters: {} });
+  assertEquals(noKey.filters?.cuisine, undefined);
+  const badType = validateInput({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { cuisine: 42 },
+  });
+  assertEquals(badType.filters?.cuisine, undefined);
+});
+
+// ---------------------------------------------------------------------------
 // Thin-results signal — iOS MapKit fallback trigger.
 // ---------------------------------------------------------------------------
 

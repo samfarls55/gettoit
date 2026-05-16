@@ -1,7 +1,7 @@
 ---
 issue: tb-17
 title: Edge Function honors the cuisine advisory tag
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 94
 prd: v1.1-quiz-redesign-prd
@@ -38,3 +38,9 @@ The cuisine-to-category id mapping needs real Foursquare taxonomy ids; research-
 ## Blocked by
 
 None — server-side, verifiable via the function's deno test harness. Observable end-to-end only once [[tb-15-wire-answer-tailored-fetch|TB-15 (v1.1)]] ships the live N+1 fetch.
+
+## Comments
+
+**2026-05-16 — done (AFK, afk/tb-17).** Added `CUISINE_CATEGORY_MAP` + `findCuisineCategory` to the shared Foursquare module, a `cuisine?` field on `PlacesProxyFilters`, and cuisine-category application in `buildFoursquareQuery`. All eight `QuizCuisine` ids map to a Foursquare "Dining and Drinking > Restaurant" taxonomy category id. A per-cuisine call scopes its `fsq_category_ids` to the mapped category; the general call (no `cuisine`) stays un-scoped; an unknown / absent value degrades to the general query with no error and `validateInput` stays tolerant of the missing / mistyped key. The cuisine tag also enters the cache signature so per-cuisine and general calls hold distinct rows. 14 new Deno tests; full `supabase/functions` suite green (194 passed). Category-id sourcing matches the `DIETARY_CHIP_MAP` posture (`verified_against_api: false`) — see the inline comment on `CUISINE_CATEGORY_MAP` and the tb-17 note appended to the filter-surface research report §3.2.
+
+**Adjacency — live-probe verification.** The cuisine→category ids are from the published Foursquare taxonomy, not a live API probe. One known overlap: `thai` = `13352` collides with the dietary map's `halal` category id, and `american` = `13146` matches the proxy's test-fixture "American Restaurant" id. The overlap is harmless at runtime (each per-cuisine call is an independent category-scoped query) but a live probe before beta cohort 1 should resolve which id Foursquare actually assigns. Out of scope for tb-17 — touching `DIETARY_CHIP_MAP` was not in this issue's scope.
