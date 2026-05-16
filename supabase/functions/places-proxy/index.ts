@@ -12,10 +12,11 @@
 //     "lng": number,                     // required
 //     "radius_meters": number,           // required, 0 < r ≤ 100000
 //     "filters": {
-//       "dietary": string[]?,            // Q1 chip ids
+//       "dietary": string[]?,            // profile dietary chip ids
 //       "price_tier": 1|2|3|4 ?,         // Q2 cap
-//       "open_at": "<ISO-8601>"?         // Q3 wall-clock
-//     }
+//       "open_at": "<ISO-8601>"?,        // meal-time wall-clock
+//       "cuisine": "<QuizCuisine id>"?   // tb-17: per-cuisine call tag;
+//     }                                 //   absent on the general call
 //   }
 //
 // Response (200):

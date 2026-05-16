@@ -12,9 +12,11 @@ import {
   buildFoursquareQuery,
   buildQuerySignature,
   computeGeoBucket,
+  CUISINE_CATEGORY_MAP,
   DIETARY_CHIP_MAP,
   estimateWalkMinutes,
   extractDietaryTags,
+  findCuisineCategory,
   findDietaryMapping,
   FOURSQUARE_API_VERSION,
   FOURSQUARE_BASE_URL,
@@ -423,4 +425,132 @@ Deno.test("photoToUrl — composes prefix + size + suffix", () => {
 Deno.test("DIETARY_CHIP_MAP — no duplicate chip names", () => {
   const chips = DIETARY_CHIP_MAP.map((m) => m.chip);
   assertEquals(chips.length, new Set(chips).size);
+});
+
+// ---------------------------------------------------------------------------
+// Cuisine advisory tag (tb-17) — per-call category scoping.
+// ---------------------------------------------------------------------------
+
+/** The eight QuizCuisine ids the iOS Q1 surface emits. Kept in sync with
+ *  `ios/Sources/App/QuizCoordinator.swift` enum `QuizCuisine`. */
+const QUIZ_CUISINE_IDS = [
+  "mexican",
+  "italian",
+  "japanese",
+  "chinese",
+  "thai",
+  "indian",
+  "american",
+  "mediterranean",
+];
+
+Deno.test("CUISINE_CATEGORY_MAP — every QuizCuisine id maps to a category", () => {
+  for (const id of QUIZ_CUISINE_IDS) {
+    const mapping = findCuisineCategory(id);
+    assertExists(mapping, `${id} cuisine is unmapped`);
+    // The category id must be a non-empty Foursquare taxonomy id.
+    assertEquals(mapping.fsq_category_id.length > 0, true);
+  }
+});
+
+Deno.test("CUISINE_CATEGORY_MAP — no duplicate cuisine ids", () => {
+  const ids = CUISINE_CATEGORY_MAP.map((m) => m.cuisine);
+  assertEquals(ids.length, new Set(ids).size);
+});
+
+Deno.test("findCuisineCategory — is case- and whitespace-tolerant", () => {
+  const a = findCuisineCategory("Mexican");
+  const b = findCuisineCategory("  mexican  ");
+  assertExists(a);
+  assertExists(b);
+  assertEquals(a.fsq_category_id, b.fsq_category_id);
+});
+
+Deno.test("findCuisineCategory — unknown cuisine returns undefined", () => {
+  assertEquals(findCuisineCategory("klingon"), undefined);
+  assertEquals(findCuisineCategory(""), undefined);
+});
+
+Deno.test("buildFoursquareQuery — cuisine tag applies the mapped category to the wire query", () => {
+  const mexican = findCuisineCategory("mexican");
+  assertExists(mexican);
+  const plan = buildFoursquareQuery({
+    lat: 40.7128,
+    lng: -74.0060,
+    radius_meters: 1600,
+    filters: { cuisine: "mexican" },
+  });
+  assertEquals(plan.query.get("fsq_category_ids"), mexican.fsq_category_id);
+});
+
+Deno.test("buildFoursquareQuery — general call (no cuisine tag) stays un-category-scoped", () => {
+  // research-01 §3.2: the mandatory general call supplies non-craved
+  // breadth and must NOT be category-filtered.
+  const plan = buildFoursquareQuery({
+    lat: 40.7128,
+    lng: -74.0060,
+    radius_meters: 1600,
+  });
+  assertEquals(plan.query.has("fsq_category_ids"), false);
+});
+
+Deno.test("buildFoursquareQuery — unknown cuisine degrades to the general query (no error)", () => {
+  // An unknown cuisine id must not throw and must not leak onto the wire.
+  const plan = buildFoursquareQuery({
+    lat: 40.7128,
+    lng: -74.0060,
+    radius_meters: 1600,
+    filters: { cuisine: "klingon" },
+  });
+  assertEquals(plan.query.has("fsq_category_ids"), false);
+});
+
+Deno.test("buildFoursquareQuery — cuisine + dietary categories both reach the wire", () => {
+  // A per-cuisine call can still carry the profile dietary category
+  // (e.g. a halal member craving Mexican). Both ids land in the
+  // sorted, comma-joined fsq_category_ids list.
+  const mexican = findCuisineCategory("mexican");
+  assertExists(mexican);
+  const plan = buildFoursquareQuery({
+    lat: 40.7128,
+    lng: -74.0060,
+    radius_meters: 1600,
+    filters: { cuisine: "mexican", dietary: ["halal"] },
+  });
+  const ids = plan.query.get("fsq_category_ids");
+  assertExists(ids);
+  const idSet = new Set(ids.split(","));
+  assertEquals(idSet.has(mexican.fsq_category_id), true);
+  assertEquals(idSet.has("13352"), true); // halal category
+});
+
+Deno.test("buildQuerySignature — cuisine tag changes the cache signature", () => {
+  // Two per-cuisine calls at the same geo must not collide in the
+  // cache, and a per-cuisine call must not collide with the general call.
+  const general = buildQuerySignature({
+    lat: 0, lng: 0, radius_meters: 100,
+  });
+  const mexican = buildQuerySignature({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { cuisine: "mexican" },
+  });
+  const italian = buildQuerySignature({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { cuisine: "italian" },
+  });
+  assertEquals(general === mexican, false);
+  assertEquals(mexican === italian, false);
+});
+
+Deno.test("buildQuerySignature — unknown cuisine signs identically to the general call", () => {
+  // An unknown cuisine degrades to the general query, so it must also
+  // share the general call's cache row rather than minting a dead one.
+  const general = buildQuerySignature({
+    lat: 0, lng: 0, radius_meters: 100,
+  });
+  const unknown = buildQuerySignature({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { cuisine: "klingon" },
+  });
+  assertEquals(general, unknown);
 });

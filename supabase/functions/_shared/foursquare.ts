@@ -39,6 +39,19 @@ export interface PlacesProxyFilters {
   /** Q3 open-at filter. ISO-8601 timestamp; Foursquare understands
    *  `open_at` as a unix-seconds value, so we convert before the call. */
   open_at?: string;
+  /** TB-07/TB-17 (v1.1) — the craved cuisine this per-member fetch call
+   *  is tagged for: a `QuizCuisine` id (e.g. `"mexican"`), enumerated in
+   *  `CUISINE_CATEGORY_MAP` below.
+   *
+   *  Set on each of the N per-cuisine calls of the N+1 fan-out; ABSENT
+   *  on the mandatory general call. When present, the proxy scopes that
+   *  individual call to the mapped Foursquare category. The general call
+   *  stays un-category-scoped so it supplies the non-craved breadth the
+   *  Q5 factorial needs (research-01 §3.2 — cuisine never strict-filters
+   *  the fetch *as a whole*; only the individual per-cuisine call is
+   *  category-scoped). An unknown / absent value degrades gracefully to
+   *  the general query — no error. */
+  cuisine?: string;
 }
 
 /** Shape returned to the iOS / web clients. Matches the `options.payload`
@@ -219,6 +232,65 @@ export function findDietaryMapping(chip: string): DietaryMapping | undefined {
   return DIETARY_CHIP_MAP.find((m) => m.chip === normalized);
 }
 
+/** Mapping from a Q1 `QuizCuisine` id to the Foursquare taxonomy
+ *  category id used to scope a per-cuisine fetch call (tb-17).
+ *
+ *  Unlike `DIETARY_CHIP_MAP` (a hard NEED — a vegan cannot eat at a
+ *  steakhouse), cuisine is a soft WANT. It is therefore applied only to
+ *  the *individual* per-cuisine call, never to the mandatory general
+ *  call, so the fetch as a whole is never cuisine-strict-filtered
+ *  (research-01 §3.2 + tb-07/tb-17 tickets).
+ *
+ *  Category-id sourcing — the same posture as `DIETARY_CHIP_MAP`:
+ *  the ids below are taken from the published Foursquare "Dining and
+ *  Drinking > Restaurant" taxonomy (the post-2025 surface keeps the
+ *  legacy v3 numeric ids; see ADR 0002). They are NOT yet verified
+ *  against a live API probe — see
+ *  `gti-vault/60_engineering/research/foursquare-dietary-tags-2026-05/`
+ *  which carries the same `verified_against_api: false` caveat for the
+ *  dietary ids. A live-probe verification before beta cohort 1 is
+ *  tracked as an adjacency on tb-17.
+ *
+ *  Known overlap to flag: `american` is mapped to `13146`, the same id
+ *  the proxy's own test fixtures label "American Restaurant"; `thai`'s
+ *  id `13352` overlaps with the dietary map's `halal` category id. The
+ *  overlap is harmless at runtime — each per-cuisine call is an
+ *  independent category-scoped query, and a mis-pinned id only widens
+ *  or narrows that one call's result set, never errors — but the live
+ *  probe should resolve which value Foursquare actually assigns.
+ */
+export interface CuisineCategoryMapping {
+  /** `QuizCuisine` id as emitted by the iOS Q1 surface. Lowercased +
+   *  trimmed on input. */
+  cuisine: string;
+  /** Foursquare taxonomy category id for the cuisine's restaurant
+   *  category. Passed verbatim in `fsq_category_ids`. */
+  fsq_category_id: string;
+}
+
+export const CUISINE_CATEGORY_MAP: readonly CuisineCategoryMapping[] = Object
+  .freeze([
+    { cuisine: "mexican", fsq_category_id: "13303" },
+    { cuisine: "italian", fsq_category_id: "13236" },
+    { cuisine: "japanese", fsq_category_id: "13263" },
+    { cuisine: "chinese", fsq_category_id: "13099" },
+    { cuisine: "thai", fsq_category_id: "13352" },
+    { cuisine: "indian", fsq_category_id: "13199" },
+    { cuisine: "american", fsq_category_id: "13146" },
+    { cuisine: "mediterranean", fsq_category_id: "13302" },
+  ]);
+
+/** Resolve a `QuizCuisine` id to its Foursquare category mapping.
+ *  Case- and whitespace-tolerant; returns `undefined` for an unknown or
+ *  empty id so the caller can degrade gracefully to the general query. */
+export function findCuisineCategory(
+  cuisine: string,
+): CuisineCategoryMapping | undefined {
+  const normalized = normalizeChip(cuisine);
+  if (normalized.length === 0) return undefined;
+  return CUISINE_CATEGORY_MAP.find((m) => m.cuisine === normalized);
+}
+
 /** Translate the proxy's input filters into the query parameters
  *  Foursquare's `/places/search` accepts. Returns the parameters split
  *  into `query` (sent on the wire) and `post_filters` (applied to the
@@ -292,6 +364,17 @@ export function buildFoursquareQuery(input: PlacesProxyInput): FoursquareQueryPl
         // is recorded on the candidate even though it didn't filter.
         emittedTags.add(mapping.emit_tag);
         break;
+    }
+  }
+
+  // Cuisine advisory tag (tb-17). Present only on a per-cuisine call of
+  // the N+1 fan-out; the mandatory general call omits it and therefore
+  // stays un-category-scoped. An unknown / absent value resolves to
+  // `undefined` and is a no-op — the call degrades to the general query.
+  if (filters.cuisine !== undefined) {
+    const cuisineMapping = findCuisineCategory(filters.cuisine);
+    if (cuisineMapping) {
+      categoryIds.add(cuisineMapping.fsq_category_id);
     }
   }
 

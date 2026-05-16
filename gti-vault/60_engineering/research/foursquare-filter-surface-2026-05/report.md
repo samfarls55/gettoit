@@ -106,6 +106,8 @@ Cuisine is the subtle one. Foursquare *does* expose cuisine as category ids (`fs
 
 The dietary categories (section 2) *are* strict filters because dietary is a genuine hard NEED (a vegan cannot eat at a steakhouse); cuisine preference is a soft WANT. **The fetch planner must keep cuisine category ids off the wire and hand cuisine to the client-side scorer**, which matches the member's cuisine preference against the venue's `categories[]` and produces a graded score.
 
+> **Implementation reconciliation (tb-17, 2026-05-16).** The N+1 per-member fetch design refines "keep cuisine off the wire" without contradicting it. The fan-out is N category-scoped per-cuisine calls **plus one mandatory general call with no cuisine tag**. Each individual per-cuisine call *is* `fsq_category_ids`-scoped to its craved cuisine — that is what makes the N+1 fan-out buy anything — but the general call stays un-scoped and supplies the non-craved breadth. So the *fetch as a whole* is still never cuisine-strict-filtered: a member's craved cuisine narrows their per-cuisine calls but never narrows the union pool, which always contains the general call's breadth. The graded client-side cuisine scorer is unchanged. See `supabase/functions/_shared/foursquare.ts` `CUISINE_CATEGORY_MAP`. The cuisine→category ids are sourced from the published Foursquare "Dining and Drinking > Restaurant" taxonomy and carry the same `verified_against_api: false` caveat as the dietary ids; a live probe should resolve one known id overlap (`thai` = `13352` overlaps the dietary map's `halal` category id).
+
 The reputation and cuisine scorers therefore derive from:
 
 - **Reputation scorer** — `rating`, `stats.total_ratings` / `stats.total_tips`, `date_created` (section 4).
