@@ -1,5 +1,12 @@
 -- TB-12 (v1.1) — per-account profile vetoes.
 --
+-- Migration version note: TB-12 and TB-13 were built in parallel and
+-- both initially claimed the `20260515020000000` prefix. TB-13 merged
+-- first (`20260515020000000_verdict_fire_on_q5_complete.sql`), so this
+-- migration was renamed to `…030000000` — Supabase keys
+-- `supabase_migrations.schema_migrations` on the version prefix, and a
+-- collision raises `duplicate key … schema_migrations_pkey` on push.
+--
 -- Adds a single `profile_vetoes` jsonb column to the existing
 -- `user_preferences` table. It stores a member's STICKY food
 -- constraints: allergies, dietary restrictions (vegan / halal / kosher
