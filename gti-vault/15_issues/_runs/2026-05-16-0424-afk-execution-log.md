@@ -1,6 +1,6 @@
 ---
 run: 2026-05-16-0424
-status: running
+status: done
 ---
 
 # AFK Execution Run — 2026-05-16-0424
@@ -40,8 +40,8 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 | tb-09 | #70 | merged | afk/tb-09 | [#84](https://github.com/samfarls55/gettoit/pull/84) | adjacency: ShapedPlace->Q5VenueProfile classifier deferred to tb-10/tb-11 |
 | tb-10 | #71 | merged | afk/tb-10 | [#85](https://github.com/samfarls55/gettoit/pull/85) | + tracker PR #86; adjacency: live-session wiring deferred to tb-11/tb-13 |
 | tb-11 | #72 | merged | afk/tb-11 | [#87](https://github.com/samfarls55/gettoit/pull/87) | resolved tb-06 schema adjacency; ADR 0011 added |
-| tb-12 | #73 | queued | afk/tb-12 | — | unblocked (tb-11 merged) |
-| tb-13 | #74 | queued | afk/tb-13 | — | unblocked (tb-08, tb-11 merged) |
+| tb-12 | #73 | merged | afk/tb-12 | [#89](https://github.com/samfarls55/gettoit/pull/89) | profile vetoes on user_preferences jsonb; fed engine hard_vetoes channel |
+| tb-13 | #74 | merged | afk/tb-13 | [#88](https://github.com/samfarls55/gettoit/pull/88) | + tracker PR #90; re-pointed FireVerdictIntegrationTests onto v1.1 firing contract |
 
 ## Event log
 - 04:24 — Run opened. Preflight passed after committing the v1.1 vault backlog to main (commit b04ea12). Work set: 3 ready, 9 waiting, 9 dropped as already-closed.
@@ -60,3 +60,31 @@ Concurrency cap: 2 subagents (default — no override given at invocation).
 - 06:43 — tb-09 MERGED via PR #84 (011a690). Synced main. Wave 6 ready: tb-10 only. Spawning tb-10.
 - 07:00 — tb-10 MERGED via PR #85 (+ tracker PR #86). Synced main to db9a2bf. Wave 7 ready: tb-11 only. Spawning tb-11.
 - 07:22 — tb-11 MERGED via PR #87 (362ad29). Synced main. Final wave: tb-12 + tb-13 both unblocked — spawning both in parallel (cap 2).
+- 08:05 — tb-12 MERGED via PR #89 and tb-13 MERGED via PR #88 (+ tracker PR #90). tb-13 merged first; tb-12 rebased (migration version-prefix collision + _index.md row conflict, both resolved). Transient CI flakes during the parallel run — Supabase anon-signup rate limit (429) and shared-backend FireVerdictIntegrationTests contamination — both cleared on re-run; scoped to the issue, not halting.
+- 08:06 — Synced main to 7c42d79. ready-issues reports no ready-for-agent issues. Run complete — all 12 issues merged.
+
+## Close-out
+
+**Completed (12 issues, all merged to main):**
+- bug-06 — [#77](https://github.com/samfarls55/gettoit/pull/77) (tracker reconciliation; code fix pre-existed in 7a95412)
+- research-01 — [#75](https://github.com/samfarls55/gettoit/pull/75)
+- tb-04 — [#76](https://github.com/samfarls55/gettoit/pull/76)
+- tb-05 — [#79](https://github.com/samfarls55/gettoit/pull/79) (+ tracker [#80](https://github.com/samfarls55/gettoit/pull/80))
+- tb-06 — [#78](https://github.com/samfarls55/gettoit/pull/78)
+- tb-07 — [#81](https://github.com/samfarls55/gettoit/pull/81) (+ tracker [#82](https://github.com/samfarls55/gettoit/pull/82))
+- tb-08 — [#83](https://github.com/samfarls55/gettoit/pull/83)
+- tb-09 — [#84](https://github.com/samfarls55/gettoit/pull/84)
+- tb-10 — [#85](https://github.com/samfarls55/gettoit/pull/85) (+ tracker [#86](https://github.com/samfarls55/gettoit/pull/86))
+- tb-11 — [#87](https://github.com/samfarls55/gettoit/pull/87)
+- tb-12 — [#89](https://github.com/samfarls55/gettoit/pull/89)
+- tb-13 — [#88](https://github.com/samfarls55/gettoit/pull/88) (+ tracker [#90](https://github.com/samfarls55/gettoit/pull/90))
+
+**Escalated / failed:** none.
+
+**Skipped (HITL-blocked / needs-info / unparseable):** none.
+
+**Dropped as already-done before the run:** bug-01..bug-04, sg-01, sg-02, tb-01, tb-02, tb-03 — all closed on GitHub prior to this run. Their vault frontmatter still reads `ready-*` (stale). Not reconciled by this run — out of scope; flag for a vault audit.
+
+**Stranded waiting issues:** none. (`ready-issues` lists `tb-01 <- sg-02`, but both are already closed on GitHub — a stale vault-vs-GitHub artifact, not real outstanding work.)
+
+**Outcome:** entire AFK backlog drained. v1.1 quiz-redesign + verdict-engine PRD slices (research-01, tb-04..tb-13) and bug-06 all merged. New ADRs 0010 (generic jsonb votes schema) and 0011 (worst-off-protecting verdict engine).
