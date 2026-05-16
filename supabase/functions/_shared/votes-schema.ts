@@ -1,5 +1,6 @@
 // votes-schema — generic Q1..Q5 jsonb storage shape + the schema-driven
-// mapping layer the verdict engine consumes its input through (TB-04).
+// mapping layer the verdict engine consumes its input through (TB-04,
+// widened by TB-11).
 //
 // Why this module exists
 // ──────────────────────
@@ -7,11 +8,11 @@
 // (`q1_vetoes text[]`, `q2_budget int`, `q3_walk_minutes int`,
 // `q4_vibe int`, `q5_regret jsonb`). That coupled the storage schema
 // to a fixed quiz: any change to the quiz — reordering questions,
-// reworording a prompt, swapping option copy — needed a migration, and
+// rewording a prompt, swapping option copy — needed a migration, and
 // the verdict engine read those columns by hardcoded field name.
 //
 // The v1.1 quiz redesign (PRD module H) makes the quiz content
-// session-variable. So `votes` now carries five GENERIC jsonb slots,
+// session-variable. So `votes` carries five GENERIC jsonb slots,
 // `q1`..`q5`. Each slot is a `{ meta, answer }` envelope:
 //
 //   * `meta`   — per-session question metadata. The load-bearing field
@@ -27,28 +28,57 @@
 // migration and without an engine change — the engine still receives a
 // stable `MemberVote`.
 //
-// Scope (TB-04 — walking-skeleton slice): the engine's internal logic
-// is unchanged. Only the storage shape and the engine's input path move
-// here. The full engine rewrite (PRD module B) is a later slice and
-// will widen the kind taxonomy; this module is the seam it builds on.
+// TB-11 widening
+// ──────────────
+// The TB-06 quiz rework reworded Q1 → cuisine craving and Q3 →
+// reputation, writing the new `cuisine_craving` and `reputation`
+// question kinds. TB-06 left `votes-schema.ts` untouched and flagged
+// that the verdict-engine rewrite (TB-11) must extend the kind taxonomy
+// before a verdict can fire over a v1.1-quiz vote. TB-11 does that here:
+// the kind set gains `cuisine_craving` and `reputation`, and the engine
+// `MemberVote` shape moves to the worst-off-protecting pipeline's
+// inputs — `hard_vetoes` + a per-candidate `scores` map.
 
-import type { MemberVote } from "./verdict-engine.ts";
+import type { HardVeto, MemberVote } from "./verdict-engine.ts";
 
 // ───────────────────────────────────────────────────────────────────────
 // Question-kind taxonomy
 // ───────────────────────────────────────────────────────────────────────
 //
-// The five kinds the current verdict engine consumes. Each maps to one
-// field (or field-pair) on `MemberVote`. The PRD module-B rewrite will
-// add kinds (e.g. cuisine craving, reputation) — when it does, extend
-// this set and the dispatch table below together.
+// The kinds the verdict engine + the quiz currently write. Each maps to
+// the `MemberVote` field(s) it contributes:
+//
+//   * dietary_veto    — Q1-era dietary chips → `q1_vetoes` (hard veto).
+//   * budget_cap      — Q2 spend cap → `q2_budget` (hard veto).
+//   * cuisine_craving — Q1 (v1.1) cuisine craving. A soft preference
+//                       scored by `prefFn`, NOT a hard veto — it
+//                       contributes nothing to the EBA prune. The
+//                       member-local `prefFn`/`scores` carry it.
+//   * reputation      — Q3 (v1.1) reputation/discovery. Soft, same.
+//   * walk_minutes    — legacy Q3. Retired from the v1.1 quiz (moved to
+//                       the parameters bucket) but kept in the taxonomy
+//                       so a legacy vote row still maps without a throw.
+//   * vibe            — Q4 vibe energy. Soft, scored by `prefFn`.
+//   * regret          — Q5 preference probe. The `answer.scores` map is
+//                       the member's per-candidate cached score, which
+//                       the engine reads directly as the satisficing /
+//                       maximin score.
+//   * profile_veto    — TB-12 profile allergies / dietary restrictions /
+//                       cuisine NEVERS. Feeds the engine's generic
+//                       `hard_vetoes` channel. Not written by the quiz
+//                       (profile data is sticky, set on the account);
+//                       the kind exists so a profile slot maps cleanly
+//                       once TB-12 wires the seeding path.
 
 export const QUESTION_KINDS = [
   "dietary_veto",
   "budget_cap",
+  "cuisine_craving",
+  "reputation",
   "walk_minutes",
   "vibe",
   "regret",
+  "profile_veto",
 ] as const;
 
 export type QuestionKind = typeof QUESTION_KINDS[number];
@@ -105,25 +135,19 @@ export interface VotesRow {
 // the most permissive answer, so an unasked question never prunes.
 
 const OPEN_BUDGET_TIER = 4; // $$$$ — no cap.
-const OPEN_WALK_MINUTES = 30; // the widest stop in the discrete set.
-const NEUTRAL_VIBE = 2; // BUZZY — the mid level, neither floor nor ceiling.
 
 // ───────────────────────────────────────────────────────────────────────
 // Mapping layer
 // ───────────────────────────────────────────────────────────────────────
 
 /** The slice of `MemberVote` produced by interpreting one slot. The
- *  mapper merges these onto a default `MemberVote`. */
+ *  mapper merges these onto a default `MemberVote`. Soft-preference
+ *  kinds (`cuisine_craving`, `reputation`, `vibe`, `walk_minutes`)
+ *  contribute nothing to the engine's hard inputs — they are carried by
+ *  the per-member `prefFn` / `scores`, which the pool manager builds —
+ *  so they produce an empty patch. */
 type MemberVotePatch = Partial<
-  Pick<
-    MemberVote,
-    | "q1_vetoes"
-    | "q2_budget"
-    | "q3_walk_minutes"
-    | "q4_vibe"
-    | "q5_regret"
-    | "soft_cuisine_vetoes"
-  >
+  Pick<MemberVote, "q1_vetoes" | "q2_budget" | "hard_vetoes" | "scores">
 >;
 
 /** Per-kind answer reader. Each takes the slot's `answer` payload and
@@ -155,6 +179,20 @@ function unionChips(base: string[], extra: string[]): string[] {
   return out;
 }
 
+/** Read a per-candidate `scores` map from a `regret`-kind answer
+ *  payload. The v1.1 Q5 probe writes `answer.scores` as
+ *  `{ <venue_id>: <1..5 rating> }` — the member's cached per-candidate
+ *  score, which the verdict engine reads directly. */
+function readScores(raw: unknown): Record<string, number> {
+  const scores: Record<string, number> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof v === "number" && Number.isFinite(v)) scores[k] = v;
+    }
+  }
+  return scores;
+}
+
 const KIND_READERS: Readonly<Record<QuestionKind, KindReader>> = Object.freeze({
   dietary_veto: (answer) => {
     // `vetoes` is the immutable original quiz answer. `vetoes_extra`
@@ -163,33 +201,54 @@ const KIND_READERS: Readonly<Record<QuestionKind, KindReader>> = Object.freeze({
     // are unioned — the engine receives one flat `q1_vetoes`.
     const vetoes = asStringArray(answer.vetoes);
     const vetoesExtra = asStringArray(answer.vetoes_extra);
-    const patch: MemberVotePatch = {
+    return {
       q1_vetoes: vetoesExtra.length > 0
         ? unionChips(vetoes, vetoesExtra)
         : vetoes,
     };
-    const soft = asStringArray(answer.soft_cuisine_vetoes);
-    if (soft.length > 0) patch.soft_cuisine_vetoes = soft;
-    return patch;
   },
   budget_cap: (answer) => ({
     q2_budget: asNumber(answer.tier, OPEN_BUDGET_TIER),
   }),
-  walk_minutes: (answer) => ({
-    q3_walk_minutes: asNumber(answer.minutes, OPEN_WALK_MINUTES),
+  // Soft preference — carried by `prefFn` / `scores`, not a hard input.
+  // The reader produces an empty patch: the cuisine craving never
+  // prunes a venue, it only scores one.
+  cuisine_craving: (_answer) => ({}),
+  // Soft preference — same.
+  reputation: (_answer) => ({}),
+  // Legacy Q3 — retired from the v1.1 quiz (walk-minutes moved to the
+  // parameters bucket). Kept so a legacy vote row maps without a throw;
+  // contributes nothing.
+  walk_minutes: (_answer) => ({}),
+  // Soft preference — same.
+  vibe: (_answer) => ({}),
+  regret: (answer) => ({
+    // The Q5 probe's per-candidate ratings ARE the member's cached
+    // score map for the verdict engine.
+    scores: readScores(answer.scores),
   }),
-  vibe: (answer) => ({
-    q4_vibe: asNumber(answer.level, NEUTRAL_VIBE),
-  }),
-  regret: (answer) => {
-    const raw = answer.scores;
-    const scores: Record<string, number> = {};
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) {
-      for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-        if (typeof v === "number" && Number.isFinite(v)) scores[k] = v;
+  profile_veto: (answer) => {
+    // TB-12 profile vetoes — allergies, dietary restrictions, cuisine
+    // NEVERS. Each entry is a `{ kind, token }` hard veto consumed by
+    // the engine's EBA prune. The payload shape is
+    // `answer.vetoes: HardVeto[]`.
+    const raw = answer.vetoes;
+    const hardVetoes: HardVeto[] = [];
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        if (entry && typeof entry === "object") {
+          const kind = (entry as Record<string, unknown>).kind;
+          const token = (entry as Record<string, unknown>).token;
+          if (
+            (kind === "dietary" || kind === "cuisine_never" || kind === "tag") &&
+            typeof token === "string"
+          ) {
+            hardVetoes.push({ kind, token });
+          }
+        }
       }
     }
-    return { q5_regret: scores };
+    return { hard_vetoes: hardVetoes };
   },
 });
 
@@ -208,9 +267,8 @@ export function mapVotesRowToMemberVote(row: VotesRow): MemberVote {
     display_name: row.display_name,
     q1_vetoes: [],
     q2_budget: OPEN_BUDGET_TIER,
-    q3_walk_minutes: OPEN_WALK_MINUTES,
-    q4_vibe: NEUTRAL_VIBE,
-    q5_regret: {},
+    hard_vetoes: [],
+    scores: {},
   };
 
   const slots: ReadonlyArray<QuestionSlot | null> = [
@@ -221,7 +279,7 @@ export function mapVotesRowToMemberVote(row: VotesRow): MemberVote {
     row.q5,
   ];
 
-  const softCuisine: string[] = [];
+  const hardVetoes: HardVeto[] = [];
 
   for (const slot of slots) {
     if (slot == null) continue;
@@ -236,17 +294,13 @@ export function mapVotesRowToMemberVote(row: VotesRow): MemberVote {
     const patch = reader(slot.answer ?? {});
     if (patch.q1_vetoes !== undefined) vote.q1_vetoes = patch.q1_vetoes;
     if (patch.q2_budget !== undefined) vote.q2_budget = patch.q2_budget;
-    if (patch.q3_walk_minutes !== undefined) {
-      vote.q3_walk_minutes = patch.q3_walk_minutes;
-    }
-    if (patch.q4_vibe !== undefined) vote.q4_vibe = patch.q4_vibe;
-    if (patch.q5_regret !== undefined) vote.q5_regret = patch.q5_regret;
-    if (patch.soft_cuisine_vetoes !== undefined) {
-      softCuisine.push(...patch.soft_cuisine_vetoes);
+    if (patch.scores !== undefined) vote.scores = patch.scores;
+    if (patch.hard_vetoes !== undefined) {
+      hardVetoes.push(...patch.hard_vetoes);
     }
   }
 
-  if (softCuisine.length > 0) vote.soft_cuisine_vetoes = softCuisine;
+  if (hardVetoes.length > 0) vote.hard_vetoes = hardVetoes;
 
   return vote;
 }
@@ -255,19 +309,25 @@ export function mapVotesRowToMemberVote(row: VotesRow): MemberVote {
 // Inverse — build the jsonb row a write path inserts
 // ───────────────────────────────────────────────────────────────────────
 //
-// The current iOS quiz still produces the five typed answers. Until the
-// PRD module-J quiz rework lands, the write path needs to wrap those
-// answers in the generic envelope. This helper builds the canonical
-// `q1`..`q5` slots from the legacy typed answers, so the existing quiz
-// keeps writing — and the engine keeps reading — end-to-end.
+// The current iOS quiz still produces typed answers per question. Until
+// every write path emits the generic envelope natively, this helper
+// wraps the typed answers in the `{ meta, answer }` slot shape, so the
+// existing quiz keeps writing — and the engine keeps reading —
+// end-to-end.
 
 export interface LegacyTypedAnswers {
+  /** Q1-era dietary veto chips. */
   q1_vetoes: string[];
+  /** Q2 spend cap tier. */
   q2_budget: number;
-  q3_walk_minutes: number;
-  q4_vibe: number;
-  q5_regret: Record<string, number>;
-  soft_cuisine_vetoes?: string[];
+  /** Q1 (v1.1) craved cuisine tokens. Soft preference. */
+  cuisines?: string[];
+  /** Q3 (v1.1) reputation chip. Soft preference. */
+  reputation?: string;
+  /** Q4 vibe energy index 0..4. Soft preference. */
+  q4_vibe?: number;
+  /** Q5 per-candidate excitement ratings, keyed by venue id. */
+  q5_scores: Record<string, number>;
 }
 
 /** The five generic slots, ready to insert into `votes.q1`..`q5`. */
@@ -279,8 +339,9 @@ export interface VotesSlotInsert {
   q5: QuestionSlot;
 }
 
-/** Wrap the legacy typed quiz answers in the generic `{ meta, answer }`
- *  envelopes. The `meta.prompt` strings are the v1 quiz copy — carried
+/** Wrap typed quiz answers in the generic `{ meta, answer }` envelopes.
+ *  Q1 carries the v1.1 `cuisine_craving` kind; Q3 carries `reputation`.
+ *  The `meta.prompt` strings are illustrative session copy — carried
  *  for audit, never read by the mapper. */
 export function buildVotesSlotsFromLegacyAnswers(
   answers: LegacyTypedAnswers,
@@ -288,16 +349,10 @@ export function buildVotesSlotsFromLegacyAnswers(
   return {
     q1: {
       meta: {
-        question_kind: "dietary_veto",
-        prompt: "Anything off the menu tonight?",
+        question_kind: "cuisine_craving",
+        prompt: "What are you craving tonight?",
       },
-      answer:
-        answers.soft_cuisine_vetoes && answers.soft_cuisine_vetoes.length > 0
-          ? {
-            vetoes: answers.q1_vetoes,
-            soft_cuisine_vetoes: answers.soft_cuisine_vetoes,
-          }
-          : { vetoes: answers.q1_vetoes },
+      answer: { cuisines: answers.cuisines ?? [] },
     },
     q2: {
       meta: {
@@ -308,24 +363,24 @@ export function buildVotesSlotsFromLegacyAnswers(
     },
     q3: {
       meta: {
-        question_kind: "walk_minutes",
-        prompt: "How far are you willing to walk?",
+        question_kind: "reputation",
+        prompt: "What kind of place are you after?",
       },
-      answer: { minutes: answers.q3_walk_minutes },
+      answer: { reputation: answers.reputation ?? "no_preference" },
     },
     q4: {
       meta: {
         question_kind: "vibe",
         prompt: "What's the energy you're after?",
       },
-      answer: { level: answers.q4_vibe },
+      answer: { level: answers.q4_vibe ?? 2 },
     },
     q5: {
       meta: {
         question_kind: "regret",
-        prompt: "Which would you most regret missing?",
+        prompt: "How excited does each of these make you?",
       },
-      answer: { scores: answers.q5_regret },
+      answer: { scores: answers.q5_scores },
     },
   };
 }

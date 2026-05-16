@@ -139,9 +139,7 @@ Deno.test("compute-verdict reroll — bypasses already_computed when last_reroll
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-ren": 5 },
+        hard_vetoes: [], scores: { "opt-ren": 5 },
       },
     ],
     previousWinnerName: "Pico's",
@@ -174,18 +172,14 @@ Deno.test("compute-verdict reroll — clean run leaves reroll_reason null on ver
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5 },
+        hard_vetoes: [], scores: { "opt-pico": 5 },
       },
       {
         user_id: "u2",
         display_name: "maya",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5 },
+        hard_vetoes: [], scores: { "opt-pico": 5 },
       },
     ],
   });
@@ -221,18 +215,14 @@ Deno.test("compute-verdict reroll avail — excluded_option_ids removes the prio
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-ren": 4 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 4 },
       },
       {
         user_id: "u2",
         display_name: "maya",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-ren": 4 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 4 },
       },
     ],
     previousWinnerName: "Pico's",
@@ -275,18 +265,14 @@ Deno.test("compute-verdict reroll cost — budget_tier_override prunes candidate
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-cheap": 4 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-cheap": 4 },
       },
       {
         user_id: "u2",
         display_name: "maya",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-cheap": 4 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-cheap": 4 },
       },
     ],
     previousWinnerName: "Pico's",
@@ -302,39 +288,48 @@ Deno.test("compute-verdict reroll cost — budget_tier_override prunes candidate
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// dist-reroll — walk_minutes_override prunes candidates over the new cap
+// dist-reroll — re-runs the engine and stamps the aggregate-rule prefix
 // ───────────────────────────────────────────────────────────────────────
+//
+// In the v1.1 worst-off-protecting engine (TB-11) walk-minutes is no
+// longer a per-member cap — it left the quiz for the parameters bucket.
+// A `dist`-reason reroll therefore no longer prunes via a
+// `walk_minutes_override`; its effect is carried through the radius
+// gate + the re-fetched, re-scored candidate pool. This test pins what
+// the handler still owns: a `dist` reroll bypasses idempotency,
+// re-runs the engine, and stamps the aggregate-rule prefix that names
+// the rule, never the rerolling member.
 
-Deno.test("compute-verdict reroll dist — walk_minutes_override prunes far candidates", async () => {
+Deno.test("compute-verdict reroll dist — re-runs the engine and stamps the Distance prefix", async () => {
   const { adapter, inserts } = memoryAdapter({
     rerollState: {
       excluded_option_ids: [],
       budget_tier_override: null,
-      walk_minutes_override: 5,
+      walk_minutes_override: null,
       last_reroll_reason: "dist",
     },
     options: [
-      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, walk_minutes_estimate: 8 } },
-      { id: "opt-near", payload: { name: "Diner",  price_tier: 2, walk_minutes_estimate: 4 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
+      { id: "opt-near", payload: { name: "Diner",  price_tier: 2 } },
     ],
+    // The re-fetched pool re-scored `opt-near` as the worst-off-safe
+    // pick (both members at 5) and `opt-pico` lower (a 3 floors it).
     votes: [
       {
         user_id: "u1",
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-near": 4 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-near": 5 },
       },
       {
         user_id: "u2",
         display_name: "maya",
         q1_vetoes: [],
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-near": 4 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 3, "opt-near": 5 },
       },
     ],
     previousWinnerName: "Pico's",
@@ -345,6 +340,7 @@ Deno.test("compute-verdict reroll dist — walk_minutes_override prunes far cand
     { env: envOk(), buildDataAdapter: () => adapter },
   );
   assertEquals(res.status, 200);
+  // opt-near min 5 beats opt-pico min 3 on the maximin rule.
   assertEquals(inserts[0].option_id, "opt-near");
   assert(inserts[0].rule_text.startsWith("Distance reroll cut Pico's."));
 });
@@ -372,9 +368,7 @@ Deno.test("compute-verdict reroll diet — q1_vetoes_extra are merged with q1_ve
         q1_vetoes: [],
         q1_vetoes_extra: ["vegan"], // added by the diet reroll
         q2_budget: 4,
-        q3_walk_minutes: 30,
-        q4_vibe: 2,
-        q5_regret: { "opt-pico": 5, "opt-vegan": 4 },
+        hard_vetoes: [], scores: { "opt-pico": 5, "opt-vegan": 4 },
       },
     ],
     previousWinnerName: "Pico's",

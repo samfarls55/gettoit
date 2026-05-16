@@ -35,6 +35,7 @@
 import {
   type CandidateOption,
   computeVerdict,
+  type HardVeto,
   type MemberVote,
   type VerdictEngineOutput,
   type VerdictMethod,
@@ -140,33 +141,32 @@ export interface RoomOptionRow {
     fsq_place_id?: string;
     name?: string;
     price_tier?: number | null;
-    walk_minutes_estimate?: number | null;
     dietary_tags?: string[];
     categories?: string[];
     /** Distance from the room's search centre in meters. Used by the
-     *  TB-09 radius_widen relax step. PlacesProxy populates this in
-     *  its `ShapedPlace` and the iOS / Edge writes it through the
-     *  options payload. */
+     *  TB-11 empty-floor cascade's radius-widen step. PlacesProxy
+     *  populates this in its `ShapedPlace` and the iOS / Edge writes it
+     *  through the options payload. */
     distance_meters?: number | null;
-    /** Q4-style vibe signal carried via the option payload. Optional
-     *  — Foursquare doesn't ship a vibe field today; PlacesProxy may
-     *  emit it later. Drives the vibe_floor relax step when present. */
-    vibe_signal?: number | null;
   };
 }
 
 export interface MemberVoteRow {
   user_id: string;
   display_name: string;
+  /** Q1-era dietary veto chips — hard veto in the EBA prune. */
   q1_vetoes: string[];
+  /** Q2 spend cap tier (1..4) — hard veto in the EBA prune. */
   q2_budget: number;
-  q3_walk_minutes: number;
-  q4_vibe: number;
-  q5_regret: Record<string, number>;
-  /** Soft cuisine vetoes (TB-09). Optional — the v1 quiz does not
-   *  currently surface this directly; reroll (TB-10) and future
-   *  taste-profile prefill (post-v1) write into it. */
-  soft_cuisine_vetoes?: string[];
+  /** Generic schema-driven hard vetoes — TB-12 profile allergies /
+   *  dietary restrictions / cuisine NEVERS. Empty for a session with
+   *  no profile data. */
+  hard_vetoes: HardVeto[];
+  /** Per-candidate cached scores — keyed by `options.id`, valued 1..5.
+   *  The Q5 preference probe (TB-08) writes these; the verdict engine
+   *  reads them as the satisficing / maximin score. Absent / partial
+   *  maps fall back to the neutral threshold inside the engine. */
+  scores: Record<string, number>;
   /** TB-10 — Q1 dietary chips appended after the initial vote via a
    *  `diet`-reason reroll. The handler merges these with `q1_vetoes`
    *  before feeding the engine so the EBA filter sees the union. */
@@ -413,11 +413,9 @@ export async function handleRequest(
     id: row.id,
     name: row.payload?.name ?? "Unnamed",
     price_tier: row.payload?.price_tier ?? null,
-    walk_minutes_estimate: row.payload?.walk_minutes_estimate ?? null,
     dietary_tags: row.payload?.dietary_tags ?? [],
     categories: row.payload?.categories ?? [],
     distance_meters: row.payload?.distance_meters ?? null,
-    vibe_signal: row.payload?.vibe_signal ?? null,
   }));
 
   // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
@@ -427,25 +425,22 @@ export async function handleRequest(
   // naturally.
   const votes: MemberVote[] = voteRows.map((row) => {
     const mergedVetoes = mergeQ1Vetoes(row.q1_vetoes, row.q1_vetoes_extra);
-    // TB-10 — apply room-level overrides as additional caps. Each
-    // member's effective cap is MIN(member, override). Note the
-    // budget_tier_override is a hard CAP (tighter is smaller); the
-    // walk override is a hard CAP (tighter is smaller).
+    // TB-10 — apply the room-level budget override as an additional
+    // cap. Each member's effective cap is MIN(member, override). The
+    // walk override no longer applies: walk-minutes left the quiz (it
+    // moved to the parameters bucket in the v1.1 redesign), so a
+    // `dist`-reason reroll's effect is carried through the radius
+    // gate, not a per-member walk cap.
     const effectiveBudget = rerollState?.budget_tier_override != null
       ? Math.min(row.q2_budget, rerollState.budget_tier_override)
       : row.q2_budget;
-    const effectiveWalk = rerollState?.walk_minutes_override != null
-      ? Math.min(row.q3_walk_minutes, rerollState.walk_minutes_override)
-      : row.q3_walk_minutes;
     return {
       user_id: row.user_id,
       display_name: row.display_name,
       q1_vetoes: mergedVetoes,
       q2_budget: effectiveBudget,
-      q3_walk_minutes: effectiveWalk,
-      q4_vibe: row.q4_vibe,
-      q5_regret: row.q5_regret,
-      soft_cuisine_vetoes: row.soft_cuisine_vetoes,
+      hard_vetoes: row.hard_vetoes ?? [],
+      scores: row.scores ?? {},
     };
   });
 

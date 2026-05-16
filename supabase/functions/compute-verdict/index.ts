@@ -97,10 +97,8 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
           display_name: vote.display_name,
           q1_vetoes: vote.q1_vetoes,
           q2_budget: vote.q2_budget,
-          q3_walk_minutes: vote.q3_walk_minutes,
-          q4_vibe: vote.q4_vibe,
-          q5_regret: vote.q5_regret,
-          soft_cuisine_vetoes: vote.soft_cuisine_vetoes,
+          hard_vetoes: vote.hard_vetoes,
+          scores: vote.scores ?? {},
         } satisfies MemberVoteRow;
       });
     },
