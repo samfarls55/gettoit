@@ -191,20 +191,26 @@ final class FireVerdictIntegrationTests: XCTestCase {
         let creatorRoomStore = RoomStore(client: creatorClient)
         let joinerRoomStore = RoomStore(client: joinerClient)
 
-        // Initiator side — create room + vote.
+        // Initiator creates the room.
         let creatorID = try await signInFreshAnon(on: creatorClient)
         let room = try await creatorRoomStore.createRoom(as: creatorID)
+
+        // Joiner joins FIRST — so the room has two members before any
+        // vote lands. (If the initiator voted while alone, the solo
+        // room would auto-fire on that single Q5-complete member.)
+        let joinerID = try await signInFreshAnon(on: joinerClient)
+        try await joinerRoomStore.joinRoom(id: room.id, as: joinerID)
+
+        // Initiator votes — one of two members is now Q5-complete.
         try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
 
-        // After only the initiator's vote the room must still be open
-        // — the joiner is a member who has not yet completed Q5.
+        // The room must still be open — the joiner has not yet
+        // completed Q5.
         let midStatus = try await fetchRoomStatus(client: creatorClient, roomID: room.id)
         XCTAssertEqual(midStatus, "open",
             "room must wait while a member has not completed Q5")
 
-        // Joiner side — join + vote. Now every member is Q5-complete.
-        let joinerID = try await signInFreshAnon(on: joinerClient)
-        try await joinerRoomStore.joinRoom(id: room.id, as: joinerID)
+        // Joiner votes — now every member is Q5-complete.
         try await insertVoteAs(client: joinerClient, roomID: room.id, userID: joinerID)
 
         // The auto-fire trigger fired on the joiner's vote insert —
@@ -231,14 +237,17 @@ final class FireVerdictIntegrationTests: XCTestCase {
         let creatorRoomStore = RoomStore(client: creatorClient)
         let joinerRoomStore = RoomStore(client: joinerClient)
 
-        // Initiator creates the room + votes.
+        // Initiator creates the room.
         let creatorID = try await signInFreshAnon(on: creatorClient)
         let room = try await creatorRoomStore.createRoom(as: creatorID)
-        try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
 
-        // Joiner joins but does NOT vote — the straggler.
+        // Joiner joins FIRST — two members before any vote lands, so
+        // the initiator's vote does not auto-fire a solo room.
         let joinerID = try await signInFreshAnon(on: joinerClient)
         try await joinerRoomStore.joinRoom(id: room.id, as: joinerID)
+
+        // Initiator votes; the joiner is the straggler — never votes.
+        try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
 
         // Room is still open — the joiner has not completed Q5.
         let preStatus = try await fetchRoomStatus(client: creatorClient, roomID: room.id)
