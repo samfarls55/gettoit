@@ -1,8 +1,10 @@
-// GetToIt — Q4 · Vibe (TB-04).
+// GetToIt — Q4 · Vibe energy (TB-04 surface, TB-06 vocabulary).
 //
-// Cardinal scalar on the locked vocabulary `HUSHED · MELLOW · BUZZY ·
-// LOUD · ROWDY` (`GTIVibeLabels.all`). Big live word at 96pt — the
-// system saying "yes, this is your vibe."  No drag handle — taps only
+// Cardinal scalar on the v1.1 energy vocabulary `QUIET · CHILL ·
+// SOCIAL · LIVELY · ROWDY` (`GTIVibeLabels.all`, generated from
+// `design-system/tokens.json`). One axis only — energy / loudness,
+// not formality. Big live word at 96pt — the system saying "yes,
+// this is your vibe."  No drag handle — taps only
 // (`surfaces/03-quiz.md` §"Q4").
 //
 // The 480ms rise-with-blur on word change is the spec's `vibe word
@@ -27,7 +29,7 @@ public struct QuizQ4Vibe: View {
             QuizQuestionHeader(
                 index: 4,
                 title: "What's the energy tonight?",
-                sub: "Slide it to where the group lands."
+                sub: "Tap where the night lands."
             )
 
             VStack(spacing: 0) {
@@ -35,10 +37,9 @@ public struct QuizQ4Vibe: View {
 
                 ZStack {
                     // 96pt is a JSX hand-tune ("huge live word" per
-                    // ScreenQ4Vibe.jsx). Between display-xl (88) and
-                    // the Q3 100pt readout — sized so HUSHED..ROWDY
-                    // fit on one line without word-break. Matched
-                    // ms-exact to the JSX.
+                    // ScreenQ4Vibe.jsx). Sized so the longest energy
+                    // label fits on one line without word-break.
+                    // Matched ms-exact to the JSX.
                     Text(GTIVibeLabels.all[coordinator.q4Vibe])
                         .font(.system(size: 96, weight: .black))
                         .tracking(-0.03 * 96)

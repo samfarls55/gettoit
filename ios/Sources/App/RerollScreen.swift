@@ -19,8 +19,9 @@
 //   * Surfaces the optional one-line detail input under the selected
 //     tile. Submitted to the apply_reroll RPC alongside the reason.
 //   * On `mood`-reason selection, surfaces an inline 5-position vibe
-//     scalar (HUSHED·MELLOW·BUZZY·LOUD·ROWDY) so the caller can pick
-//     their new vibe value; the RPC writes that into their `votes` row.
+//     scalar (QUIET·CHILL·SOCIAL·LIVELY·ROWDY — `GTIVibeLabels.all`)
+//     so the caller can pick their new vibe value; the RPC writes
+//     that into their `votes` row.
 //   * On `diet`-reason selection, surfaces an inline dietary chip
 //     picker so the caller can pick the additional EBA veto.
 //   * Cancel CTA reads `"Cancel · keep <Place>"` (named alternative,

@@ -118,9 +118,10 @@ final class FireVerdictIntegrationTests: XCTestCase {
         let row = QuizCoordinator.VoteRow(
             roomID: roomID,
             userID: userID,
-            q1Vetoes: [],
+            q1Cuisines: [],
+            q1NoPreference: true,
             q2Budget: 4,
-            q3WalkMinutes: 30,
+            q3Reputation: QuizReputation.noPreference,
             q4Vibe: 2,
             q5Regret: [:]
         )

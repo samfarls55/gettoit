@@ -466,11 +466,28 @@ public final class VerdictStore {
     /// shaping helpers below stay unchanged. Decode-only — the verdict
     /// screen reads votes, never writes them. The typed `init` is kept
     /// for unit-test fixture construction.
+    ///
+    /// TB-06 (v1.1 quiz rework): Q1 changed from a dietary-veto answer
+    /// to a positive cuisine-craving answer (`{cuisines, no_preference}`)
+    /// and Q3 from a walk-minutes threshold to a reputation chip
+    /// (`{reputation}`). Dietary vetoes moved to the profile and
+    /// walk-minutes to the session parameters, so neither is carried by
+    /// the session quiz any more. The decoder is tolerant of BOTH the
+    /// legacy and the new answer shapes — `q1Vetoes` / `q3WalkMinutes`
+    /// stay on the struct (the verdict-screen receipt helpers still
+    /// reference them) but resolve to the no-constraint default
+    /// (`[]` / `30`) when the slot carries the new v1.1 shape. The
+    /// dietary/walk receipts simply do not fire from session votes
+    /// once dietary/walk have moved buckets — the verdict-engine
+    /// rewrite (tb-11) re-sources those receipts.
     public struct VoteRow: Decodable, Sendable {
         public let userID: UUID
         public let q1Vetoes: [String]
+        public let q1Cuisines: [String]
+        public let q1NoPreference: Bool
         public let q2Budget: Int
         public let q3WalkMinutes: Int
+        public let q3Reputation: String?
         public let q4Vibe: Int
         public let q5Regret: [String: Int]
 
@@ -480,12 +497,18 @@ public final class VerdictStore {
             q2Budget: Int,
             q3WalkMinutes: Int,
             q4Vibe: Int,
-            q5Regret: [String: Int]
+            q5Regret: [String: Int],
+            q1Cuisines: [String] = [],
+            q1NoPreference: Bool = false,
+            q3Reputation: String? = nil
         ) {
             self.userID = userID
             self.q1Vetoes = q1Vetoes
+            self.q1Cuisines = q1Cuisines
+            self.q1NoPreference = q1NoPreference
             self.q2Budget = q2Budget
             self.q3WalkMinutes = q3WalkMinutes
+            self.q3Reputation = q3Reputation
             self.q4Vibe = q4Vibe
             self.q5Regret = q5Regret
         }
@@ -495,28 +518,51 @@ public final class VerdictStore {
             case q1, q2, q3, q4, q5
         }
         private struct Slot<Answer: Decodable>: Decodable { let answer: Answer }
-        private struct VetoesAnswer: Decodable {
-            let vetoes: [String]
+        /// Tolerant Q1 answer — accepts the legacy dietary-veto shape
+        /// (`vetoes` / `vetoes_extra`) AND the v1.1 cuisine-craving
+        /// shape (`cuisines` / `no_preference`). Every field optional.
+        private struct Q1Answer: Decodable {
+            let vetoes: [String]?
             let vetoesExtra: [String]?
+            let cuisines: [String]?
+            let noPreference: Bool?
             enum CodingKeys: String, CodingKey {
                 case vetoes
                 case vetoesExtra = "vetoes_extra"
+                case cuisines
+                case noPreference = "no_preference"
             }
         }
+        /// Tolerant Q3 answer — accepts the legacy walk-minutes shape
+        /// (`minutes`) AND the v1.1 reputation shape (`reputation`).
+        private struct Q3Answer: Decodable {
+            let minutes: Int?
+            let reputation: String?
+        }
         private struct TierAnswer: Decodable { let tier: Int }
-        private struct MinutesAnswer: Decodable { let minutes: Int }
         private struct LevelAnswer: Decodable { let level: Int }
         private struct ScoresAnswer: Decodable { let scores: [String: Int] }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: RowKey.self)
             userID = try c.decode(UUID.self, forKey: .userID)
-            let dietary = try c.decode(Slot<VetoesAnswer>.self, forKey: .q1).answer
-            // A diet-reason reroll appends to `vetoes_extra`; the engine
-            // prunes on the union, so the verdict screen shows it too.
-            q1Vetoes = dietary.vetoes + (dietary.vetoesExtra ?? [])
+
+            let q1 = try c.decode(Slot<Q1Answer>.self, forKey: .q1).answer
+            // Legacy dietary veto: a diet-reason reroll appends to
+            // `vetoes_extra`; the engine prunes on the union. New v1.1
+            // quiz: no vetoes — dietary moved to the profile.
+            q1Vetoes = (q1.vetoes ?? []) + (q1.vetoesExtra ?? [])
+            q1Cuisines = q1.cuisines ?? []
+            q1NoPreference = q1.noPreference ?? false
+
             q2Budget = try c.decode(Slot<TierAnswer>.self, forKey: .q2).answer.tier
-            q3WalkMinutes = try c.decode(Slot<MinutesAnswer>.self, forKey: .q3).answer.minutes
+
+            let q3 = try c.decode(Slot<Q3Answer>.self, forKey: .q3).answer
+            // Absent walk-minutes (v1.1 quiz dropped it) defaults to the
+            // open ceiling so the walk receipt never fires spuriously.
+            q3WalkMinutes = q3.minutes ?? 30
+            q3Reputation = q3.reputation
+
             q4Vibe = try c.decode(Slot<LevelAnswer>.self, forKey: .q4).answer.level
             q5Regret = try c.decode(Slot<ScoresAnswer>.self, forKey: .q5).answer.scores
         }

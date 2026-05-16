@@ -1,4 +1,4 @@
-// GetToIt — Quiz screen snapshot-style smoke tests (TB-04).
+// GetToIt — Quiz screen snapshot-style smoke tests (TB-04 / TB-06).
 //
 // Pixel-snapshot tooling (e.g. `pointfreeco/swift-snapshot-testing`) is
 // not yet on the iOS dependency graph — pulling it in is a tooling
@@ -6,8 +6,8 @@
 // here. Until then, "snapshot tests for each quiz surface, default
 // state" (ticket AC) is satisfied by smoke tests that verify the
 // view body materialises without crashing and the spec-driven
-// inputs feed through (chip count, walk stops, vibe labels, candidate
-// cards).
+// inputs feed through (chip count, reputation chips, vibe labels,
+// candidate cards).
 //
 // SwiftUI's accessibility identifier attachments don't surface into
 // UIKit's `view.subviews` tree, so identifier-walking via UIView is a
@@ -42,9 +42,9 @@ final class QuizScreenSnapshotTests: XCTestCase {
 
     func testEverySurfaceRendersWithoutCrashing() {
         let coord = makeCoordinator()
-        render(QuizQ1Vetoes(coordinator: coord))
+        render(QuizQ1Cuisine(coordinator: coord))
         render(QuizQ2Budget(coordinator: coord))
-        render(QuizQ3Distance(coordinator: coord))
+        render(QuizQ3Reputation(coordinator: coord))
         render(QuizQ4Vibe(coordinator: coord))
         render(QuizQ5Regret(coordinator: coord, onSubmit: {}))
         render(QuizScreen(coordinator: coord, onClose: {}))
@@ -61,27 +61,48 @@ final class QuizScreenSnapshotTests: XCTestCase {
         }
     }
 
+    func testQ1RendersAtTheCuisineCap() {
+        // The Q1 surface dims unselected chips once 3 cuisines are
+        // picked — render that state to confirm the disabled-chip
+        // branch type-checks and materialises.
+        let coord = makeCoordinator()
+        coord.toggleCuisine(QuizCuisine.mexican)
+        coord.toggleCuisine(QuizCuisine.italian)
+        coord.toggleCuisine(QuizCuisine.japanese)
+        render(QuizQ1Cuisine(coordinator: coord))
+    }
+
     // MARK: - spec-driven content shape
 
-    func testQ1ChipsAreSourcedFromTheLockedDisplayOrder() {
-        // Six chips in display order per surfaces/03-quiz.md §Q1.
-        XCTAssertEqual(QuizVeto.displayOrder.count, 6)
-        XCTAssertEqual(QuizVeto.displayOrder.last?.id, QuizVeto.nothingTonight,
-            "expected nothing_tonight to be the trailing chip")
+    func testQ1CuisineChipsAreSourcedFromTheLockedDisplayOrder() {
+        // Cuisine chips render in the locked display order.
+        XCTAssertFalse(QuizCuisine.displayOrder.isEmpty)
+        XCTAssertEqual(QuizCuisine.displayOrder.first?.id, QuizCuisine.mexican)
+    }
+
+    func testQ1CuisineCapIsThree() {
+        XCTAssertEqual(QuizCoordinator.cuisineCap, 3,
+            "Q1 caps cuisine craving at 3 picks per surfaces/03-quiz.md §Q1")
     }
 
     func testQ2HasExactlyFourTiers() {
         XCTAssertEqual(QuizConstants.budgetTiers.count, 4,
-            "EBA budget cap surfaces 4 tiers — never a slider (S03 §Q2)")
+            "EBA spend cap surfaces 4 tiers — never a slider (S03 §Q2)")
     }
 
-    func testQ3StopSetMatchesTheSpec() {
-        XCTAssertEqual(QuizConstants.walkStops, [5, 10, 15, 20, 30],
-            "Q3 stops are 5 / 10 / 15 / 20 / 30 per surfaces/03-quiz.md §Q3")
+    func testQ3ReputationChipsMatchTheSpec() {
+        let ids = QuizReputation.all.map(\.id)
+        XCTAssertEqual(ids, [
+            QuizReputation.popular,
+            QuizReputation.hiddenGem,
+            QuizReputation.classic,
+            QuizReputation.new,
+            QuizReputation.noPreference,
+        ], "Q3 chips are Popular / Hidden gem / Classic / New / No preference per S03 §Q3")
     }
 
-    func testQ4VibeLabelsLockToTheCanonicalVocabulary() {
-        XCTAssertEqual(GTIVibeLabels.all, ["HUSHED", "MELLOW", "BUZZY", "LOUD", "ROWDY"])
+    func testQ4VibeLabelsLockToTheV11EnergyVocabulary() {
+        XCTAssertEqual(GTIVibeLabels.all, ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"])
     }
 
     func testQ5HasThreeCandidatesPerSpec() {
@@ -91,13 +112,15 @@ final class QuizScreenSnapshotTests: XCTestCase {
 
     // MARK: - coordinator default state
 
-    func testDefaultsMatchTheJSXDefaults() {
+    func testDefaultsMatchTheSpecDefaults() {
         let coord = makeCoordinator()
         XCTAssertEqual(coord.step, .q1)
-        XCTAssertTrue(coord.q1Vetoes.isEmpty)
-        XCTAssertEqual(coord.q2Budget, 1, "Q2 defaults to tier 1 ($) per JSX")
-        XCTAssertEqual(coord.q3WalkMinutes, 15, "Q3 defaults to 15 min per JSX")
-        XCTAssertEqual(coord.q4Vibe, 2, "Q4 defaults to BUZZY (mid stop) per JSX")
+        XCTAssertTrue(coord.q1Cuisines.isEmpty)
+        XCTAssertFalse(coord.q1NoPreference)
+        XCTAssertEqual(coord.q2Budget, 1, "Q2 defaults to tier 1 ($)")
+        XCTAssertEqual(coord.q3Reputation, QuizReputation.noPreference,
+            "Q3 defaults to No preference — the neutral, non-pruning answer")
+        XCTAssertEqual(coord.q4Vibe, 2, "Q4 defaults to the mid energy stop")
         for candidate in QuizDummyCandidates.all {
             XCTAssertEqual(coord.q5Ratings[candidate.id], 3,
                 "Q5 defaults each candidate to 3 (middle of 1–5 scale)")

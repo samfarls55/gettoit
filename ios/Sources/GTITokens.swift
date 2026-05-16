@@ -224,7 +224,7 @@ public enum GTIMotion {
 
 /// Q4 vibe scalar labels. Locked vocabulary.
 public enum GTIVibeLabels {
-    public static let all: [String] = ["HUSHED", "MELLOW", "BUZZY", "LOUD", "ROWDY"]
+    public static let all: [String] = ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"]
 }
 
 public enum GTITexture {
