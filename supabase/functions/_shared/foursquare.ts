@@ -68,6 +68,18 @@ export interface ShapedPlace {
   photos: string[];
   address: string | null;
   categories: string[];
+  /** TB-16 (v1.1) — reputation-axis metadata. The Foursquare quality
+   *  score (0..10), the volume signal (`stats.total_ratings`), and the
+   *  record-age signal (`date_created`). The iOS `Q5VenueClassifier`
+   *  buckets these pool-relatively into the Q5 factorial's reputation
+   *  axis (Popular / Hidden gem / Classic / New) — see
+   *  gti-vault/60_engineering/research/foursquare-filter-surface-2026-05
+   *  §4. All three are nullable: an older client that does not read them
+   *  simply ignores the extra keys; a venue Foursquare returns no
+   *  reputation data for shapes them as `null`. */
+  rating: number | null;
+  total_ratings: number | null;
+  date_created: string | null;
 }
 
 export interface PlaceHours {
@@ -109,6 +121,15 @@ export interface FoursquareSearchResult {
   /** Distance in metres from the search centre — used to estimate walk
    *  minutes without a routing API call. */
   distance?: number;
+  /** TB-16 (v1.1) — reputation-axis metadata. `rating` is Foursquare's
+   *  0..10 quality score; `stats.total_ratings` is the volume signal;
+   *  `date_created` is the ISO-8601 record-creation date. All optional —
+   *  coverage is uneven across venues, per the foursquare-filter-surface
+   *  research §4. The shaper passes whatever is present straight through
+   *  for the iOS `Q5VenueClassifier` to bucket pool-relatively. */
+  rating?: number;
+  stats?: { total_ratings?: number; total_tips?: number };
+  date_created?: string;
 }
 
 export interface FoursquareCategory {
@@ -414,6 +435,10 @@ export function buildFoursquareQuery(input: PlacesProxyInput): FoursquareQueryPl
       "photos",
       "tastes",
       "distance",
+      // TB-16 (v1.1) — reputation-axis metadata for the Q5 factorial.
+      "rating",
+      "stats",
+      "date_created",
     ].join(","),
   );
 
@@ -554,6 +579,15 @@ export function shapeFoursquareResult(
     photos: (result.photos ?? []).map(photoToUrl),
     address: result.location?.formatted_address ?? null,
     categories: (result.categories ?? []).map((c) => c.name),
+    // TB-16 (v1.1) — reputation-axis metadata. Pass whatever Foursquare
+    // returned straight through; a venue with no reputation data shapes
+    // as `null` on every field. The iOS `Q5VenueClassifier` buckets
+    // these pool-relatively for the Q5 factorial's reputation axis.
+    rating: typeof result.rating === "number" ? result.rating : null,
+    total_ratings: typeof result.stats?.total_ratings === "number"
+      ? result.stats.total_ratings
+      : null,
+    date_created: result.date_created ?? null,
   };
 }
 

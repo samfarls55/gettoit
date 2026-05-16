@@ -29,6 +29,24 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
     public let photos: [String]
     public let address: String?
     public let categories: [String]
+    /// TB-16 (v1.1) — reputation-axis metadata. The Foursquare quality
+    /// score, 0…10. `nil` when the venue carries no rating, or when the
+    /// Edge Function build predates the reputation-field projection
+    /// (these three fields are decoded as `nil` on an older response —
+    /// `Codable` tolerates the absent key — so the wire is forward- and
+    /// backward-compatible). `Q5VenueClassifier` reads it for the
+    /// reputation axis (foursquare-filter-surface research §4).
+    public let rating: Double?
+    /// TB-16 (v1.1) — reputation-axis volume signal: how many people
+    /// have rated the venue (`stats.total_ratings`). The primary
+    /// "how known is this place" signal. `nil` when absent.
+    public let totalRatings: Int?
+    /// TB-16 (v1.1) — reputation-axis age signal: the ISO-8601 date the
+    /// Foursquare record was created (`date_created`). A proxy for
+    /// New vs Classic; `nil` when absent. See the research §4
+    /// `date_created` caveat — it is the record's age, not the
+    /// restaurant's.
+    public let dateCreated: String?
 
     public init(
         fsqPlaceId: String,
@@ -41,7 +59,10 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
         hours: PlaceHours? = nil,
         photos: [String] = [],
         address: String? = nil,
-        categories: [String] = []
+        categories: [String] = [],
+        rating: Double? = nil,
+        totalRatings: Int? = nil,
+        dateCreated: String? = nil
     ) {
         self.fsqPlaceId = fsqPlaceId
         self.name = name
@@ -54,6 +75,9 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
         self.photos = photos
         self.address = address
         self.categories = categories
+        self.rating = rating
+        self.totalRatings = totalRatings
+        self.dateCreated = dateCreated
     }
 
     enum CodingKeys: String, CodingKey {
@@ -68,6 +92,31 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
         case photos
         case address
         case categories
+        case rating
+        case totalRatings = "total_ratings"
+        case dateCreated = "date_created"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        fsqPlaceId = try c.decode(String.self, forKey: .fsqPlaceId)
+        name = try c.decode(String.self, forKey: .name)
+        lat = try c.decode(Double.self, forKey: .lat)
+        lng = try c.decode(Double.self, forKey: .lng)
+        priceTier = try c.decodeIfPresent(Int.self, forKey: .priceTier)
+        walkMinutesEstimate = try c.decodeIfPresent(Int.self, forKey: .walkMinutesEstimate)
+        dietaryTags = try c.decodeIfPresent([String].self, forKey: .dietaryTags) ?? []
+        hours = try c.decodeIfPresent(PlaceHours.self, forKey: .hours)
+        photos = try c.decodeIfPresent([String].self, forKey: .photos) ?? []
+        address = try c.decodeIfPresent(String.self, forKey: .address)
+        categories = try c.decodeIfPresent([String].self, forKey: .categories) ?? []
+        // The three reputation fields are optional on the wire: an Edge
+        // Function build that predates the TB-16 projection omits them,
+        // and `decodeIfPresent` decodes that as `nil` rather than
+        // throwing. Forward-compatible.
+        rating = try c.decodeIfPresent(Double.self, forKey: .rating)
+        totalRatings = try c.decodeIfPresent(Int.self, forKey: .totalRatings)
+        dateCreated = try c.decodeIfPresent(String.self, forKey: .dateCreated)
     }
 }
 

@@ -26,33 +26,74 @@ final class QuizSessionAssemblerTests: XCTestCase {
     // MARK: - Recording proxy
 
     /// Records every `PlacesProxyRequest` the per-member fetch fires.
-    /// Returns a per-request distinct venue so the union/dedupe and
-    /// price-cap assertions have real rows to inspect.
+    ///
+    /// TB-16: the default response returns a *factorial-feasible* venue
+    /// set per call — a venue carrying the call's cuisine tag at the
+    /// member-matching vibe (a keep-card candidate), the same cuisine at
+    /// a deviating vibe (the vibe-drop candidate), and a non-craved
+    /// cuisine at the matching vibe (the cuisine-drop candidate). The
+    /// unioned pool therefore has the cuisine + vibe spread the v1.1
+    /// `Q5FactorialCardGenerator` needs to select three one-axis-
+    /// deviation cards. Reputation rides on the default `no_preference`
+    /// Q3 answer, whose factorial rule is always-satisfied.
     final class RecordingProxyClient: PlacesProxyClient {
         var observed: [PlacesProxyRequest] = []
         /// Optional per-request response override (price-cap test).
         var responseFor: (@Sendable (PlacesProxyRequest) -> PlacesProxyResponse)?
+
+        /// A Foursquare category name for each `QuizCuisine` id, so the
+        /// classifier's `categories[]` cuisine match resolves.
+        static let categoryForCuisine: [String: String] = [
+            QuizCuisine.mexican: "Mexican Restaurant",
+            QuizCuisine.italian: "Italian Restaurant",
+            QuizCuisine.japanese: "Sushi Restaurant",
+            QuizCuisine.thai: "Thai Restaurant",
+            QuizCuisine.chinese: "Chinese Restaurant",
+            QuizCuisine.indian: "Indian Restaurant",
+            QuizCuisine.american: "American Restaurant",
+            QuizCuisine.mediterranean: "Mediterranean Restaurant",
+        ]
 
         func search(_ request: PlacesProxyRequest) async throws -> PlacesProxyResponse {
             Self.lock.lock()
             observed.append(request)
             Self.lock.unlock()
             if let responseFor { return responseFor(request) }
-            let tag = request.filters?.cuisine ?? "general"
+            let cuisineTag = request.filters?.cuisine
+            let tag = cuisineTag ?? "general"
+            let cap = request.filters?.priceTier
+            // The call's cuisine category (a plain restaurant on the
+            // general call — the classifier reads that as no cuisine).
+            let cuisineCategory = cuisineTag.flatMap { Self.categoryForCuisine[$0] }
+                ?? "Restaurant"
+            func place(_ suffix: String, categories: [String]) -> ShapedPlace {
+                ShapedPlace(
+                    fsqPlaceId: "fsq-\(tag)-\(suffix)",
+                    name: "Spot \(tag) \(suffix)",
+                    lat: 0, lng: 0,
+                    priceTier: cap,
+                    walkMinutesEstimate: 7,
+                    dietaryTags: [],
+                    hours: nil,
+                    photos: [],
+                    address: nil,
+                    categories: categories
+                )
+            }
             return PlacesProxyResponse(
                 places: [
-                    ShapedPlace(
-                        fsqPlaceId: "fsq-\(tag)",
-                        name: "Spot \(tag)",
-                        lat: 0, lng: 0,
-                        priceTier: request.filters?.priceTier,
-                        walkMinutesEstimate: 7,
-                        dietaryTags: [],
-                        hours: nil,
-                        photos: [],
-                        address: nil,
-                        categories: ["Diner"]
-                    ),
+                    // Social (vibe 2 — a plain restaurant) of the call's
+                    // cuisine — a keep-card / cuisine-drop candidate.
+                    place("social", categories: [cuisineCategory]),
+                    // A higher-energy (vibe 3 — a bar) venue that still
+                    // carries the call's cuisine — the vibe-drop
+                    // candidate. Two categories: the bar archetype wins
+                    // the vibe scan, the cuisine fragment still resolves.
+                    place("lively", categories: [cuisineCategory, "Cocktail Bar"]),
+                    // A non-craved cuisine at Social vibe — the
+                    // cuisine-drop candidate when the member craves
+                    // something else.
+                    place("thai-social", categories: ["Thai Restaurant"]),
                 ],
                 disclaimers: [],
                 isThin: false,
@@ -208,37 +249,16 @@ final class QuizSessionAssemblerTests: XCTestCase {
             "exactly one general (untagged) call")
     }
 
-    // MARK: - Q5 renders the fetched pool; spend cap respected
+    // MARK: - Q5 renders the factorial cards; spend cap respected
 
-    /// Q5's candidate list is drawn from the executor's unioned pool —
-    /// not the dummy fixture — and the rendered set respects the Q2
-    /// spend cap (the proxy honoring `price_tier` shows through).
-    func testQ5RendersTheFetchedPoolAndRespectsTheQ2SpendCap() async {
+    /// Q5's candidate list is the three `Q5FactorialCardGenerator` cards
+    /// selected from the executor's unioned pool — not the dummy fixture
+    /// — and the rendered set respects the Q2 spend cap (the proxy
+    /// honoring `price_tier` shows through). The default recording proxy
+    /// already returns a factorial-feasible (cuisine + vibe varied)
+    /// pool priced at the cap.
+    func testQ5RendersTheFactorialCardsAndRespectsTheQ2SpendCap() async {
         let proxy = RecordingProxyClient()
-        // The proxy honors the spend cap: it returns a venue priced AT
-        // the requested cap, and drops anything pricier. With cap = 2
-        // every returned venue is tier <= 2.
-        proxy.responseFor = { req in
-            let cap = req.filters?.priceTier ?? 4
-            let tag = req.filters?.cuisine ?? "general"
-            return PlacesProxyResponse(
-                places: [
-                    ShapedPlace(
-                        fsqPlaceId: "fsq-\(tag)",
-                        name: "Spot \(tag)",
-                        lat: 0, lng: 0,
-                        priceTier: cap,
-                        walkMinutesEstimate: 6,
-                        dietaryTags: [],
-                        hours: nil,
-                        photos: [],
-                        address: nil,
-                        categories: ["Diner"]
-                    ),
-                ],
-                disclaimers: [], isThin: false, servedFromCache: false
-            )
-        }
         let assembled = QuizSessionAssembler.assembleCoordinator(
             roomID: UUID(),
             userID: UUID(),
@@ -258,17 +278,20 @@ final class QuizSessionAssemblerTests: XCTestCase {
         await coord.awaitCandidateFetch()
 
         XCTAssertEqual(coord.q5CandidatesState, .ready)
-        XCTAssertFalse(coord.allCandidates.isEmpty,
-            "Q5 must render the fetched pool")
+        XCTAssertEqual(coord.allCandidates.count, 3,
+            "Q5 renders exactly the three factorial cards")
         let dummyIDs = Set(QuizDummyCandidates.all.map(\.id))
         for candidate in coord.allCandidates {
             XCTAssertFalse(dummyIDs.contains(candidate.id),
-                "Q5 candidates must come from the fetched pool, not the dummy fixture")
+                "Q5 candidates must be factorial cards from the fetched pool, not the dummy fixture")
             // Every fetched venue was priced at the cap (tier 2) — the
             // meta string therefore shows "$$".
             XCTAssertTrue(candidate.meta.contains("$$"),
                 "the Q2 spend cap (tier 2 → $$) must show through the rendered set")
         }
+        // The three rated venues key on real fsq ids.
+        XCTAssertEqual(Set(coord.allCandidates.map(\.id)).count, 3,
+            "the three factorial cards are distinct real venues")
     }
 
     // MARK: - pool starvation: three rateable rows, no stranded flow

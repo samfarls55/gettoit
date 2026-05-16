@@ -346,22 +346,28 @@ public final class QuizCoordinator {
     /// explicit-`candidates:` init (`candidateFetch` is nil) or when a
     /// fetch is already in flight / complete.
     ///
-    /// The fetch forwards the member's REAL Q1 craved cuisines + Q2
-    /// spend cap + the shared session parameters through
-    /// `FoursquareFetchExecutor` — never an empty `PlacesFilters()`.
+    /// The fetch forwards the member's REAL Q1-Q4 answers + the shared
+    /// session parameters. Q1 cuisines + Q2 spend cap drive the N+1
+    /// `FoursquareFetchExecutor` calls (never an empty `PlacesFilters()`);
+    /// TB-16 additionally forwards Q3 reputation + Q4 vibe so the
+    /// downstream factorial probe (`Q5FactorialCardGenerator`) can build
+    /// the member's `Q5MemberProfile`.
     private func startCandidateFetchIfNeeded() {
         guard let candidateFetch else { return }
         guard q5CandidatesState == .idle, fetchTask == nil else { return }
 
         q5CandidatesState = .loading
-        let cuisines = q1NoPreference ? [] : q1Cuisines.sorted()
-        let budgetTier = q2Budget
+        let answers = QuizFetchAnswers(
+            cuisines: q1NoPreference ? [] : q1Cuisines.sorted(),
+            budgetTier: q2Budget,
+            reputation: q3Reputation,
+            vibe: q4Vibe
+        )
         let parameters = sessionParameters
 
         fetchTask = Task { [weak self] in
             let result = await candidateFetch.fetchCandidates(
-                cuisines: cuisines,
-                budgetTier: budgetTier,
+                answers: answers,
                 parameters: parameters
             )
             guard let self else { return }
