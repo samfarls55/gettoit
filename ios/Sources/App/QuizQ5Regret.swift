@@ -1,12 +1,17 @@
-// GetToIt — Q5 · Regret rater (TB-04).
+// GetToIt — Q5 · Preference probe (TB-04 shell, TB-08 framing).
 //
-// 3 candidate cards × 5 regret buttons each. The only surface in the
-// system where multi-option rating is allowed. CTA flips to sun-yellow
-// `Drop the verdict` — telegraphs that the verdict is landing
-// (S03 §"Cross-quiz invariants").
+// 3 candidate cards × 5 excitement buttons each. The only surface in
+// the system where multi-option rating is allowed. CTA flips to
+// sun-yellow `Drop the verdict` — telegraphs that the verdict is
+// landing (S03 §"Cross-quiz invariants").
 //
-// TB-04 ships dummy candidates from `QuizDummyCandidates.all`. TB-06
-// wires the real survivor set from the VerdictEngine.
+// TB-08 (v1.1): Q5 is a preference *probe*, not a tiebreaker. The
+// member rates three real, strict-factorial candidate venues 1–5 on
+// **excitement** ("How excited does this make you?") — the surface
+// spec (`design-system/surfaces/03-quiz.md` §Q5) and the v1.1 PRD
+// fixed the framing as excitement, replacing the v1 "regret" wording.
+// Card selection is the `Q5FactorialCardGenerator`; the real venues
+// reach this view as `coordinator.allCandidates`.
 
 import SwiftUI
 
@@ -27,8 +32,8 @@ public struct QuizQ5Regret: View {
             // placeholder: marketing-branding pass
             QuizQuestionHeader(
                 index: 5,
-                title: "If we don't go here, how much would you mind?",
-                sub: "Three places cleared everyone's filters. Rate each."
+                title: "How excited does each of these make you?",
+                sub: "Three real spots near you. Rate each."
             )
 
             VStack(spacing: 12) {
@@ -67,13 +72,13 @@ public struct QuizQ5Regret: View {
 
             HStack {
                 // placeholder: marketing-branding pass
-                Text("DON'T MIND")
+                Text("NOT FOR ME")
                     .font(.system(size: 9, weight: .bold))
                     .tracking(0.12 * 9)
                     .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.6))
                 Spacer()
                 // placeholder: marketing-branding pass
-                Text("REALLY MIND")
+                Text("CAN'T WAIT")
                     .font(.system(size: 9, weight: .bold))
                     .tracking(0.12 * 9)
                     .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.6))
