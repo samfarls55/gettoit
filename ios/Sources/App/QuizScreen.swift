@@ -142,7 +142,24 @@ public struct QuizScreen: View {
         case .q4:
             QuizQ4Vibe(coordinator: coordinator)
         case .q5:
-            QuizQ5Regret(coordinator: coordinator, onSubmit: submitFromQ5)
+            // TB-15 (v1.1) — the per-member Foursquare fetch fires on
+            // the Q4 -> Q5 transition. While it is in flight Q5 shows a
+            // loading state; once the answer-tailored pool lands (or
+            // degrades to the dummy fixture) the rateable cards render.
+            if coordinator.q5CandidatesState == .loading {
+                VStack(spacing: GTISpacing.step3) {
+                    ProgressView()
+                        .tint(GTIColor.TextOnGradient.primary)
+                    Text("LINING UP SPOTS NEAR YOU")
+                        .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                        .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityIdentifier("quiz.q5.loading")
+            } else {
+                QuizQ5Regret(coordinator: coordinator, onSubmit: submitFromQ5)
+            }
         case .submitting:
             VStack(spacing: GTISpacing.step3) {
                 ProgressView()

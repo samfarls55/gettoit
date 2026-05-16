@@ -1,7 +1,7 @@
 ---
 issue: tb-15
 title: Wire the answer-tailored Foursquare fetch into the live quiz
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 92
 prd: v1.1-quiz-redesign-prd
@@ -39,3 +39,17 @@ This slice keeps Q5's existing flat presentation (the factorial selection is the
 ## Blocked by
 
 None — can start immediately. End-to-end verification against live Foursquare data depends on [[tb-14-restore-placesproxy-foursquare-path|TB-14 (v1.1)]]; the boundary tests do not.
+
+## Comments
+
+**2026-05-16 — done (PR #97).** The per-member Foursquare fetch now fires from the `QuizCoordinator` step machine on the Q4 → Q5 transition, not on the pre-quiz assembler seam.
+
+- New `QuizCandidateFetch` protocol is the trigger seam. `FoursquareQuizCandidateFetch` (production) wraps the tb-07 `FoursquareFetchExecutor` — it plans + runs the N+1 answer-tailored calls and shapes the unioned, deduped venue pool into Q5's `[QuizCandidate]` list. `DummyQuizCandidateFetch` covers the no-coordinate path.
+- `QuizCoordinator` gained a second, live-quiz init taking a `candidateFetch`; the candidate list starts empty and is populated when the fetch resolves. `q5CandidatesState` (`idle` / `loading` / `ready` / `fallbackDummy`) tracks the lifecycle. The member's real Q1 cuisines + Q2 spend cap + session parameters forward to the fetch. The legacy explicit-`candidates:` init is kept fetch-free for the unit/snapshot harness.
+- `QuizSessionAssembler` no longer fetches — it wires the fetch onto the coordinator and returns synchronously.
+- `QuizScreen` renders a Q5 loading state while the fetch is in flight (existing on-gradient tokens, no new tokens).
+- The bug-03 early-fetch path is removed: `Q5CandidatesLoader.load(near:)` (one early `PlacesService.fetchPlaces` with an empty `PlacesFilters()`) is gone. `Q5CandidatesLoader` is now a pure shaping namespace (`shapeCandidates` / `metaString`), still reused by `FoursquareQuizCandidateFetch` and `Q5FactorialCardGenerator`.
+
+Boundary tests (`QuizSessionAssemblerTests`, `QuizCandidateFetchTests`, recording `PlacesProxyClient`): zero proxy calls before Q4, the N+1 calls fire on Q4 → Q5 with the member's answers forwarded intact, the Q2 spend cap shows through the rendered set, and genuine pool starvation still leaves Q5 with three rateable rows.
+
+iOS test suite verified by CI (no local Xcode toolchain in the agent environment).
