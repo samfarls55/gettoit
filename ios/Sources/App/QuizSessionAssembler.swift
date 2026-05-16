@@ -44,6 +44,7 @@ public enum QuizSessionAssembler {
         userID: UUID,
         coordinate: CLLocationCoordinate2D?,
         radiusMeters: Int,
+        sessionParameters: SessionParameters = .default,
         places: PlacesService,
         writer: @escaping QuizVoteWriter
     ) async -> Assembled {
@@ -57,10 +58,14 @@ public enum QuizSessionAssembler {
                 source: .fallbackDummy
             )
         }
+        // TB-05 (v1.1) — the session parameters are carried onto the
+        // coordinator so every member's quiz (initiator or joiner)
+        // runs against the same initiator-set bucket.
         let coordinator = QuizCoordinator(
             roomID: roomID,
             userID: userID,
             candidates: loaded.candidates,
+            sessionParameters: sessionParameters,
             writer: writer
         )
         return Assembled(coordinator: coordinator, loadedSource: loaded.source)

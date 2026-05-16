@@ -47,6 +47,14 @@ public struct RootView: View {
     @State private var deepLink: InviteLink.Payload?
     @State private var activeQuiz: QuizContext?
     @State private var readOnlyView: ReadOnlyContext?
+    /// TB-05 (v1.1) — set when the initiator finishes S01 (room
+    /// created, link dropped or solo) and the pre-quiz S01b parameters
+    /// surface should render before the quiz starts. Cleared when the
+    /// initiator persists the parameters and `startQuiz` fires. A
+    /// JOINER never gets a `ParametersContext` — joiners read the
+    /// initiator's parameters off the room and skip straight to the
+    /// quiz.
+    @State private var pendingParameters: ParametersContext?
     /// TB-11 — re-invite prefill carried through from a read-only
     /// landing. When the late-joiner taps "Start a new decision",
     /// the InitiatorScreen opens with these values pre-populated
@@ -154,6 +162,28 @@ public struct RootView: View {
                             deepLink = nil
                         }
                     )
+                } else if let parameters = pendingParameters {
+                    // TB-05 (v1.1) — S01b pre-quiz parameters surface.
+                    // The initiator just finished S01 (room created);
+                    // S01b captures the session-wide parameters bucket
+                    // and persists it onto the room before the quiz
+                    // starts. On Continue the parameters are written
+                    // and `startQuiz` fires.
+                    ParametersScreen(
+                        roomID: parameters.roomID,
+                        roomStore: coordinators.roomStore,
+                        locationName: coordinators.locationCoordinator.place?.name,
+                        initialParameters: SessionParameters.default,
+                        onContinue: {
+                            self.pendingParameters = nil
+                            startQuiz(
+                                roomID: parameters.roomID,
+                                userID: parameters.userID,
+                                client: coordinators.client,
+                                invitedShared: parameters.invitedShared
+                            )
+                        }
+                    )
                 } else if let payload = deepLink {
                     JoinScreen(
                         payload: payload,
@@ -211,19 +241,27 @@ public struct RootView: View {
                             prefilledTimerMinutes: reInvitePrefill?.timerMinutes,
                             prefilledRadiusMiles: reInvitePrefill?.radiusMiles,
                             onSharedRoom: { roomID in
-                                // Clearing `reInvitePrefill` /
-                                // `showingInitiator` is deferred into
-                                // `startQuiz` so the swap to QuizScreen
-                                // is atomic — otherwise the async places
-                                // fetch leaves a window where the
-                                // precedence chain falls through to S00
-                                // Landing and the user sees a flash of
-                                // the landing surface between S01 and
-                                // the quiz.
-                                startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: true)
+                                // TB-05 (v1.1) — the initiator's S01
+                                // CTA now routes into the S01b
+                                // pre-quiz parameters surface rather
+                                // than straight to the quiz. S01b
+                                // persists the parameters bucket and
+                                // its Continue handler fires
+                                // `startQuiz`. `showingInitiator` /
+                                // `reInvitePrefill` are torn down in
+                                // `startQuiz` so the swap stays atomic.
+                                self.pendingParameters = ParametersContext(
+                                    roomID: roomID,
+                                    userID: userID,
+                                    invitedShared: true
+                                )
                             },
                             onSoloRoom: { roomID in
-                                startQuiz(roomID: roomID, userID: userID, client: coordinators.client, invitedShared: false)
+                                self.pendingParameters = ParametersContext(
+                                    roomID: roomID,
+                                    userID: userID,
+                                    invitedShared: false
+                                )
                             },
                             onSettings: {
                                 showingSettings = true
@@ -403,6 +441,13 @@ public struct RootView: View {
                 userID: userID,
                 coordinate: resolved?.coordinate,
                 radiusMeters: resolved?.radiusMeters ?? RoomStore.defaultRadiusMeters,
+                // TB-05 (v1.1) — hydrate the session parameters from
+                // the room. On the joiner path this is the initiator's
+                // S01b bucket read back off `rooms.session_params`, so
+                // the joiner's quiz runs against the same parameters
+                // without re-prompting. Falls back to the canonical
+                // defaults when the column is NULL / room unreadable.
+                sessionParameters: resolved?.sessionParameters ?? SessionParameters.default,
                 places: places,
                 writer: QuizSupabaseWriter.make(client: client)
             )
@@ -437,10 +482,15 @@ public struct RootView: View {
     /// Returns nil only when the room row is missing or unreadable
     /// (RLS deny on a stale routing) - the caller falls back to dummy
     /// candidates rather than block the user mid-flow.
+    ///
+    /// TB-05 (v1.1) — also carries the room's `session_params` so the
+    /// joiner path hydrates the initiator's parameters bucket off the
+    /// same single room fetch (no extra round-trip). NULL column /
+    /// unreadable room → `SessionParameters.default`.
     private func resolvePlacesQuery(
         roomID: UUID,
         coordinators: Coordinators
-    ) async -> (coordinate: CLLocationCoordinate2D, radiusMeters: Int)? {
+    ) async -> (coordinate: CLLocationCoordinate2D, radiusMeters: Int, sessionParameters: SessionParameters)? {
         let room: RoomStore.Room?
         do {
             room = try await coordinators.roomStore.fetchRoom(id: roomID)
@@ -448,9 +498,10 @@ public struct RootView: View {
             room = nil
         }
         let radiusMeters = room?.radiusMeters ?? RoomStore.defaultRadiusMeters
+        let sessionParameters = room?.sessionParameters ?? SessionParameters.default
 
         if let place = coordinators.locationCoordinator.place {
-            return (place.coordinate, radiusMeters)
+            return (place.coordinate, radiusMeters, sessionParameters)
         }
         if let location = room?.location {
             // Joiner path: hydrate the coordinator from the initiator's
@@ -468,7 +519,7 @@ public struct RootView: View {
                 source: location.source == .gps ? .gps : .manual
             )
             coordinators.locationCoordinator.commit(place: resolved)
-            return (coordinate, radiusMeters)
+            return (coordinate, radiusMeters, sessionParameters)
         }
         return nil
     }
@@ -487,6 +538,15 @@ public struct RootView: View {
         /// resolved place flow from the pre-prime into the initiator
         /// surface without re-instantiating CLLocationManager.
         let locationCoordinator: LocationCoordinator
+    }
+
+    /// TB-05 (v1.1) — carries the room + user from the S01 CTA into
+    /// the S01b parameters surface, plus the `invitedShared` flag the
+    /// post-Q5 router needs once the quiz starts.
+    private struct ParametersContext {
+        let roomID: UUID
+        let userID: UUID
+        let invitedShared: Bool
     }
 
     private struct QuizContext {
