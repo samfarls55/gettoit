@@ -18,6 +18,7 @@ Product vision, decisions, feature context.
 - [[verdict-screen-spec]] — P3 synthesis. Verdict-screen copy framework, ratification UX, distribution rule (NEED-then-EQUALITY, never EQUITY).
 - [[v1-design-locks]] — The four research-brief deliverables locked: quiz length (5), signal type, tiebreaker rule, verdict-screen copy framework.
 - [[questions-profile-vs-session-split]] — v1.1 rule for which inputs live on the account (profile) vs are asked every run (session). Source of truth for v1.1 #9.
+- [[v1.1-quiz-amendments]] — v1.1 quiz redesign: three-bucket model, the 5 questions, Q5 preference probe, satisficing + maximin verdict engine. Amends [[v1-design-locks]].
 - [[research/decision-simplification-frameworks/report|research/decision-simplification-frameworks/]] — P1 raw research archive: 6 framework JSONs + outline + synthesized report. Source for [[framework-comparison]].
 - [[research/paralysis-causes/report|research/paralysis-causes/]] — P2 raw research archive: 6 paralysis-cause JSONs + outline + synthesized report. Source for [[paralysis-cause-priority]].
 - [[research/group-fairness-procedural-justice/report|research/group-fairness-procedural-justice/]] — P3 raw research archive: 7 fairness-construct JSONs + outline + synthesized report. Source for [[verdict-screen-spec]].

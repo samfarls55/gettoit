@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
-purpose: v1.1 follow-up issues from 2026-05-14 TestFlight dogfood — bugs against shipped v1 + missing-surface work + product decisions
-status: 11 issues published 2026-05-14 (GitHub #41–#51); sg-03 closed 2026-05-14
+purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
+status: 11 dogfood issues published 2026-05-14 (GitHub #41–#51); 11 quiz-redesign issues published 2026-05-15 (GitHub #64–#74)
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -25,7 +25,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | bug-03 | [[issues/bug-03-q5-placeholder-no-foursquare-calls\|Q5 placeholders, zero Foursquare calls — wire PlacesService into Q5]] (ready-for-human) | AFK | [#43](https://github.com/samfarls55/gettoit/issues/43) | — |
 | bug-04 | [[issues/bug-04-question-transition-motion-lag\|Question transition motion lag]] ⏳ ready-for-human | AFK | [#44](https://github.com/samfarls55/gettoit/issues/44) | — |
 | bug-05 | [[issues/bug-05-info-plist-missing-location-purpose-string\|Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125]] | AFK | — | — |
-| bug-06 | [[issues/bug-06-legacy-anon-bypasses-s00a-gate\|Legacy v1 anonymous session bypasses S00a sign-in gate on launch]] ⏳ ready-for-human | AFK | [#63](https://github.com/samfarls55/gettoit/issues/63) | — |
+| bug-06 | [[issues/bug-06-legacy-anon-bypasses-s00a-gate\|Legacy v1 anonymous session bypasses S00a sign-in gate on launch]] ready-for-agent | AFK | [#63](https://github.com/samfarls55/gettoit/issues/63) | — |
 
 ### Spec gaps
 
@@ -61,6 +61,27 @@ v1.1 introduces one new artifact kind beyond v1's existing taxonomy:
 - `bug` *(new)* — defect against shipped v1 functionality. No spec change required; localized code fix.
 - `tracer-bullet` *(existing)* — vertical build slice for new functionality.
 - `spec-gap` *(existing)* — change to the locked `design-system/` spec.
+- `research` *(new)* — research spike that ships a vault doc, not code.
+
+## Quiz redesign & verdict engine (PRD 2026-05-15)
+
+Build slices decomposed from [[../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Redesign & Verdict Engine PRD]] via `/to-issues` on 2026-05-15. Vertical capability slices — all AFK. Canonical design record: [[../../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]].
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| research-01 | [[issues/research-01-foursquare-filter-surface\|Foursquare filter-surface + venue-metadata research]] | AFK | [#64](https://github.com/samfarls55/gettoit/issues/64) | — |
+| tb-04 | [[issues/tb-04-votes-jsonb-schema\|Generic votes Q1..Q5 jsonb schema + engine mapping layer]] | AFK | [#65](https://github.com/samfarls55/gettoit/issues/65) | — |
+| tb-05 | [[issues/tb-05-pre-quiz-parameters-surface\|Pre-quiz parameters setup surface]] | AFK | [#66](https://github.com/samfarls55/gettoit/issues/66) | tb-04 |
+| tb-06 | [[issues/tb-06-quiz-q1-q4-rework\|Quiz Q1-Q4 rework — four new input surfaces]] | AFK | [#67](https://github.com/samfarls55/gettoit/issues/67) | tb-04 |
+| tb-07 | [[issues/tb-07-per-member-foursquare-fetch\|Per-member real Foursquare fetch + Q1-Q4 trigger]] | AFK | [#68](https://github.com/samfarls55/gettoit/issues/68) | research-01, tb-04, tb-06 |
+| tb-08 | [[issues/tb-08-q5-factorial-probe\|Q5 factorial preference probe over real venues]] | AFK | [#69](https://github.com/samfarls55/gettoit/issues/69) | research-01, tb-04, tb-07 |
+| tb-09 | [[issues/tb-09-preference-function-axis-scorers\|Preference function + axis scorers]] | AFK | [#70](https://github.com/samfarls55/gettoit/issues/70) | research-01, tb-08 |
+| tb-10 | [[issues/tb-10-running-union-pool-manager\|Running-union candidate pool manager]] | AFK | [#71](https://github.com/samfarls55/gettoit/issues/71) | tb-07, tb-09 |
+| tb-11 | [[issues/tb-11-verdict-engine-rewrite\|Worst-off-protecting verdict engine rewrite]] | AFK | [#72](https://github.com/samfarls55/gettoit/issues/72) | tb-04, tb-10 |
+| tb-12 | [[issues/tb-12-profile-vetoes\|Profile vetoes — account allergy/dietary/NEVERS storage]] | AFK | [#73](https://github.com/samfarls55/gettoit/issues/73) | tb-11 |
+| tb-13 | [[issues/tb-13-verdict-firing-q5-complete\|Verdict firing on the new Q5-complete signal]] | AFK | [#74](https://github.com/samfarls55/gettoit/issues/74) | tb-08, tb-11 |
+
+Build order: research-01 first (blocks all Foursquare work), then tb-04 → tb-13 along the dependency graph above.
 
 ## Cross-references
 
