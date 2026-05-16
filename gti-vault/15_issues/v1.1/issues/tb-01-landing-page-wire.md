@@ -2,7 +2,7 @@
 issue: tb-01
 title: Wire landing surface into iOS — route to existing Pick a Vertical
 github_issue: 49
-status: ready-for-human
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd

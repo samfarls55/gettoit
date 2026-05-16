@@ -8,14 +8,14 @@ created: 2026-05-08
 
 # Decision Model
 
-How a single group decision flows end-to-end. Mechanic-level details (exact question content, signal type) are gated on research — see [[research-brief]].
+How a single group decision flows end-to-end. The mechanic-level details below (quiz length, signal type, aggregation, tiebreaker) were locked 2026-05-08 in [[v1-design-locks]] and amended for v1.1 in [[v1.1-quiz-amendments]] — those two docs are the source of truth for the mechanics; this doc records the flow.
 
 ## Flow at a glance
 
 1. **Initiator** opens app, picks vertical (food / activities / bars), starts a decision.
 2. App generates an **invite link**. Initiator drops it in a group chat (iMessage / WhatsApp / etc).
 3. **Invitees** open link. Web fallback works for non-installers; native app preferred.
-4. Each participant answers a fixed-length quiz (provisional: 5 questions).
+4. Each participant answers a fixed-length quiz (5 questions — [[v1-design-locks]] Lock 1).
 5. App pulls candidate options from **external data** for the chosen vertical.
 6. App aggregates answers, filters and ranks options, returns a **single verdict**.
 7. Group sees verdict. They either commit, or trigger a **reroll-with-reason**.
@@ -27,12 +27,9 @@ How a single group decision flows end-to-end. Mechanic-level details (exact ques
 
 ## The quiz
 
-- Length: provisional 5 questions. Final count TBD pending [[research-brief|research]] on cognitive load and existing simplification frameworks.
-- Signal extracted: TBD pending research. Candidate signal types under evaluation:
-	- Constraint / hard filter (dietary, budget, distance)
-	- Mood / vibe state (energy, adventurous vs. comfort)
-	- Forced trade-off preferences (cheap vs. close, new vs. reliable)
-	- Veto map (each person's hard-no's + soft-yeses)
+- Length: 5 questions, locked in [[v1-design-locks]] Lock 1. Re-evaluate after the first beta cohort.
+- Signal type, locked in [[v1-design-locks]] Lock 2: hard vetoes / constraints (primary) → cardinal preference intensity on one axis (secondary) → commitment lock (tertiary).
+- **v1.1 amendment** ([[v1.1-quiz-amendments]]): the question set was redesigned into a three-bucket input model (profile / parameters / questions). The five questions are now cuisine craving, spend cap, reputation/discovery, vibe energy, and a Q5 preference probe over real candidate venues. Q5's role shifted from "tiebreaker scalar" to "preference probe."
 - Aggregation philosophy locks the question design: questions must elicit BOTH dealbreakers AND preferences (see Aggregation below).
 
 ## Option source
@@ -47,13 +44,13 @@ Each vertical = its own integration:
 
 ## Aggregation
 
-**Veto-respecting + majority.**
+**Veto-respecting + satisficing, with a worst-off-protecting tiebreak.** Locked in [[v1-design-locks]] Lock 3; realized for v1.1 per [[v1.1-quiz-amendments]] §4 and [[60_engineering/adr/0011-worst-off-protecting-verdict-engine|ADR 0011]].
 
-1. Hard-no signals from any participant filter the candidate pool (e.g., "no spicy" eliminates spicy options).
-2. Among surviving options, majority preference wins.
-3. Tiebreakers: TBD pending research on group fairness / procedural justice.
+1. **EBA prune** — hard-no signals from any participant filter the candidate pool (dietary, budget cap, cuisine NEVERS).
+2. **Satisficing floor** — among survivors, keep options every member scores at or above an acceptability threshold.
+3. **Maximin tiebreak** — pick the option with the best worst-case (highest minimum) member score, protecting the worst-off member. Not a majority or sum vote: a polarizing higher-sum pick loses to a worst-off-protecting one.
 
-Why this philosophy: matches how real groups actually decide — dealbreakers come first, taste second. Defensible when verdict is explained.
+Why this philosophy: matches how real groups actually decide — dealbreakers come first, taste second — and a worst-off-protecting tiebreak prevents the quiet-defection backfire a majority/sum rule invites. Defensible when the verdict is explained.
 
 ## Output
 
@@ -75,8 +72,8 @@ This turns rejection into signal, feeds future preference learning (see [[v1-sco
 
 ## Group memory
 
-- v1: app remembers persistent groups ("Friday crew") + decision history. One-tap re-invite same group.
-- v1 instruments preference data for future ML.
+- Persistent groups were **cut from v1** ([[v1-design-locks]] §"Resolved 2026-05-12"). The group-chat thread the invite link is dropped into is the persistent group; there is no in-app "Friday crew" or one-tap re-invite.
+- Decision history is **backend-only** in v1 — recorded for future preference learning, but with no UI surface.
 - Aspirational endpoint: full per-user and per-group preference learning. Out of v1 scope — see [[v1-scope]].
 
 ## Verification

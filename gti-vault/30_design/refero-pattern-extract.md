@@ -2,7 +2,7 @@
 title: Refero Pattern Extract — Quiz + Verdict Loop
 description: Common UI/UX patterns observed in Refero across iOS quiz, verdict-reveal, group-lobby, and result-card flows. Feeds the v1 prototype directions.
 type: research-extract
-status: draft
+status: superseded
 created: 2026-05-12
 related:
   - "[[frontend-design-brief]]"
@@ -11,6 +11,8 @@ related:
 ---
 
 # Refero Pattern Extract — Quiz + Verdict Loop
+
+> **Superseded — design exploration archived.** These patterns fed the v1 prototype directions; the chosen direction (Sunset Pop) shipped as the `design-system/` package. Kept as a historical record.
 
 Patterns harvested from Refero screen + flow search for the surfaces GetToIt v1 needs: quiz (5 questions, one-decision-per-screen) and verdict reveal (single recommendation, copy-framework-locked). Apps cited are reference points, not models to copy.
 

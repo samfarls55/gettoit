@@ -12,7 +12,7 @@ Architecture, conventions, runbooks, ADRs.
 - [[adr/_index|adr/]] — Architecture Decision Records (one file per decision, numbered from `0001`).
 - [[research/_index|research/]] — Time-stamped research bundles that feed ADRs (outline + fields + deep-research outputs).
 - [[stack-patterns|stack-patterns.md]] — Implementation patterns implied by the current stack (cross-references the active ADR).
-- [[verdict-engine|verdict-engine.md]] — VerdictEngine architecture, EBA order, anonymization rules, and the canon for TB-06's clean-run path.
+- [[verdict-engine|verdict-engine.md]] — VerdictEngine architecture: the v1.1 worst-off-protecting pipeline (EBA prune + satisficing floor + maximin tiebreak), anonymization rules, Q5-complete firing, and the compute-verdict Edge Function.
 - [[waiting-fire-trigger|waiting-fire-trigger.md]] — TB-07's S04 Waiting surface, Realtime wiring, verdict-fire trigger + pg_cron auto-fire path, expired-no-quorum terminal.
 - [[ratification-push-hardclose|ratification-push-hardclose.md]] — TB-08's "I'm in" ratification, push permission prompt (once per session), correctability window + S06 hard-close shutter motion, APNsSender Edge Function with ES256 JWT signing.
 - [[checkin-telemetry|checkin-telemetry.md]] — TB-14's next-day check-in (S08), CheckinScheduler pg_cron + exactly-once `checkin_dispatches` table, 3-day-no-signal sweeper, TelemetryWriter module + event vocabulary, and the three SQL metric views (`metric_follow_through_pct`, `metric_time_to_verdict_p50`, `metric_invite_acceptance`).

@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: 11 dogfood issues published 2026-05-14 (GitHub #41–#51); 11 quiz-redesign issues published 2026-05-15 (GitHub #64–#74)
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -20,19 +20,19 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| bug-01 | [[issues/bug-01-invite-link-404\|Invite link 404 + AASA regression test]] (ready-for-human) | AFK | [#41](https://github.com/samfarls55/gettoit/issues/41) | — |
-| bug-02 | [[issues/bug-02-static-og-image-placeholder\|Static placeholder OG image + meta tags]] (ready-for-human) | AFK | [#42](https://github.com/samfarls55/gettoit/issues/42) | — |
-| bug-03 | [[issues/bug-03-q5-placeholder-no-foursquare-calls\|Q5 placeholders, zero Foursquare calls — wire PlacesService into Q5]] (ready-for-human) | AFK | [#43](https://github.com/samfarls55/gettoit/issues/43) | — |
-| bug-04 | [[issues/bug-04-question-transition-motion-lag\|Question transition motion lag]] ⏳ ready-for-human | AFK | [#44](https://github.com/samfarls55/gettoit/issues/44) | — |
-| bug-05 | [[issues/bug-05-info-plist-missing-location-purpose-string\|Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125]] | AFK | — | — |
+| bug-01 | [[issues/bug-01-invite-link-404\|Invite link 404 + AASA regression test]] ✅ done | AFK | [#41](https://github.com/samfarls55/gettoit/issues/41) | — |
+| bug-02 | [[issues/bug-02-static-og-image-placeholder\|Static placeholder OG image + meta tags]] ✅ done | AFK | [#42](https://github.com/samfarls55/gettoit/issues/42) | — |
+| bug-03 | [[issues/bug-03-q5-placeholder-no-foursquare-calls\|Q5 placeholders, zero Foursquare calls — wire PlacesService into Q5]] ✅ done | AFK | [#43](https://github.com/samfarls55/gettoit/issues/43) | — |
+| bug-04 | [[issues/bug-04-question-transition-motion-lag\|Question transition motion lag]] ✅ done | AFK | [#44](https://github.com/samfarls55/gettoit/issues/44) | — |
+| bug-05 | [[issues/bug-05-info-plist-missing-location-purpose-string\|Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125]] — fixed-in-branch (not filed to GitHub) | AFK | — | — |
 | bug-06 | [[issues/bug-06-legacy-anon-bypasses-s00a-gate\|Legacy v1 anonymous session bypasses S00a sign-in gate on launch]] ✅ done | AFK | [#63](https://github.com/samfarls55/gettoit/issues/63) | — |
 
 ### Spec gaps
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| sg-01 | [[issues/sg-01-on-gradient-subheader-contrast\|On-gradient subheader contrast token fix]] | AFK | [#45](https://github.com/samfarls55/gettoit/issues/45) | — |
-| sg-02 | [[issues/sg-02-landing-page-surface\|Landing page surface (two-button)]] | AFK | [#46](https://github.com/samfarls55/gettoit/issues/46) | — |
+| sg-01 | [[issues/sg-01-on-gradient-subheader-contrast\|On-gradient subheader contrast token fix]] ✅ done | AFK | [#45](https://github.com/samfarls55/gettoit/issues/45) | — |
+| sg-02 | [[issues/sg-02-landing-page-surface\|Landing page surface (two-button)]] ✅ done | AFK | [#46](https://github.com/samfarls55/gettoit/issues/46) | — |
 | sg-03 | [[issues/sg-03-account-creation-surfaces\|Forced first-launch sign-in + waiting-screen download CTA]] ✅ done | AFK | [#47](https://github.com/samfarls55/gettoit/issues/47) | — |
 | sg-04 | [[issues/sg-04-geo-permission-and-location-selector\|Geo permission + location selector — C-23 LocationPicker]] ✅ done | AFK | [#48](https://github.com/samfarls55/gettoit/issues/48) | — |
 
@@ -41,8 +41,8 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
 | TB-01 (v1.1) | [[issues/tb-01-landing-page-wire\|Wire landing surface into iOS]] ✅ done | AFK | [#49](https://github.com/samfarls55/gettoit/issues/49) | sg-02 |
-| TB-02 (v1.1) | [[issues/tb-02-account-creation-wire\|Wire forced sign-in (iOS) + waiting-screen CTA (web)]] ⏳ ready-for-human | AFK | [#50](https://github.com/samfarls55/gettoit/issues/50) | sg-03 |
-| TB-03 (v1.1) | [[issues/tb-03-geo-permission-and-location-selector-wire\|Wire geo permission + location selector]] | AFK | [#51](https://github.com/samfarls55/gettoit/issues/51) | sg-04 |
+| TB-02 (v1.1) | [[issues/tb-02-account-creation-wire\|Wire forced sign-in (iOS) + waiting-screen CTA (web)]] ✅ done | AFK | [#50](https://github.com/samfarls55/gettoit/issues/50) | sg-03 |
+| TB-03 (v1.1) | [[issues/tb-03-geo-permission-and-location-selector-wire\|Wire geo permission + location selector]] ✅ done | AFK | [#51](https://github.com/samfarls55/gettoit/issues/51) | sg-04 |
 
 ### Dependency notes
 
@@ -204,4 +204,4 @@ Triage these when planning the milestone after v1.1 ships. Not appropriate to fi
 ## Completed prerequisites (2026-05-14)
 
 - **[[../../50_product/questions-profile-vs-session-split|50_product/questions-profile-vs-session-split.md]]** written — the #9 decision note recording the split rule (identity/body/values vs right-now context), the P/S tagging, the v1.1 deferrals (distance, time), and the future passive-learning direction.
-- 11 issues published to vault + GitHub (#41–#51); see [[#Published issues]] for the table.
+- 11 issues published to vault + GitHub (#41–#51) in the initial 2026-05-14 batch. `bug-05` (ITMS-90683, never filed to GitHub) and `bug-06` (#63) were filed afterward — see [[#Published issues]] for the full 13-issue table.

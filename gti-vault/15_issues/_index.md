@@ -19,4 +19,8 @@ See `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md` for the fu
 ## Features
 
 - [[v1/_index|v1]] — v1 PRD implementation issues. Tracer-bullet build slices (`tb-00`–`tb-17`) + design-system spec-gap issues (S01 controls, S04 Decide-now, S05 read-only, S05 no-survivor, Foursquare tag research). PRD at [[../10_prds/v1-prd|10_prds/v1-prd.md]].
-- [[v1.1/_index|v1.1]] — dogfood follow-ups from 2026-05-14 TestFlight first-install. 11 issues published 2026-05-14 (GitHub #41–#51): 4 bugs (`bug-01`–`bug-04`), 4 spec-gaps (`sg-01`–`sg-04`), 3 tracer-bullets (`tb-01`–`tb-03`). Two candidates (#2b dynamic OG card, #10 allergy/dietary capture) deferred to the pre-public-launch milestone. Plus the 2026-05-15 quiz-redesign & verdict-engine PRD build slices — 11 vertical AFK issues (`research-01`, `tb-04`–`tb-13`; GitHub #64–#74) from [[../10_prds/v1.1-quiz-redesign-prd|v1.1-quiz-redesign-prd.md]].
+- [[v1.1/_index|v1.1]] — dogfood follow-ups from the 2026-05-14 TestFlight first-install, plus the 2026-05-15 quiz-redesign build slices. **Dogfood batch:** 6 bugs (`bug-01`–`bug-06`), 4 spec-gaps (`sg-01`–`sg-04`), 3 tracer-bullets (`tb-01`–`tb-03`). The initial publish on 2026-05-14 was 11 issues (GitHub #41–#51); `bug-05` (ITMS-90683 location-purpose string) and `bug-06` (#63, legacy-anon S00a bypass) were filed afterward. Two candidates (#2b dynamic OG card, #10 allergy/dietary capture) deferred to the pre-public-launch milestone. **Quiz-redesign batch:** 11 vertical AFK issues (`research-01`, `tb-04`–`tb-13`; GitHub #64–#74) from [[../10_prds/v1.1-quiz-redesign-prd|v1.1-quiz-redesign-prd.md]].
+
+## Runs
+
+- [[_runs/_index|_runs/]] — AFK execution run logs from `/execute-issues`. One file per run, named `<YYYY-MM-DD-HHmm>-afk-execution-log.md`.

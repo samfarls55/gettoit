@@ -2,7 +2,7 @@
 issue: sg-01
 title: On-gradient subheader contrast — token-level fix for white subheader on yellow gradient
 github_issue: 45
-status: ready-for-human
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd

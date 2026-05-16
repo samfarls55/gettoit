@@ -2,7 +2,7 @@
 issue: bug-03
 title: Q5 (Regret?) shows placeholder options — diagnose why PlacesService never calls Foursquare
 github_issue: 43
-status: ready-for-human
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd

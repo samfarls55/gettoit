@@ -2,7 +2,7 @@
 title: Frontend Design Brief — GetToIt v1
 description: One-page brief for kicking off frontend design exploration. Concept, key screens, voice, must-haves, anti-patterns.
 type: brief
-status: draft
+status: superseded
 created: 2026-05-08
 related:
   - "[[50_product/north-star]]"
@@ -12,6 +12,8 @@ related:
 ---
 
 # Frontend Design Brief — GetToIt v1
+
+> **Superseded — design exploration archived.** The design work this brief kicked off shipped as the `design-system/` package (Sunset Pop). Kept as a historical record of the kickoff brief.
 
 ## What it is
 

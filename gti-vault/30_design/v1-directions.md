@@ -2,16 +2,18 @@
 title: v1 Design Directions — Three Aesthetics
 description: Three aesthetic directions for the v1 food vertical, all using the same locked quiz + verdict mechanic. Built as a Next.js prototype at design-prototype/.
 type: design-exploration
-status: draft
+status: superseded
 created: 2026-05-12
 related:
   - "[[frontend-design-brief]]"
   - "[[refero-pattern-extract]]"
   - "[[v1-design-locks]]"
-  - "[[60_engineering/adr/0001-v1-stack]]"
+  - "[[60_engineering/adr/0001-ios-tech-stack-supabase]]"
 ---
 
 # v1 Design Directions — Three Aesthetics
+
+> **Superseded — design exploration archived.** Direction C (Sunset Pop) was chosen and built out as the full design system at `design-system/` (repo root). The `design-prototype/` Next.js app the "How to view" steps below describe no longer exists. Kept as a historical record of the three-direction exploration.
 
 Same flow (5-question quiz → verdict), three visual personalities. Each draws from a distinct Refero pattern family (see [[refero-pattern-extract]]).
 
@@ -32,7 +34,7 @@ Routes:
 
 The prototype renders inside an iPhone 14-sized frame on a dark stage so the design reads at the right scale.
 
-> **Prototype only.** v1 ships native iOS in Swift + SwiftUI per [[60_engineering/adr/0001-v1-stack|ADR 0001]]. Web prototype is for design exploration; component decisions translate to SwiftUI in implementation.
+> **Prototype only.** v1 ships native iOS in Swift + SwiftUI per [[60_engineering/adr/0001-ios-tech-stack-supabase|ADR 0001]]. Web prototype is for design exploration; component decisions translate to SwiftUI in implementation.
 
 ## Direction A — Warm Receipt
 
@@ -97,5 +99,5 @@ The prototype renders inside an iPhone 14-sized frame on a dark stage so the des
 ## Next session
 
 1. Lock direction (or hybrid).
-2. Translate locked direction to SwiftUI tokens (colors, typography, spacing scale) in [[60_engineering/swiftui-tokens]] (not yet written).
+2. Translate locked direction to SwiftUI tokens (colors, typography, spacing scale).
 3. Design the 5 remaining surfaces (initiator, invite, waiting, reroll, check-in) in the locked direction.

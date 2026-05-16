@@ -1,179 +1,175 @@
 ---
 folder: 60_engineering
-purpose: Server-authoritative VerdictEngine — architecture, edge cases, anonymization rules
+purpose: Server-authoritative VerdictEngine — v1.1 worst-off-protecting pipeline, edge cases, anonymization rules
 ---
 
-# VerdictEngine — TB-06 clean-run
+# VerdictEngine — v1.1 worst-off-protecting pipeline
 
 Server-authoritative engine that turns a room's `votes` + `options` into a single `verdicts` row plus `option_cuts` rows. The S05 surface reads the engine's output; the iOS client never recomputes a verdict.
 
+The current engine is the v1.1 rewrite shipped by [[../15_issues/v1.1/issues/tb-11-verdict-engine-rewrite|tb-11]] under [[adr/0011-worst-off-protecting-verdict-engine|ADR 0011]]. It **replaces** the v1 TB-06 engine (EBA prune + regret-of-omission sum tiebreaker) entirely — see §"What changed from v1" at the bottom.
+
 ## Where the canonical code lives
 
-- **Engine logic** — `supabase/functions/_shared/verdict-engine.ts` (pure functions).
-- **Edge Function** — `supabase/functions/compute-verdict/` (handler + index, supabase-js adapter).
-- **Schema** — `supabase/migrations/20260513220000000_verdicts_and_cuts.sql`.
+- **Engine logic** — `supabase/functions/_shared/verdict-engine.ts` (pure functions, `computeVerdict()`).
+- **Edge Function** — `supabase/functions/compute-verdict/` (`handler.ts` + `index.ts`, supabase-js adapter).
+- **Schema mapping layer** — `supabase/functions/_shared/votes-schema.ts` ([[../15_issues/v1.1/issues/tb-04-votes-jsonb-schema|tb-04]]). The engine reads quiz answers through this layer, never by hardcoded field name.
+- **Firing predicate** — `supabase/functions/_shared/verdict-firing.ts` (`decideFiring()`).
+- **Schema** — `supabase/migrations/20260513220000000_verdicts_and_cuts.sql` (verdicts + cuts); `supabase/migrations/20260515020000000_verdict_fire_on_q5_complete.sql` (v1.1 firing trigger + RPC).
 - **iOS reader** — `ios/Sources/App/VerdictStore.swift` (read-only over PostgREST).
-- **iOS surface** — `ios/Sources/App/VerdictScreen.swift` (S05 `default` mode).
+- **iOS surface** — `ios/Sources/App/VerdictScreen.swift` (S05).
 
 ## Implementation choice — TypeScript Edge Function over PL/pgSQL
 
-The PRD ([[../10_prds/v1-prd|v1-prd]] §"Modules" #10) leaves the choice open. TB-06 landed on a TypeScript Edge Function for three reasons:
+The PRD ([[../10_prds/v1.1-quiz-redesign-prd|v1.1-quiz-redesign-prd]] module B) fixes only the interface and leaves the implementation choice to the engineer. The engine stays a TypeScript Edge Function for two reasons:
 
-1. **Rule-text formatting is verbose in SQL.** The engine emits aggregate-attribution strings ("Budget cap cut Ren Soba. Pico's had the lowest regret-of-omission.") which require conditional join + capitalisation logic. TS is the cleaner home.
-2. **Fixture testability without a live Postgres.** Deno tests against pure functions exercise the engine algorithm end-to-end without spinning up a database container. The Edge Function HTTP layer has its own thin handler tests with an in-memory data adapter.
-3. **The "RPC" framing in the ticket maps to `client.functions.invoke("compute-verdict")`.** Supabase's Functions API is the modern equivalent of an RPC for stateful operations; pure RPC stays for read-only / declarative queries.
+1. **Rule-text formatting is verbose in SQL.** The engine emits aggregate-attribution strings; conditional join + capitalisation logic is cleaner in TS.
+2. **Fixture testability without a live Postgres.** Deno tests against the pure `computeVerdict()` exercise the whole pipeline with no database container. The Edge Function HTTP layer has its own handler tests with an in-memory data adapter.
 
-TB-07 will land the auto-fire path. Two options under consideration:
-- Postgres trigger `AFTER INSERT ON votes` that uses `pg_net.http_post` to invoke the Edge Function. Simpler trigger code; depends on `pg_net`.
-- `pg_cron` job that polls rooms whose `deadline_at` has passed and triggers the same Edge Function. Same `pg_net` dependency.
+The engine is **pure** — no network, no Supabase client, no clock, no ambient randomness. The one source of randomness is injected (`VerdictEngineOptions.random`) so a verdict is reproducible. Running server-side is load-bearing: the verdict must be byte-identical for every member.
 
-Either path keeps the engine canonical in TypeScript — the trigger is the dispatcher, not the engine.
+## The pipeline — six steps
 
-## EBA pruning order — fixed for TB-06 + TB-09
+`computeVerdict(input, options)` runs:
 
-The engine prunes candidates in this order; the first failing predicate decides the cut reason:
+1. **EBA prune** — drop venues failing ANY member's hard vetoes. Three veto channels, none of which relax (see below). Run once; its survivors feed every cascade iteration.
+2. **Per-member scoring** — each member's preference function scores every EBA survivor 1..5. Scored once; the matrix is reused across the cascade.
+3. **Satisficing floor** — keep venues every member scores at or above the acceptability threshold T (cohort-zero default 3, inclusive).
+4. **Maximin tiebreak** — among floor survivors, pick the venue with the highest *minimum* member score. This protects the worst-off member rather than averaging the group: a polarizing higher-sum pick LOSES to a worst-off-protecting one. This is the load-bearing anti-defection mechanic (the Kim 2023 backfire avoidance, [[../50_product/framework-comparison|framework-comparison]]).
+5. **Final tiebreak** — equal minimums break on the higher group sum, then on the injected random (`flat_tiebreak_fallback` flags this).
+6. **Empty-floor cascade** — when no venue clears the floor, relax (see below), then emit a terminal `no_survivor` output.
 
-1. **Q1 dietary (`emit_tag` membership)** — `cut_reason='dietary'`. Hard NEED. Never relaxes.
-2. **Q2 budget tier ≤ min member cap** — `cut_reason='budget'`. Hard NEED. Never relaxes.
-3. **Q3 walk minutes ≤ min member threshold** — `cut_reason='walk'`. Hard NEED. Never relaxes.
-4. **Soft cuisine veto** (any member's `soft_cuisine_vetoes` chip matches `option.categories` by substring) — `cut_reason='cuisine_veto'`. Soft. Relaxes on the cascade's first step.
-5. **Q4 vibe floor** (`option.vibe_signal < max_member_q4_vibe - state.vibeFloorRelaxStep`) — `cut_reason='vibe_floor'`. Soft. Relaxes on the cascade's second step.
-6. **Radius** (`option.distance_meters > state.radiusMeters`) — `cut_reason='radius_widen'`. Soft. Relaxes on the cascade's third step in 805 m (0.5 mi) increments up to `radius_meters_cap`.
+## EBA prune — three hard-veto channels
+
+All three are hard NEEDs; none relax. The first failing predicate decides the cut:
+
+1. **Q2 spend cap** — the binding cap is the MIN `q2_budget` tier across members. A candidate with `price_tier > minBudget` is cut (`cut_reason='budget'`). A null `price_tier` passes — Foursquare frequently omits price, and failing-closed would over-prune.
+2. **Dietary menu-compliance** — Q1-era dietary chips plus `hard_vetoes` of kind `dietary`. A candidate whose `dietary_tags` lacks the required tag for an active chip is cut (`cut_reason='dietary'`, cut_text `"{chip} veto"`). The chip→tag map (`DIETARY_REQUIREMENTS`) mirrors `DIETARY_CHIP_MAP.emit_tag` in `foursquare.ts`. The "Nothing tonight" / "No preference" chips carry no constraint.
+3. **Generic `hard_vetoes`** — the schema-driven channel TB-12 profile vetoes feed:
+   - kind `tag` — a raw required allergy tag missing from `dietary_tags` (escape hatch for tags the dietary chip map doesn't cover) → `cut_reason='veto'`.
+   - kind `cuisine_never` — a vetoed cuisine substring matched against the candidate's `categories` → `cut_reason='veto'`.
+
+If the EBA pass leaves zero survivors, the engine short-circuits straight to `no_survivor` (the cascade has nothing to relax — hard vetoes never recover).
+
+## Per-member scoring
+
+Each member scores every EBA survivor on a 1..5 scale, the same scale as the satisficing threshold T. The score comes from one of two sources:
+
+- **Injected `prefFn`** (the live path) — the per-member preference function built per [[../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §3 from the member's Q1–Q5 answers, cached by the running-union pool manager ([[../15_issues/v1.1/issues/tb-10-running-union-pool-manager|tb-10]]).
+- **Static `scores` map** (the test / replay path) — a per-candidate cached score, read only when `prefFn` is absent. A candidate id missing from the map falls back to `scores.__fallback`, then to the neutral threshold.
+
+For each candidate the engine records `minScore` (the maximin key) and `sumScore` (the final-tiebreak key).
+
+## Satisficing floor + maximin + final tiebreak
+
+- **Floor** — keep candidates where `minScore >= threshold`.
+- **Maximin** — among floor survivors, the highest `minScore` wins.
+- **Final tiebreak** — maximin ties break on highest `sumScore`; a remaining tie breaks on the injected random and sets `flat_tiebreak_fallback = true`.
+
+## Empty-floor cascade — `RELAX_STEPS`
+
+When a cascade iteration leaves the floor empty, the engine relaxes in this canonical order (exposed as `RELAX_STEPS = ["threshold", "radius_widen"]` on the module surface so iOS / web / QA share one vocabulary):
+
+1. **`threshold`** — lower T by 1, down to a floor of 1. Relaxing past 1 is meaningless on a 1..5 scale.
+2. **`radius_widen`** — once T bottoms out, widen the search radius by 805 m (0.5 mi) per step, up to `radius_meters_cap` (default 8047 m / 5 mi). The radius gate is only active when the caller supplied a `radius_meters` and candidates carry `distance_meters`; otherwise the caller pre-filtered the pool and the gate is a no-op.
+
+Hard-veto cuts (budget / dietary / generic veto) NEVER appear in the cascade — they are immune. The cascade trail is surfaced in `relax_chain_applied` for observability; the UI does not render it (silent relax, per the [[../50_product/v1-scope|v1-scope]] no-survivor rule).
+
+When the cascade is exhausted, the engine emits a `no_survivor` output:
+
+- `winning_option_id = null`, `method = "no_survivor"`, `cuts = []`.
+- `rule_text` — aggregate-attribution copy (`"No spot fit within vegan options and $$ cap tonight."`); never names a person.
+- `surviving_hard_needs` — short anonymized labels for the S05 meta line.
+- `radius_meters_used` / `threshold_used` — the last values the engine tried.
 
 ## Cut reason vocabulary
 
-Short machine tokens emitted into `option_cuts.cut_reason`:
+Machine tokens emitted into `option_cuts.cut_reason`. The `OptionCut` type documents the set `budget · dietary · veto · radius · below_floor · lower_maximin`:
 
-- `dietary` — failed a dietary `emit_tag` requirement.
-- `budget` — `price_tier > min(q2_budget)` across members.
-- `walk` — `walk_minutes_estimate > min(q3_walk_minutes)` across members.
-- `cuisine_veto` — matched a member's soft cuisine veto chip on the option's categories before that chip was relaxed.
-- `vibe_floor` — option's `vibe_signal` fell below the effective vibe floor (max member q4_vibe minus any vibe_floor relax steps).
-- `radius_widen` — option's `distance_meters` exceeded the (possibly already-widened) radius.
-- `no_regret` — survived pruning but lost the Q5 tiebreaker (or tied on the flat-regret fallback path).
+- `budget` — `price_tier` exceeded the MIN member spend cap.
+- `dietary` — failed a dietary chip's menu-compliance tag.
+- `veto` — failed a generic `hard_vetoes` entry (raw allergy tag or cuisine NEVER).
+- `below_floor` — survived EBA but at least one member scored it below the (possibly relaxed) threshold T.
+- `lower_maximin` — cleared the floor but lost the maximin / final tiebreak.
 
-## Q5 regret tiebreaker
-
-After pruning, the engine:
-
-1. Sums `q5_regret[option_id]` across every member's vote per surviving option.
-2. If population variance over the sums exceeds the flat-regret threshold (default `0` — exact tie only), the maximum-sum option wins.
-3. Otherwise, fall back to random within the survivor set. The randomness is injectable for tests (`computeVerdict(input, { random: () => 0.5 })`).
-
-The variance threshold is a tuneable, not a research finding. Default of `0` means "fall back only on exact tie." Tests can lift it to model wider bands; production should keep `0` until cohort-1 telemetry says otherwise.
+`below_floor` and `lower_maximin` are emitted only when a winner is seated — the Cuts drawer on S05 shows the full elimination picture: EBA hard-veto cuts first, then every scored non-winner.
 
 ## Rule text generation — aggregate attribution
 
-The rule chip is the load-bearing copy on S05. Per [[../50_product/verdict-screen-spec|verdict-screen-spec]] §"Name the rule, not the picker" the engine NEVER:
+The rule chip is the load-bearing copy on S05. Per [[../50_product/verdict-screen-spec|verdict-screen-spec]] §"Name the rule, not the picker" the engine NEVER names a person or exposes a private constraint. It emits aggregate sentences, joined with single spaces:
 
-- Names a person ("Maya's veto cut Ren Soba").
-- Exposes a private constraint ("Alex's shellfish allergy filtered Café Lou").
+- More than one floor survivor: `"{name} was the safest pick for everyone — the best worst-case score."` — names the maximin rule, not a member.
+- Exactly one floor survivor: `"{name} was the only spot the whole group was OK with."`
+- When `radius_widen` fired: append `"The search radius was widened to find it."`
+- Reroll runs prefix the rule with `"{Cost|Distance|Mood|Diet|Availability} reroll cut {prior pick}."` — the rerolling member is never named.
 
-Instead, it emits aggregate attribution sentences:
+## Anonymization rules — dietary chips are private
 
-- `"Budget cap cut Ren Soba."` — the rule (budget cap), not a member, is the agent.
-- `"Shellfish-safe kitchens filter applied."` — the constraint (attribute), not the person, is named.
-- `"Pico's had the lowest regret-of-omission."` — the tiebreaker explanation when multiple options survive.
+Every dietary chip is treated as private. Consequences:
 
-Sentences are joined with single spaces. The S05 surface renders the result in the rule-chip slot at the locked 1020ms reveal step.
+- The rule chip never lists "dairy / shellfish / nuts" as the cause; `surviving_hard_needs` surfaces them via "safe options" framing.
+- Voice receipts (`buildReceipts`) carry a lowercase first name + an anonymized action verb-phrase (`"filtered {chip}"`, `"set a hard limit"`, `"capped at $$"`, `"voted in"`) — attribute, never a personal-causal claim. Receipts are computed from `votes`, not stored.
 
-## Anonymization rules — all dietary chips are private
+## Reroll handling
 
-The first iteration of the engine treats every dietary chip as private (`private: true` in the requirements table). This is more conservative than the JSX hint suggests but matches the verdict-screen-spec's stated rule: "Names are consented; conditions are not."
+The engine accepts a reroll slice on its input, populated by the `apply_reroll` RPC ([[../15_issues/v1/issues/tb-10-reroll|v1 tb-10]] reroll path, carried into v1.1):
 
-Consequences:
+- `excluded_option_ids` — option ids removed from the pool *before* pruning (`avail`-reason rerolls); they never reach the Cuts surface.
+- `reroll_reason` (`cost · dist · mood · diet · avail`) — drives the rule-text prefix and the `verdicts.reroll_reason` stamp.
+- `previous_winner_name` — the option the reroll replaced.
 
-- The rule chip never lists "dairy / shellfish / nuts" as the cause; it surfaces them via "safe options" framing ("Shellfish-safe kitchens filter applied.").
-- The cut text for a cut option uses the short `"{chip} veto"` form ("shellfish veto") rather than naming a constraint that's private.
-- Receipts use `"filtered {chip}"` — attribute, not person ("alex filtered shellfish").
+A `dist`-reason reroll no longer prunes via a `walk_minutes` override: walk-minutes left the quiz for the parameters bucket in the v1.1 redesign, so a `dist` reroll's effect is carried through the radius gate and the re-fetched, re-scored candidate pool. `rooms.walk_minutes_override` is retained for schema stability but the engine no longer applies it.
 
-If marketing-branding lands the final copy and wants a different register, the chip → label mapping is the only thing that needs to change — the engine's anonymization gate stays in place.
+## Edge Function — `compute-verdict`
 
-## Soft-pref relax cascade — locked for TB-09
+POST body `{ room_id }`, with optional `method` and `radius_meters_override`. The handler (`handler.ts`) is independent of the supabase-js client so tests exercise it with an in-memory adapter.
 
-When `runPruning` returns zero survivors, the engine attempts to relax soft preferences in this canonical order before giving up:
+- **Method** — the auto-fire dispatcher passes `quorum` / `deadline`; anything else is `manual`. The engine overrides to `no_survivor` when the cascade is exhausted.
+- **Idempotency** — if a verdict already exists for the room, the handler returns it with `already_computed: true`, 200. Two exceptions: a widen-radius re-run over a prior `no_survivor`, and a reroll run (`last_reroll_reason` set on the room — the `apply_reroll` RPC already deleted the prior verdict).
+- **Widen-radius re-run** — `radius_meters_override` is clamped defensively to `[805, 16093]` (0.5..10 mi). On a prior `no_survivor` the handler drops the old verdict (FK cascade clears `option_cuts`) and re-runs with `radius_meters` and `radius_meters_cap` both set to the override, so the engine doesn't widen past where the user asked.
+- **TB-12 profile vetoes** — `fetchProfileVetoes` reads each member's sticky per-account allergies / dietary restrictions / cuisine NEVERS and folds them into the member's `hard_vetoes` channel. Profile data lives on the account record, not the per-session `votes` row.
+- **Post-write** — best-effort: flip `rooms.status` to `verdict_ready` (the iOS Realtime handshake into S05) and emit a `verdict_ready` broadcast on `room:{room_id}`. A failure here is logged, not surfaced.
 
-1. **`cuisine_veto`** — drop the MOST-cited cuisine veto across members. Tie among cuisines with the same citation count: lexicographic-arbitrary (Map iteration order). The dropped chip is added to `state.droppedCuisines` and the engine re-runs pruning. If more than one cuisine is active, subsequent cascade iterations drop the next most-cited.
-2. **`vibe_floor`** — increment `state.vibeFloorRelaxStep` by 1. Each step widens the gap between candidate `vibe_signal` and the room's max `q4_vibe`. After 5 increments the floor is fully open (covers the entire 0..4 scale) and further relax is a no-op.
-3. **`radius_widen`** — add 805 m (0.5 mi) to `state.radiusMeters`, capped at `radius_meters_cap`. The S01 default cap is 8047 m (5 mi); the S05 "Widen radius" CTA raises it to whatever the user picked on the inline slider (1..10 mi).
+## Firing — Q5-complete signal, no timer
 
-Hard NEED vetoes (Q1 dietary, Q2 budget, Q3 walk) NEVER appear in `relax_chain_applied` — they are immune to the cascade. The engine surfaces the cascade trail in `VerdictEngineOutput.relax_chain_applied` for observability; the UI does not render it (silent relax).
+The v1.1 quiz has no shot clock ([[../10_prds/v1.1-quiz-redesign-prd|v1.1-quiz-redesign-prd]] module H). The verdict fires on exactly two signals, decided by the pure predicate `decideFiring()` in `verdict-firing.ts` (`FiringMethod = "quorum" | "manual"`):
 
-If the cascade is exhausted and survivors are still 0, the engine emits a `no_survivor` output:
+- **All participants completed Q5** — the `AFTER INSERT ON votes` trigger auto-fires the moment every current room member has a `regret`-kind votes slot. No `deadline_at` channel, no minimum quorum.
+- **Initiator closed voting** — the `fire_verdict(room_id)` RPC, with the v1 two-vote quorum gate removed, produces the verdict on demand. A solo session (initiator alone) resolves; the initiator never waits on a straggler.
 
-- `winning_option_id = null`
-- `method = "no_survivor"`
-- `cuts = []` (the S05 no-survivor surface suppresses the cuts drawer)
-- `rule_text` — aggregate-attribution copy like `"Vegan options left no candidates within walking distance tonight."`. NEVER names a person.
-- `surviving_hard_needs` — short labels for the S05 meta line (`["vegan options", "$$ cap", "15 min walk"]`).
-- `radius_meters_used` — the last radius the engine tried (helpful for the widen slider's default-next-suggestion math).
-
-## Widen-radius re-run
-
-The `compute-verdict` Edge Function accepts an optional `radius_meters_override` body field. When supplied:
-
-- Clamped to `[805, 16093]` (0.5..10 mi) defensively against client tampering.
-- The handler reads the existing verdict via `existingVerdict(room_id)`. If a prior verdict exists AND its `method === "no_survivor"`, the handler calls `deleteVerdictForRoom` (FK cascade drops `option_cuts`) so the engine can write fresh under the `verdicts.room_id` UNIQUE constraint.
-- If a prior `method = "manual"` verdict exists, the override is IGNORED — successful verdicts are never replaced by a widen request. Defends against a duplicate "Widen radius" tap after the engine has produced a winner.
-- The engine runs with `radius_meters = override` and `radius_meters_cap = override` so it doesn't itself widen past where the user asked.
-
-## v1.1 firing — Q5-complete signal, no timer (TB-13)
-
-The TB-07 timer firing path below is **superseded by TB-13** for the
-v1.1 quiz redesign. The v1.1 quiz has no shot clock (PRD module H,
-user stories 33-36); the verdict fires on exactly two signals:
-
-- **All participants completed Q5** — the `AFTER INSERT ON votes`
-  trigger auto-fires the moment every *current* room member has a
-  `regret`-kind votes slot (`count_q5_complete_members(room) = count(members)`).
-  No `deadline_at` channel, no minimum quorum.
-- **Initiator closed voting** — the `fire_verdict(room_id)` RPC, with
-  the v1 two-vote quorum gate removed, produces the verdict on demand.
-  A solo session (initiator alone) resolves; the initiator never waits
-  on a straggler.
-
-The `gettoit_verdict_auto_fire` per-minute timer cron is unscheduled
-(a timer cron would expire a live v1.1 room mid-quiz). The canonical,
-fixture-tested statement of the firing contract is the pure predicate
-`supabase/functions/_shared/verdict-firing.ts` (`decideFiring`); the
-SQL trigger / RPC in `20260515020000000_verdict_fire_on_q5_complete.sql`
-mirror it. `rooms.timer_minutes` / `rooms.deadline_at` are left in
-place as inert columns.
-
-## What's not in TB-09 (next tracer bullets)
-
-- **TB-07** ✅ landed — `AFTER INSERT ON votes` trigger that fires the engine on full quorum + status='firing'; `pg_cron` job (`gettoit_verdict_auto_fire`) that fires on deadline expiry; Realtime Broadcast on `verdict_ready`; `fire_verdict(room_id)` RPC for the initiator's "Decide now" tap. See [[waiting-fire-trigger|waiting-fire-trigger.md]].
-- **TB-08** — `"I'm in"` ratification wiring + push permission prompt + hard-close motion.
-- **TB-10** — reroll sheet, 3-per-session cap, reason-to-constraint mapping. The reroll reason taxonomy (`cost · dist · mood · diet · avail`) writes into `votes.soft_cuisine_vetoes` for "diet" and into vibe / budget / walk fields for the others; the engine's cuisine-veto step is the consumer.
-- **TB-11** — late-joiner read-only verdict surface (S05 `read-only` mode).
+The SQL trigger / RPC in `20260515020000000_verdict_fire_on_q5_complete.sql` mirror the `decideFiring` predicate. The v1 per-minute `gettoit_verdict_auto_fire` timer cron is unscheduled — a timer cron would expire a live v1.1 room mid-quiz. `rooms.timer_minutes` / `rooms.deadline_at` are left in place as inert columns.
 
 ## Edge cases the engine handles
 
-- **Empty Q5 regret map** — a member who didn't rate a candidate contributes 0 to that candidate's regret sum. The engine doesn't penalise the candidate.
-- **Single-survivor short-circuit** — when EBA leaves exactly one option, Q5 is skipped (variance is moot). The rule chip surfaces the elimination reasons without naming a tiebreaker.
-- **Unknown chip in `q1_vetoes`** — the engine ignores chips not in `DIETARY_REQUIREMENTS` so placeholder copy churn during TB-04 doesn't break the engine. The `nothing_tonight` escape is explicitly recognised as a no-op.
-- **`price_tier` null on a candidate** — treated as "tier unknown, passes the cap." Foursquare frequently omits price; failing-closed would over-prune.
-- **`walk_minutes_estimate` null** — same treatment as price.
+- **No votes** — `computeVerdict` throws; the engine requires at least one member's input. The Edge Function returns 404 `no_votes` before reaching the engine.
+- **EBA prunes everything** — immediate `no_survivor`; the cascade has no soft lever to pull.
+- **Null `price_tier`** — treated as "tier unknown, passes the cap." Failing-closed would over-prune.
+- **Null `distance_meters`** — the candidate always passes the radius gate (the caller pre-filtered).
+- **Missing score** — a candidate id absent from a static `scores` map falls back to `__fallback`, then to the neutral threshold; a member who didn't rate a candidate doesn't sink it.
+- **Single floor survivor** — maximin is moot; the rule chip uses the "only spot" copy.
 
 ## Idempotency contract
 
-The Edge Function checks `existingVerdict(room_id)` first. If a verdict exists, it returns that row + an empty cuts list with `already_computed: true`. The unique constraint on `verdicts.room_id` enforces the same shape at the DB layer — a second insert would 23505. TB-07's trigger will use `ON CONFLICT (room_id) DO NOTHING` so duplicate trigger-fires don't fight each other.
+The Edge Function checks `existingVerdict(room_id)` first. The `verdicts.room_id` UNIQUE constraint enforces one verdict per room at the DB layer. Widen-radius re-runs and reroll runs are the documented exceptions — both delete the prior row so the engine can write fresh.
 
-TB-09's widen-radius re-run is the documented exception: when `radius_meters_override` is supplied AND the existing verdict is a `no_survivor`, the handler drops the prior row (cascading the empty `option_cuts` set) so the engine can write fresh. Successful (manual) verdicts are never replaced by a widen request.
+## Tests
 
-## Choreography token note
+- `verdict-engine.test.ts` — the pure-pipeline acceptance suite, including the pinned anti-defection case (a polarizing higher-sum pick loses to a worst-off-protecting one). The three v1-era files (`verdict-engine-relax/-reroll/-solo.test.ts`) were removed — they tested the deleted pipeline.
+- `compute-verdict/index.test.ts`, `index-no-survivor.test.ts`, `index-reroll.test.ts` — Edge Function handler tests against the in-memory adapter.
 
-The S05 reveal needs seven timing constants. `tokens.json` originally exposed only four (`name`, `time`, `rule`, `stagger-receipt`). TB-06 added the missing three (`eyebrow`, `meta`, `receipts`, `cta`) so the SwiftUI port can source them via `GTITokens.swift` rather than inlining literals. The values are taken verbatim from `motion.md` §"Verdict reveal — full choreography" and `ScreenVerdict.jsx`'s `VERDICT_CHOREO` constant — no rounding.
+## What changed from v1 (TB-06 → TB-11)
 
-## Adjacencies flagged (not fixed)
+The v1 engine ran EBA pruning followed by a **regret-of-omission sum** tiebreaker — the survivor with the highest summed Q5 regret across members won. ADR 0011 rejected that: a sum (utilitarian) aggregation lets a polarizing pick win even though one member quietly hates it — the exact post-decision defection GetToIt exists to prevent. Specifically:
 
-- **`options_select_room_members` SELECT policy** — TB-05's `options` table left this SELECT policy as a follow-up. TB-06 added it inline in the verdicts migration because the verdict cuts drawer needs to join `option_cuts` → `options` to get the human name. If a future TB needs `options.SELECT` to behave differently, the policy lives in `20260513220000000_verdicts_and_cuts.sql`.
-- **Display-name source for receipts** — the iOS surface and the Edge Function both currently surface `"m{uuid_prefix}"` as the receipt name. TB-08 (ratification) or TB-12 (Apple Sign-in) will introduce a stable `display_name`. The receipts contract is robust against this — receipts are computed from `votes` not stored.
-- **Wall-clock "when" for the time badge** — the JSX prints `7:00 PM`; the iOS surface and the engine both hardcode the same placeholder. Real scheduling is a post-v1 candidate.
+- The Q5 regret-sum tiebreaker is gone; the maximin rule replaces it.
+- The v1 cuisine-veto / vibe-floor soft relax steps are gone — cuisine, reputation and vibe are now soft *scoring* axes inside each member's `prefFn`, not in-engine filters. The cascade's only levers are the satisficing threshold and the radius.
+- The engine consumes input through the `votes-schema.ts` mapping layer, never by hardcoded field name.
 
 ## Related
 
-- [[../10_prds/v1-prd|v1 PRD]] §"VerdictEngine"
-- [[../50_product/verdict-screen-spec|verdict-screen-spec]] — convergent prescriptions across constructs
-- [[../50_product/decision-model|decision-model]] — EBA + satisficing rationale
-- [[stack-patterns|stack-patterns.md]] §"Deadline / quorum / verdict computation"
+- [[adr/0011-worst-off-protecting-verdict-engine|ADR 0011]] — the decision record for this engine.
+- [[adr/0010-generic-jsonb-votes-schema|ADR 0010]] — the generic jsonb votes schema the mapping layer reads.
+- [[../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Redesign & Verdict Engine PRD]] §module B.
+- [[../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §3 (preference function) + §4 (verdict aggregation).
+- [[../50_product/verdict-screen-spec|verdict-screen-spec]] — verdict-screen copy framework.
+- [[waiting-fire-trigger|waiting-fire-trigger.md]] — the Waiting surface + Realtime wiring.

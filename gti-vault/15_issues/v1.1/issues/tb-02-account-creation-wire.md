@@ -2,7 +2,7 @@
 issue: tb-02
 title: Wire forced first-launch Apple sign-in (iOS) + waiting-screen download CTA (web)
 github_issue: 50
-status: ready-for-human
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd

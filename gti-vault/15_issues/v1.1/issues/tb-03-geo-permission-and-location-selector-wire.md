@@ -2,7 +2,7 @@
 issue: tb-03
 title: Wire geo permission pre-prime + persistent location selector
 github_issue: 51
-status: ready-for-human
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd

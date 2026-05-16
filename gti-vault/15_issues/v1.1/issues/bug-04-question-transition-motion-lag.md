@@ -2,7 +2,7 @@
 issue: bug-04
 title: Question transition motion lag — gradient ~1s behind card on every transition
 github_issue: 44
-status: ready-for-human
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd

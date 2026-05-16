@@ -2,7 +2,7 @@
 issue: bug-02
 title: Invite link in iMessage shows plain text — add placeholder OG image + meta tags
 github_issue: 42
-status: ready-for-human
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd

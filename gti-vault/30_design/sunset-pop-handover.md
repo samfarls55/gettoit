@@ -2,7 +2,7 @@
 title: Sunset Pop — Design System Handover Brief
 description: Self-contained brief for a fresh Claude design session. Pulls "Sunset Pop" direction from the v1 prototype and asks for a full token + component system around it.
 type: handover-brief
-status: draft
+status: superseded
 created: 2026-05-12
 related:
   - "[[v1-directions]]"
@@ -12,6 +12,8 @@ related:
 ---
 
 # Sunset Pop — Design System Handover Brief
+
+> **Superseded — design system shipped.** The handover this brief requested was completed; the Sunset Pop design system lives at `design-system/` (repo root). Kept as a historical record of the handover brief.
 
 This file is the prompt to feed to a fresh Claude design session. Everything between the horizontal rules is self-contained — paste it as context along with the five screenshots (drag-and-dropped into the session).
 

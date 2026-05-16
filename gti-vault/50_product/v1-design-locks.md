@@ -12,6 +12,7 @@ related:
   - "[[framework-comparison]]"
   - "[[paralysis-cause-priority]]"
   - "[[verdict-screen-spec]]"
+  - "[[v1.1-quiz-amendments]]"
 ---
 
 # v1 Design Locks
@@ -19,6 +20,8 @@ related:
 The four deliverables `[[research-brief]]` named under "Outputs that update the v1 design." Each is locked as of 2026-05-08, with a one-line rationale and citations back to the synthesis docs and raw research.
 
 These supersede every "TBD pending research" placeholder in [[decision-model]] and [[v1-scope]]. Update those docs to reference this one.
+
+> **Amended for v1.1.** [[v1.1-quiz-amendments]] (2026-05-15) layers v1.1 changes on top of these locks: Lock 1 (quiz length 5) survives, Lock 2 (signal stack) is partially amended, Lock 3 (regret-of-omission tiebreaker) is **fully overridden** by a maximin rule, and Lock 4 (verdict-screen copy) is untouched. Read that doc alongside this one for the current quiz + verdict design.
 
 ## Lock 1 — Quiz length
 

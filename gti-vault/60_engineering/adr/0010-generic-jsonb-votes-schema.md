@@ -113,9 +113,12 @@ consumes its input through.**
 
 ## Notes
 
-The full verdict-engine rewrite (PRD module B) is a later slice; tb-04
-is the walking-skeleton foundation it builds on. The current engine's
-internal logic is unchanged — tb-04 moved only the storage shape and
-the engine's input path. When module B lands it will widen the
-`question_kind` taxonomy; the mapping layer's `QUESTION_KINDS` set and
-its per-kind reader table are extended together at that point.
+The full verdict-engine rewrite (PRD module B) landed later as
+[[0011-worst-off-protecting-verdict-engine|ADR 0011]] (tb-11); tb-04 is
+the walking-skeleton foundation it built on. tb-04 itself moved only the
+storage shape and the engine's input path — it did not change the engine
+algorithm. ADR 0011 then widened the `question_kind` taxonomy
+(`QUESTION_KINDS` gained `cuisine_craving`, `reputation` and
+`profile_veto`) and extended the mapping layer's per-kind reader table
+alongside it. ADR 0010 still stands — the generic jsonb schema is the
+shape ADR 0011's engine consumes through `votes-schema.ts`.

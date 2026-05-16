@@ -55,18 +55,18 @@ Relational, with RLS policies enforcing room-scoped access. Indicative tables:
 - `members (room_id, user_id, role, joined_at)` — `role` ∈ {`owner`, `participant`}
 - `options (id, room_id, label, payload_json)` — `payload_json` carries food-vertical fields (place_id, lat, lng, etc.)
 - `votes (room_id, user_id, option_id, created_at)` — unique on (room_id, user_id) for single-vote semantics, or composite if ranked
-- `verdicts (room_id, option_id, computed_at, method)` — `method` ∈ {`quorum`, `deadline`, `manual`}
+- `verdicts (room_id, option_id, computed_at, method)` — `method` ∈ {`quorum`, `manual`, `deadline`, `no_survivor`}; `deadline` is inert in v1.1 (no shot clock — see "Verdict firing" below)
 
 **RLS rule of thumb:** every table has `WHERE room_id IN (SELECT room_id FROM members WHERE user_id = auth.uid())` style policies. Auth.uid() comes from the JWT. Declarative, server-enforced.
 
-## Deadline / quorum / verdict computation
+## Verdict firing / computation
 
-Server-authoritative. Two interchangeable patterns:
+Server-authoritative. The v1.1 quiz has no shot clock — the verdict fires on a **Q5-complete signal**, not a deadline:
 
-- **Trigger-driven:** `AFTER INSERT ON votes` checks `count(votes) = count(members)`. If true, computes verdict, inserts into `verdicts`, broadcasts `verdict_ready` event.
-- **Cron-driven:** `pg_cron` job runs every minute, scans `rooms WHERE status='open' AND deadline_at <= now()`, computes verdict for each, broadcasts.
+- **Trigger-driven:** `AFTER INSERT ON votes` checks whether every current room member has completed Q5 (a `regret`-kind votes slot). If so, it computes the verdict, inserts into `verdicts`, and broadcasts `verdict_ready`.
+- **Manual close:** the initiator's `fire_verdict(room_id)` RPC fires on demand, with no minimum quorum — a solo session resolves.
 
-Both can coexist (whichever fires first wins; the other becomes a no-op via `status` check).
+The v1 per-minute `pg_cron` deadline scan is retired: a timer cron would expire a live v1.1 room mid-quiz. `rooms.deadline_at` / `rooms.timer_minutes` remain as inert columns. See [[verdict-engine|verdict-engine.md]] §"Firing" and [[waiting-fire-trigger|waiting-fire-trigger.md]].
 
 ## Food vertical / geo
 
