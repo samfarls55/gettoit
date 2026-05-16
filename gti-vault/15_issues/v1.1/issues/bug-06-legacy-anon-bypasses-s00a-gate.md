@@ -2,7 +2,7 @@
 issue: bug-06
 title: Legacy v1 anonymous session bypasses S00a sign-in gate on launch
 github_issue: 63
-status: ready-for-agent
+status: done
 type: AFK
 created: 2026-05-14
 prd: v1-prd
@@ -76,3 +76,16 @@ A fresh install with no session at all continues to mint a Linked-Apple session 
 ## Blocked by
 
 None — can start immediately. The required `AuthCoordinator.linkApple` path was built in v1 for the C-22 chip and is exercised by `AuthCoordinatorLinkAppleTests`; no new auth surface needed.
+
+## Comments
+
+**2026-05-15 — closed (AFK).** The fix landed in commit `7a95412` (`bug-06 (v1.1): route legacy anonymous session through S00a via linkApple`), already squash-merged into `main`. It implements every code/spec acceptance criterion:
+
+- `RootView.shouldRenderSignInGate` returns `true` for `.idle` **and** `.anonymous`, so a pre-v1.1 install carrying a v1 anonymous session in Keychain now renders the S00a gate instead of falling through to S00 Landing.
+- `SignInScreen.onSaveTapped` captures the coordinator state at tap time: `.anonymous` → `auth.linkApple` (preserves `user_id` and every owned `rooms` / `votes` / `members` / `events` row), otherwise → `auth.signInWithApple`.
+- `SignInScreenTests` covers both tap branches plus the user-cancel path through the injectable `AppleSignInProviding` + `StubAuthLinker` seams.
+- `design-system/surfaces/00a-signin.md` Two-launch boundary table gained the "Legacy v1 anonymous session in Keychain" row; `design-system/CHANGELOG.md` has the dated entry.
+
+The fix commit added this issue file but never flipped its tracker state. This AFK run reconciled the tracker only — `status: done` here, the `v1.1/_index.md` row, and GitHub issue #63 closed via the `Closes #63` PR. No code changed in this PR.
+
+The three TestFlight-device acceptance items (launch into S00a over a real legacy-anon Keychain entry, CTA completes Apple flow → `.linkedApple`, `user_id` preserved) are on-device manual checks against the founder's iPhone and cannot be exercised by CI or this Linux runner — they ride with the existing TestFlight verification cadence (TB-17). The `LinkError.userIDChanged` throw already enforces the `user_id`-preservation invariant in code.
