@@ -235,9 +235,12 @@ public final class VerdictStore {
     }
 
     private func fetchVotes(roomID: UUID) async throws -> [VoteRow] {
+        // TB-04 (v1.1) — `votes` stores answers in five generic jsonb
+        // slots (`q1`..`q5`). `VoteRow`'s decoder unwraps the
+        // `{ meta, answer }` envelopes back to the typed values.
         try await client
             .from("votes")
-            .select("user_id, q1_vetoes, q2_budget, q3_walk_minutes, q4_vibe, q5_regret")
+            .select("user_id, q1, q2, q3, q4, q5")
             .eq("room_id", value: roomID.uuidString.lowercased())
             .execute()
             .value
@@ -455,7 +458,15 @@ public final class VerdictStore {
         }
     }
 
-    public struct VoteRow: Codable, Sendable {
+    /// A `votes` row as read for the verdict screen.
+    ///
+    /// TB-04 (v1.1): `votes` stores answers in five generic jsonb
+    /// slots (`q1`..`q5`), each a `{ meta, answer }` envelope. The
+    /// decoder unwraps the envelopes back to the typed values so the
+    /// shaping helpers below stay unchanged. Decode-only — the verdict
+    /// screen reads votes, never writes them. The typed `init` is kept
+    /// for unit-test fixture construction.
+    public struct VoteRow: Decodable, Sendable {
         public let userID: UUID
         public let q1Vetoes: [String]
         public let q2Budget: Int
@@ -479,13 +490,35 @@ public final class VerdictStore {
             self.q5Regret = q5Regret
         }
 
-        enum CodingKeys: String, CodingKey {
+        private enum RowKey: String, CodingKey {
             case userID = "user_id"
-            case q1Vetoes = "q1_vetoes"
-            case q2Budget = "q2_budget"
-            case q3WalkMinutes = "q3_walk_minutes"
-            case q4Vibe = "q4_vibe"
-            case q5Regret = "q5_regret"
+            case q1, q2, q3, q4, q5
+        }
+        private struct Slot<Answer: Decodable>: Decodable { let answer: Answer }
+        private struct VetoesAnswer: Decodable {
+            let vetoes: [String]
+            let vetoesExtra: [String]?
+            enum CodingKeys: String, CodingKey {
+                case vetoes
+                case vetoesExtra = "vetoes_extra"
+            }
+        }
+        private struct TierAnswer: Decodable { let tier: Int }
+        private struct MinutesAnswer: Decodable { let minutes: Int }
+        private struct LevelAnswer: Decodable { let level: Int }
+        private struct ScoresAnswer: Decodable { let scores: [String: Int] }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: RowKey.self)
+            userID = try c.decode(UUID.self, forKey: .userID)
+            let dietary = try c.decode(Slot<VetoesAnswer>.self, forKey: .q1).answer
+            // A diet-reason reroll appends to `vetoes_extra`; the engine
+            // prunes on the union, so the verdict screen shows it too.
+            q1Vetoes = dietary.vetoes + (dietary.vetoesExtra ?? [])
+            q2Budget = try c.decode(Slot<TierAnswer>.self, forKey: .q2).answer.tier
+            q3WalkMinutes = try c.decode(Slot<MinutesAnswer>.self, forKey: .q3).answer.minutes
+            q4Vibe = try c.decode(Slot<LevelAnswer>.self, forKey: .q4).answer.level
+            q5Regret = try c.decode(Slot<ScoresAnswer>.self, forKey: .q5).answer.scores
         }
     }
 

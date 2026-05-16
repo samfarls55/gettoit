@@ -19,6 +19,11 @@ import {
   type VerdictInsert,
   type VerdictRow,
 } from "./handler.ts";
+import {
+  mapVotesRowToMemberVote,
+  type QuestionSlot,
+  type VotesRow,
+} from "../_shared/votes-schema.ts";
 
 function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter {
   const supabaseUrl = env.SUPABASE_URL ?? "";
@@ -52,9 +57,15 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       return (data ?? []) as RoomOptionRow[];
     },
     async fetchVotes(room_id): Promise<MemberVoteRow[]> {
+      // TB-04 — `votes` now stores answers in five generic jsonb slots
+      // (`q1`..`q5`). The engine's answer fields are derived by the
+      // schema-driven mapping layer `_shared/votes-schema.ts`, which
+      // dispatches each slot on `meta.question_kind` rather than on a
+      // hardcoded column name — so quiz content can change without a
+      // migration or an engine change.
       const { data, error } = await client
         .from("votes")
-        .select("user_id, q1_vetoes, q1_vetoes_extra, q2_budget, q3_walk_minutes, q4_vibe, q5_regret")
+        .select("user_id, q1, q2, q3, q4, q5")
         .eq("room_id", room_id);
       if (error) {
         console.warn("compute-verdict fetchVotes failed:", error.message);
@@ -66,24 +77,32 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       // user_metadata. Surface the short uuid prefix as a placeholder;
       // TB-08 (ratification) or TB-12 (Apple upgrade) will introduce
       // a real `display_name`.
-      return (data ?? []).map((row) => ({
-        user_id: row.user_id,
-        display_name: `m${(row.user_id as string).slice(0, 4)}`,
-        q1_vetoes: row.q1_vetoes ?? [],
-        // TB-10 — q1_vetoes_extra are appended by the apply_reroll RPC
-        // on a diet-reason reroll. The handler merges them with
-        // q1_vetoes before feeding the engine.
-        q1_vetoes_extra: row.q1_vetoes_extra ?? [],
-        q2_budget: row.q2_budget,
-        q3_walk_minutes: row.q3_walk_minutes,
-        q4_vibe: row.q4_vibe,
-        q5_regret: row.q5_regret ?? {},
-        // soft_cuisine_vetoes isn't currently stored on the `votes`
-        // row in v1 — reroll (TB-10) and post-v1 taste-profile work
-        // will wire this in. Returning undefined here lets the engine
-        // skip the cuisine_veto relax step until the column lands.
-        soft_cuisine_vetoes: undefined,
-      })) as MemberVoteRow[];
+      return (data ?? []).map((row) => {
+        const userId = row.user_id as string;
+        const votesRow: VotesRow = {
+          user_id: userId,
+          display_name: `m${userId.slice(0, 4)}`,
+          q1: (row.q1 ?? null) as QuestionSlot | null,
+          q2: (row.q2 ?? null) as QuestionSlot | null,
+          q3: (row.q3 ?? null) as QuestionSlot | null,
+          q4: (row.q4 ?? null) as QuestionSlot | null,
+          q5: (row.q5 ?? null) as QuestionSlot | null,
+        };
+        // The mapping layer already unions a diet-reason reroll's
+        // `vetoes_extra` into `q1_vetoes`, so the handler's
+        // `q1_vetoes_extra` merge is a harmless no-op here.
+        const vote = mapVotesRowToMemberVote(votesRow);
+        return {
+          user_id: vote.user_id,
+          display_name: vote.display_name,
+          q1_vetoes: vote.q1_vetoes,
+          q2_budget: vote.q2_budget,
+          q3_walk_minutes: vote.q3_walk_minutes,
+          q4_vibe: vote.q4_vibe,
+          q5_regret: vote.q5_regret,
+          soft_cuisine_vetoes: vote.soft_cuisine_vetoes,
+        } satisfies MemberVoteRow;
+      });
     },
     async fetchRoomRerollState(room_id) {
       const { data, error } = await client

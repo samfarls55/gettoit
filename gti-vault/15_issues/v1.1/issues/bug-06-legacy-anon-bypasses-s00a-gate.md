@@ -2,7 +2,7 @@
 issue: bug-06
 title: Legacy v1 anonymous session bypasses S00a sign-in gate on launch
 github_issue: 63
-status: ready-for-human
+status: ready-for-agent
 type: AFK
 created: 2026-05-14
 prd: v1-prd
