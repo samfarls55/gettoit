@@ -131,7 +131,9 @@ type MemberVotePatch = Partial<
 type KindReader = (answer: Record<string, unknown>) => MemberVotePatch;
 
 function asStringArray(v: unknown): string[] {
-  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  return Array.isArray(v)
+    ? v.filter((x): x is string => typeof x === "string")
+    : [];
 }
 
 function asNumber(v: unknown, fallback: number): number {
@@ -234,7 +236,9 @@ export function mapVotesRowToMemberVote(row: VotesRow): MemberVote {
     const patch = reader(slot.answer ?? {});
     if (patch.q1_vetoes !== undefined) vote.q1_vetoes = patch.q1_vetoes;
     if (patch.q2_budget !== undefined) vote.q2_budget = patch.q2_budget;
-    if (patch.q3_walk_minutes !== undefined) vote.q3_walk_minutes = patch.q3_walk_minutes;
+    if (patch.q3_walk_minutes !== undefined) {
+      vote.q3_walk_minutes = patch.q3_walk_minutes;
+    }
     if (patch.q4_vibe !== undefined) vote.q4_vibe = patch.q4_vibe;
     if (patch.q5_regret !== undefined) vote.q5_regret = patch.q5_regret;
     if (patch.soft_cuisine_vetoes !== undefined) {
@@ -283,25 +287,44 @@ export function buildVotesSlotsFromLegacyAnswers(
 ): VotesSlotInsert {
   return {
     q1: {
-      meta: { question_kind: "dietary_veto", prompt: "Anything off the menu tonight?" },
-      answer: answers.soft_cuisine_vetoes && answers.soft_cuisine_vetoes.length > 0
-        ? { vetoes: answers.q1_vetoes, soft_cuisine_vetoes: answers.soft_cuisine_vetoes }
-        : { vetoes: answers.q1_vetoes },
+      meta: {
+        question_kind: "dietary_veto",
+        prompt: "Anything off the menu tonight?",
+      },
+      answer:
+        answers.soft_cuisine_vetoes && answers.soft_cuisine_vetoes.length > 0
+          ? {
+            vetoes: answers.q1_vetoes,
+            soft_cuisine_vetoes: answers.soft_cuisine_vetoes,
+          }
+          : { vetoes: answers.q1_vetoes },
     },
     q2: {
-      meta: { question_kind: "budget_cap", prompt: "Where's the ceiling tonight?" },
+      meta: {
+        question_kind: "budget_cap",
+        prompt: "Where's the ceiling tonight?",
+      },
       answer: { tier: answers.q2_budget },
     },
     q3: {
-      meta: { question_kind: "walk_minutes", prompt: "How far are you willing to walk?" },
+      meta: {
+        question_kind: "walk_minutes",
+        prompt: "How far are you willing to walk?",
+      },
       answer: { minutes: answers.q3_walk_minutes },
     },
     q4: {
-      meta: { question_kind: "vibe", prompt: "What's the energy you're after?" },
+      meta: {
+        question_kind: "vibe",
+        prompt: "What's the energy you're after?",
+      },
       answer: { level: answers.q4_vibe },
     },
     q5: {
-      meta: { question_kind: "regret", prompt: "Which would you most regret missing?" },
+      meta: {
+        question_kind: "regret",
+        prompt: "Which would you most regret missing?",
+      },
       answer: { scores: answers.q5_regret },
     },
   };

@@ -33,7 +33,10 @@ import {
 
 function dietarySlot(vetoes: string[]): QuestionSlot {
   return {
-    meta: { question_kind: "dietary_veto", prompt: "Anything off the menu tonight?" },
+    meta: {
+      question_kind: "dietary_veto",
+      prompt: "Anything off the menu tonight?",
+    },
     answer: { vetoes },
   };
 }
@@ -125,7 +128,11 @@ Deno.test("dispatches on question_kind, not slot column — questions can move s
 
   // The mapper read the metadata, not the column name.
   assertEquals(vote.q4_vibe, 1, "vibe answer was in slot q3 but still mapped");
-  assertEquals(vote.q3_walk_minutes, 10, "walk answer was in slot q4 but still mapped");
+  assertEquals(
+    vote.q3_walk_minutes,
+    10,
+    "walk answer was in slot q4 but still mapped",
+  );
   assertEquals(vote.q1_vetoes, ["halal"]);
   assertEquals(vote.q2_budget, 3);
   assertEquals(vote.q5_regret, { a: 4 });
@@ -141,14 +148,22 @@ Deno.test("a row with the SAME answers in two different slot orders maps identic
   };
 
   const orderA: VotesRow = {
-    user_id: "u1", display_name: "a",
-    q1: answers.dietary, q2: answers.budget, q3: answers.walk,
-    q4: answers.vibe, q5: answers.regret,
+    user_id: "u1",
+    display_name: "a",
+    q1: answers.dietary,
+    q2: answers.budget,
+    q3: answers.walk,
+    q4: answers.vibe,
+    q5: answers.regret,
   };
   const orderB: VotesRow = {
-    user_id: "u1", display_name: "a",
-    q1: answers.regret, q2: answers.vibe, q3: answers.dietary,
-    q4: answers.walk, q5: answers.budget,
+    user_id: "u1",
+    display_name: "a",
+    q1: answers.regret,
+    q2: answers.vibe,
+    q3: answers.dietary,
+    q4: answers.walk,
+    q5: answers.budget,
   };
 
   const voteA = mapVotesRowToMemberVote(orderA);
@@ -197,15 +212,30 @@ Deno.test("missing optional slots default to a no-constraint MemberVote", () => 
   };
   const vote = mapVotesRowToMemberVote(sparse);
   assertEquals(vote.q1_vetoes, []);
-  assertEquals(vote.q2_budget, 4, "absent budget cap defaults to the open tier");
-  assertEquals(vote.q3_walk_minutes, 30, "absent walk threshold defaults to the open ceiling");
-  assertEquals(vote.q4_vibe, 2, "absent vibe defaults to the neutral mid level");
+  assertEquals(
+    vote.q2_budget,
+    4,
+    "absent budget cap defaults to the open tier",
+  );
+  assertEquals(
+    vote.q3_walk_minutes,
+    30,
+    "absent walk threshold defaults to the open ceiling",
+  );
+  assertEquals(
+    vote.q4_vibe,
+    2,
+    "absent vibe defaults to the neutral mid level",
+  );
   assertEquals(vote.q5_regret, { pico: 5 });
 });
 
 Deno.test("an unknown question_kind throws rather than silently dropping the answer", () => {
   const bad: VotesRow = canonicalRow({
-    q3: { meta: { question_kind: "telepathy" }, answer: {} } as unknown as QuestionSlot,
+    q3: {
+      meta: { question_kind: "telepathy" },
+      answer: {},
+    } as unknown as QuestionSlot,
   });
   assertThrows(
     () => mapVotesRowToMemberVote(bad),
@@ -257,7 +287,9 @@ Deno.test("dietary slot vetoes_extra (diet-reason reroll additions) union into q
 // ───────────────────────────────────────────────────────────────────────
 
 Deno.test("buildVotesSlotsFromLegacyAnswers round-trips through the mapper", async () => {
-  const { buildVotesSlotsFromLegacyAnswers } = await import("./votes-schema.ts");
+  const { buildVotesSlotsFromLegacyAnswers } = await import(
+    "./votes-schema.ts"
+  );
   const legacy = {
     q1_vetoes: ["halal"],
     q2_budget: 3,
