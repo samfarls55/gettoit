@@ -63,8 +63,26 @@ still dark.
 The actual live deploy happens on the merge of this PR to `main`
 (which triggers the `edge-deploy` lane). The AFK worktree has no
 Supabase credentials, so the deploy itself could not be run from here
-— the durable CI fix is the deliverable. Acceptance criterion #5
-(Foursquare dashboard non-zero call count after a real Q5 session)
-remains a founder check.
+— the durable CI fix is the deliverable.
+
+**Post-merge finding (2026-05-16).** The `edge-deploy` lane ran on the
+merge commit: the `supabase functions deploy` and `supabase secrets
+set` steps **succeeded**, and the live invocation returned **HTTP
+200** — not `404` (undeployed) and not `places_proxy_misconfigured`
+(secrets unset). The deploy gap tb-14 owned is genuinely closed.
+
+However, the deployed function returned a **200 with an empty
+`places` array** for a known dense-urban coordinate — Foursquare data
+is not flowing. That is a fault *outside* tb-14's "deploy + secrets"
+scope (the issue explicitly framed the key as known-good and the
+problem as deployment-only) and it cannot be diagnosed without the
+Edge Function runtime logs, which need a credential the AFK worktree
+does not carry. Filed as a separate follow-up:
+[[../placesproxy-empty-foursquare-results|placesproxy-empty-foursquare-results]].
+The live integration test was split into a hard-gate deploy-contract
+tier (passes) and a non-blocking Foursquare-data diagnostic tier, so
+acceptance criteria #1–#3 are met and verified while criterion #4's
+data assertion is captured as a loud diagnostic pending that
+follow-up. Criterion #5 remains a founder check.
 
 Decision recorded in [[../../../60_engineering/supabase-setup#edge-function-deploy-ci-lane-edge-deploy|supabase-setup.md §Edge Function deploy]].
