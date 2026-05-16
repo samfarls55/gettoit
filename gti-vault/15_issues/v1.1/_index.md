@@ -103,6 +103,8 @@ Build order: tb-14, tb-15, tb-17 can start immediately; tb-16 after tb-15. tb-15
 
 **Follow-up surfaced by tb-14 (2026-05-16).** tb-14 closed the deploy gap — the `places-proxy` Edge Function is now deployed and configured (live invocation returns HTTP 200, not `404` / `places_proxy_misconfigured`). But the deployed function returns an *empty* `places` array: Foursquare data still does not flow. Filed as [[placesproxy-empty-foursquare-results|placesproxy-empty-foursquare-results]] — a bad/expired key or a stale API-version pin, outside tb-14's deploy-only scope, needs a diagnosis pass with the Edge Function runtime logs.
 
+**Adjacency flagged during the tb-14 run (2026-05-16).** The `ios` CI lane's integration tests (`RoomStore` / `Verdict` / `Votes` `IntegrationTests`) flake against the shared live Supabase DB — same commit passed and failed on re-run across the rapid tb-14 PR cadence. Pre-existing, not a tb-14 regression (tb-14 changed no Swift). Flagged in [[ios-integration-tests-flaky-on-shared-db|ios-integration-tests-flaky-on-shared-db]]; needs CI-hardening triage.
+
 ## Cross-references
 
 - [[testflight-first-dogfood-2026-05-14|Source raw note]] — original first-impression observations (moved from 01_raw/ on 2026-05-14 compile)
