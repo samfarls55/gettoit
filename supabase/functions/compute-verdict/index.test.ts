@@ -16,6 +16,7 @@ import {
   type VerdictInsert,
   type VerdictRow,
 } from "./handler.ts";
+import type { HardVeto } from "../_shared/verdict-engine.ts";
 
 function envOk() {
   return {
@@ -29,6 +30,10 @@ interface AdapterSeed {
   options?: RoomOptionRow[];
   votes?: MemberVoteRow[];
   existing?: VerdictRow | null;
+  /** TB-12 — per-account sticky profile vetoes, keyed by user_id.
+   *  A user_id absent from this map (or an absent map entirely) means
+   *  "no profile row" — the handler treats it as no profile vetoes. */
+  profileVetoes?: Record<string, HardVeto[]>;
 }
 
 interface AdapterState {
@@ -84,6 +89,14 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
     },
     async deleteVerdictForRoom(_id) {
       // no-op for tests that don't exercise the widen-replace path
+    },
+    async fetchProfileVetoes(user_ids) {
+      const out: Record<string, HardVeto[]> = {};
+      const map = seed.profileVetoes ?? {};
+      for (const id of user_ids) {
+        if (map[id]) out[id] = map[id];
+      }
+      return out;
     },
   };
   return { adapter, inserts, cuts, marked, broadcasts };
@@ -405,6 +418,104 @@ Deno.test("compute-verdict — happy path flips rooms.status to verdict_ready an
     "expected exactly one verdict_ready broadcast to be emitted");
   assertEquals(broadcasts[0].room_id, VALID_ROOM_ID);
   assertEquals(broadcasts[0].verdict_id, "verdict-1");
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// TB-12 — profile vetoes (per-account allergy / dietary / cuisine NEVERS)
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("compute-verdict — TB-12: a member's stored profile veto prunes the matching venue", async () => {
+  // The member has a sticky cuisine-NEVER profile veto for "sushi".
+  // The `votes` row carries NO hard veto (profile data is per-account,
+  // not per-session) — the handler must fetch it from the profile
+  // store and fold it into the engine's hard_vetoes channel.
+  const { adapter, inserts } = memoryAdapter({
+    options: [
+      { id: "opt-taco", payload: { name: "Taco Stand", price_tier: 2, categories: ["Taco Stand"] } },
+      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"] } },
+    ],
+    votes: [
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-taco": 5, "opt-sushi": 5 } },
+    ],
+    profileVetoes: {
+      u1: [{ kind: "cuisine_never", token: "sushi" }],
+    },
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.option_id, "opt-taco");
+  assert(
+    body.cuts.some((c: { option_id: string; cut_reason: string }) =>
+      c.option_id === "opt-sushi" && c.cut_reason === "veto"
+    ),
+    "expected the sushi venue to be EBA-pruned on the stored profile cuisine-NEVER",
+  );
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].option_id, "opt-taco");
+});
+
+Deno.test("compute-verdict — TB-12: profile vetoes are unioned with session hard_vetoes (not replaced)", async () => {
+  // The votes row already carries a session hard_veto (an allergy tag);
+  // the profile store adds a separate cuisine-NEVER. Both must prune.
+  const { adapter } = memoryAdapter({
+    options: [
+      { id: "opt-safe", payload: { name: "Safe Spot", price_tier: 2, categories: ["Cafe"], dietary_tags: ["no_nuts_unverified"] } },
+      { id: "opt-nutty", payload: { name: "Nutty Place", price_tier: 2, categories: ["Cafe"], dietary_tags: [] } },
+      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"], dietary_tags: ["no_nuts_unverified"] } },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [{ kind: "tag", token: "no_nuts_unverified" }],
+        scores: { "opt-safe": 5, "opt-nutty": 5, "opt-sushi": 5 },
+      },
+    ],
+    profileVetoes: {
+      u1: [{ kind: "cuisine_never", token: "sushi" }],
+    },
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.option_id, "opt-safe");
+  // opt-nutty pruned by the session allergy tag, opt-sushi by the
+  // stored profile cuisine NEVER.
+  assert(body.cuts.some((c: { option_id: string }) => c.option_id === "opt-nutty"));
+  assert(body.cuts.some((c: { option_id: string }) => c.option_id === "opt-sushi"));
+});
+
+Deno.test("compute-verdict — TB-12: a member with no profile row contributes no profile veto", async () => {
+  // Absent profile store / absent member row — the handler treats it
+  // as "no profile vetoes" and the run proceeds normally.
+  const { adapter } = memoryAdapter({
+    options: [
+      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"] } },
+    ],
+    votes: [
+      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-sushi": 5 } },
+    ],
+    // no `profileVetoes` seed at all
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.option_id, "opt-sushi");
 });
 
 Deno.test("compute-verdict — engine no-survivor exits 200 with method=no_survivor (TB-09)", async () => {

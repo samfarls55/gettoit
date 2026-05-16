@@ -110,6 +110,18 @@ export interface ComputeVerdictDataAdapter {
    *  Returns null when the prior verdict was a `no_survivor` (no
    *  option_id) or when the option lookup fails (RLS / race). */
   fetchPreviousWinnerName?(room_id: string): Promise<string | null>;
+  /** TB-12 — fetch each member's sticky per-account profile vetoes
+   *  (allergies, dietary restrictions, cuisine NEVERS). Profile data
+   *  lives on the account record, NOT the per-session `votes` row, so
+   *  the handler reads it here and folds the result into every
+   *  member's `hard_vetoes` before calling the engine — feeding the
+   *  same generic EBA channel the schema mapping layer uses.
+   *
+   *  The return is keyed by `user_id`; a user with no profile row is
+   *  simply absent from the map (treated as "no profile vetoes").
+   *  Optional — tests that don't exercise profile vetoes omit it; the
+   *  handler treats absence as "every member has an empty profile." */
+  fetchProfileVetoes?(user_ids: string[]): Promise<Record<string, HardVeto[]>>;
 }
 
 /** Aggregate of the reroll-state slice the engine reads from `rooms`
@@ -248,6 +260,27 @@ export function mergeQ1Vetoes(
     if (key.length === 0 || seen.has(key)) continue;
     seen.add(key);
     out.push(chip);
+  }
+  return out;
+}
+
+/** TB-12 — union session hard vetoes with the member's sticky profile
+ *  vetoes. Deduped on the `(kind, token)` pair (token compared
+ *  case-insensitively, matching the engine's own normalization);
+ *  `session` entries land first, `profile` entries are appended. The
+ *  engine's veto lookup is set-based so a duplicate would not change
+ *  the verdict — the dedupe keeps the engine input minimal. */
+export function mergeHardVetoes(
+  session: readonly HardVeto[],
+  profile: readonly HardVeto[],
+): HardVeto[] {
+  const out: HardVeto[] = [];
+  const seen = new Set<string>();
+  for (const v of [...session, ...profile]) {
+    const key = `${v.kind} ${v.token.trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
   }
   return out;
 }
@@ -418,6 +451,16 @@ export async function handleRequest(
     distance_meters: row.payload?.distance_meters ?? null,
   }));
 
+  // TB-12 — fetch each member's sticky per-account profile vetoes
+  // (allergies / dietary restrictions / cuisine NEVERS). Profile data
+  // lives on the account record, not the per-session `votes` row, so
+  // it is read here and folded into the member's `hard_vetoes` channel
+  // — the same generic EBA channel the schema mapping layer feeds. A
+  // member with no profile row contributes nothing.
+  const profileVetoes: Record<string, HardVeto[]> = data.fetchProfileVetoes
+    ? await data.fetchProfileVetoes(voteRows.map((r) => r.user_id))
+    : {};
+
   // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
   // the union of "original quiz answer" + "diet-reason reroll add."
   // The engine itself doesn't need the split visible — its lookup
@@ -434,12 +477,22 @@ export async function handleRequest(
     const effectiveBudget = rerollState?.budget_tier_override != null
       ? Math.min(row.q2_budget, rerollState.budget_tier_override)
       : row.q2_budget;
+    // TB-12 — union any session hard_vetoes (a `profile_veto` slot,
+    // were one ever written to the vote row) with the member's sticky
+    // profile vetoes. Order: session entries first, profile entries
+    // appended, deduped on (kind, token). The engine's lookup is
+    // set-based so duplicates are harmless — the dedupe just keeps the
+    // engine input tidy.
+    const hardVetoes = mergeHardVetoes(
+      row.hard_vetoes ?? [],
+      profileVetoes[row.user_id] ?? [],
+    );
     return {
       user_id: row.user_id,
       display_name: row.display_name,
       q1_vetoes: mergedVetoes,
       q2_budget: effectiveBudget,
-      hard_vetoes: row.hard_vetoes ?? [],
+      hard_vetoes: hardVetoes,
       scores: row.scores ?? {},
     };
   });
