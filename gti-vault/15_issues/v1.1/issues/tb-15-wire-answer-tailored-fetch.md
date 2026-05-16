@@ -42,7 +42,7 @@ None — can start immediately. End-to-end verification against live Foursquare 
 
 ## Comments
 
-**2026-05-16 — done (PR #95).** The per-member Foursquare fetch now fires from the `QuizCoordinator` step machine on the Q4 → Q5 transition, not on the pre-quiz assembler seam.
+**2026-05-16 — done (PR #97).** The per-member Foursquare fetch now fires from the `QuizCoordinator` step machine on the Q4 → Q5 transition, not on the pre-quiz assembler seam.
 
 - New `QuizCandidateFetch` protocol is the trigger seam. `FoursquareQuizCandidateFetch` (production) wraps the tb-07 `FoursquareFetchExecutor` — it plans + runs the N+1 answer-tailored calls and shapes the unioned, deduped venue pool into Q5's `[QuizCandidate]` list. `DummyQuizCandidateFetch` covers the no-coordinate path.
 - `QuizCoordinator` gained a second, live-quiz init taking a `candidateFetch`; the candidate list starts empty and is populated when the fetch resolves. `q5CandidatesState` (`idle` / `loading` / `ready` / `fallbackDummy`) tracks the lifecycle. The member's real Q1 cuisines + Q2 spend cap + session parameters forward to the fetch. The legacy explicit-`candidates:` init is kept fetch-free for the unit/snapshot harness.
