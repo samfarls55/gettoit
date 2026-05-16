@@ -1,14 +1,31 @@
-// GetToIt — fire_verdict RPC integration tests (TB-07).
+// GetToIt — fire_verdict RPC integration tests (TB-07, re-pointed by
+// TB-13 onto the v1.1 firing contract).
 //
 // Hits the live Supabase project. Skips when secrets are absent
 // (same pattern as VotesIntegrationTests / VerdictIntegrationTests).
 //
+// TB-13 (v1.1) retired the v1 timer / shot-clock / minimum-quorum
+// firing path. The verdict now fires on exactly two signals:
+//   * All participants completed Q5 — the AFTER INSERT ON votes
+//     trigger auto-fires the moment every current member has a
+//     `regret`-kind votes slot. A votes row inserted via the
+//     production `QuizCoordinator.VoteRow` writer always carries a
+//     `regret` Q5 slot, so a member is Q5-complete the instant their
+//     vote lands.
+//   * The initiator pressed "close voting" — `fire_verdict` produces
+//     the verdict on demand, with NO minimum quorum: a solo session
+//     (initiator alone) resolves and the initiator never waits on a
+//     straggler.
+//
 // Acceptance covered:
-//   * Initiator with quorum can flip a room from `open` to `firing`.
-//   * Initiator below quorum (only their own vote, or 0 votes) gets
-//     a `below_quorum` reject and the room stays `open`.
+//   * Solo initiator can close voting with no other members and no
+//     votes — `fire_verdict` returns `firing` (no quorum gate).
+//   * A two-member room auto-fires once both members have voted
+//     (both Q5-complete) — without anyone calling `fire_verdict`.
+//   * The initiator can close voting before a joiner finishes — the
+//     RPC flips the room without waiting on the straggler.
 //   * Non-initiator gets `not_initiator` and the room stays `open`.
-//   * Re-firing a room already in `firing` returns `already_firing`
+//   * Re-firing a room already past `open` returns `already_firing`
 //     (idempotency).
 //
 // Notes:
@@ -17,7 +34,7 @@
 //     our CI / local-dev environment that's typically unset, so the
 //     RPC returns `firing` cleanly without trying to reach the Edge
 //     Function. The HTTP dispatch is fire-and-forget anyway — the
-//     RPC result we care about for the RLS/quorum tests is the
+//     RPC result we care about for the RLS / firing tests is the
 //     status flip, not whether the engine ran.
 
 import XCTest
@@ -133,63 +150,120 @@ final class FireVerdictIntegrationTests: XCTestCase {
 
     // MARK: - tests
 
-    func testBelowQuorumRejectsWithRoomStillOpen() async throws {
+    func testSoloInitiatorCanCloseVotingWithNoMinimumQuorum() async throws {
+        // TB-13 (v1.1): there is NO minimum quorum. A solo session —
+        // the initiator alone, with no other members and no votes —
+        // can still close voting and produce a verdict. The v1
+        // `below_quorum` reject is gone.
         let client = try makeClient()
         let roomStore = RoomStore(client: client)
 
         let userID = try await signInFreshAnon(on: client)
         let room = try await roomStore.createRoom(as: userID)
 
-        // No votes yet — quorum (0) is below 2.
+        // No votes, solo room — close voting fires regardless.
         let result = try await callFireVerdict(client: client, roomID: room.id)
-        XCTAssertEqual(result["error"] as? String, "below_quorum",
-            "expected below_quorum reject before any votes land")
+        XCTAssertEqual(result["status"] as? String, "firing",
+            "expected a solo close-voting RPC to flip to firing — got \(result)")
+        XCTAssertNil(result["error"],
+            "v1.1 has no quorum gate; close voting must not reject")
 
         let status = try await fetchRoomStatus(client: client, roomID: room.id)
-        XCTAssertEqual(status, "open",
-            "expected the rejected RPC to leave status unchanged")
+        XCTAssertNotEqual(status, "open",
+            "expected the close-voting RPC to move the room past 'open'")
 
         try? await client.auth.signOut()
     }
 
-    func testInitiatorWithQuorumFlipsRoomToFiring() async throws {
-        // Drive both the initiator and joiner identities on separate
-        // clients so we can hop between sessions without losing the
-        // initiator JWT. signInAnonymously on the same client
-        // overwrites the prior session; supabase-swift caches the
-        // session in our in-memory storage, so we use one client per
-        // identity.
+    func testRoomAutoFiresOnceAllParticipantsCompleteQ5() async throws {
+        // TB-13 (v1.1): the verdict auto-fires the moment every member
+        // has completed Q5. A votes row written through the production
+        // `QuizCoordinator.VoteRow` writer always carries a `regret`
+        // Q5 slot, so once both members have voted the AFTER INSERT ON
+        // votes trigger flips the room past `open` — with nobody
+        // calling `fire_verdict`.
+        //
+        // Two clients so we can hop between identities without losing
+        // the initiator JWT (signInAnonymously overwrites the prior
+        // session on the same client).
         let creatorClient = try makeClient()
         let joinerClient = try makeClient()
         let creatorRoomStore = RoomStore(client: creatorClient)
         let joinerRoomStore = RoomStore(client: joinerClient)
 
-        // Initiator side — create room + vote.
+        // Initiator creates the room.
         let creatorID = try await signInFreshAnon(on: creatorClient)
         let room = try await creatorRoomStore.createRoom(as: creatorID)
-        try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
 
-        // Joiner side — join + vote. Quorum now met (2 votes).
+        // Joiner joins FIRST — so the room has two members before any
+        // vote lands. (If the initiator voted while alone, the solo
+        // room would auto-fire on that single Q5-complete member.)
         let joinerID = try await signInFreshAnon(on: joinerClient)
         try await joinerRoomStore.joinRoom(id: room.id, as: joinerID)
+
+        // Initiator votes — one of two members is now Q5-complete.
+        try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
+
+        // The room must still be open — the joiner has not yet
+        // completed Q5.
+        let midStatus = try await fetchRoomStatus(client: creatorClient, roomID: room.id)
+        XCTAssertEqual(midStatus, "open",
+            "room must wait while a member has not completed Q5")
+
+        // Joiner votes — now every member is Q5-complete.
         try await insertVoteAs(client: joinerClient, roomID: room.id, userID: joinerID)
 
-        // Initiator presses Decide now via their own client — RPC
-        // sees creator_user_id = auth.uid() and admits.
+        // The auto-fire trigger fired on the joiner's vote insert —
+        // no `fire_verdict` call. Status moved past `open`. It is
+        // `firing` when the dispatcher GUC is unset (CI / local), or
+        // `verdict_ready` if the live compute path ran.
+        let status = try await fetchRoomStatus(client: creatorClient, roomID: room.id)
+        XCTAssertNotEqual(status, "open",
+            "expected all-participants-complete to auto-fire the verdict")
+        XCTAssertNotEqual(status, "expired",
+            "auto-fire on all-complete must not flip the room to expired")
+
+        try? await creatorClient.auth.signOut()
+        try? await joinerClient.auth.signOut()
+    }
+
+    func testInitiatorClosesVotingWithoutWaitingOnAStraggler() async throws {
+        // TB-13 (v1.1): the initiator's close-voting control produces
+        // the verdict without waiting on a straggler. Here the joiner
+        // has joined but NOT voted — the room is not all-complete —
+        // yet the initiator can still close voting and fire.
+        let creatorClient = try makeClient()
+        let joinerClient = try makeClient()
+        let creatorRoomStore = RoomStore(client: creatorClient)
+        let joinerRoomStore = RoomStore(client: joinerClient)
+
+        // Initiator creates the room.
+        let creatorID = try await signInFreshAnon(on: creatorClient)
+        let room = try await creatorRoomStore.createRoom(as: creatorID)
+
+        // Joiner joins FIRST — two members before any vote lands, so
+        // the initiator's vote does not auto-fire a solo room.
+        let joinerID = try await signInFreshAnon(on: joinerClient)
+        try await joinerRoomStore.joinRoom(id: room.id, as: joinerID)
+
+        // Initiator votes; the joiner is the straggler — never votes.
+        try await insertVoteAs(client: creatorClient, roomID: room.id, userID: creatorID)
+
+        // Room is still open — the joiner has not completed Q5.
+        let preStatus = try await fetchRoomStatus(client: creatorClient, roomID: room.id)
+        XCTAssertEqual(preStatus, "open",
+            "room must not auto-fire while the joiner is mid-quiz")
+
+        // Initiator presses close voting — fires without the joiner.
         let result = try await callFireVerdict(client: creatorClient, roomID: room.id)
         XCTAssertEqual(result["status"] as? String, "firing",
-            "expected initiator + quorum RPC to flip status to firing — got \(result)")
+            "expected close-voting to fire without the straggler — got \(result)")
 
-        // Verify the row actually moved past `open` from the
-        // initiator's perspective (they're a member, RLS admits).
         let status = try await fetchRoomStatus(client: creatorClient, roomID: room.id)
-        // Status may be `firing` if the dispatcher GUC isn't set on
-        // this project, OR `verdict_ready` if the live compute path
-        // ran. Either is a successful flip away from `open`.
         XCTAssertNotEqual(status, "open",
-            "expected the rooms.status to move past 'open' after a successful fire")
+            "expected close-voting to move the room past 'open'")
         XCTAssertNotEqual(status, "expired",
-            "happy-path fire must not flip the room to expired")
+            "close-voting must not flip the room to expired")
 
         try? await creatorClient.auth.signOut()
         try? await joinerClient.auth.signOut()
