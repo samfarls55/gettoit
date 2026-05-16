@@ -1,8 +1,15 @@
-// GetToIt — QuizCoordinator unit tests (TB-04).
+// GetToIt — QuizCoordinator unit tests (TB-06 — Q1–Q4 rework).
 //
 // Pure-logic tests (no Supabase round-trip). Drives the coordinator
-// through realistic flows and asserts the wire row shape + the
-// idempotency / rapid-tap semantics.
+// through the v1.1 question semantics and asserts the wire row shape +
+// the idempotency / rapid-tap semantics.
+//
+// v1.1 question rework (PRD module J, part 1):
+//   * Q1 — cuisine craving. Multi-select, capped at 3, with a
+//     mutually-exclusive "No preference" toggle.
+//   * Q2 — spend cap. A hard ceiling, unchanged 4-tier semantics.
+//   * Q3 — reputation / discovery. A single-select chip picker.
+//   * Q4 — vibe energy. A 5-point cardinal scale (Quiet…Rowdy).
 
 import XCTest
 @testable import GetToIt
@@ -41,38 +48,112 @@ final class QuizCoordinatorTests: XCTestCase {
         var description: String { "network timeout" }
     }
 
-    // MARK: - Q1 toggling
+    // MARK: - Q1 cuisine craving — the 3-cap
 
-    func testNothingTonightChipIsMutuallyExclusiveWithOtherVetoes() async {
-        let writer = RecordingWriter()
-        let coord = QuizCoordinator(
-            roomID: UUID(),
-            userID: UUID(),
-            writer: writer.writer()
-        )
+    func testQ1CapsCuisineSelectionAtThree() {
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
 
-        coord.toggleVeto(QuizVeto.shellfish)
-        coord.toggleVeto(QuizVeto.dairy)
-        XCTAssertEqual(coord.q1Vetoes, [QuizVeto.shellfish, QuizVeto.dairy])
+        coord.toggleCuisine(QuizCuisine.mexican)
+        coord.toggleCuisine(QuizCuisine.japanese)
+        coord.toggleCuisine(QuizCuisine.italian)
+        XCTAssertEqual(coord.q1Cuisines, [QuizCuisine.mexican, QuizCuisine.japanese, QuizCuisine.italian])
 
-        coord.toggleVeto(QuizVeto.nothingTonight)
-        XCTAssertEqual(coord.q1Vetoes, [QuizVeto.nothingTonight],
-                       "expected nothing_tonight to clear the other selections")
-
-        coord.toggleVeto(QuizVeto.gluten)
-        XCTAssertEqual(coord.q1Vetoes, [QuizVeto.gluten],
-                       "expected selecting another chip to clear nothing_tonight")
+        // The 4th selection is prevented — the set stays at 3.
+        coord.toggleCuisine(QuizCuisine.thai)
+        XCTAssertEqual(coord.q1Cuisines.count, 3,
+            "expected the 4th cuisine selection to be prevented by the cap")
+        XCTAssertFalse(coord.q1Cuisines.contains(QuizCuisine.thai),
+            "expected the rejected 4th cuisine to not enter the set")
     }
 
-    func testNothingTonightChipDeselectsItself() {
-        let writer = RecordingWriter()
-        let coord = QuizCoordinator(
-            roomID: UUID(), userID: UUID(), writer: writer.writer()
-        )
-        coord.toggleVeto(QuizVeto.nothingTonight)
-        XCTAssertEqual(coord.q1Vetoes, [QuizVeto.nothingTonight])
-        coord.toggleVeto(QuizVeto.nothingTonight)
-        XCTAssertTrue(coord.q1Vetoes.isEmpty, "expected re-tapping nothing_tonight to clear the set")
+    func testQ1CanDeselectAtCapToFreeASlot() {
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        coord.toggleCuisine(QuizCuisine.mexican)
+        coord.toggleCuisine(QuizCuisine.japanese)
+        coord.toggleCuisine(QuizCuisine.italian)
+        // Deselecting a cuisine at the cap always works — it frees a slot.
+        coord.toggleCuisine(QuizCuisine.japanese)
+        XCTAssertEqual(coord.q1Cuisines, [QuizCuisine.mexican, QuizCuisine.italian])
+        // …and now a new pick lands.
+        coord.toggleCuisine(QuizCuisine.thai)
+        XCTAssertEqual(coord.q1Cuisines, [QuizCuisine.mexican, QuizCuisine.italian, QuizCuisine.thai])
+    }
+
+    func testQ1AtCapReportsNoFreeSlots() {
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        XCTAssertTrue(coord.q1HasFreeCuisineSlot, "an empty set has free slots")
+        coord.toggleCuisine(QuizCuisine.mexican)
+        coord.toggleCuisine(QuizCuisine.japanese)
+        XCTAssertTrue(coord.q1HasFreeCuisineSlot, "2 of 3 still has a free slot")
+        coord.toggleCuisine(QuizCuisine.italian)
+        XCTAssertFalse(coord.q1HasFreeCuisineSlot, "3 of 3 is full")
+    }
+
+    // MARK: - Q1 cuisine craving — "No preference" exclusivity
+
+    func testQ1NoPreferenceIsMutuallyExclusiveBothWays() {
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+
+        coord.toggleCuisine(QuizCuisine.mexican)
+        coord.toggleCuisine(QuizCuisine.japanese)
+        XCTAssertEqual(coord.q1Cuisines.count, 2)
+        XCTAssertFalse(coord.q1NoPreference)
+
+        // Selecting "No preference" clears every cuisine.
+        coord.toggleCuisineNoPreference()
+        XCTAssertTrue(coord.q1NoPreference)
+        XCTAssertTrue(coord.q1Cuisines.isEmpty,
+            "expected No preference to clear all selected cuisines")
+
+        // Selecting a cuisine clears "No preference".
+        coord.toggleCuisine(QuizCuisine.italian)
+        XCTAssertFalse(coord.q1NoPreference,
+            "expected selecting a cuisine to clear No preference")
+        XCTAssertEqual(coord.q1Cuisines, [QuizCuisine.italian])
+    }
+
+    func testQ1NoPreferenceTogglesItselfOff() {
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        coord.toggleCuisineNoPreference()
+        XCTAssertTrue(coord.q1NoPreference)
+        coord.toggleCuisineNoPreference()
+        XCTAssertFalse(coord.q1NoPreference, "expected re-tapping No preference to clear it")
+    }
+
+    func testQ1NoPreferenceDoesNotConsumeACuisineSlot() {
+        // "No preference" is its own flag — it must never count toward
+        // the 3-cap (otherwise a No-preference pick would block cuisines
+        // if the user changed their mind).
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        coord.toggleCuisineNoPreference()
+        coord.toggleCuisine(QuizCuisine.mexican)   // clears No preference
+        coord.toggleCuisine(QuizCuisine.japanese)
+        coord.toggleCuisine(QuizCuisine.italian)
+        XCTAssertEqual(coord.q1Cuisines.count, 3, "3 cuisines fit after a No-preference detour")
+    }
+
+    // MARK: - Q3 reputation chip
+
+    func testQ3CapturesTheReputationChip() {
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        // Default is "No preference" — the neutral, non-pruning answer.
+        XCTAssertEqual(coord.q3Reputation, QuizReputation.noPreference)
+        coord.setReputation(QuizReputation.hiddenGem)
+        XCTAssertEqual(coord.q3Reputation, QuizReputation.hiddenGem)
+        coord.setReputation(QuizReputation.classic)
+        XCTAssertEqual(coord.q3Reputation, QuizReputation.classic,
+            "expected the reputation chip to be single-select — last pick wins")
+    }
+
+    // MARK: - Q4 vibe energy
+
+    func testQ4CapturesTheFivePointEnergyValue() {
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        for level in 0..<GTIVibeLabels.all.count {
+            coord.setVibe(level)
+            XCTAssertEqual(coord.q4Vibe, level)
+        }
+        XCTAssertEqual(GTIVibeLabels.all.count, 5, "vibe energy is a 5-point scale")
     }
 
     // MARK: - step advancement
@@ -88,7 +169,34 @@ final class QuizCoordinatorTests: XCTestCase {
             "advance past q5 must be a no-op — submit is the only forward path")
     }
 
-    // MARK: - submit happy path
+    func testAdvancingQ1ThroughQ4NeverStalls() {
+        // Acceptance criterion: advancing through Q1-Q4 never stalls.
+        // Every Qn step has a defined successor and `advance()` always
+        // moves forward — regardless of which answers are picked.
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        coord.toggleCuisine(QuizCuisine.mexican)
+        XCTAssertEqual(coord.step, .q1)
+        coord.advance(); XCTAssertEqual(coord.step, .q2)
+        coord.setBudget(2)
+        coord.advance(); XCTAssertEqual(coord.step, .q3)
+        coord.setReputation(QuizReputation.popular)
+        coord.advance(); XCTAssertEqual(coord.step, .q4)
+        coord.setVibe(4)
+        coord.advance(); XCTAssertEqual(coord.step, .q5,
+            "expected the flow to reach Q5 without stalling on any Q1-Q4 step")
+    }
+
+    func testAdvancingQ1WithNoAnswerStillMovesForward() {
+        // No answer is required to advance — the flow never stalls even
+        // if a member taps Next without selecting anything.
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        coord.advance(); XCTAssertEqual(coord.step, .q2)
+        coord.advance(); XCTAssertEqual(coord.step, .q3)
+        coord.advance(); XCTAssertEqual(coord.step, .q4)
+        coord.advance(); XCTAssertEqual(coord.step, .q5)
+    }
+
+    // MARK: - submit happy path + persistence
 
     func testSubmitWritesASingleRowOnQ5() async {
         let writer = RecordingWriter()
@@ -100,11 +208,12 @@ final class QuizCoordinatorTests: XCTestCase {
 
         // Walk a full quiz with non-default picks so we can verify the
         // wire row carries the captured answers.
-        coord.toggleVeto(QuizVeto.shellfish)
+        coord.toggleCuisine(QuizCuisine.mexican)
+        coord.toggleCuisine(QuizCuisine.thai)
         coord.advance()
         coord.setBudget(3)
         coord.advance()
-        coord.setWalkMinutes(10)
+        coord.setReputation(QuizReputation.hiddenGem)
         coord.advance()
         coord.setVibe(1)
         coord.advance()
@@ -124,13 +233,24 @@ final class QuizCoordinatorTests: XCTestCase {
         let row = writer.rows[0]
         XCTAssertEqual(row.roomID, roomID)
         XCTAssertEqual(row.userID, userID)
-        XCTAssertEqual(row.q1Vetoes, [QuizVeto.shellfish])
+        XCTAssertEqual(Set(row.q1Cuisines), [QuizCuisine.mexican, QuizCuisine.thai])
+        XCTAssertFalse(row.q1NoPreference)
         XCTAssertEqual(row.q2Budget, 3)
-        XCTAssertEqual(row.q3WalkMinutes, 10)
+        XCTAssertEqual(row.q3Reputation, QuizReputation.hiddenGem)
         XCTAssertEqual(row.q4Vibe, 1)
         XCTAssertEqual(row.q5Regret[QuizDummyCandidates.all[0].id], 5)
         XCTAssertEqual(row.q5Regret[QuizDummyCandidates.all[1].id], 2)
         XCTAssertEqual(row.q5Regret[QuizDummyCandidates.all[2].id], 4)
+    }
+
+    func testSubmitCarriesNoPreferenceCuisineAnswer() async {
+        let writer = RecordingWriter()
+        let coord = QuizCoordinator(roomID: UUID(), userID: UUID(), writer: writer.writer())
+        coord.toggleCuisineNoPreference()
+        _ = await coord.submit()
+        let row = try? XCTUnwrap(writer.rows.first)
+        XCTAssertEqual(row?.q1NoPreference, true)
+        XCTAssertEqual(row?.q1Cuisines, [])
     }
 
     // MARK: - partial exits don't write
@@ -143,11 +263,11 @@ final class QuizCoordinatorTests: XCTestCase {
         let coord = QuizCoordinator(
             roomID: UUID(), userID: UUID(), writer: writer.writer()
         )
-        coord.toggleVeto(QuizVeto.dairy)
+        coord.toggleCuisine(QuizCuisine.japanese)
         coord.advance()
         coord.setBudget(2)
         coord.advance()
-        coord.setWalkMinutes(15)
+        coord.setReputation(QuizReputation.popular)
         coord.advance()
         coord.setVibe(0)
         // user closes the session here without tapping "Drop the verdict"
@@ -215,20 +335,21 @@ final class QuizCoordinatorTests: XCTestCase {
             "expected rapid-tap submits to fold into a single write, got \(writer.rows.count)")
     }
 
-    // MARK: - sanity
+    // MARK: - wire shape
 
-    /// TB-04 (v1.1) — the `votes` table now stores answers in five
-    /// generic jsonb slots (`q1`..`q5`), each a `{ meta, answer }`
-    /// envelope. `meta.question_kind` is the discriminator the
-    /// verdict-engine mapping layer dispatches on. The wire row must
-    /// emit that envelope shape, not the old typed columns.
+    /// TB-06 (v1.1) — the reworked quiz writes generic `{ meta, answer }`
+    /// jsonb slots. Q1 carries the cuisine craving, Q3 the reputation
+    /// chip; Q2 and Q4 keep their existing kinds (spend cap / vibe).
+    /// `meta.question_kind` is the discriminator the verdict-engine
+    /// mapping layer dispatches on.
     func testVoteRowEncodesGenericQuestionSlotEnvelopes() throws {
         let row = QuizCoordinator.VoteRow(
             roomID: UUID(),
             userID: UUID(),
-            q1Vetoes: [QuizVeto.shellfish, QuizVeto.dairy].sorted(),
+            q1Cuisines: [QuizCuisine.mexican, QuizCuisine.japanese].sorted(),
+            q1NoPreference: false,
             q2Budget: 2,
-            q3WalkMinutes: 10,
+            q3Reputation: QuizReputation.hiddenGem,
             q4Vibe: 3,
             q5Regret: ["dummy-pico": 5]
         )
@@ -252,22 +373,24 @@ final class QuizCoordinatorTests: XCTestCase {
             let meta = try XCTUnwrap(env["meta"] as? [String: Any])
             return try XCTUnwrap(meta["question_kind"] as? String)
         }
-        XCTAssertEqual(try kindOf("q1"), "dietary_veto")
+        XCTAssertEqual(try kindOf("q1"), "cuisine_craving")
         XCTAssertEqual(try kindOf("q2"), "budget_cap")
-        XCTAssertEqual(try kindOf("q3"), "walk_minutes")
+        XCTAssertEqual(try kindOf("q3"), "reputation")
         XCTAssertEqual(try kindOf("q4"), "vibe")
         XCTAssertEqual(try kindOf("q5"), "regret")
 
         // The answer payloads carry the actual responses.
+        let q1Answer = try XCTUnwrap((json["q1"] as? [String: Any])?["answer"] as? [String: Any])
+        let cuisines = try XCTUnwrap(q1Answer["cuisines"] as? [String])
+        XCTAssertEqual(Set(cuisines), Set([QuizCuisine.mexican, QuizCuisine.japanese]))
+        XCTAssertEqual(q1Answer["no_preference"] as? Bool, false)
+
         let q2Answer = try XCTUnwrap((json["q2"] as? [String: Any])?["answer"] as? [String: Any])
         XCTAssertEqual(q2Answer["tier"] as? Int, 2)
         let q3Answer = try XCTUnwrap((json["q3"] as? [String: Any])?["answer"] as? [String: Any])
-        XCTAssertEqual(q3Answer["minutes"] as? Int, 10)
+        XCTAssertEqual(q3Answer["reputation"] as? String, QuizReputation.hiddenGem)
         let q4Answer = try XCTUnwrap((json["q4"] as? [String: Any])?["answer"] as? [String: Any])
         XCTAssertEqual(q4Answer["level"] as? Int, 3)
-        let q1Answer = try XCTUnwrap((json["q1"] as? [String: Any])?["answer"] as? [String: Any])
-        let vetoes = try XCTUnwrap(q1Answer["vetoes"] as? [String])
-        XCTAssertEqual(Set(vetoes), Set([QuizVeto.shellfish, QuizVeto.dairy]))
         let q5Answer = try XCTUnwrap((json["q5"] as? [String: Any])?["answer"] as? [String: Any])
         let scores = try XCTUnwrap(q5Answer["scores"] as? [String: Any])
         XCTAssertEqual(scores["dummy-pico"] as? Int, 5)
@@ -278,5 +401,26 @@ final class QuizCoordinatorTests: XCTestCase {
         XCTAssertNil(json["q3_walk_minutes"])
         XCTAssertNil(json["q4_vibe"])
         XCTAssertNil(json["q5_regret"])
+    }
+
+    /// A "No preference" cuisine answer encodes with an empty cuisine
+    /// list and the flag set — the engine reads `no_preference` to zero
+    /// the cuisine axis weight.
+    func testVoteRowEncodesNoPreferenceCuisine() throws {
+        let row = QuizCoordinator.VoteRow(
+            roomID: UUID(),
+            userID: UUID(),
+            q1Cuisines: [],
+            q1NoPreference: true,
+            q2Budget: 4,
+            q3Reputation: QuizReputation.noPreference,
+            q4Vibe: 2,
+            q5Regret: [:]
+        )
+        let data = try JSONEncoder().encode(row)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let q1Answer = try XCTUnwrap((json["q1"] as? [String: Any])?["answer"] as? [String: Any])
+        XCTAssertEqual(q1Answer["no_preference"] as? Bool, true)
+        XCTAssertEqual(q1Answer["cuisines"] as? [String], [])
     }
 }

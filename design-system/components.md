@@ -52,9 +52,9 @@ Eyebrow + display title + sub.
 
 ---
 
-## C-04 · Chip (Veto / Single-Select)
+## C-04 · Chip (Multi / Single-Select)
 
-Used in Q1 (multi), Q3 ticks (single), Q5 row buttons (variant), reroll reasons (variant), check-in why (multi).
+Used in Q1 cuisine craving (multi, capped), Q3 reputation picker (single), Q5 row buttons (variant), reroll reasons (variant), check-in why (multi).
 
 | State | Background | Text | Border | Shadow | Transform |
 |---|---|---|---|---|---|
@@ -68,7 +68,9 @@ Used in Q1 (multi), Q3 ticks (single), Q5 row buttons (variant), reroll reasons 
 **Transition:** `all 180ms cubic-bezier(.22,.61,.36,1)`.
 **Backdrop:** default state has `blur(4px)` so it reads on busy gradient. Selected does not (sun is opaque).
 
-**Multi-select rule (Q1, check-in why):** the meta option `"Nothing tonight"` is mutually exclusive — selecting it clears all others; selecting any other clears it.
+**Multi-select rule (check-in why):** the meta option `"Nothing tonight"` is mutually exclusive — selecting it clears all others; selecting any other clears it.
+
+**Capped multi-select rule (Q1 cuisine craving):** Q1 is multi-select with a hard cap of **3** picks plus a mutually-exclusive **"No preference"** chip. Once 3 cuisines are selected, every unselected cuisine chip renders in the `disabled` state (dimmed); a selected chip always stays tappable so it can be deselected to free a slot. Selecting "No preference" clears every cuisine; selecting any cuisine clears "No preference". "No preference" never counts toward the 3-cap. (v1.1 quiz redesign — Q1; `surfaces/03-quiz.md` §Q1.)
 
 **SwiftUI:**
 ```swift
@@ -145,7 +147,11 @@ Used in waiting state and (optionally) receipts. Initial letter on colored disk.
 
 ---
 
-## C-08 · Vibe Slider (Q4)
+## C-08 · Vibe Energy Scale (Q4)
+
+The Q4 input — a 5-point cardinal energy scale. (The v1 name "Vibe Slider"
+was retired: Q4 was never a continuous slider, and the v1.1 quiz redesign
+fixes the question to a single axis — energy / loudness, not formality.)
 
 | Element | Spec |
 |---|---|
@@ -157,12 +163,13 @@ Used in waiting state and (optionally) receipts. Initial letter on colored disk.
 | Stop transition | `all 200ms ease-out` |
 | End labels | eyebrow / white 0.7, justify-between |
 
-**Vocabulary** (token: `vibeVocab`):
-- `mood` (canon): `HUSHED · MELLOW · BUZZY · LOUD · ROWDY`
-- `slang`: `ZZZ · CHILL · LIT · LOUD · WILD`
-- `neutral`: `QUIET · CALM · ALIVE · LOUD · ELECTRIC`
+**Vocabulary** — the canonical Q4 energy scale is the `vibe-labels` token
+in `tokens.json`: `QUIET · CHILL · SOCIAL · LIVELY · ROWDY`. The scale runs
+low-energy → high-energy; index 0 is the quietest stop. Generated into
+`GTIVibeLabels.all` (`ios/Sources/GTITokens.swift`) by `gen-swift.mjs` — never
+hardcode the labels. (v1.1 quiz redesign — `gti-vault/50_product/v1.1-quiz-amendments` §2.)
 
-**Why no real drag handle:** Q4 is **cardinal-scalar**, not interpolatable; tapping a stop is the canonical interaction. A drag handle would invite users to land between stops, which the regret math can't use.
+**Why no real drag handle:** Q4 is **cardinal-scalar**, not interpolatable; tapping a stop is the canonical interaction. A drag handle would invite users to land between stops, which the preference math can't use.
 
 ---
 

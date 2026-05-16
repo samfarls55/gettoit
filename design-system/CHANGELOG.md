@@ -8,6 +8,14 @@ Prefix `BREAKING:` for any change that requires code or downstream consumers to 
 
 ---
 
+## 2026-05-15
+
+- **BREAKING: `vibe-labels` token changed** — the Q4 energy vocabulary moved from `HUSHED · MELLOW · BUZZY · LOUD · ROWDY` to `QUIET · CHILL · SOCIAL · LIVELY · ROWDY`. The v1.1 quiz redesign fixes Q4 to a single axis — energy / loudness, not formality (`gti-vault/50_product/v1.1-quiz-amendments` §2). Regenerated into `ios/Sources/GTITokens.swift` (`GTIVibeLabels.all`) and `code/tokens.css` via the standard generators. Downstream consumers that hardcoded the old labels must update — the only canonical source is the token. (TB-06 v1.1, #67.)
+- **C-08 renamed Vibe Slider → Vibe Energy Scale.** Q4 was never a continuous slider; the rename matches the cardinal-scale reality. The `vibeVocab` `slang` / `neutral` alternates were dropped — the single canonical vocabulary is the `vibe-labels` token. No layout, motion, or token-value change beyond the vocabulary above. (TB-06 v1.1, #67.)
+- **S03 Quiz Q1–Q4 reworked** (`surfaces/03-quiz.md`). The v1.1 quiz redesign moved dietary vetoes to the per-account profile and walk-time to the pre-quiz parameters surface, so the in-quiz questions are now positive decision-shaping signals: **Q1** cuisine craving (capped multi-select, max 3, mutually-exclusive "No preference"), **Q2** spend cap (unchanged 4-tier shape, re-labelled), **Q3** reputation / discovery (single-select chip picker — Popular / Hidden gem / Classic / New / No preference), **Q4** vibe energy (the 5-point scale above). No new components — Q1/Q3 use the existing C-04 Chip, Q4 the C-08 Energy Scale. C-04's spec gained a "capped multi-select rule" for the Q1 3-cap. The `code/screens/` JSX (`ScreenQ1Vetoes` / `ScreenQ3Distance`) still carry v1 sample content and were intentionally not renamed — sample screen copy is illustrative, the markdown is the authoritative question spec. (TB-06 v1.1, #67.)
+
+---
+
 ## 2026-05-14
 
 - **S00a Forced Sign-in Gate:** widened the render trigger to cover legacy v1 anonymous sessions still in Keychain. Pre-fix the gate only fired when `Auth.currentSession == nil`; founder dogfood surfaced an installed device that had carried a v1 anonymous session through the v1.1 upgrade, so `restoreSessionIfPresent` landed in `.anonymous` and S00a was skipped, dropping the user onto S00 Landing with no Apple identity attached. Two-launch boundary table now lists the legacy-anonymous row, including its tap-time dispatch (`linkApple` instead of `signInWithApple` — preserves the existing `user_id` per [[../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s merge invariant). Behavior §1–§3 updated to describe the conditional dispatch. No new components, no new tokens, no copy changes — same surface, same single pill, broader render gate. ([[../gti-vault/15_issues/v1.1/issues/bug-06-legacy-anon-bypasses-s00a-gate|bug-06]] v1.1, #63.)

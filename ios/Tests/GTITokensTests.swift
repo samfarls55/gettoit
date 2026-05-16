@@ -20,7 +20,10 @@ final class GTITokensTests: XCTestCase {
     }
 
     func testVibeLabelsMatchLockedVocabulary() {
-        XCTAssertEqual(GTIVibeLabels.all, ["HUSHED", "MELLOW", "BUZZY", "LOUD", "ROWDY"])
+        // v1.1 quiz redesign: the Q4 energy vocabulary is
+        // Quiet -> Chill -> Social -> Lively -> Rowdy (one axis:
+        // energy / loudness). See 50_product/v1.1-quiz-amendments §2.
+        XCTAssertEqual(GTIVibeLabels.all, ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"])
     }
 
     func testMotionDurationsInSeconds() {

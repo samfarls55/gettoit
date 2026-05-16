@@ -88,23 +88,33 @@ final class VotesIntegrationTests: XCTestCase {
     /// TB-04 (v1.1): `votes` stores answers in five generic jsonb
     /// slots (`q1`..`q5`), each a `{ meta, answer }` envelope. The
     /// readback decodes the envelopes and re-exposes the typed values
-    /// (`q1Vetoes`, `q2Budget`, …) so the assertions below stay
-    /// unchanged.
+    /// so the assertions below stay legible.
+    ///
+    /// TB-06: Q1 carries the cuisine-craving answer (`cuisines` /
+    /// `no_preference`) and Q3 the reputation chip (`reputation`).
     private struct VoteRowReadback: Decodable {
         let roomID: UUID
         let userID: UUID
-        let q1Vetoes: [String]
+        let q1Cuisines: [String]
+        let q1NoPreference: Bool
         let q2Budget: Int
-        let q3WalkMinutes: Int
+        let q3Reputation: String
         let q4Vibe: Int
 
         /// One generic `{ meta, answer }` slot.
         private struct Slot<Answer: Decodable>: Decodable {
             let answer: Answer
         }
-        private struct VetoesAnswer: Decodable { let vetoes: [String] }
+        private struct CuisineAnswer: Decodable {
+            let cuisines: [String]
+            let noPreference: Bool
+            enum CodingKeys: String, CodingKey {
+                case cuisines
+                case noPreference = "no_preference"
+            }
+        }
         private struct TierAnswer: Decodable { let tier: Int }
-        private struct MinutesAnswer: Decodable { let minutes: Int }
+        private struct ReputationAnswer: Decodable { let reputation: String }
         private struct LevelAnswer: Decodable { let level: Int }
 
         enum CodingKeys: String, CodingKey {
@@ -117,9 +127,11 @@ final class VotesIntegrationTests: XCTestCase {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             roomID = try c.decode(UUID.self, forKey: .roomID)
             userID = try c.decode(UUID.self, forKey: .userID)
-            q1Vetoes = try c.decode(Slot<VetoesAnswer>.self, forKey: .q1).answer.vetoes
+            let cuisine = try c.decode(Slot<CuisineAnswer>.self, forKey: .q1).answer
+            q1Cuisines = cuisine.cuisines
+            q1NoPreference = cuisine.noPreference
             q2Budget = try c.decode(Slot<TierAnswer>.self, forKey: .q2).answer.tier
-            q3WalkMinutes = try c.decode(Slot<MinutesAnswer>.self, forKey: .q3).answer.minutes
+            q3Reputation = try c.decode(Slot<ReputationAnswer>.self, forKey: .q3).answer.reputation
             q4Vibe = try c.decode(Slot<LevelAnswer>.self, forKey: .q4).answer.level
         }
     }
@@ -146,11 +158,11 @@ final class VotesIntegrationTests: XCTestCase {
             userID: userID,
             writer: QuizSupabaseWriter.make(client: client)
         )
-        coord.toggleVeto(QuizVeto.shellfish)
+        coord.toggleCuisine(QuizCuisine.japanese)
         coord.advance()
         coord.setBudget(2)
         coord.advance()
-        coord.setWalkMinutes(10)
+        coord.setReputation(QuizReputation.hiddenGem)
         coord.advance()
         coord.setVibe(3)
         coord.advance()
@@ -188,9 +200,10 @@ final class VotesIntegrationTests: XCTestCase {
         XCTAssertEqual(afterFirst.count, 1, "expected exactly one votes row after the first submit")
         let row = try XCTUnwrap(afterFirst.first)
         XCTAssertEqual(row.userID, userID)
-        XCTAssertEqual(row.q1Vetoes, [QuizVeto.shellfish])
+        XCTAssertEqual(row.q1Cuisines, [QuizCuisine.japanese])
+        XCTAssertFalse(row.q1NoPreference)
         XCTAssertEqual(row.q2Budget, 2)
-        XCTAssertEqual(row.q3WalkMinutes, 10)
+        XCTAssertEqual(row.q3Reputation, QuizReputation.hiddenGem)
         XCTAssertEqual(row.q4Vibe, 3)
 
         // Second submit — same (room, user) → idempotent. Coordinator

@@ -1,9 +1,14 @@
-// GetToIt — Q2 · Budget cap (TB-04).
+// GetToIt — Q2 · Spend cap (TB-04 surface, TB-06 question rework).
 //
 // Single-select tier. 4 fixed tiers — never a slider (see
 // `surfaces/03-quiz.md` §"Q2"). Each tier row uses the spec'd
 // 32pt display label + uppercase-tracked sub line; selected row
 // flips to sun-yellow fill.
+//
+// The spend cap is a hard ceiling — the verdict never exceeds it
+// (PRD user story 15). Its 4-tier shape is unchanged from v1; the
+// v1.1 rework only re-labels the question "spend cap" and keeps the
+// `budget_cap` wire kind.
 
 import SwiftUI
 

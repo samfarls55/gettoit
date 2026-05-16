@@ -7,7 +7,7 @@
 //     `GTIMotion.Duration.gradTween`, easing locked at
 //     `GTIMotion.Easing.inOut`).
 //   * The top bar (× + 5-segment progress).
-//   * Routing between QuizQ1Vetoes / QuizQ2Budget / QuizQ3Distance /
+//   * Routing between QuizQ1Cuisine / QuizQ2Budget / QuizQ3Reputation /
 //     QuizQ4Vibe / QuizQ5Regret based on `coordinator.step`. The
 //     content swap cross-fades in lockstep with the gradient tween
 //     (same `gradTween` duration + `inOut` easing) per
@@ -134,11 +134,11 @@ public struct QuizScreen: View {
     private var content: some View {
         switch coordinator.step {
         case .q1:
-            QuizQ1Vetoes(coordinator: coordinator)
+            QuizQ1Cuisine(coordinator: coordinator)
         case .q2:
             QuizQ2Budget(coordinator: coordinator)
         case .q3:
-            QuizQ3Distance(coordinator: coordinator)
+            QuizQ3Reputation(coordinator: coordinator)
         case .q4:
             QuizQ4Vibe(coordinator: coordinator)
         case .q5:

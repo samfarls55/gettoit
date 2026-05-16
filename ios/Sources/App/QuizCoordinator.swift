@@ -1,11 +1,20 @@
-// GetToIt — QuizCoordinator (TB-04).
+// GetToIt — QuizCoordinator (TB-04 schema, TB-06 question rework).
 //
 // Holds the user's Q1–Q4 answers locally as they advance through the
 // quiz. Writes a single `votes` row on Q5 submit. One round-trip per
 // room per user.
 //
+// v1.1 question rework (PRD module J, part 1 — issue tb-06):
+//   * Q1 — cuisine craving. Multi-select cuisine chips, capped at 3,
+//     with a mutually-exclusive "No preference" toggle. A soft scoring
+//     signal, not a hard veto (dietary vetoes moved to the profile).
+//   * Q2 — spend cap. A hard ceiling on spend. Unchanged 4-tier shape.
+//   * Q3 — reputation / discovery. A single-select chip picker
+//     (Popular / Hidden gem / Classic / New / No preference).
+//   * Q4 — vibe energy. A 5-point cardinal scale (Quiet…Rowdy).
+//
 // Why a single submit rather than per-question writes:
-//   * The quiz has no back arrow (PRD user story 26 + S03 cross-quiz
+//   * The quiz has no back arrow (PRD user story 21 + S03 cross-quiz
 //     invariants). Partial answers don't have observers — there's no
 //     reason to surface them in the DB.
 //   * Partial-quiz exits via `×` must NOT write a partial row.
@@ -17,18 +26,18 @@
 //     the second time, which the coordinator treats as success.
 //
 // Q5 candidates: TB-04 ships dummy candidates from `dummyCandidates`
-// below. TB-06 wires the real survivor set from the VerdictEngine /
-// `options` table — the coordinator's `submit(...)` interface stays the
-// same; only the source of `Candidate.id` strings changes.
+// below. TB-08 wires the real factorial-probe set from the per-member
+// Foursquare fetch — the coordinator's `submit(...)` interface stays
+// the same; only the source of `Candidate.id` strings changes.
 //
-// All visual code lives in `QuizQ{1..5}Screen.swift`. The coordinator
-// is intentionally view-free so it can be tested without SwiftUI.
+// All visual code lives in `QuizQ{1..5}*.swift`. The coordinator is
+// intentionally view-free so it can be tested without SwiftUI.
 
 import Foundation
 import Supabase
 
 /// A Q5 candidate (place the user can rate). TB-04 ships dummy ids
-/// from a local fixture; TB-06 wires real `options.id` values.
+/// from a local fixture; TB-08 wires real `options.id` values.
 public struct QuizCandidate: Equatable, Sendable, Identifiable {
     public let id: String
     public let name: String
@@ -41,7 +50,7 @@ public struct QuizCandidate: Equatable, Sendable, Identifiable {
     }
 }
 
-/// Default Q5 candidates the iOS app uses until TB-06 wires real
+/// Default Q5 candidates the iOS app uses until TB-08 wires real
 /// survivors. Three places — matches the JSX fixture in
 /// `design-system/code/screens/ScreenQ5Regret.jsx`.
 ///
@@ -89,12 +98,25 @@ public final class QuizCoordinator {
 
     public private(set) var step: Step = .q1
 
-    /// Captured answers. Defaults match the JSX defaults so the visual
-    /// port stays 1:1 with the locked spec.
-    public private(set) var q1Vetoes: Set<String> = []
-    public private(set) var q2Budget: Int = 1            // tier 1 (== "$")
-    public private(set) var q3WalkMinutes: Int = 15      // JSX default
-    public private(set) var q4Vibe: Int = 2              // JSX default mid-stop (BUZZY)
+    /// The cuisine-craving cap. Q1 allows at most this many cuisine
+    /// picks before further selections are prevented (PRD user story
+    /// 13 — "be prevented from selecting more than 3 cuisines").
+    public static let cuisineCap = 3
+
+    /// Captured answers.
+    ///
+    /// Q1 — cuisine craving. `q1Cuisines` is the multi-select set (max
+    /// `cuisineCap`); `q1NoPreference` is the mutually-exclusive "No
+    /// preference" flag. The two are never both non-empty.
+    public private(set) var q1Cuisines: Set<String> = []
+    public private(set) var q1NoPreference: Bool = false
+    /// Q2 — spend cap. Tier 1…4 ($, $$, $$$, $$$$). Defaults to tier 1.
+    public private(set) var q2Budget: Int = 1
+    /// Q3 — reputation / discovery chip. Defaults to "No preference" —
+    /// the neutral, non-pruning answer.
+    public private(set) var q3Reputation: String = QuizReputation.noPreference
+    /// Q4 — vibe energy. 0…4 on the Quiet…Rowdy scale. Defaults mid.
+    public private(set) var q4Vibe: Int = 2
     public private(set) var q5Ratings: [String: Int] = [:]
 
     private let roomID: UUID
@@ -129,42 +151,60 @@ public final class QuizCoordinator {
 
     public var allCandidates: [QuizCandidate] { candidates }
 
-    // MARK: - Q1
+    // MARK: - Q1 — cuisine craving
 
-    /// Toggle a Q1 chip. `"nothing_tonight"` is mutually exclusive with
-    /// all other vetoes — selecting it clears the set; selecting any
-    /// other clears it. Matches the JSX `toggle` logic in
-    /// `ScreenQ1Vetoes.jsx`.
-    public func toggleVeto(_ id: String) {
-        let nothing = QuizVeto.nothingTonight
-        if id == nothing {
-            if q1Vetoes.contains(nothing) {
-                q1Vetoes.removeAll()
-            } else {
-                q1Vetoes = [nothing]
-            }
+    /// True while the cuisine set has room for another pick. The Q1
+    /// surface dims unselected chips when this is false.
+    public var q1HasFreeCuisineSlot: Bool {
+        q1Cuisines.count < QuizCoordinator.cuisineCap
+    }
+
+    /// Toggle a Q1 cuisine chip.
+    ///
+    /// Rules (PRD user stories 11–13 + `surfaces/03-quiz.md` §Q1):
+    ///   * Selecting a cuisine clears the "No preference" flag — the
+    ///     two are mutually exclusive.
+    ///   * The set is capped at `cuisineCap` (3). A pick that would
+    ///     exceed the cap is prevented (no-op). Deselecting a cuisine
+    ///     always works — it frees a slot.
+    public func toggleCuisine(_ id: String) {
+        if q1Cuisines.contains(id) {
+            q1Cuisines.remove(id)
             return
         }
-        q1Vetoes.remove(nothing)
-        if q1Vetoes.contains(id) {
-            q1Vetoes.remove(id)
+        // A new selection — cap-gated.
+        guard q1HasFreeCuisineSlot else { return }
+        q1NoPreference = false
+        q1Cuisines.insert(id)
+    }
+
+    /// Toggle the mutually-exclusive "No preference" cuisine option.
+    /// Selecting it clears every cuisine pick; re-tapping clears it.
+    public func toggleCuisineNoPreference() {
+        if q1NoPreference {
+            q1NoPreference = false
         } else {
-            q1Vetoes.insert(id)
+            q1NoPreference = true
+            q1Cuisines.removeAll()
         }
     }
 
-    // MARK: - Q2/Q3/Q4
+    // MARK: - Q2 — spend cap
 
     public func setBudget(_ tier: Int) {
         precondition((1...4).contains(tier), "q2_budget must be 1...4")
         q2Budget = tier
     }
 
-    public func setWalkMinutes(_ minutes: Int) {
-        precondition(QuizConstants.walkStops.contains(minutes),
-                     "q3_walk_minutes must be one of \(QuizConstants.walkStops)")
-        q3WalkMinutes = minutes
+    // MARK: - Q3 — reputation / discovery
+
+    public func setReputation(_ reputation: String) {
+        precondition(QuizReputation.all.contains(where: { $0.id == reputation }),
+                     "q3_reputation must be one of \(QuizReputation.all.map(\.id))")
+        q3Reputation = reputation
     }
+
+    // MARK: - Q4 — vibe energy
 
     public func setVibe(_ index: Int) {
         precondition((0..<GTIVibeLabels.all.count).contains(index),
@@ -184,6 +224,10 @@ public final class QuizCoordinator {
 
     /// Advance from a question to the next one. No-ops if we're
     /// already past Q5 or in the middle of a submit. Forward-only.
+    ///
+    /// No answer is required to advance — `advance()` always moves
+    /// forward, so the flow never stalls on a Q1-Q4 step (PRD user
+    /// story 21).
     public func advance() {
         switch step {
         case .q1: step = .q2
@@ -243,6 +287,13 @@ public final class QuizCoordinator {
     /// mapping layer (`supabase/functions/_shared/votes-schema.ts`)
     /// dispatches on — so quiz content can change without a migration.
     ///
+    /// TB-06: Q1's kind is `cuisine_craving` (a positive soft signal)
+    /// and Q3's kind is `reputation` — both new with the question
+    /// rework. Q2 (`budget_cap`) and Q4 (`vibe`) keep their existing
+    /// kinds; their semantics are unchanged. The verdict-engine
+    /// rewrite (PRD module B / tb-11) widens the engine's kind
+    /// taxonomy to consume the two new kinds.
+    ///
     /// The typed Swift properties below remain the in-memory shape the
     /// coordinator and the unit tests work with; only the encoded wire
     /// JSON is the generic envelope. `Encodable` only — the row is
@@ -251,26 +302,29 @@ public final class QuizCoordinator {
     public struct VoteRow: Encodable, Equatable, Sendable {
         public let roomID: UUID
         public let userID: UUID
-        public let q1Vetoes: [String]
+        public let q1Cuisines: [String]
+        public let q1NoPreference: Bool
         public let q2Budget: Int
-        public let q3WalkMinutes: Int
+        public let q3Reputation: String
         public let q4Vibe: Int
         public let q5Regret: [String: Int]
 
         public init(
             roomID: UUID,
             userID: UUID,
-            q1Vetoes: [String],
+            q1Cuisines: [String],
+            q1NoPreference: Bool,
             q2Budget: Int,
-            q3WalkMinutes: Int,
+            q3Reputation: String,
             q4Vibe: Int,
             q5Regret: [String: Int]
         ) {
             self.roomID = roomID
             self.userID = userID
-            self.q1Vetoes = q1Vetoes
+            self.q1Cuisines = q1Cuisines
+            self.q1NoPreference = q1NoPreference
             self.q2Budget = q2Budget
-            self.q3WalkMinutes = q3WalkMinutes
+            self.q3Reputation = q3Reputation
             self.q4Vibe = q4Vibe
             self.q5Regret = q5Regret
         }
@@ -291,7 +345,7 @@ public final class QuizCoordinator {
         }
 
         /// Encode one generic `{ meta, answer }` slot. The `prompt`
-        /// strings are the v1 quiz copy — carried for audit, never
+        /// strings are the v1.1 quiz copy — carried for audit, never
         /// read by the engine's mapping layer.
         private func encodeSlot<A: Encodable>(
             into container: inout KeyedEncodingContainer<RowKey>,
@@ -307,6 +361,19 @@ public final class QuizCoordinator {
             try slot.encode(answer, forKey: .answer)
         }
 
+        /// The Q1 cuisine-craving answer payload. `cuisines` is the
+        /// (possibly empty) selected set; `no_preference` is the
+        /// mutually-exclusive flag the engine reads to zero the
+        /// cuisine axis weight.
+        private struct CuisineAnswer: Encodable {
+            let cuisines: [String]
+            let noPreference: Bool
+            enum CodingKeys: String, CodingKey {
+                case cuisines
+                case noPreference = "no_preference"
+            }
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: RowKey.self)
             try container.encode(roomID, forKey: .roomID)
@@ -314,21 +381,21 @@ public final class QuizCoordinator {
 
             try encodeSlot(
                 into: &container, key: .q1,
-                questionKind: "dietary_veto",
-                prompt: "Anything off the menu tonight?",
-                answer: ["vetoes": q1Vetoes]
+                questionKind: "cuisine_craving",
+                prompt: "What are you craving tonight?",
+                answer: CuisineAnswer(cuisines: q1Cuisines, noPreference: q1NoPreference)
             )
             try encodeSlot(
                 into: &container, key: .q2,
                 questionKind: "budget_cap",
-                prompt: "Where's the ceiling tonight?",
+                prompt: "What's the ceiling tonight?",
                 answer: ["tier": q2Budget]
             )
             try encodeSlot(
                 into: &container, key: .q3,
-                questionKind: "walk_minutes",
-                prompt: "How far are you willing to walk?",
-                answer: ["minutes": q3WalkMinutes]
+                questionKind: "reputation",
+                prompt: "What kind of place are you after?",
+                answer: ["reputation": q3Reputation]
             )
             try encodeSlot(
                 into: &container, key: .q4,
@@ -339,7 +406,7 @@ public final class QuizCoordinator {
             try encodeSlot(
                 into: &container, key: .q5,
                 questionKind: "regret",
-                prompt: "Which would you most regret missing?",
+                prompt: "How excited does each of these make you?",
                 answer: ["scores": q5Regret]
             )
         }
@@ -351,9 +418,10 @@ public final class QuizCoordinator {
         VoteRow(
             roomID: roomID,
             userID: userID,
-            q1Vetoes: q1Vetoes.sorted(),
+            q1Cuisines: q1Cuisines.sorted(),
+            q1NoPreference: q1NoPreference,
             q2Budget: q2Budget,
-            q3WalkMinutes: q3WalkMinutes,
+            q3Reputation: q3Reputation,
             q4Vibe: q4Vibe,
             q5Regret: q5Ratings
         )
@@ -381,33 +449,58 @@ public final class QuizCoordinator {
 
 // MARK: - identifiers
 
-/// Constants for chip identifiers / scale stops. Plain strings live
-/// here so they're greppable from both the SwiftUI surfaces and tests.
-public enum QuizVeto {
-    public static let gluten = "gluten"
-    public static let dairy = "dairy"
-    public static let shellfish = "shellfish"
-    public static let veganOptions = "vegan_options"
-    public static let halalOnly = "halal_only"
-    public static let nothingTonight = "nothing_tonight"
+/// Q1 cuisine-craving options. Plain string ids live here so they're
+/// greppable from both the SwiftUI surface and tests. The id is the
+/// stable wire value; the label is the displayed copy.
+///
+/// `// placeholder: marketing-branding pass` applies to the label
+/// copy; the id strings are the engine contract.
+public enum QuizCuisine {
+    public static let mexican = "mexican"
+    public static let italian = "italian"
+    public static let japanese = "japanese"
+    public static let chinese = "chinese"
+    public static let thai = "thai"
+    public static let indian = "indian"
+    public static let american = "american"
+    public static let mediterranean = "mediterranean"
 
     /// Display order matches the JSX option array.
     public static let displayOrder: [(id: String, label: String)] = [
         // placeholder: marketing-branding pass
-        (gluten,        "Gluten"),
-        (dairy,         "Dairy"),
-        (shellfish,     "Shellfish"),
-        (veganOptions,  "Needs vegan options"),
-        (halalOnly,     "Halal-only"),
-        (nothingTonight,"Nothing tonight"),
+        (mexican,       "Mexican"),
+        (italian,       "Italian"),
+        (japanese,      "Japanese"),
+        (chinese,       "Chinese"),
+        (thai,          "Thai"),
+        (indian,        "Indian"),
+        (american,      "American"),
+        (mediterranean, "Mediterranean"),
+    ]
+}
+
+/// Q3 reputation / discovery chip options. Single-select. The
+/// `noPreference` chip is the neutral, non-pruning answer and is the
+/// Q3 default.
+public enum QuizReputation {
+    public static let popular = "popular"
+    public static let hiddenGem = "hidden_gem"
+    public static let classic = "classic"
+    public static let new = "new"
+    public static let noPreference = "no_preference"
+
+    /// Display order matches the JSX option array.
+    public static let all: [(id: String, label: String)] = [
+        // placeholder: marketing-branding pass
+        (popular,      "Popular"),
+        (hiddenGem,    "Hidden gem"),
+        (classic,      "Classic"),
+        (new,          "New"),
+        (noPreference, "No preference"),
     ]
 }
 
 public enum QuizConstants {
-    /// Q3 stop set — JSX `ticks` array. Migration check constraint
-    /// matches.
-    public static let walkStops: [Int] = [5, 10, 15, 20, 30]
-
     /// Q2 tiers — display label + sub copy. `// placeholder: marketing-branding pass`.
     public static let budgetTiers: [(label: String, sub: String)] = [
         // placeholder: marketing-branding pass
