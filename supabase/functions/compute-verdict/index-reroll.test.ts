@@ -17,12 +17,13 @@ import {
   type ComputeVerdictDataAdapter,
   handleRequest,
   type MemberVoteRow,
+  mergeHardVetoes,
+  mergeQ1Vetoes,
   type OptionCutInsert,
   type RoomOptionRow,
   type RoomRerollState,
   type VerdictInsert,
   type VerdictRow,
-  mergeQ1Vetoes,
 } from "./handler.ts";
 
 function envOk() {
@@ -409,4 +410,48 @@ Deno.test("mergeQ1Vetoes — preserves order and dedupes case-insensitively", ()
     mergeQ1Vetoes([""], ["", "shellfish"]),
     ["shellfish"],
   );
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// TB-12 — mergeHardVetoes pure helper
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("mergeHardVetoes — appends profile vetoes after session vetoes", () => {
+  assertEquals(
+    mergeHardVetoes(
+      [{ kind: "tag", token: "no_nuts_unverified" }],
+      [{ kind: "cuisine_never", token: "sushi" }],
+    ),
+    [
+      { kind: "tag", token: "no_nuts_unverified" },
+      { kind: "cuisine_never", token: "sushi" },
+    ],
+  );
+});
+
+Deno.test("mergeHardVetoes — dedupes on (kind, token), token case-insensitively", () => {
+  // Same kind + same token (different case) collapses to one entry;
+  // the session entry wins (lands first).
+  assertEquals(
+    mergeHardVetoes(
+      [{ kind: "cuisine_never", token: "Sushi" }],
+      [{ kind: "cuisine_never", token: "sushi" }],
+    ),
+    [{ kind: "cuisine_never", token: "Sushi" }],
+  );
+  // Same token but different kind is NOT a duplicate.
+  assertEquals(
+    mergeHardVetoes(
+      [{ kind: "tag", token: "vegan" }],
+      [{ kind: "dietary", token: "vegan" }],
+    ),
+    [
+      { kind: "tag", token: "vegan" },
+      { kind: "dietary", token: "vegan" },
+    ],
+  );
+});
+
+Deno.test("mergeHardVetoes — empty inputs yield an empty array", () => {
+  assertEquals(mergeHardVetoes([], []), []);
 });

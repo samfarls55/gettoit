@@ -147,6 +147,72 @@ Deno.test("EBA prune — a generic hard_veto entry drops a candidate by tag", ()
   assert(out.cuts.some((c) => c.option_id === "sushi" && c.cut_reason === "veto"));
 });
 
+Deno.test("EBA prune — TB-12: a profile dietary hard_veto drops a non-compliant venue", () => {
+  // A member's sticky profile carries a `dietary` hard veto. The EBA
+  // prune drops a venue whose `dietary_tags` lack the chip's required
+  // tag — identical treatment to a Q1-era dietary chip, but sourced
+  // from the per-account profile rather than the session quiz.
+  const veganOk = makeCandidate({
+    id: "vegan-ok",
+    name: "Green Plate",
+    dietary_tags: ["vegan_friendly"],
+  });
+  const noVegan = makeCandidate({ id: "no-vegan", name: "Steakhouse", dietary_tags: [] });
+  const out = run({
+    candidates: [veganOk, noVegan],
+    votes: [
+      scoredVote("u1", { "vegan-ok": 5, "no-vegan": 5 }, 5, {
+        hard_vetoes: [{ kind: "dietary", token: "vegan" }],
+      }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "vegan-ok");
+  assert(
+    out.cuts.some((c) => c.option_id === "no-vegan" && c.cut_reason === "dietary"),
+  );
+});
+
+Deno.test("EBA prune — TB-12: a profile allergy `tag` hard_veto drops a venue missing the tag", () => {
+  // The `tag` kind is the allergy escape hatch — the token is a raw
+  // required dietary tag. A venue that does not carry it is pruned.
+  const peanutSafe = makeCandidate({
+    id: "peanut-safe",
+    name: "Safe Kitchen",
+    dietary_tags: ["no_peanut_unverified"],
+  });
+  const unknown = makeCandidate({ id: "unknown", name: "Mystery Diner", dietary_tags: [] });
+  const out = run({
+    candidates: [peanutSafe, unknown],
+    votes: [
+      scoredVote("u1", { "peanut-safe": 5, "unknown": 5 }, 5, {
+        hard_vetoes: [{ kind: "tag", token: "no_peanut_unverified" }],
+      }),
+    ],
+  });
+  assertEquals(out.winning_option_id, "peanut-safe");
+  assert(out.cuts.some((c) => c.option_id === "unknown" && c.cut_reason === "veto"));
+});
+
+Deno.test("EBA prune — TB-12: one member's profile veto prunes for the whole room", () => {
+  // Hard vetoes are room-wide: a venue failing ANY member's profile
+  // veto is dropped for everyone, even members who scored it 5.
+  const taco = makeCandidate({ id: "taco", name: "Taqueria", categories: ["Taco Stand"] });
+  const sushi = makeCandidate({ id: "sushi", name: "Omakase", categories: ["Sushi Restaurant"] });
+  const out = run({
+    candidates: [taco, sushi],
+    votes: [
+      // u1 has the profile veto.
+      scoredVote("u1", { taco: 4, sushi: 5 }, 4, {
+        hard_vetoes: [{ kind: "cuisine_never", token: "sushi" }],
+      }),
+      // u2 has no veto and would happily take sushi.
+      scoredVote("u2", { taco: 4, sushi: 5 }, 4),
+    ],
+  });
+  assertEquals(out.winning_option_id, "taco");
+  assert(out.cuts.some((c) => c.option_id === "sushi" && c.cut_reason === "veto"));
+});
+
 // ───────────────────────────────────────────────────────────────────────
 // 2 + 3. Per-member scoring + satisficing floor
 // ───────────────────────────────────────────────────────────────────────

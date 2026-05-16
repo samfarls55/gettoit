@@ -134,6 +134,49 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
           : null,
       };
     },
+    async fetchProfileVetoes(user_ids) {
+      // TB-12 — read each voting member's sticky per-account profile
+      // vetoes from `user_preferences.profile_vetoes` (a jsonb array of
+      // `{ kind, token }` HardVeto entries). The service-role key
+      // bypasses RLS so the verdict can read every member's profile,
+      // not just the caller's. A user with no `user_preferences` row,
+      // or a NULL `profile_vetoes`, is simply absent from the result.
+      const out: Record<string, HardVeto[]> = {};
+      if (user_ids.length === 0) return out;
+      const { data, error } = await client
+        .from("user_preferences")
+        .select("user_id, profile_vetoes")
+        .in("user_id", user_ids);
+      if (error) {
+        // Best-effort: a failed profile read must not block the
+        // verdict. Logged + treated as "no profile vetoes" — the only
+        // risk is surfacing a venue a member would have vetoed, which
+        // the no-profile path already accepts pre-TB-12.
+        console.warn("compute-verdict fetchProfileVetoes failed:", error.message);
+        return out;
+      }
+      for (const row of (data ?? []) as Array<
+        { user_id: string; profile_vetoes: unknown }
+      >) {
+        const raw = row.profile_vetoes;
+        if (!Array.isArray(raw)) continue;
+        const vetoes: HardVeto[] = [];
+        for (const entry of raw) {
+          if (entry && typeof entry === "object") {
+            const kind = (entry as Record<string, unknown>).kind;
+            const token = (entry as Record<string, unknown>).token;
+            if (
+              (kind === "dietary" || kind === "cuisine_never" || kind === "tag") &&
+              typeof token === "string"
+            ) {
+              vetoes.push({ kind, token });
+            }
+          }
+        }
+        if (vetoes.length > 0) out[row.user_id] = vetoes;
+      }
+      return out;
+    },
     async fetchPreviousWinnerName(room_id) {
       // Race-tolerant: the prior verdict may have been deleted by
       // apply_reroll already. We surface null in that case so the
