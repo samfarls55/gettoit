@@ -75,7 +75,7 @@ Build slices decomposed from [[../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Re
 | tb-06 | [[issues/tb-06-quiz-q1-q4-rework\|Quiz Q1-Q4 rework — four new input surfaces]] ✅ done | AFK | [#67](https://github.com/samfarls55/gettoit/issues/67) | tb-04 |
 | tb-07 | [[issues/tb-07-per-member-foursquare-fetch\|Per-member real Foursquare fetch + Q1-Q4 trigger]] ✅ done | AFK | [#68](https://github.com/samfarls55/gettoit/issues/68) | research-01, tb-04, tb-06 |
 | tb-08 | [[issues/tb-08-q5-factorial-probe\|Q5 factorial preference probe over real venues]] ✅ done | AFK | [#69](https://github.com/samfarls55/gettoit/issues/69) | research-01, tb-04, tb-07 |
-| tb-09 | [[issues/tb-09-preference-function-axis-scorers\|Preference function + axis scorers]] | AFK | [#70](https://github.com/samfarls55/gettoit/issues/70) | research-01, tb-08 |
+| tb-09 | [[issues/tb-09-preference-function-axis-scorers\|Preference function + axis scorers]] ✅ done | AFK | [#70](https://github.com/samfarls55/gettoit/issues/70) | research-01, tb-08 |
 | tb-10 | [[issues/tb-10-running-union-pool-manager\|Running-union candidate pool manager]] | AFK | [#71](https://github.com/samfarls55/gettoit/issues/71) | tb-07, tb-09 |
 | tb-11 | [[issues/tb-11-verdict-engine-rewrite\|Worst-off-protecting verdict engine rewrite]] | AFK | [#72](https://github.com/samfarls55/gettoit/issues/72) | tb-04, tb-10 |
 | tb-12 | [[issues/tb-12-profile-vetoes\|Profile vetoes — account allergy/dietary/NEVERS storage]] | AFK | [#73](https://github.com/samfarls55/gettoit/issues/73) | tb-11 |
