@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), ready-for-agent
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -82,6 +82,24 @@ Build slices decomposed from [[../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Re
 | tb-13 | [[issues/tb-13-verdict-firing-q5-complete\|Verdict firing on the new Q5-complete signal]] ✅ done | AFK | [#74](https://github.com/samfarls55/gettoit/issues/74) | tb-08, tb-11 |
 
 Build order: research-01 first (blocks all Foursquare work), then tb-04 → tb-13 along the dependency graph above.
+
+## Q5 wiring + PlacesProxy fix (2026-05-16)
+
+Decomposed via `/to-issues` after a Q5 diagnosis session. Symptom: Q5 rendered location-generic options and the Foursquare API was never hit. Two faults:
+
+1. **PlacesProxy is dark.** The `places-proxy` Edge Function is invoked by the live quiz but never reaches Foursquare — every call falls through to the on-device MapKit fallback. A deployment / secrets gap, not a credentials problem (the Foursquare key is known-good from one v1-dev call).
+2. **The v1.1 Q5 pipeline was built but never wired in.** tb-07 (`FoursquareFetchPlanner` / `FoursquareFetchExecutor`), tb-08 (`Q5FactorialCardGenerator`), tb-09 (axis scorers) and tb-10 (`RunningUnionPoolManager`) all shipped as unit-tested components, but each issue flagged "not wired into the live quiz" as an adjacency and named the *next* issue as the home for the wiring. The wiring never happened — the live quiz still runs the bug-03 tracer-bullet bridge (`Q5CandidatesLoader`): one fetch, early, with empty filters, truncated to three.
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| TB-14 (v1.1) | [[issues/tb-14-restore-placesproxy-foursquare-path\|Restore the PlacesProxy Foursquare path — deploy + secrets]] | AFK | [#91](https://github.com/samfarls55/gettoit/issues/91) | — |
+| TB-15 (v1.1) | [[issues/tb-15-wire-answer-tailored-fetch\|Wire the answer-tailored Foursquare fetch into the live quiz]] | AFK | [#92](https://github.com/samfarls55/gettoit/issues/92) | — |
+| TB-16 (v1.1) | [[issues/tb-16-q5-factorial-card-selection\|Q5 factorial card selection in the live quiz]] | AFK | [#93](https://github.com/samfarls55/gettoit/issues/93) | TB-15 |
+| TB-17 (v1.1) | [[issues/tb-17-edge-function-cuisine-tag\|Edge Function honors the cuisine advisory tag]] | AFK | [#94](https://github.com/samfarls55/gettoit/issues/94) | — |
+
+Build order: tb-14, tb-15, tb-17 can start immediately; tb-16 after tb-15. tb-15's end-to-end verification against live Foursquare data depends on tb-14, but its boundary tests do not.
+
+**Adjacency flagged, not filed.** `RunningUnionPoolManager` (tb-10) shows the same not-wired-in smell on the *verdict* side — see [[verdict-pipeline-pool-manager-unwired|verdict-pipeline-pool-manager-unwired]]. Out of scope for the Q5 fix; needs its own diagnosis pass before it becomes an issue.
 
 ## Cross-references
 
