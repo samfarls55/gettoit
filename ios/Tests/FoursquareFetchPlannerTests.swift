@@ -20,8 +20,7 @@ import CoreLocation
 final class FoursquareFetchPlannerTests: XCTestCase {
 
     // A fixed instant so the meal-time → open_at derivation is
-    // deterministic. 2026-05-15 is a Friday; the time-of-day is what
-    // matters for the open_at instant.
+    // deterministic: 2026-05-05 16:53:20 UTC, a Tuesday.
     private let fixedNow = Date(timeIntervalSince1970: 1_778_000_000)
 
     private let coordinate = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
@@ -195,9 +194,9 @@ final class FoursquareFetchPlannerTests: XCTestCase {
     }
 
     func testOpenAtTokenUsesTheProvidedAreaTimeZone() {
-        // fixedNow is 2026-05-15 16:53 UTC — a Friday. In New York
-        // (UTC-4) it is still Friday 12:53; in Tokyo (UTC+9) it has
-        // already rolled to Saturday 01:53. open_at is venue-local, so
+        // fixedNow is 2026-05-05 16:53 UTC — a Tuesday. In New York
+        // (UTC-4) it is still Tuesday 12:53; in Tokyo (UTC+9) it has
+        // already rolled to Wednesday 01:53. open_at is venue-local, so
         // the planner must compute the weekday in the SEARCH AREA's
         // timezone — the token's day digit differs accordingly.
         let newYork = FoursquareFetchPlanner.plan(
@@ -211,9 +210,9 @@ final class FoursquareFetchPlannerTests: XCTestCase {
             timeZone: TimeZone(identifier: "Asia/Tokyo")!
         )
         // `.default` meal time is dinner → representative hour 19:00.
-        // Foursquare weekday: Friday = 5, Saturday = 6.
-        XCTAssertEqual(newYork[0].filters?.openAt, "5T1900")
-        XCTAssertEqual(tokyo[0].filters?.openAt, "6T1900")
+        // Foursquare weekday (1=Mon … 7=Sun): Tuesday = 2, Wednesday = 3.
+        XCTAssertEqual(newYork[0].filters?.openAt, "2T1900")
+        XCTAssertEqual(tokyo[0].filters?.openAt, "3T1900")
     }
 
     func testMealTimeOpenAtTracksTheSelectedMeal() {
