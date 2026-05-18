@@ -234,6 +234,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - name: Skip when credentials are missing
@@ -256,6 +257,57 @@ jobs:
           set -euo pipefail
           supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
           supabase db push --password "$SUPABASE_DB_PASSWORD" --include-all
+      - name: Seed app_config.service_role_key (bug-09)
+        # bug-09: the verdict-fire dispatcher (`dispatch_compute_verdict`)
+        # reads its service-role key from the `app_config` table. The
+        # non-secret `supabase_url` row is seeded by the committed
+        # migration; the secret `service_role_key` row must NOT be
+        # committed, so it is re-applied here on every deploy from the
+        # `SUPABASE_SERVICE_ROLE_KEY` Actions secret. A plain
+        # `INSERT ... ON CONFLICT` needs no superuser — that is the
+        # whole point of the GUC -> table re-scope. ON CONFLICT keeps it
+        # idempotent; a project re-provision self-heals on the next
+        # deploy with no manual action.
+        #
+        # The INSERT runs against the live DB via the Management API
+        # /database/query endpoint (the job already authenticates with
+        # SUPABASE_ACCESS_TOKEN). The key value is passed to the request
+        # body via an env var and never echoed; `set +x` keeps it out of
+        # the run log even on failure.
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "${SERVICE_ROLE_KEY:-}" ]; then
+            echo "SUPABASE_SERVICE_ROLE_KEY secret is not set — the verdict" >&2
+            echo "dispatcher would silently no-op (bug-09). Set the repo secret." >&2
+            exit 1
+          fi
+          # SQL-escape the key value: double every single quote so it is
+          # a safe single-quoted SQL string literal. (A Supabase
+          # service-role key is a JWT and contains no quotes, but the
+          # escape keeps the statement correct regardless.)
+          KEY_ESC=$(printf '%s' "$SERVICE_ROLE_KEY" | sed "s/'/''/g")
+          SQL="insert into public.app_config (key, value) values ('service_role_key', '${KEY_ESC}') on conflict (key) do update set value = excluded.value;"
+          # Hand the statement to the Management API as a JSON body.
+          # jq --arg JSON-escapes the SQL and keeps the key out of the
+          # process arg list.
+          BODY=$(jq -n --arg q "$SQL" '{query: $q}')
+          HTTP=$(curl -sS -o /tmp/seed-resp.json -w "%{http_code}" \
+            -X POST \
+            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/database/query" \
+            -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+          if [ "${HTTP:0:1}" != "2" ]; then
+            echo "FAIL: seeding app_config.service_role_key returned HTTP $HTTP." >&2
+            # The response body cannot contain the key — safe to print.
+            cat /tmp/seed-resp.json >&2 || true
+            exit 1
+          fi
+          echo "OK: app_config.service_role_key seeded (HTTP $HTTP)."
 
   edge-deploy:
     name: supabase (functions deploy)

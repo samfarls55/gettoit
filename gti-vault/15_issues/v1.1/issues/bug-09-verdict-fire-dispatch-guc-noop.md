@@ -1,7 +1,7 @@
 ---
 issue: bug-09
 title: Verdict engine is never auto-invoked — dispatch_compute_verdict silently no-ops because the app.* database GUCs are unset
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 117
 created: 2026-05-18
@@ -92,11 +92,11 @@ Re-confirmed AFK at the 2026-05-18 re-triage, after the first AFK run escalated.
 
 ## Acceptance criteria
 
-- [ ] An `app_config(key, value)` table exists, created by a committed migration, with RLS enabled and unreadable by `anon` / `authenticated`.
-- [ ] `dispatch_compute_verdict` reads `supabase_url` and `service_role_key` from `app_config` (not `current_setting('app.*')`), is `SECURITY DEFINER`, and still silently no-ops when a value is missing.
-- [ ] On the live project, `app_config` holds non-empty `supabase_url` and `service_role_key` rows; the URL is seeded by the committed migration, the key re-applied by a step in the CI database-deploy job from the `SUPABASE_SERVICE_ROLE_KEY` Actions secret — both survive a project re-provision with no manual action.
-- [ ] No service-role key value appears in any committed file (migration, workflow, or otherwise).
-- [ ] After a quiz completes — once bug-08's candidate-pool slices land — `dispatch_compute_verdict` reaches `compute-verdict` and a `verdicts` row is written. Cross-checked when tb-21/tb-23 merge; not a gate for closing this issue.
+- [x] An `app_config(key, value)` table exists, created by a committed migration, with RLS enabled and unreadable by `anon` / `authenticated`.
+- [x] `dispatch_compute_verdict` reads `supabase_url` and `service_role_key` from `app_config` (not `current_setting('app.*')`), is `SECURITY DEFINER`, and still silently no-ops when a value is missing.
+- [x] On the live project, `app_config` holds non-empty `supabase_url` and `service_role_key` rows; the URL is seeded by the committed migration, the key re-applied by a step in the CI database-deploy job from the `SUPABASE_SERVICE_ROLE_KEY` Actions secret — both survive a project re-provision with no manual action.
+- [x] No service-role key value appears in any committed file (migration, workflow, or otherwise).
+- [ ] After a quiz completes — once bug-08's candidate-pool slices land — `dispatch_compute_verdict` reaches `compute-verdict` and a `verdicts` row is written. Cross-checked when tb-21/tb-23 merge; not a gate for closing this issue. (Engine *reachability* verified live this run via a `pg_net` smoke POST that reached `compute-verdict`.)
 
 ## Blocked by
 
@@ -124,3 +124,5 @@ Not blocked. Necessary but not sufficient on its own: with [[bug-08-verdict-pipe
 Full evidence + the recommended re-scope are in [[../../../60_engineering/verdict-dispatch-guc-superuser-blocker|verdict-dispatch-guc-superuser-blocker]]. Two viable paths, both needing a triage decision: (1) **HITL** — a human sets the two values once in the Supabase dashboard's *Custom Postgres config*, `dispatch_compute_verdict` unchanged; (2) **AFK, re-scoped** — change `dispatch_compute_verdict` to read its URL/key from an ordinary `app_config` table instead of `current_setting()`, which removes the superuser dependency entirely (any role can `INSERT`/`SELECT` a table) — but this needs a `dispatch_compute_verdict` change, which the current "Out of scope" section forbids, so it is a spec change. No code merged on `afk/bug-09`; the run produced only the engineering diagnosis note. Re-triaged `needs-triage`.
 
 **2026-05-18 — re-triaged needs-triage → ready-for-agent (Option 2, re-scoped).** Maintainer chose the AFK re-scope over the HITL dashboard route. The fix abandons the `app.*` GUCs (unsettable without a superuser) and moves the URL/key into an `app_config` table that `dispatch_compute_verdict` reads — a plain table write, no superuser. The `dispatch_compute_verdict` change is now in scope (a deliberate spec change made at triage; the iOS fire path stays out of scope). The `SUPABASE_SERVICE_ROLE_KEY` GitHub Actions secret was created by the maintainer on 2026-05-18, so the issue is cleanly agent-executable end to end. "Fix — re-scoped plan", Agent Brief, and acceptance criteria rewritten for the table approach. Re-triaged `ready-for-agent` / AFK on the vault and GitHub.
+
+**2026-05-18 — done (AFK run, `afk/bug-09`, PR #122).** Re-scoped Option-2 fix landed. Migration `20260518010000000_app_config_verdict_dispatch.sql` creates the `app_config(key, value)` table (RLS on, no policies, `REVOKE ALL` from `anon` / `authenticated`), seeds the non-secret `supabase_url` row idempotently, and rewrites both `dispatch_compute_verdict` overloads to read `app_config` instead of the `app.*` GUCs — both `SECURITY DEFINER`, both keeping the silent-return-when-empty guard. CI: a step added to the existing `supabase-db` job seeds the secret `service_role_key` row from the `SUPABASE_SERVICE_ROLE_KEY` Actions secret on every deploy via the Management API `/database/query` endpoint. Applied live on `rlnevdqebmzbxpntghzb`: both rows present and non-empty; `anon` read of `app_config` over PostgREST returns `42501 permission denied`; a smoke invoke of `dispatch_compute_verdict` queued a `pg_net` POST that reached `compute-verdict` (HTTP 404 `room_not_found` for a random UUID — proving the engine is now *reachable*, where it previously silently no-op'd). Regression guard: `supabase/functions/compute-verdict/app-config-dispatch.test.ts` (13 deno tests, runs in the `edge` CI lane). The end-to-end `verdicts`-row criterion stays pending bug-08's tb-21/tb-23 candidate-pool slices — not a gate for closing this issue, per the AC. One CI fix made during the run: an early `jq @json` approach double-quoted the SQL string literal (Postgres read it as an identifier); switched the CI seed step to plain single-quote SQL escaping.
