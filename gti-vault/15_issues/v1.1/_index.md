@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); tb-18 Q4-vibe triaged 2026-05-18 to ready-for-agent + research-02 allowlist spike split out (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -117,7 +117,7 @@ After the Foursquare account moved to a paid (credit-backed) plan, a session dia
 | # | Title | Type | GitHub | Status |
 |---|---|---|---|---|
 | research-02 (v1.1) | [[issues/research-02-tastes-vibe-token-allowlist\|Foursquare tastes vibe-token allowlist — sample + curate]] ✅ done | AFK | [#108](https://github.com/samfarls55/gettoit/issues/108) | done — PR #113; allowlist in [[../../60_engineering/research/foursquare-tastes-vibe-2026-05/report\|foursquare-tastes-vibe-2026-05]] |
-| TB-18 (v1.1) | [[issues/tb-18-q4-vibe-tastes-signal\|Q4 vibe energy from the Foursquare tastes signal]] | AFK | [#102](https://github.com/samfarls55/gettoit/issues/102) | ready-for-agent — triaged 2026-05-18; blocked by research-02 |
+| TB-18 (v1.1) | [[issues/tb-18-q4-vibe-tastes-signal\|Q4 vibe energy from the Foursquare tastes signal]] ✅ done | AFK | [#102](https://github.com/samfarls55/gettoit/issues/102) | done — PR #114; `tastes` decoded onto `ShapedPlace`, `Q5VenueClassifier` blends a ±1 allowlist-token nudge into the Q4 vibe baseline |
 
 **research-02 done 2026-05-18 (PR #113).** The live-data spike is filed at [[../../60_engineering/research/foursquare-tastes-vibe-2026-05/_index|foursquare-tastes-vibe-2026-05]]: a 1090-venue sample of the live Foursquare `tastes` field, a 2732-token frequency table, and a curated **30-token vibe-token allowlist** (16 `+1` / 14 `-1`). Measured `tastes` coverage is **66.8%**, correcting the ~76% estimate the tb-18 ticket and research-01 carried. tb-18 (#102) is now unblocked — it transcribes the allowlist verbatim.
 

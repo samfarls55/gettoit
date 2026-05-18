@@ -1,7 +1,7 @@
 ---
 issue: tb-18
 title: Q4 vibe energy from the Foursquare tastes signal
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 102
 prd: v1.1-quiz-redesign-prd
@@ -68,6 +68,8 @@ Classifier precedence for a venue's vibe value:
 **2026-05-17 — filed `needs-triage`.** Surfaced by the premium-data audit; needed a research/design pass before it could be specified.
 
 **2026-05-18 — triaged (`ready-for-agent`, AFK).** A `/grill-with-docs` session locked the blend design (see §"Design — locked during triage"). The live-data allowlist build was split out into [[research-02-tastes-vibe-token-allowlist|research-02]]; this issue is now the implementation tracer-bullet, blocked by it. Agent brief below.
+
+**2026-05-18 — done (PR [#114](https://github.com/samfarls55/gettoit/pull/114)).** Shipped the `tastes` blend exactly per the locked precedence. The Edge Function `ShapedPlace` (`_shared/foursquare.ts`) and the iOS `ShapedPlace` (`PlacesService.swift`) both gained a `tastes` field (`[]` when absent — forward/backward compatible, mirrors the TB-16 reputation-field pattern). `Q5VenueClassifier` gained `vibeTokenAllowlist` (the research-02 30-token allowlist transcribed verbatim as a `[String: Int]`) and `tastesNudge(for:)`; `vibe(of:)` now does archetype baseline → `tastes` nudge (±1, matched or unmatched) → else `priceTier` tie-break (last-resort) → clamp 0–4. The allowlist is transcribed into the classifier rather than loaded at runtime — the iOS target has no vault bundle access and the classifier is a pure no-I/O function (the artifact's `_comment` prescribes verbatim transcription). 13 new tests (2 decode + 11 vibe-nudge). All CI lanes green including `ios (xcodebuild test)`. Note: code comments use research-02's measured 66.8% `tastes` coverage, not the ticket's earlier ~76% estimate.
 
 ### Agent Brief
 
