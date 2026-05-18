@@ -1,7 +1,7 @@
 ---
 issue: bug-09
 title: Verdict engine is never auto-invoked — dispatch_compute_verdict silently no-ops because the app.* database GUCs are unset
-status: ready-for-agent
+status: needs-triage
 type: AFK
 github_issue: 117
 created: 2026-05-18
@@ -103,3 +103,11 @@ Not blocked. Necessary but not sufficient on its own: with [[bug-08-verdict-pipe
 **2026-05-18 — filed.** Root cause confirmed live: both `app.*` GUCs unset; test room wedged in `firing`. Triaged `ready-for-human` — the fix is an ops action (set a production GUC containing the service-role key) plus a durability decision; not AFK-delegable.
 
 **2026-05-18 — re-triaged HITL → AFK.** The original `ready-for-human` call assumed dashboard / secret handling needed a human. It does not: the service-role key and Management API token are in `/workspace/.env` (agent-readable via that absolute path, even from an isolated worktree), and the `gh` token has the `repo` scope to create the Actions secret. Robust plan added — `app.supabase_url` via a committed migration, `app.service_role_key` via a CI database-deploy step fed by a new `SUPABASE_SERVICE_ROLE_KEY` GitHub Actions secret (confirmed not currently present). Durability decision resolved to automated CI over a runbook (rationale in "Fix — robust plan"). Agent Brief added. Re-triaged `ready-for-agent` / AFK on the vault and GitHub.
+
+**2026-05-18 — AFK run ESCALATED; re-triaged AFK → needs-triage.** The AFK→HITL re-triage assumed the prescribed fix is mechanically agent-executable. It is not. Setting any `app.*` placeholder GUC at the database or role level (`ALTER DATABASE postgres SET ...` / `ALTER ROLE ... SET ...`) requires a **Postgres superuser**. On this Supabase project the `postgres` role — which `supabase db push` and the Management API `/database/query` endpoint both authenticate as — is **not** a superuser; only `supabase_admin` is, and it is not reachable by any agent-held credential. Every variant of the statement returns `42501 permission denied` (verified live, 2026-05-18). Consequences:
+
+- The prescribed **migration half cannot land** — committing `ALTER DATABASE postgres SET app.supabase_url = ...` would abort the shared `supabase-db` CI lane with `42501`, reding CI for the whole repo.
+- The prescribed **CI-step half cannot work** — it runs the same statement against the same Management API endpoint as the same non-superuser `postgres` role.
+- The two secondary ACs (no committed key; both halves survive a re-provision) are moot once the primary mechanism is unavailable.
+
+Full evidence + the recommended re-scope are in [[../../../60_engineering/verdict-dispatch-guc-superuser-blocker|verdict-dispatch-guc-superuser-blocker]]. Two viable paths, both needing a triage decision: (1) **HITL** — a human sets the two values once in the Supabase dashboard's *Custom Postgres config*, `dispatch_compute_verdict` unchanged; (2) **AFK, re-scoped** — change `dispatch_compute_verdict` to read its URL/key from an ordinary `app_config` table instead of `current_setting()`, which removes the superuser dependency entirely (any role can `INSERT`/`SELECT` a table) — but this needs a `dispatch_compute_verdict` change, which the current "Out of scope" section forbids, so it is a spec change. No code merged on `afk/bug-09`; the run produced only the engineering diagnosis note. Re-triaged `needs-triage`.
