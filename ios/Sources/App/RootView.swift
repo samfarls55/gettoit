@@ -167,15 +167,19 @@ public struct RootView: View {
                         }
                     )
                 } else if let host = postQuizHost {
-                    // TB-19 — the post-Q5 router. Owns the session from
-                    // "Q5 submitted" to "verdict on screen". A solo
-                    // session resolves straight to S05 in `.solo` mode;
-                    // a group session holds on the neutral resolving
-                    // surface (the full S04 Waiting surface is tb-20)
-                    // and still reaches S05 when the verdict fires.
-                    // Ending the session returns to S00 Landing.
+                    // TB-19 / TB-20 — the post-Q5 router. Owns the
+                    // session from "Q5 submitted" to "verdict on
+                    // screen". A solo session resolves straight to S05
+                    // in `.solo` mode; a group session shows the S04
+                    // Waiting surface (avatar row re-bootstrapped from
+                    // a snapshot poll) and advances to S05 when the
+                    // verdict fires. Ending the session returns to S00
+                    // Landing. `auth` + `promptStore` back the C-22
+                    // Auth Upgrade Chip the S04 surface hosts.
                     PostQuizHostScreen(
                         host: host,
+                        auth: coordinators.auth,
+                        promptStore: AuthPromptStore(client: coordinators.client),
                         onEndSession: {
                             host.teardown()
                             postQuizHost = nil
@@ -544,6 +548,7 @@ public struct RootView: View {
     /// to the verdict.
     private func enterPostQuiz(quiz: QuizContext, client: SupabaseClient) {
         let store = VerdictStore(client: client)
+        let snapshotStore = SessionSnapshotStore(client: client)
         let context = PostQuizSessionContext(
             roomID: quiz.roomID,
             userID: quiz.userID,
@@ -557,6 +562,13 @@ public struct RootView: View {
             // poller calls `fetchVerdict` until it does.
             fetchVerdict: { roomID in
                 try await store.fetchVerdict(roomID: roomID)
+            },
+            // TB-20 — the group path's snapshot read. The host
+            // re-bootstraps its `WaitingStore` from this on each poll
+            // cycle so the S04 avatar row stays live. A solo session's
+            // `PostQuizHost` ignores this (it never enters `.waiting`).
+            fetchSnapshot: { roomID in
+                try await snapshotStore.fetchSnapshot(roomID: roomID)
             }
         )
         self.postQuizHost = host

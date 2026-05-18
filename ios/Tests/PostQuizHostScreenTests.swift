@@ -73,4 +73,46 @@ final class PostQuizHostScreenTests: XCTestCase {
         }
         render(PostQuizHostScreen(host: host))
     }
+
+    // MARK: - phase: waiting (tb-20, group path)
+
+    private func makeAuth() -> AuthCoordinator {
+        let url = URL(string: "https://example.supabase.co")!
+        return AuthCoordinator(
+            client: SupabaseClient(supabaseURL: url, supabaseKey: "anon")
+        )
+    }
+
+    private func makePromptStore() -> AuthPromptStore {
+        let url = URL(string: "https://example.supabase.co")!
+        return AuthPromptStore(
+            client: SupabaseClient(supabaseURL: url, supabaseKey: "anon")
+        )
+    }
+
+    func testWaitingPhaseRendersTheWaitingScreen() {
+        // A group session opens on `.waiting` — the screen materialises
+        // the S04 Waiting surface, NOT the neutral resolving hold.
+        let host = PostQuizHost(
+            context: PostQuizSessionContext(
+                roomID: UUID(),
+                userID: UUID(),
+                isInitiator: true,
+                invitedShared: true
+            ),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in nil },
+            sleep: { _ in }
+        )
+        guard case .waiting = host.phase else {
+            return XCTFail("a group host should open on .waiting")
+        }
+        render(
+            PostQuizHostScreen(
+                host: host,
+                auth: makeAuth(),
+                promptStore: makePromptStore()
+            )
+        )
+    }
 }
