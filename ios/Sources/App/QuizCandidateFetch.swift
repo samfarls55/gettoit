@@ -62,12 +62,37 @@ public struct QuizCandidateFetchResult: Equatable, Sendable {
         case fallbackDummy
     }
 
+    /// The three shaped Q5 rows the surface renders.
     public let candidates: [QuizCandidate]
     public let source: Source
 
-    public init(candidates: [QuizCandidate], source: Source) {
+    /// TB-21 (v1.1) — the member's **full raw Foursquare fetch**: every
+    /// venue the executor's N+1 calls unioned, NOT just the three Q5
+    /// factorial cards. Before TB-21 this union was computed, used to
+    /// pick the Q5 cards, and then discarded as a local variable — so
+    /// nothing ever populated the server-side `options` table and the
+    /// verdict engine had no candidate pool (parent bug-08).
+    ///
+    /// The `QuizCoordinator` persists this list into `member_fetches`
+    /// so the `compute-verdict` Edge Function can union every member's
+    /// raw fetch into `options` at verdict fire time. This is always
+    /// the *real* fetched union — never the dummy fixture. It is
+    /// non-empty even on the `fallbackDummy` source when the union was
+    /// real venues that were merely too thin / uniform for the Q5
+    /// factorial to furnish three one-axis-deviation cards: those
+    /// venues are still valid verdict candidates. It is empty only
+    /// when the fetch genuinely returned nothing (every call came back
+    /// empty, the fetch threw, or there was no session coordinate).
+    public let rawFetch: [ShapedPlace]
+
+    public init(
+        candidates: [QuizCandidate],
+        source: Source,
+        rawFetch: [ShapedPlace] = []
+    ) {
         self.candidates = candidates
         self.source = source
+        self.rawFetch = rawFetch
     }
 }
 
@@ -169,10 +194,13 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
             union = result.places
         } catch {
             // The whole fetch threw — degrade to the dummy fixture so
-            // Q5 still has three rateable rows (bug-03 hard rule).
+            // Q5 still has three rateable rows (bug-03 hard rule). The
+            // raw fetch is empty: a thrown fetch produced no real
+            // venues to contribute to the room's `options` union.
             return QuizCandidateFetchResult(
                 candidates: QuizDummyCandidates.all,
-                source: .fallbackDummy
+                source: .fallbackDummy,
+                rawFetch: []
             )
         }
 
@@ -181,6 +209,8 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
             member: answers.memberProfile
         )
     }
+
+    // (see `selectFactorialCards` below)
 
     /// Classify the unioned pool, run the factorial generator, and
     /// shape the result into Q5 rows. Exposed `static` so the boundary
@@ -210,16 +240,31 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
             // Pool starvation at the factorial boundary — Q5 still
             // renders three rateable rows; no placeholder venue is ever
             // invented mid-pool (the bug-03 hard rule).
+            //
+            // TB-21: the raw fetched `union` is carried through even on
+            // this fallback. A union too thin / uniform for the Q5
+            // factorial is still a set of real venues — they belong in
+            // the room's `options` pool so the verdict engine can rank
+            // them (a verdict winner may be a venue shown to no member
+            // at Q5).
             return QuizCandidateFetchResult(
                 candidates: QuizDummyCandidates.all,
-                source: .fallbackDummy
+                source: .fallbackDummy,
+                rawFetch: union
             )
         }
 
         // The three factorial cards become Q5's candidate list, each
-        // carrying its real `fsq_place_id`.
+        // carrying its real `fsq_place_id`. TB-21: the full raw fetched
+        // `union` rides along on `rawFetch` so the coordinator can
+        // persist it into `member_fetches` — the verdict engine ranks
+        // the whole fetched pool, not just these three cards.
         let candidates = Q5FactorialCardGenerator.quizCandidates(from: cards)
-        return QuizCandidateFetchResult(candidates: candidates, source: .fetched)
+        return QuizCandidateFetchResult(
+            candidates: candidates,
+            source: .fetched,
+            rawFetch: union
+        )
     }
 }
 

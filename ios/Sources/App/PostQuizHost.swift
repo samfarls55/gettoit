@@ -18,7 +18,11 @@
 //
 //   * resolving — neutral hold surface for a SOLO session. A transient
 //     pass-through (the host polls the verdict straight away). It is
-//     NOT S00 Landing, so the session no longer dead-ends.
+//     NOT S00 Landing, so the session no longer dead-ends. The verdict
+//     poll is BOUNDED (bug-10): if no verdict row ever lands — the
+//     silent-failure shape bug-08 / bug-09 produce — the poll gives up
+//     after `verdictPollMaxWait` seconds and the host moves to `failed`
+//     rather than spinning forever.
 //   * waiting — the full S04 Waiting surface for a GROUP session
 //     (tb-20). The host bootstraps a `WaitingStore` from the room
 //     snapshot and re-bootstraps it on a few-second cadence so the
@@ -105,6 +109,10 @@ public final class PostQuizHost {
     private let fetchSnapshot: SessionSnapshotFetch?
     private let sleep: VerdictPollSleep
     private let pollInterval: TimeInterval
+    /// Total wall-clock seconds the verdict poll waits before giving up
+    /// and moving the host to `failed`. See `VerdictPoller.maxWait` —
+    /// bug-10. The group snapshot+verdict poll honours the same bound.
+    private let verdictPollMaxWait: TimeInterval
 
     /// The live `WaitingStore` for a group session. Held so the
     /// snapshot poll can re-bootstrap the same instance every cycle
@@ -119,6 +127,7 @@ public final class PostQuizHost {
     public init(
         context: PostQuizSessionContext,
         pollInterval: TimeInterval = 3,
+        verdictPollMaxWait: TimeInterval = 75,
         fetchVerdict: @escaping VerdictFetch,
         fetchSnapshot: SessionSnapshotFetch? = nil,
         sleep: @escaping VerdictPollSleep = { seconds in
@@ -127,6 +136,7 @@ public final class PostQuizHost {
     ) {
         self.context = context
         self.pollInterval = pollInterval
+        self.verdictPollMaxWait = verdictPollMaxWait
         self.fetchVerdict = fetchVerdict
         self.fetchSnapshot = fetchSnapshot
         self.sleep = sleep
@@ -207,10 +217,14 @@ public final class PostQuizHost {
     }
 
     /// Solo path — poll `verdicts` straight to the verdict. No S04.
+    /// The poll is bounded: if no verdict row lands inside
+    /// `verdictPollMaxWait`, `VerdictPoller.run()` throws `PollExhausted`,
+    /// which `poll()`'s catch routes to `.failed` (bug-10).
     private func pollSolo() async throws {
         let poller = VerdictPoller(
             roomID: context.roomID,
             interval: pollInterval,
+            maxWait: verdictPollMaxWait,
             fetch: fetchVerdict,
             sleep: sleep
         )
@@ -227,10 +241,17 @@ public final class PostQuizHost {
     ///
     /// `WaitingStore.bootstrap` is documented idempotent — re-applying
     /// a snapshot every cycle overwrites cleanly with no residue.
+    ///
+    /// The loop is bounded by the same `verdictPollMaxWait` ceiling as
+    /// the solo path (bug-10): if no verdict row lands inside the bound
+    /// it throws `VerdictPoller.PollExhausted`, which `poll()`'s catch
+    /// routes to `.failed`. Cancellation is checked before the bound so
+    /// host teardown still unwinds as `CancellationError`.
     private func pollGroup(
         store: WaitingStore,
         fetchSnapshot: @escaping SessionSnapshotFetch
     ) async throws {
+        var elapsed: TimeInterval = 0
         while true {
             try Task.checkCancellation()
 
@@ -247,7 +268,15 @@ public final class PostQuizHost {
                 return
             }
 
+            try Task.checkCancellation()
+            if elapsed + pollInterval >= verdictPollMaxWait {
+                throw VerdictPoller.PollExhausted(
+                    roomID: context.roomID,
+                    maxWait: verdictPollMaxWait
+                )
+            }
             try await sleep(pollInterval)
+            elapsed += pollInterval
         }
     }
 }

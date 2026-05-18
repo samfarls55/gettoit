@@ -1,7 +1,7 @@
 ---
 issue: bug-10
 title: Post-Q5 "Lining Up the Verdict" spinner hangs forever — the verdict poll has no timeout
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 118
 created: 2026-05-18
@@ -71,3 +71,5 @@ None — self-contained iOS change against components that already exist. Indepe
 ## Comments
 
 **2026-05-18 — filed.** Found during the verdict-spinner diagnosis. Triaged `ready-for-agent` / AFK — self-contained iOS change, clear behavioral contract, testable through the poller's existing injected seams, no external access or design fork.
+
+**2026-05-18 — done (PR #122, AFK).** `VerdictPoller` gained a `maxWait` wall-clock ceiling (default 75s, inside the 60–90s window). Once the next inter-poll sleep would push total wait past `maxWait`, `run()` throws `VerdictPoller.PollExhausted` — a distinct `Error` sentinel. `PostQuizHost.poll()`'s existing generic `catch` already routes any thrown error to `.failed`, so poll-exhaustion reaches the existing quiet retry surface with no host phase-machine change; the group `pollGroup` loop honours the same ceiling. Cancellation is checked before the give-up branch, so host/view teardown still unwinds as `CancellationError` — the timeout never fights cancellation. A non-finite `maxWait` (`.infinity`) disables the bound; the three cancellation-isolation tests use it so the bound never races their cancel window. All acceptance criteria covered by unit tests via the injected `fetch`/`sleep` seams (no real wall-clock wait). See [[../../../60_engineering/verdict-path-options-table-never-populated|verdict diagnosis]] Defect C for the resolution note.

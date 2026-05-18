@@ -66,6 +66,13 @@ public enum QuizSessionAssembler {
     /// LocationCoordinator, hydrating from `rooms.location_*` on the
     /// joiner path). When `coordinate` is nil the assembler wires a
     /// dummy-fixture fetch so Q5 still renders three rows.
+    /// TB-21 (v1.1) — `memberFetchWriter` persists each member's full
+    /// raw Foursquare fetch into the server-readable `member_fetches`
+    /// table when the per-member fetch resolves. The `compute-verdict`
+    /// Edge Function unions every member's persisted fetch into
+    /// `options` at verdict fire time. Optional — when nil (or when the
+    /// session has no coordinate, so there is no live fetch) the
+    /// coordinator simply skips the persistence step.
     public static func assembleCoordinator(
         roomID: UUID,
         userID: UUID,
@@ -74,6 +81,7 @@ public enum QuizSessionAssembler {
         timeZone: TimeZone = .current,
         sessionParameters: SessionParameters = .default,
         places: PlacesService,
+        memberFetchWriter: MemberFetchWriter? = nil,
         writer: @escaping QuizVoteWriter
     ) -> Assembled {
         let candidateFetch: QuizCandidateFetch
@@ -100,6 +108,10 @@ public enum QuizSessionAssembler {
             roomID: roomID,
             userID: userID,
             candidateFetch: candidateFetch,
+            // TB-21 — the writer that persists the member's raw fetch
+            // into `member_fetches`. Carried through so the per-member
+            // fetch result flows to the server-side `options` union.
+            memberFetchWriter: memberFetchWriter,
             sessionParameters: sessionParameters,
             writer: writer
         )

@@ -1,7 +1,7 @@
 ---
 issue: research-03
 title: Measure the vibe-token nudge hit-rate against the research-02 sample
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 115
 prd: v1.1-quiz-redesign-prd
@@ -65,3 +65,5 @@ None — can start immediately. research-02 (#108) and tb-18 (#102) are both mer
 ## Comments
 
 **2026-05-18 — filed (`ready-for-agent`).** Surfaced reviewing research-02's 66.8% coverage finding: that figure is the nudge ceiling, not the fire-rate. This spike measures the fire-rate offline against the existing research-02 sample — no new API cost. AFK; the analysis is deterministic over on-disk data.
+
+**2026-05-18 — done (AFK, `afk/research-03`).** Replayed the merged tb-18 `Q5VenueClassifier.tastesNudge` logic offline over `data/raw-sample.json` and `data/vibe-token-allowlist.json` — no new Foursquare calls, no application code touched. Measured **nudge fire-rate at 46.3%** (505 of 1090 venues), well below the 66.8% coverage ceiling. Funnel: 1090 sampled → 728 tastes-bearing → 571 token-matched → 505 non-zero net (66 net-zero cancellations, 11.6% of token-matched). By category: Restaurant 58.8%, Bar 60.3%, Cafe 22.7%. Direction split: 415 louder (`+1`) / 90 quieter (`-1`) — 82% loud-skewed. Verdict: **keep the nudge as specified** — it moves nearly half of every pool at trivial classifier-complexity cost; a future lever is a wider cafe-and-quiet-aware allowlist, not removal. Written up as §7 of the `foursquare-tastes-vibe-2026-05` research note; analysis script `nudge-firerate.ts` + Deno test suite `validate-nudge-firerate.test.ts` shipped alongside (16 tests green). PR closes #115.

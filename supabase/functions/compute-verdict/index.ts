@@ -13,8 +13,10 @@ import {
   type ComputeVerdictDataAdapter,
   type ComputeVerdictEnv,
   handleRequest,
+  type MemberFetchRow,
   type MemberVoteRow,
   type OptionCutInsert,
+  type OptionInsertRow,
   type RoomOptionRow,
   type VerdictInsert,
   type VerdictRow,
@@ -55,6 +57,54 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         return [];
       }
       return (data ?? []) as RoomOptionRow[];
+    },
+    async fetchMemberFetches(room_id): Promise<MemberFetchRow[]> {
+      // TB-21 — read every member's persisted raw Foursquare fetch for
+      // the room. `member_fetches.payload` is the jsonb array of every
+      // venue the member's fetch returned (the full raw union, not the
+      // three Q5 factorial cards). The service-role key bypasses RLS so
+      // the union sees every member's fetch, not just the caller's.
+      const { data, error } = await client
+        .from("member_fetches")
+        .select("user_id, payload")
+        .eq("room_id", room_id);
+      if (error) {
+        console.warn("compute-verdict fetchMemberFetches failed:", error.message);
+        return [];
+      }
+      return (data ?? []).map((row) => {
+        const payload = (row as { payload?: unknown }).payload;
+        return {
+          user_id: (row as { user_id: string }).user_id,
+          // The DB stores the fetch as a jsonb array; a malformed /
+          // non-array payload is tolerated as an empty fetch by the
+          // pure union primitive.
+          payload: Array.isArray(payload) ? payload : [],
+        } satisfies MemberFetchRow;
+      });
+    },
+    async insertOptions(rows: OptionInsertRow[]): Promise<void> {
+      // TB-21 — write the unioned candidate pool into `options`. The
+      // handler calls this only when `options` is empty for the room,
+      // so a plain insert is correct; the `options` (room_id,
+      // fsq_place_id) UNIQUE constraint is a backstop against a racing
+      // concurrent fire, which `ignoreDuplicates` lets through
+      // harmlessly rather than failing the verdict.
+      if (rows.length === 0) return;
+      const { error } = await client
+        .from("options")
+        .upsert(
+          rows.map((r) => ({
+            room_id: r.room_id,
+            fsq_place_id: r.fsq_place_id,
+            payload: r.payload,
+          })),
+          { onConflict: "room_id,fsq_place_id", ignoreDuplicates: true },
+        );
+      if (error) {
+        console.error("compute-verdict insertOptions failed:", error.message);
+        throw error;
+      }
     },
     async fetchVotes(room_id): Promise<MemberVoteRow[]> {
       // TB-04 — `votes` now stores answers in five generic jsonb slots

@@ -166,6 +166,23 @@ public final class QuizCoordinator {
     /// `candidates:` path so the unit tests stay fetch-free.
     private let candidateFetch: QuizCandidateFetch?
 
+    /// TB-21 (v1.1) — the writer that persists the member's full raw
+    /// Foursquare fetch into the server-readable `member_fetches`
+    /// table. Fired once, when the per-member fetch resolves on the
+    /// Q4 -> Q5 transition.
+    ///
+    /// Parent bug-08: before TB-21 the fetched venue union was used to
+    /// pick the three Q5 factorial cards and then discarded — nothing
+    /// ever populated the server-side `options` table, so the verdict
+    /// engine had no candidate pool. This writer persists the raw
+    /// union so `compute-verdict` can union every member's fetch into
+    /// `options` at verdict fire time.
+    ///
+    /// Nil on the legacy explicit-`candidates:` init and whenever the
+    /// caller does not supply one (no session coordinate / unit
+    /// tests); the persistence step is then simply skipped.
+    private let memberFetchWriter: MemberFetchWriter?
+
     /// In-flight per-member fetch task, so a re-entrant Q4 -> Q5
     /// transition (or a defensive double-`advance()`) folds into the
     /// already-running fetch instead of firing the N+1 calls twice.
@@ -204,6 +221,7 @@ public final class QuizCoordinator {
         self.candidates = candidates
         self.sessionParameters = sessionParameters
         self.candidateFetch = nil
+        self.memberFetchWriter = nil
         self.writer = writer
         // Seed Q5 ratings at the spec'd default (3 — middle of the
         // 1–5 scale) so the surface renders with a chosen state per
@@ -217,10 +235,18 @@ public final class QuizCoordinator {
     /// transition with the member's real Q1-Q4 answers. This is the
     /// init `QuizSessionAssembler` uses for the running quiz — no
     /// PlacesProxy / Foursquare call fires before Q1-Q4 are answered.
+    ///
+    /// TB-21 (v1.1) — `memberFetchWriter` persists the member's full
+    /// raw Foursquare fetch into the server-readable `member_fetches`
+    /// table when the per-member fetch resolves. Optional: the live
+    /// quiz path supplies one (`QuizSessionAssembler` injects a
+    /// `MemberFetchSupabaseWriter`); the boundary tests omit it and the
+    /// persistence step is skipped.
     public init(
         roomID: UUID,
         userID: UUID,
         candidateFetch: QuizCandidateFetch,
+        memberFetchWriter: MemberFetchWriter? = nil,
         sessionParameters: SessionParameters = .default,
         writer: @escaping QuizVoteWriter
     ) {
@@ -229,6 +255,7 @@ public final class QuizCoordinator {
         self.candidates = []
         self.sessionParameters = sessionParameters
         self.candidateFetch = candidateFetch
+        self.memberFetchWriter = memberFetchWriter
         self.writer = writer
         self.q5Ratings = [:]
     }
@@ -372,6 +399,46 @@ public final class QuizCoordinator {
             )
             guard let self else { return }
             self.applyFetchResult(result)
+            // TB-21 — persist the member's full raw fetched union into
+            // `member_fetches` so the server can union it into
+            // `options` at verdict fire time. Awaited inside the fetch
+            // task so `awaitCandidateFetch()` covers the persistence
+            // too; best-effort, so a write failure never strands Q5.
+            await self.persistRawFetch(result.rawFetch)
+        }
+    }
+
+    /// TB-21 — persist the member's full raw Foursquare fetch into the
+    /// server-readable `member_fetches` table.
+    ///
+    /// Parent bug-08: the fetched venue union was discarded after the
+    /// Q5 factorial picked its three cards, so the verdict engine had
+    /// no candidate pool. This write closes that gap — the
+    /// `compute-verdict` Edge Function unions every member's persisted
+    /// fetch into `options` at verdict fire time.
+    ///
+    /// Skipped when no `memberFetchWriter` was injected (legacy init /
+    /// unit tests) or when the raw fetch is empty (a genuinely empty
+    /// fetch — every call came back empty, or the fetch threw — has no
+    /// real venues to contribute to the room's union).
+    ///
+    /// Best-effort: a write failure is swallowed. The member must
+    /// still reach Q5 and submit — a missing `member_fetches` row
+    /// degrades that member's fetch out of the room's `options` union,
+    /// which is recoverable, whereas blocking the quiz is not.
+    private func persistRawFetch(_ rawFetch: [ShapedPlace]) async {
+        guard let memberFetchWriter, !rawFetch.isEmpty else { return }
+        let row = MemberFetchRow(
+            roomID: roomID,
+            userID: userID,
+            payload: rawFetch
+        )
+        do {
+            try await memberFetchWriter(row)
+        } catch {
+            // Best-effort — the quiz flow is never blocked on this
+            // write. The member still reaches Q5; the only cost is
+            // their fetch missing from the room's `options` union.
         }
     }
 

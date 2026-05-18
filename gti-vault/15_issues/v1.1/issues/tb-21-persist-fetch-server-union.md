@@ -1,7 +1,7 @@
 ---
 issue: tb-21
 title: Persist each member's raw candidate fetch; server unions it into the options table at fire time
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 119
 prd: v1.1-quiz-redesign-prd
@@ -54,3 +54,11 @@ Note: full *auto*-fire end-to-end also needs [[bug-09-verdict-fire-dispatch-guc-
 ## Comments
 
 **2026-05-18 — filed.** Decomposed from [[bug-08-verdict-pipeline-integration-unwired|bug-08]] after the architecture fork was decided (Option 2, server-side). Triaged `ready-for-agent` / AFK — clear end-to-end contract, verifiable via direct `compute-verdict` invoke.
+
+**2026-05-18 — done (PR #119 branch `afk/tb-21`).** Shipped server-side per the bug-08 Option 2 decision.
+
+- **Storage:** new per-`(room, member)` table `member_fetches(room_id, user_id, payload jsonb, fetched_at)` — `payload` is the full raw fetched venue union (every venue, not the three Q5 cards). Dedicated table over a `votes` jsonb slot — the fetch resolves before the Q5 vote and the union is large; RLS mirrors `votes` but admits UPDATE so a re-run quiz overwrites the stale fetch.
+- **iOS:** `QuizCandidateFetchResult` gained `rawFetch: [ShapedPlace]` (the union previously discarded as a local var); `QuizCoordinator` persists it via a new `MemberFetchWriter` / `MemberFetchSupabaseWriter` (upsert) when the per-member fetch resolves. Best-effort — a write failure never strands Q5.
+- **Server:** pure `_shared/member-fetch-union.ts` (`unionMemberFetches`) — running union, first-seen dedup by `fsq_place_id`, no solo/group special case. `compute-verdict` unions every `member_fetches` row into `options` when `options` is empty, then re-reads — idempotent across re-invokes; iOS never writes `options`.
+- **Verified:** full `deno test` edge suite green (231 + new union/handler tests). iOS lane verified in CI (no local Xcode in the AFK environment). Architecture recorded in [[../../../60_engineering/verdict-path-options-table-never-populated|verdict-path-options-table-never-populated]] §"Defect A — resolution".
+- Scoring quality stays out of scope — the engine still scores from `votes.q5.answer.scores` until [[tb-23-server-prefn-scoring|tb-23]].

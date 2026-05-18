@@ -103,6 +103,18 @@ manifests as an **eternal spinner**, never the `.failed` retry surface. The
 resolving copy literally promises *"no spinners forever"* — the code cannot
 honor that. Real bug independent of A/B.
 
+> **Resolved 2026-05-18 (bug-10, PR #118).** `VerdictPoller` now takes a
+> `maxWait` ceiling (default 75s — inside the issue's 60–90s window). Once
+> the next inter-poll sleep would push total wait past `maxWait` the loop
+> throws `VerdictPoller.PollExhausted` — a distinct `Error` sentinel, not a
+> verdict and not a crash. `PostQuizHost.poll()`'s existing generic `catch`
+> routes it to `.failed` exactly as it does a fetch error, so the eternal
+> spinner becomes the existing quiet retry surface. The bound is wall-clock
+> seconds (not a raw attempt count) so it stays meaningful if the cadence
+> changes. Cancellation is checked before the bound, so host teardown still
+> unwinds as `CancellationError` — the timeout never fights cancellation.
+> The group snapshot+verdict poll in `pollGroup` honours the same ceiling.
+
 ## Failure chain
 
 Q5 submit → votes row ✓ → trigger fires, room `open→firing` ✓ →
@@ -137,11 +149,58 @@ bound `VerdictPoller`; route to `.failed` on exhaustion.
 The stuck room `f8087f7c…` cannot be salvaged (no candidates ever existed for
 it); it stays wedged in `firing`.
 
+## Defect A — resolution (tb-21, 2026-05-18)
+
+The bug-08 architecture fork was decided **Option 2, server-side**. tb-21 is the
+load-bearing slice of that decomposition — the first end-to-end tracer that
+flows a member's raw fetch all the way to `options`.
+
+**Storage shape chosen.** A new per-`(room, member)` table
+`member_fetches(room_id, user_id, payload jsonb, fetched_at)` —
+`supabase/migrations/20260518000000000_member_fetches.sql`. `payload` is the
+jsonb array of every venue the member's Foursquare fetch returned (the full raw
+union, not the three Q5 factorial cards). A dedicated table was chosen over a
+`votes` jsonb slot because (a) the fetched union is large and keeping it off
+the `votes` row keeps the verdict-engine's `votes` read tight, (b) the fetch
+resolves on the Q4→Q5 transition, strictly before the Q5 vote — a separate
+table lets the two writes stay independent rather than forcing one atomic write
+or a `votes` UPDATE the v1.1 RLS contract forbids. RLS mirrors `votes`, except
+`member_fetches` admits UPDATE (a re-run quiz overwrites the stale fetch — the
+union must reflect the member's latest fetch, not a stacked duplicate).
+
+**iOS side.** `QuizCandidateFetchResult` gained a `rawFetch: [ShapedPlace]`
+field carrying the full fetched union (previously discarded as a local
+variable). `QuizCoordinator` persists it via a new `MemberFetchWriter` /
+`MemberFetchSupabaseWriter` (upsert on the `member_fetches` PK) when the
+per-member fetch resolves. The write is best-effort — a failure never strands
+the member at Q5. `rawFetch` carries real venues even on the `fallbackDummy`
+source (a union too thin/uniform for the Q5 factorial is still valid verdict
+candidates); it is empty only when the fetch genuinely returned nothing.
+
+**Server side.** A pure `_shared/member-fetch-union.ts` (`unionMemberFetches`)
+assembles the running union of every member's persisted fetch — first-seen
+dedup by `fsq_place_id`, no solo/group special case. The `compute-verdict`
+handler calls it before reading `options`: when `options` is empty for a room,
+it unions every `member_fetches` row and writes the result into `options`, then
+re-reads. The union runs only when `options` is empty, so it is idempotent
+across re-invokes. iOS never writes `options` — the server is the single owner
+of the union.
+
+**Out of scope for tb-21.** Preference-correct scoring — the engine still
+scores members from the `votes.q5.answer.scores` probe ratings until
+[[../15_issues/v1.1/issues/tb-23-server-prefn-scoring|tb-23]] ports the
+server-side prefFn. A verdict is now computable, but not yet preference-correct.
+Full *auto*-fire end-to-end also still needs Defect B (bug-09).
+
 ## Related
 
 - [[../15_issues/v1.1/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] /
   [[../15_issues/v1.1/issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]] /
   [[../15_issues/v1.1/issues/bug-10-verdict-poll-no-timeout|bug-10]] — the triaged fixes
+- [[../15_issues/v1.1/issues/tb-21-persist-fetch-server-union|tb-21]] — Defect A's load-bearing fix slice
+- `supabase/migrations/20260518000000000_member_fetches.sql` — the per-member
+  raw-fetch table tb-21 lands
+- `supabase/functions/_shared/member-fetch-union.ts` — the pure server-side union
 - [[verdict-engine]] — engine architecture + idempotency contract
 - [[waiting-fire-trigger]] — the two fire paths + GUC no-op note
 - `supabase/migrations/20260513183000_places_and_options.sql` — `options`
