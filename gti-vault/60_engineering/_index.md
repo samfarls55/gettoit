@@ -10,6 +10,7 @@ Architecture, conventions, runbooks, ADRs.
 ## Contents
 
 - [[adr/_index|adr/]] — Architecture Decision Records (one file per decision, numbered from `0001`).
+- [[verdict-path-options-table-never-populated|verdict-path-options-table-never-populated.md]] — 2026-05-18 diagnosis: the post-Q5 verdict spinner hangs forever. Three compounding defects — the `options` table has no writer (0 rows / 2587 rooms, root cause), the verdict-fire dispatch silently no-ops on unset `app.*` GUCs, and `VerdictPoller` has no timeout. Verdict path has never produced a row.
 - [[research/_index|research/]] — Time-stamped research bundles that feed ADRs (outline + fields + deep-research outputs).
 - [[stack-patterns|stack-patterns.md]] — Implementation patterns implied by the current stack (cross-references the active ADR).
 - [[verdict-engine|verdict-engine.md]] — VerdictEngine architecture: the v1.1 worst-off-protecting pipeline (EBA prune + satisficing floor + maximin tiebreak), anonymization rules, Q5-complete firing, and the compute-verdict Edge Function.

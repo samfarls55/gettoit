@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared; verdict-pipeline diagnosis 2026-05-18 — 3 bugs filed (bug-08–bug-10, GitHub #116–#118): the verdict path has never produced a row — candidate-pool integration unwired (bug-08), fire dispatch no-ops on unset GUCs (bug-09), resolving poll never times out (bug-10); bug-08 fork decided 2026-05-18 (Option 2, server-side) and decomposed into AFK slices tb-21–tb-23 (GitHub #119–#121)
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -27,6 +27,9 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | bug-05 | [[issues/bug-05-info-plist-missing-location-purpose-string\|Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125]] — fixed-in-branch (not filed to GitHub) | AFK | — | — |
 | bug-06 | [[issues/bug-06-legacy-anon-bypasses-s00a-gate\|Legacy v1 anonymous session bypasses S00a sign-in gate on launch]] ✅ done | AFK | [#63](https://github.com/samfarls55/gettoit/issues/63) | — |
 | bug-07 | [[issues/bug-07-post-q5-router-unwired\|Quiz submit dead-ends to landing — post-Q5 router (S04/S05) unwired]] ✅ closed — decomposed into tb-19/tb-20; fix tracked there | HITL | [#109](https://github.com/samfarls55/gettoit/issues/109) | — |
+| bug-08 | [[issues/bug-08-verdict-pipeline-integration-unwired\|Verdict never computes — candidate-pool + preference-scoring integration (modules A/E/G) never wired]] ✅ closed — fork decided (Option 2, server-side); decomposed into tb-21/tb-22/tb-23; fix tracked there | HITL | [#116](https://github.com/samfarls55/gettoit/issues/116) | — |
+| bug-09 | [[issues/bug-09-verdict-fire-dispatch-guc-noop\|Verdict engine never auto-invoked — dispatch no-ops on unset app.* DB GUCs]] 🟢 ready-for-agent — re-triaged HITL→AFK 2026-05-18 (robust plan added) | AFK | [#117](https://github.com/samfarls55/gettoit/issues/117) | — |
+| bug-10 | [[issues/bug-10-verdict-poll-no-timeout\|Post-Q5 "Lining Up the Verdict" spinner hangs forever — poll has no timeout]] 🟢 ready-for-agent | AFK | [#118](https://github.com/samfarls55/gettoit/issues/118) | — |
 
 ### Spec gaps
 
@@ -140,6 +143,18 @@ Decomposed via `/to-issues` after a dogfood session surfaced [[issues/bug-07-pos
 Build order: tb-19 first (stands up the post-quiz host + `RootView` wiring on the solo path), then tb-20 (adds the group S04 Waiting surface on the same host).
 
 **Adjacencies flagged on bug-07, not filed.** Realtime upgrade for live S04 peer updates; S06 Locked / S07 Reroll / S08 Check-in routing — the same unwired-surface pattern, separate follow-ups.
+
+## Verdict-pipeline integration fix (2026-05-18)
+
+Decomposed via `/to-issues` from [[issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] — the verdict candidate-pool + preference-scoring integration (PRD modules A/E/G) was never wired; `options` is empty across all 2587 rooms and the verdict path has never produced a row. bug-08's architecture fork was decided 2026-05-18: **Option 2 (server-side)** — the union + preference-scoring runs server-side at verdict fire time; iOS writes only raw fetch results. Three vertical slices.
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| TB-21 (v1.1) | [[issues/tb-21-persist-fetch-server-union\|Persist raw per-member fetch; server unions it into `options` at fire time]] 🟢 ready-for-agent | AFK | [#119](https://github.com/samfarls55/gettoit/issues/119) | — |
+| TB-22 (v1.1) | [[issues/tb-22-port-preference-function-ts\|Port the preference function (PRD modules A/E) Swift → TypeScript]] 🟢 ready-for-agent | AFK | [#120](https://github.com/samfarls55/gettoit/issues/120) | — |
+| TB-23 (v1.1) | [[issues/tb-23-server-prefn-scoring\|Server-side prefFn scoring over the full union, into the verdict engine]] 🟢 ready-for-agent | AFK | [#121](https://github.com/samfarls55/gettoit/issues/121) | TB-21, TB-22 |
+
+Build order: tb-21 and tb-22 run in parallel (both unblocked); tb-23 after both. tb-22 is a deliberate horizontal slice — a pure Swift→TS port verified by its ported test vectors — kept separate for parallelism and a focused port-vs-wiring review split. The group path is folded into tb-21/tb-23 acceptance criteria, not its own slice: Option 2's server-side union has no solo/group special case. Full *auto*-fire end-to-end also needs [[issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]] (GUCs); the slices stay verifiable without it via direct `compute-verdict` invoke.
 
 ## Cross-references
 
