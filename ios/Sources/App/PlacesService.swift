@@ -53,6 +53,16 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
     /// `date_created` caveat — it is the record's age, not the
     /// restaurant's.
     public let dateCreated: String?
+    /// TB-18 (v1.1) — vibe-axis signal: Foursquare's crowd-sourced
+    /// `tastes` tag cloud, passed through verbatim by the places-proxy.
+    /// `Q5VenueClassifier` matches these tokens against the research-02
+    /// curated allowlist to apply a bounded ±1 nudge to the category-
+    /// archetype vibe baseline. Decodes as `[]` when absent — an Edge
+    /// Function build predating the TB-18 projection, or a venue with
+    /// no tags, simply yields an empty list (the ~33% of venues with no
+    /// `tastes` coverage classify exactly as TB-16 did). See
+    /// gti-vault/60_engineering/research/foursquare-tastes-vibe-2026-05.
+    public let tastes: [String]
 
     public init(
         fsqPlaceId: String,
@@ -68,7 +78,8 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
         categories: [String] = [],
         rating: Double? = nil,
         totalRatings: Int? = nil,
-        dateCreated: String? = nil
+        dateCreated: String? = nil,
+        tastes: [String] = []
     ) {
         self.fsqPlaceId = fsqPlaceId
         self.name = name
@@ -84,6 +95,7 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
         self.rating = rating
         self.totalRatings = totalRatings
         self.dateCreated = dateCreated
+        self.tastes = tastes
     }
 
     enum CodingKeys: String, CodingKey {
@@ -101,6 +113,7 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
         case rating
         case totalRatings = "total_ratings"
         case dateCreated = "date_created"
+        case tastes
     }
 
     public init(from decoder: Decoder) throws {
@@ -123,6 +136,11 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
         rating = try c.decodeIfPresent(Double.self, forKey: .rating)
         totalRatings = try c.decodeIfPresent(Int.self, forKey: .totalRatings)
         dateCreated = try c.decodeIfPresent(String.self, forKey: .dateCreated)
+        // TB-18 — the `tastes` vibe signal. Optional on the wire: an
+        // Edge Function build predating the TB-18 projection omits the
+        // key, and `decodeIfPresent` decodes that as `[]` rather than
+        // throwing. Forward- and backward-compatible.
+        tastes = try c.decodeIfPresent([String].self, forKey: .tastes) ?? []
     }
 }
 

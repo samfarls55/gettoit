@@ -21,7 +21,8 @@ final class Q5VenueClassifierTests: XCTestCase {
         priceTier: Int? = nil,
         rating: Double? = nil,
         totalRatings: Int? = nil,
-        dateCreated: String? = nil
+        dateCreated: String? = nil,
+        tastes: [String] = []
     ) -> ShapedPlace {
         ShapedPlace(
             fsqPlaceId: id,
@@ -31,7 +32,8 @@ final class Q5VenueClassifierTests: XCTestCase {
             categories: categories,
             rating: rating,
             totalRatings: totalRatings,
-            dateCreated: dateCreated
+            dateCreated: dateCreated,
+            tastes: tastes
         )
     }
 
@@ -116,6 +118,162 @@ final class Q5VenueClassifierTests: XCTestCase {
             Q5VenueClassifier.vibe(of: place("a", categories: ["Mexican Restaurant", "Cocktail Bar"])),
             3
         )
+    }
+
+    // MARK: - Vibe axis — `tastes` nudge (TB-18)
+
+    func testTastesNudgesAMatchedArchetypeLouder() {
+        // Two same-category venues: the plain restaurant sits at the
+        // Social (2) baseline; a loud-token restaurant nudges to 3.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place("plain", categories: ["Italian Restaurant"])),
+            2)
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "loud",
+                categories: ["Italian Restaurant"],
+                tastes: ["lively", "good for groups"])),
+            3,
+            "loud-leaning tastes nudge a matched archetype up one step — splits two same-category venues")
+    }
+
+    func testTastesNudgesAMatchedArchetypeQuieter() {
+        // A quiet-token restaurant nudges below the Social baseline.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "quiet",
+                categories: ["Italian Restaurant"],
+                tastes: ["quiet", "good for working"])),
+            1,
+            "quiet-leaning tastes nudge a matched archetype down one step")
+    }
+
+    func testTastesNudgeIsCappedAtOneStep() {
+        // Even with several same-direction tokens, the nudge never
+        // exceeds ±1 — it is the sign of the sum, not the magnitude.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "veryLoud",
+                categories: ["Italian Restaurant"],
+                tastes: ["lively", "loud", "crowded", "dancing", "live music"])),
+            3,
+            "the tastes nudge is direction-only, capped at one step")
+    }
+
+    func testConflictingTastesNetToZeroNoNudge() {
+        // A venue with balanced loud/quiet tokens nets 0 → no nudge;
+        // it classifies exactly at the archetype baseline.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "mixed",
+                categories: ["Italian Restaurant"],
+                tastes: ["lively", "quiet"])),
+            2,
+            "balanced loud/quiet tastes net to zero — no nudge, baseline holds")
+    }
+
+    func testUnknownTastesTokensAreIgnored() {
+        // Folksonomy noise (`trains`, chef names) is not in the
+        // allowlist and contributes nothing — the venue classifies at
+        // its archetype baseline, exactly as TB-16.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "noisy",
+                categories: ["Italian Restaurant"],
+                tastes: ["trains", "hummingbirds", "great pasta"])),
+            2,
+            "tokens absent from the research-02 allowlist are ignored — no regression")
+    }
+
+    func testTastesNudgesAnUnmatchedArchetype() {
+        // A `tastes` nudge applies whether or not an archetype matched.
+        // A loud-token unknown-category venue moves off the default
+        // Social middle.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "loudUnknown",
+                categories: ["Museum"],
+                tastes: ["lively", "crowded"])),
+            Q5VenueClassifier.defaultVibeBaseline + 1,
+            "tastes nudge an unmatched archetype too")
+    }
+
+    func testTastesTakesPrecedenceOverPriceTieBreak() {
+        // An unmatched-archetype venue with BOTH a loud `tastes` signal
+        // and an expensive price: `tastes` wins, price is suppressed.
+        // The result is the loud nudge (+1), not the price nudge (-1).
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "loudButPricey",
+                categories: ["Museum"],
+                priceTier: 4,
+                tastes: ["lively", "crowded"])),
+            Q5VenueClassifier.defaultVibeBaseline + 1,
+            "tastes and price are mutually exclusive — tastes wins, price never fires when tastes contributed")
+    }
+
+    func testPriceTieBreakStillFiresWhenTastesContributesNothing() {
+        // An unmatched venue with only noise / conflicting tastes still
+        // falls through to the price tie-break — TB-16 behaviour intact.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "pricey",
+                categories: ["Museum"],
+                priceTier: 4,
+                tastes: ["trains"])),
+            Q5VenueClassifier.defaultVibeBaseline - 1,
+            "price tie-break still fires when tastes nets zero — last-resort, unchanged")
+    }
+
+    func testTastesMatchIsCaseInsensitive() {
+        // Foursquare tags arrive mixed-case; allowlist matching must
+        // be case-insensitive.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "shouty",
+                categories: ["Italian Restaurant"],
+                tastes: ["LIVELY", "Good For Groups"])),
+            3,
+            "tastes-token matching is case-insensitive")
+    }
+
+    func testNoTastesClassifiesExactlyAsTB16() {
+        // The core no-regression guarantee: a venue with no `tastes`
+        // classifies identically to the pre-TB-18 archetype + price
+        // path across every archetype + price combination.
+        let categories = ["Cocktail Bar", "Tea House", "Italian Restaurant", "Museum"]
+        for cat in categories {
+            for tier in [nil, 1, 2, 3, 4] as [Int?] {
+                let v = Q5VenueClassifier.vibe(of: place(
+                    "x", categories: [cat], priceTier: tier, tastes: []))
+                XCTAssertTrue((0...4).contains(v), "vibe \(v) for \(cat)/\(String(describing: tier)) in range")
+            }
+        }
+        // Spot-check the exact pre-TB-18 values.
+        XCTAssertEqual(Q5VenueClassifier.vibe(of: place("a", categories: ["Cocktail Bar"], tastes: [])), 3)
+        XCTAssertEqual(Q5VenueClassifier.vibe(of: place("b", categories: ["Tea House"], tastes: [])), 0)
+        XCTAssertEqual(Q5VenueClassifier.vibe(of: place("c", categories: ["Museum"], priceTier: 1, tastes: [])),
+            Q5VenueClassifier.defaultVibeBaseline + 1)
+    }
+
+    func testTastesNudgeClampsAtTheRowdyCeiling() {
+        // A loud-token nudge on the already-top Rowdy archetype clamps
+        // — it does not overflow past 4.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "club", categories: ["Nightclub"], tastes: ["dancing", "loud"])),
+            4,
+            "a loud nudge on the Rowdy ceiling clamps to 4")
+    }
+
+    func testTastesNudgeClampsAtTheQuietFloor() {
+        // A quiet-token nudge on the already-bottom Quiet archetype
+        // clamps — it does not underflow past 0.
+        XCTAssertEqual(
+            Q5VenueClassifier.vibe(of: place(
+                "tea", categories: ["Tea House"], tastes: ["quiet", "cozy"])),
+            0,
+            "a quiet nudge on the Quiet floor clamps to 0")
     }
 
     // MARK: - Reputation axis (pool-relative)

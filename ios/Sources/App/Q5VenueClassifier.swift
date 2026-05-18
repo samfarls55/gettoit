@@ -20,14 +20,16 @@
 //     `nil` (an unclassified cuisine — a valid cuisine-drop deviation).
 //
 //   * **Vibe** — a category-archetype baseline table, 0…4 on the
-//     Quiet…Rowdy scale, with `priceTier` as a small tie-break. This
-//     is the heuristic the foursquare-filter-surface research §5
-//     prescribes: most of the vibe signal lives in the category
-//     archetype (a cocktail bar is reliably high-energy, a tea house
-//     reliably low); price nudges an ambiguous score slightly. The
-//     research flags this as a deliberate, documented accuracy
-//     compromise — the Q5 factorial exists precisely to measure
-//     whether a noisy vibe axis is load-bearing.
+//     Quiet…Rowdy scale, with a curated `tastes`-token nudge as the
+//     secondary signal and `priceTier` as a last-resort tie-break.
+//     Most of the vibe signal lives in the category archetype (a
+//     cocktail bar is reliably high-energy, a tea house reliably low);
+//     TB-18 adds a bounded ±1 nudge from Foursquare's crowd-sourced
+//     `tastes` tag cloud — matched against the research-02 curated
+//     vibe-token allowlist — so two same-category venues can differ.
+//     `priceTier` drops to last-resort: it fires only on an unmatched
+//     archetype where `tastes` contributed nothing. `tastes` and price
+//     are mutually exclusive, so drift from the baseline is ≤ ±1.
 //
 //   * **Reputation** — a pool-relative bucketing over `totalRatings`
 //     (volume), `rating` (quality), and `dateCreated` (age), per
@@ -165,10 +167,87 @@ public enum Q5VenueClassifier {
     /// middle, not as quiet.
     static let defaultVibeBaseline: Int = 2
 
-    /// The venue's vibe level, 0…4. Category archetype is the primary
-    /// signal; `priceTier` is a tertiary tie-break of at most one step
-    /// — research §5: high-price fine dining skews quieter, cheap
-    /// fast-casual louder, but price must not move the score much.
+    /// Curated Foursquare `tastes` vibe-token allowlist — transcribed
+    /// verbatim from the research-02 deliverable
+    /// (`gti-vault/60_engineering/research/foursquare-tastes-vibe-2026-05/`
+    /// `data/vibe-token-allowlist.json`). Each token is direction-only:
+    /// `+1` loud-leaning, `-1` quiet-leaning, no magnitude. Tokens are
+    /// lower-cased; allowlist matching is case-insensitive. A venue's
+    /// matched-token tags are summed and the *sign* of the sum is the
+    /// nudge (`-1` / `0` / `+1`) — see `tastesNudge(for:)`.
+    ///
+    /// research-02 measured `tastes` coverage at 66.8% of sampled
+    /// venues (the issue's earlier ~76% estimate was corrected by the
+    /// live sample); the ~33% with no `tastes` net a zero nudge and
+    /// classify exactly as TB-16 did.
+    static let vibeTokenAllowlist: [String: Int] = [
+        // Loud-leaning (+1).
+        "crowded": 1,
+        "trendy": 1,
+        "good for groups": 1,
+        "happy hour": 1,
+        "good for singles": 1,
+        "hipster": 1,
+        "people watching": 1,
+        "dancing": 1,
+        "live music": 1,
+        "lively": 1,
+        "loud": 1,
+        "fun atmosphere": 1,
+        "nightclubs": 1,
+        "night clubs": 1,
+        "festive atmosphere": 1,
+        "noisy": 1,
+        // Quiet-leaning (-1).
+        "spacious": -1,
+        "good for dates": -1,
+        "comfortable": -1,
+        "quiet": -1,
+        "good for working": -1,
+        "good for business meetings": -1,
+        "comfortable seats": -1,
+        "cozy": -1,
+        "cosy atmosphere": -1,
+        "study area": -1,
+        "romantic": -1,
+        "business meetings": -1,
+        "quaint atmosphere": -1,
+        "pleasant atmosphere": -1,
+    ]
+
+    /// The `tastes` nudge for a venue — `-1`, `0`, or `+1`. Sums the
+    /// direction tags of the venue's `tastes` tokens that appear in the
+    /// `vibeTokenAllowlist`, then returns the *sign* of that sum.
+    /// Direction-only: magnitude is intentionally discarded so a venue
+    /// with five loud tokens nudges the same one step as a venue with
+    /// one. A balanced or conflicting venue (and a venue with no
+    /// matching tokens) nets `0` → no nudge. Folksonomy noise that is
+    /// not in the allowlist contributes nothing.
+    static func tastesNudge(for place: ShapedPlace) -> Int {
+        let sum = place.tastes.reduce(0) { acc, token in
+            acc + (vibeTokenAllowlist[token.lowercased()] ?? 0)
+        }
+        if sum > 0 { return 1 }
+        if sum < 0 { return -1 }
+        return 0
+    }
+
+    /// The venue's vibe level, 0…4. The category archetype is the
+    /// baseline; a curated `tastes`-token nudge is the secondary
+    /// signal; `priceTier` is the last-resort tie-break.
+    ///
+    /// Precedence (locked TB-18, grill-with-docs 2026-05-18):
+    ///   1. Category-archetype baseline (0…4) — the TB-16 table.
+    ///   2. `tastes` nudge (±1, the sign of the summed allowlist-token
+    ///      tags) — applies whether or not an archetype matched, so it
+    ///      splits two same-category venues.
+    ///   3. Else `priceTier` tie-break (±1, unmatched archetype only) —
+    ///      the TB-16 behaviour, demoted to last-resort: it fires only
+    ///      when `tastes` contributed nothing.
+    ///   4. Clamp to 0…4.
+    ///
+    /// `tastes` and `priceTier` are mutually exclusive, so total drift
+    /// from the baseline is always ≤ ±1.
     static func vibe(of place: ShapedPlace) -> Int {
         let haystack = place.categories.map { $0.lowercased() }
         var baseline = defaultVibeBaseline
@@ -183,8 +262,17 @@ public enum Q5VenueClassifier {
             }
         }
 
-        // Price tie-break — only nudge an *ambiguous* (unmatched-
-        // archetype) score, and only by one step, so price never
+        // `tastes` nudge — the secondary signal. Applies whether or not
+        // an archetype matched (a nudge on a matched archetype is the
+        // point — it splits two same-category venues).
+        let nudge = tastesNudge(for: place)
+        if nudge != 0 {
+            return clampVibe(baseline + nudge)
+        }
+
+        // Price tie-break — last-resort, and only when `tastes`
+        // contributed nothing. Still gated on an *ambiguous* (unmatched-
+        // archetype) score, and still at most one step, so price never
         // overrides the category signal. tier 1 (cheap) nudges louder,
         // tier 4 (expensive) nudges quieter.
         if !matched, let tier = place.priceTier {
