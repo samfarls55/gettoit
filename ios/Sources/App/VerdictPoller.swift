@@ -79,7 +79,8 @@ public struct VerdictPoller: Sendable {
     /// firing, so the default is generous (75s) — long enough never to
     /// truncate a slow-but-healthy resolve, short enough that a real
     /// silent failure surfaces as a retryable error, not an infinite
-    /// spinner. See bug-10.
+    /// spinner. See bug-10. A non-finite value (`.infinity`) disables
+    /// the bound — the loop then ends only on a verdict or cancellation.
     public let maxWait: TimeInterval
 
     private let fetch: VerdictFetch
@@ -122,7 +123,11 @@ public struct VerdictPoller: Sendable {
             // Cancellation is checked before the bound so host teardown
             // unwinds as CancellationError, never as PollExhausted.
             try Task.checkCancellation()
-            if elapsed + interval >= maxWait {
+            // A non-finite `maxWait` means "unbounded" — the give-up
+            // branch is skipped and only a verdict or cancellation ends
+            // the loop. The default is finite (75s); `.infinity` is the
+            // explicit opt-out used by cancellation-isolation tests.
+            if maxWait.isFinite && elapsed + interval >= maxWait {
                 throw PollExhausted(roomID: roomID, maxWait: maxWait)
             }
             try await sleep(interval)

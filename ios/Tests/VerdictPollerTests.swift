@@ -77,9 +77,13 @@ final class VerdictPollerTests: XCTestCase {
     func testPollerStopsOnTaskCancellation() async throws {
         let attempts = Counter()
         // fetch never returns a verdict — only cancellation can end this.
+        // `maxWait: .infinity` disables the bug-10 bound so this test
+        // isolates the cancellation contract; the bound is covered
+        // separately by the give-up tests above.
         let poller = VerdictPoller(
             roomID: UUID(),
             interval: 2,
+            maxWait: .infinity,
             fetch: { _ in
                 _ = await attempts.increment()
                 return nil
@@ -199,14 +203,19 @@ final class VerdictPollerTests: XCTestCase {
             "the bound must not add round-trips to a healthy resolve")
     }
 
-    func testBoundedPollerStillStopsOnTaskCancellation() async throws {
-        // A timeout must not fight cancellation — teardown still unwinds
-        // the loop with a CancellationError, not a PollExhausted.
+    func testCancellationWinsOverTheBoundCheck() async throws {
+        // A timeout must not fight cancellation. The give-up branch is
+        // preceded by `try Task.checkCancellation()`, so a cancelled
+        // poller always unwinds as CancellationError, never as
+        // PollExhausted. `maxWait: .infinity` keeps the bound from
+        // racing the 5ms cancel window — this test isolates the
+        // ordering guarantee; the bound itself is covered by the
+        // give-up tests above.
         let attempts = Counter()
         let poller = VerdictPoller(
             roomID: UUID(),
             interval: 3,
-            maxWait: 90,
+            maxWait: .infinity,
             fetch: { _ in
                 _ = await attempts.increment()
                 return nil

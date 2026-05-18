@@ -380,8 +380,12 @@ final class PostQuizHostTests: XCTestCase {
 
     func testTeardownStopsThePollLoop() async throws {
         let attempts = Counter()
+        // `verdictPollMaxWait: .infinity` disables the bug-10 bound so
+        // this test isolates the teardown / no-leak contract — only
+        // teardown ends the loop. Poll-exhaustion is covered separately.
         let host = PostQuizHost(
             context: soloContext(),
+            verdictPollMaxWait: .infinity,
             fetchVerdict: { _ in
                 _ = await attempts.increment()
                 return nil  // never resolves — only teardown can end it
