@@ -69,6 +69,21 @@ export interface CandidateOption {
    *  caller pre-filtered the pool to the radius it can be omitted and
    *  the radius gate is a no-op. */
   distance_meters?: number | null;
+  /** Foursquare 0..10 venue rating. The engine never reads it — it is
+   *  carried so the TB-23 server-side venue classifier can derive the
+   *  reputation axis. Optional / null when the venue carries no rating. */
+  rating?: number | null;
+  /** Foursquare total-ratings count. Carried for the TB-23 venue
+   *  classifier's pool-relative reputation terciles. The engine never
+   *  reads it. Optional / null when the venue carries no count. */
+  total_ratings?: number | null;
+  /** Foursquare ISO-8601 record-creation date. Carried for the TB-23
+   *  venue classifier's reputation age check. The engine never reads
+   *  it. Optional / null when absent. */
+  date_created?: string | null;
+  /** Foursquare crowd-sourced `tastes` tag cloud. Carried for the
+   *  TB-23 venue classifier's vibe nudge. The engine never reads it. */
+  tastes?: string[];
 }
 
 /** A generic, schema-driven hard veto. TB-12 profile vetoes

@@ -55,7 +55,7 @@ If the EBA pass leaves zero survivors, the engine short-circuits straight to `no
 
 Each member scores every EBA survivor on a 1..5 scale, the same scale as the satisficing threshold T. The score comes from one of two sources:
 
-- **Injected `prefFn`** (the live path) — the per-member preference function built per [[../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §3 from the member's Q1–Q5 answers, cached by the running-union pool manager ([[../15_issues/v1.1/issues/tb-10-running-union-pool-manager|tb-10]]).
+- **Injected `prefFn`** (the live path) — the per-member preference function built per [[../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §3 from the member's Q1–Q5 answers. Per the [[../15_issues/v1.1/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] Option 2 fork, the `prefFn` is built **server-side in `compute-verdict`** ([[../15_issues/v1.1/issues/tb-23-server-prefn-scoring|tb-23]]), not on-device: the handler classifies the unioned `options` pool with `_shared/venue-classifier.ts`, builds each member's `prefFn` from `_shared/preference-function.ts`, and injects it into the engine. The pre-fork on-device `RunningUnionPoolManager` ([[../15_issues/v1.1/issues/tb-10-running-union-pool-manager|tb-10]]) is superseded for the verdict path by this server-side build.
 - **Static `scores` map** (the test / replay path) — a per-candidate cached score, read only when `prefFn` is absent. A candidate id missing from the map falls back to `scores.__fallback`, then to the neutral threshold.
 
 For each candidate the engine records `minScore` (the maximin key) and `sumScore` (the final-tiebreak key).

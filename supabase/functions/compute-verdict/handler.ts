@@ -45,11 +45,19 @@ import {
   type OptionInsertRow,
   unionMemberFetches,
 } from "../_shared/member-fetch-union.ts";
+import { buildPreferenceFunction } from "../_shared/preference-function.ts";
+import { classifyVenuePool } from "../_shared/venue-classifier.ts";
+import type { MemberPreferenceInputs } from "../_shared/votes-schema.ts";
 
 // TB-21 — re-export the union primitive's row types so the Edge entry
 // point (`index.ts`) and the handler tests can bind them without a
 // second import of `_shared/member-fetch-union.ts`.
 export type { MemberFetchRow, OptionInsertRow };
+
+// TB-23 — re-export the preference-input shape so the Edge entry point
+// and the handler tests bind it without a second import of
+// `_shared/votes-schema.ts`.
+export type { MemberPreferenceInputs };
 
 /** Hard upper bound for `radius_meters_override`. S05's widen-radius
  *  slider exposes 1..10 mi (1609..16093 m); the handler clamps
@@ -181,6 +189,18 @@ export interface RoomOptionRow {
      *  populates this in its `ShapedPlace` and the iOS / Edge writes it
      *  through the options payload. */
     distance_meters?: number | null;
+    /** TB-23 — Foursquare 0..10 venue rating. Read by the server-side
+     *  venue classifier for the reputation axis. */
+    rating?: number | null;
+    /** TB-23 — Foursquare total-ratings count. Read by the classifier
+     *  for the pool-relative reputation terciles. */
+    total_ratings?: number | null;
+    /** TB-23 — Foursquare ISO-8601 record-creation date. Read by the
+     *  classifier for the reputation age check. */
+    date_created?: string | null;
+    /** TB-23 — Foursquare crowd-sourced `tastes` tag cloud. Read by the
+     *  classifier for the vibe nudge. */
+    tastes?: string[];
   };
 }
 
@@ -196,10 +216,21 @@ export interface MemberVoteRow {
    *  no profile data. */
   hard_vetoes: HardVeto[];
   /** Per-candidate cached scores — keyed by `options.id`, valued 1..5.
-   *  The Q5 preference probe (TB-08) writes these; the verdict engine
-   *  reads them as the satisficing / maximin score. Absent / partial
-   *  maps fall back to the neutral threshold inside the engine. */
+   *  The legacy / replay scoring path. Pre-TB-23 the Q5 probe wrote a
+   *  per-candidate map here and the engine read it directly. After
+   *  TB-23 the live path builds a `prefFn` from `preference_inputs`
+   *  instead; `scores` is read by the engine only when a vote row
+   *  carries NO `preference_inputs` (the test / replay path). Absent /
+   *  partial maps fall back to the neutral threshold inside the
+   *  engine. */
   scores: Record<string, number>;
+  /** TB-23 — the member's preference inputs: their stated Q1/Q3/Q4
+   *  profile + their three Q5 factorial card ratings. When present, the
+   *  handler builds the member's `prefFn` from these and the classified
+   *  candidate pool, and injects it into the engine `MemberVote` —
+   *  scoring the FULL pool on real preferences. Absent for the legacy
+   *  scores path (the engine then reads the static `scores` map). */
+  preference_inputs?: MemberPreferenceInputs;
   /** TB-10 — Q1 dietary chips appended after the initial vote via a
    *  `diet`-reason reroll. The handler merges these with `q1_vetoes`
    *  before feeding the engine so the EBA filter sees the union. */
@@ -499,7 +530,21 @@ export async function handleRequest(
     dietary_tags: row.payload?.dietary_tags ?? [],
     categories: row.payload?.categories ?? [],
     distance_meters: row.payload?.distance_meters ?? null,
+    // TB-23 — carry the Foursquare reputation / vibe signal so the
+    // server-side venue classifier can derive the preference axes. The
+    // engine itself never reads these fields.
+    rating: row.payload?.rating ?? null,
+    total_ratings: row.payload?.total_ratings ?? null,
+    date_created: row.payload?.date_created ?? null,
+    tastes: row.payload?.tastes ?? [],
   }));
+
+  // TB-23 — classify the FULL candidate pool into per-venue
+  // `Q5VenueProfile`s, ONCE. Reputation is pool-relative (its volume
+  // terciles are derived from this pool), so classification must see
+  // the whole pool in a single call. Every member's `prefFn` then
+  // scores against this shared classified pool.
+  const venueProfiles = classifyVenuePool(candidates);
 
   // TB-12 — fetch each member's sticky per-account profile vetoes
   // (allergies / dietary restrictions / cuisine NEVERS). Profile data
@@ -537,6 +582,36 @@ export async function handleRequest(
       row.hard_vetoes ?? [],
       profileVetoes[row.user_id] ?? [],
     );
+    // TB-23 — server-side preference scoring. When the vote row carries
+    // `preference_inputs` (the member's stated Q1/Q3/Q4 profile + their
+    // three Q5 factorial ratings), build that member's `prefFn` and
+    // inject it. The engine then scores EVERY candidate in the full
+    // `options` pool through the member's preference function — a score
+    // over the whole running union, not just the three Q5 cards. This
+    // is the bug-08 Option 2 fix: the verdict winner can be a venue no
+    // member saw at Q5.
+    //
+    // The Q5 ratings are the *preference probe* that feeds the prefFn
+    // build — they are no longer the candidate scores. A vote row with
+    // no `preference_inputs` falls back to the static `scores` map (the
+    // test / replay path); the engine's `scoreFor` reads `prefFn` first
+    // and `scores` only when `prefFn` is absent.
+    let prefFn: MemberVote["prefFn"] | undefined;
+    if (row.preference_inputs) {
+      const built = buildPreferenceFunction(
+        row.preference_inputs.member,
+        row.preference_inputs.q5Ratings,
+      );
+      prefFn = (candidate) => {
+        // A candidate with no classified profile (it was not in the
+        // pool the classifier saw — should not happen, the classifier
+        // covers the whole pool) scores at the match ceiling, the same
+        // benefit-of-the-doubt the engine gives a no-signal candidate.
+        const profile = venueProfiles.get(candidate.id);
+        if (!profile) return 5;
+        return built(profile);
+      };
+    }
     return {
       user_id: row.user_id,
       display_name: row.display_name,
@@ -544,6 +619,7 @@ export async function handleRequest(
       q2_budget: effectiveBudget,
       hard_vetoes: hardVetoes,
       scores: row.scores ?? {},
+      prefFn,
     };
   });
 

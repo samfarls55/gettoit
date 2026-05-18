@@ -40,6 +40,7 @@
 // inputs — `hard_vetoes` + a per-candidate `scores` map.
 
 import type { HardVeto, MemberVote } from "./verdict-engine.ts";
+import type { Axis, Q5MemberProfile, Q5Rating } from "./preference-function.ts";
 
 // ───────────────────────────────────────────────────────────────────────
 // Question-kind taxonomy
@@ -382,5 +383,151 @@ export function buildVotesSlotsFromLegacyAnswers(
       },
       answer: { scores: answers.q5_scores },
     },
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// TB-23 — preference-input extraction (the prefFn build path)
+// ───────────────────────────────────────────────────────────────────────
+//
+// `mapVotesRowToMemberVote` produces the engine's HARD inputs
+// (`q1_vetoes`, `q2_budget`, `hard_vetoes`) plus — pre-TB-23 — a
+// per-candidate `scores` map read straight from the `regret` slot's
+// three Q5 card ratings.
+//
+// TB-23 changes the verdict's live scoring. The engine no longer reads
+// `votes.q5.answer.scores` as the candidate scores; instead the handler
+// builds each member's `prefFn` (`buildPreferenceFunction`,
+// `preference-function.ts`) from the member's stated Q1/Q3/Q4 profile
+// plus their three Q5 factorial ratings, and scores the FULL `options`
+// pool with it. After TB-23 the Q5 ratings are the *preference probe*
+// that feeds the prefFn build — they are no longer the candidate
+// scores.
+//
+// `mapVotesRowToPreferenceInputs` is the slice of the mapping layer
+// that produces those preference inputs. It dispatches on
+// `meta.question_kind`, same as `mapVotesRowToMemberVote` — the slot
+// column name is never inspected. A `null` slot falls back to the
+// soft-default "no preference" answer for its axis.
+//
+// The `regret` slot's `answer` carries the canonical v1.1 probe shape:
+//
+//     answer.ratings: [{ droppedAxis, score }, ...]
+//
+// — the three Q5 factorial card ratings, one per axis. (The pre-TB-23
+// `answer.scores` per-candidate map is left untouched on the slot for
+// `mapVotesRowToMemberVote`'s legacy `scores` path / audit; the
+// preference-input extractor reads `ratings`.)
+
+/** The preference inputs for one member — everything
+ *  `buildPreferenceFunction` needs to construct that member's
+ *  `prefFn`. */
+export interface MemberPreferenceInputs {
+  user_id: string;
+  /** The member's stated Q1/Q3/Q4 profile. */
+  member: Q5MemberProfile;
+  /** The three Q5 factorial card ratings — the preference probe. May be
+   *  empty when the session had no Q5 slot; `buildPreferenceFunction`
+   *  tolerates an empty probe (the equal-weight prior survives). */
+  q5Ratings: Q5Rating[];
+}
+
+/** Soft-default member profile — the most permissive "no preference"
+ *  answer for every axis. An unasked question contributes no signal. */
+const NO_PREFERENCE_MEMBER: Q5MemberProfile = Object.freeze({
+  cuisines: [],
+  reputation: "no_preference",
+  vibe: 2,
+});
+
+const Q5_AXES: ReadonlySet<string> = new Set(["cuisine", "reputation", "vibe"]);
+
+/** Read the three Q5 card ratings from a `regret`-kind answer payload.
+ *  The canonical v1.1 shape is `answer.ratings: [{ droppedAxis, score
+ *  }]`. Entries with an unknown axis or a non-numeric score are
+ *  dropped — a malformed entry must never corrupt the prefFn build. */
+function readQ5Ratings(raw: unknown): Q5Rating[] {
+  if (!Array.isArray(raw)) return [];
+  const out: Q5Rating[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const axis = (entry as Record<string, unknown>).droppedAxis;
+    const score = (entry as Record<string, unknown>).score;
+    if (
+      typeof axis === "string" && Q5_AXES.has(axis) &&
+      typeof score === "number" && Number.isFinite(score)
+    ) {
+      out.push({ droppedAxis: axis as Axis, score });
+    }
+  }
+  return out;
+}
+
+/** Map one generic `votes` row to the member's preference inputs.
+ *
+ *  Dispatch is on `meta.question_kind`. An unknown kind throws — same
+ *  contract as `mapVotesRowToMemberVote`: a quiz that wrote a kind the
+ *  engine cannot interpret is a bug.
+ *
+ *  Hard-input kinds (`dietary_veto`, `budget_cap`, `profile_veto`,
+ *  `walk_minutes`) contribute nothing here — they are read by
+ *  `mapVotesRowToMemberVote`. This extractor is concerned only with the
+ *  soft preference axes. */
+export function mapVotesRowToPreferenceInputs(
+  row: VotesRow,
+): MemberPreferenceInputs {
+  let cuisines: string[] = [...NO_PREFERENCE_MEMBER.cuisines];
+  let reputation = NO_PREFERENCE_MEMBER.reputation;
+  let vibe = NO_PREFERENCE_MEMBER.vibe;
+  let q5Ratings: Q5Rating[] = [];
+
+  const slots: ReadonlyArray<QuestionSlot | null> = [
+    row.q1,
+    row.q2,
+    row.q3,
+    row.q4,
+    row.q5,
+  ];
+
+  for (const slot of slots) {
+    if (slot == null) continue;
+    const kind = slot.meta?.question_kind;
+    if (typeof kind !== "string" || !QUESTION_KIND_SET.has(kind)) {
+      throw new Error(
+        `mapVotesRowToPreferenceInputs: unknown question_kind "${String(kind)}" — ` +
+          `expected one of ${QUESTION_KINDS.join(", ")}`,
+      );
+    }
+    const answer = slot.answer ?? {};
+    switch (kind as QuestionKind) {
+      case "cuisine_craving":
+        cuisines = asStringArray(answer.cuisines);
+        break;
+      case "reputation": {
+        const r = answer.reputation;
+        reputation = typeof r === "string" && r.length > 0
+          ? r
+          : NO_PREFERENCE_MEMBER.reputation;
+        break;
+      }
+      case "vibe":
+        vibe = asNumber(answer.level, NO_PREFERENCE_MEMBER.vibe);
+        break;
+      case "regret":
+        q5Ratings = readQ5Ratings(answer.ratings);
+        break;
+      // Hard-input + legacy kinds contribute no preference signal.
+      case "dietary_veto":
+      case "budget_cap":
+      case "walk_minutes":
+      case "profile_veto":
+        break;
+    }
+  }
+
+  return {
+    user_id: row.user_id,
+    member: { cuisines, reputation, vibe },
+    q5Ratings,
   };
 }
