@@ -103,6 +103,18 @@ manifests as an **eternal spinner**, never the `.failed` retry surface. The
 resolving copy literally promises *"no spinners forever"* — the code cannot
 honor that. Real bug independent of A/B.
 
+> **Resolved 2026-05-18 (bug-10, PR #118).** `VerdictPoller` now takes a
+> `maxWait` ceiling (default 75s — inside the issue's 60–90s window). Once
+> the next inter-poll sleep would push total wait past `maxWait` the loop
+> throws `VerdictPoller.PollExhausted` — a distinct `Error` sentinel, not a
+> verdict and not a crash. `PostQuizHost.poll()`'s existing generic `catch`
+> routes it to `.failed` exactly as it does a fetch error, so the eternal
+> spinner becomes the existing quiet retry surface. The bound is wall-clock
+> seconds (not a raw attempt count) so it stays meaningful if the cadence
+> changes. Cancellation is checked before the bound, so host teardown still
+> unwinds as `CancellationError` — the timeout never fights cancellation.
+> The group snapshot+verdict poll in `pollGroup` honours the same ceiling.
+
 ## Failure chain
 
 Q5 submit → votes row ✓ → trigger fires, room `open→firing` ✓ →

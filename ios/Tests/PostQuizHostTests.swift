@@ -292,12 +292,100 @@ final class PostQuizHostTests: XCTestCase {
         }
     }
 
+    // MARK: - bug-10: poll-exhaustion routes to .failed
+
+    func testSoloPollExhaustionMovesTheHostToFailed() async throws {
+        // The verdict row never lands and no fetch error is thrown — the
+        // exact silent-failure shape bug-08 / bug-09 produce. Before
+        // bug-10 this spun forever; now the bounded poll gives up and the
+        // host lands on its existing retry surface.
+        let host = PostQuizHost(
+            context: soloContext(),
+            verdictPollMaxWait: 12,
+            fetchVerdict: { _ in nil },
+            sleep: { _ in }
+        )
+
+        await host.start()
+
+        guard case .failed = host.phase else {
+            return XCTFail("a verdict that never lands must give up to .failed, got \(host.phase)")
+        }
+    }
+
+    func testRetryFromPollExhaustionReEntersResolvingAndCanStillResolve() async throws {
+        // After the bounded poll gives up, the retry CTA re-enters the
+        // poll for the session's phase — and a verdict that lands on the
+        // retry still resolves.
+        let calls = Counter()
+        let view = Self.verdictView()
+        let host = PostQuizHost(
+            context: soloContext(),
+            verdictPollMaxWait: 12,
+            fetchVerdict: { _ in
+                // First poll run (4 attempts at a 3s cadence inside a 12s
+                // ceiling) finds nothing; the retry run finds the verdict.
+                let n = await calls.increment()
+                return n > 4 ? view : nil
+            },
+            sleep: { _ in
+                try Task.checkCancellation()
+                await Task.yield()
+            }
+        )
+
+        await host.start()
+        guard case .failed = host.phase else {
+            return XCTFail("the bounded poll must give up to .failed first")
+        }
+
+        host.retry()
+        // Let the retried poll task run to the verdict.
+        var spins = 0
+        while spins < 1000 {
+            if case .verdict = host.phase { break }
+            try await Task.sleep(nanoseconds: 1_000_000)
+            spins += 1
+        }
+        host.teardown()
+
+        guard case .verdict = host.phase else {
+            return XCTFail("the retry must re-enter the poll and still resolve, got \(host.phase)")
+        }
+    }
+
+    func testHealthyResolveIsNeverTruncatedByTheBound() async throws {
+        // A verdict that lands inside the bound resolves normally — the
+        // timeout never cuts off a slow-but-healthy resolve.
+        let attempts = Counter()
+        let view = Self.verdictView()
+        let host = PostQuizHost(
+            context: soloContext(),
+            verdictPollMaxWait: 30,
+            fetchVerdict: { _ in
+                let n = await attempts.increment()
+                return n >= 3 ? view : nil
+            },
+            sleep: { _ in }
+        )
+
+        await host.start()
+
+        guard case .verdict = host.phase else {
+            return XCTFail("a verdict inside the bound must still resolve, got \(host.phase)")
+        }
+    }
+
     // MARK: - teardown stops the poll loop (no leaked task)
 
     func testTeardownStopsThePollLoop() async throws {
         let attempts = Counter()
+        // `verdictPollMaxWait: .infinity` disables the bug-10 bound so
+        // this test isolates the teardown / no-leak contract — only
+        // teardown ends the loop. Poll-exhaustion is covered separately.
         let host = PostQuizHost(
             context: soloContext(),
+            verdictPollMaxWait: .infinity,
             fetchVerdict: { _ in
                 _ = await attempts.increment()
                 return nil  // never resolves — only teardown can end it
