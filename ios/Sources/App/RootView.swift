@@ -29,13 +29,20 @@
 //   * VerdictScreen `.readOnly` — surfaced when the late-joiner
 //     tapped an invite link AFTER the verdict was sealed (TB-11).
 //
-// State precedence (inner-most wins): `activeQuiz` → `readOnlyView`
-// → `deepLink` → settings → S01 (when `showingInitiator` is true) →
-// S00 Landing (the default for a signed-in idle session). The S00a
-// gate sits outside this chain — it is the launch destination iff no
-// session exists. Once the user signs in, the gate dismisses and the
-// standard precedence chain takes over (idle landing on S00, not S01).
-// Re-opening a deep link mid-quiz doesn't force-rejoin.
+// State precedence (inner-most wins): `activeQuiz` → `postQuizHost`
+// → `readOnlyView` → `deepLink` → settings → S01 (when
+// `showingInitiator` is true) → S00 Landing (the default for a
+// signed-in idle session). The S00a gate sits outside this chain — it
+// is the launch destination iff no session exists. Once the user
+// signs in, the gate dismisses and the standard precedence chain
+// takes over (idle landing on S00, not S01). Re-opening a deep link
+// mid-quiz doesn't force-rejoin.
+//
+// TB-19 — `postQuizHost` is the post-Q5 router. A successful Q5
+// submit clears `activeQuiz` and sets `postQuizHost`, so the chain
+// hands the session to the verdict-resolving surface (S04 resolving →
+// S05 verdict) rather than falling through to S00 Landing. Before
+// TB-19 the chain dead-ended on S00 after a submit — that was bug-07.
 
 import SwiftUI
 import Supabase
@@ -46,6 +53,15 @@ public struct RootView: View {
     @State private var configMissing = false
     @State private var deepLink: InviteLink.Payload?
     @State private var activeQuiz: QuizContext?
+    /// TB-19 — set when the quiz reports a successful Q5 submit. Owns
+    /// the post-Q5 session lifecycle (resolving → verdict → failed) and
+    /// closes bug-07: before this, a Q5 submit just cleared `activeQuiz`
+    /// and the precedence chain fell through to S00 Landing — the
+    /// session dead-ended. The host polls the `verdicts` table until
+    /// the engine's row lands, then renders `VerdictScreen`. Cleared
+    /// when the user ends the session (→ S00 Landing, now the correct
+    /// destination).
+    @State private var postQuizHost: PostQuizHost?
     @State private var readOnlyView: ReadOnlyContext?
     /// TB-05 (v1.1) — set when the initiator finishes S01 (room
     /// created, link dropped or solo) and the pre-quiz S01b parameters
@@ -137,11 +153,33 @@ public struct RootView: View {
                         auth: coordinators.auth,
                         onDone: { showingSettings = false }
                     )
-                } else if let quizCoordinator = activeQuiz?.coordinator {
+                } else if let quiz = activeQuiz {
                     QuizScreen(
-                        coordinator: quizCoordinator,
+                        coordinator: quiz.coordinator,
                         onClose: { activeQuiz = nil },
-                        onSubmitted: { activeQuiz = nil }
+                        // TB-19 — a successful Q5 submit no longer just
+                        // clears the quiz (which dead-ended on S00
+                        // Landing — bug-07). It hands the session to the
+                        // post-Q5 router, which resolves the verdict and
+                        // routes to S05.
+                        onSubmitted: {
+                            enterPostQuiz(quiz: quiz, client: coordinators.client)
+                        }
+                    )
+                } else if let host = postQuizHost {
+                    // TB-19 — the post-Q5 router. Owns the session from
+                    // "Q5 submitted" to "verdict on screen". A solo
+                    // session resolves straight to S05 in `.solo` mode;
+                    // a group session holds on the neutral resolving
+                    // surface (the full S04 Waiting surface is tb-20)
+                    // and still reaches S05 when the verdict fires.
+                    // Ending the session returns to S00 Landing.
+                    PostQuizHostScreen(
+                        host: host,
+                        onEndSession: {
+                            host.teardown()
+                            postQuizHost = nil
+                        }
                     )
                 } else if let readOnly = readOnlyView {
                     // TB-11 — read-only late-joiner branch. The
@@ -180,7 +218,13 @@ public struct RootView: View {
                                 roomID: parameters.roomID,
                                 userID: parameters.userID,
                                 client: coordinators.client,
-                                invitedShared: parameters.invitedShared
+                                invitedShared: parameters.invitedShared,
+                                // The S01b parameters surface is only
+                                // reached by the initiator (joiners read
+                                // the initiator's parameters off the
+                                // room and skip S01b — see the
+                                // `ParametersContext` doc comment).
+                                isInitiator: true
                             )
                         }
                     )
@@ -423,11 +467,18 @@ public struct RootView: View {
     /// LocationCoordinator (hydrated for the joiner from
     /// `rooms.location_*` so a single source answers for both
     /// initiator and joiner).
+    ///
+    /// TB-19 — `isInitiator` records whether this device created the
+    /// room. It is carried onto the `QuizContext` so the post-Q5 router
+    /// can build a `PostQuizSessionContext`. Defaults to `false`: the
+    /// only call site that omits it is the join flow, whose user is by
+    /// definition a joiner, not the initiator.
     private func startQuiz(
         roomID: UUID,
         userID: UUID,
         client: SupabaseClient,
-        invitedShared: Bool = true
+        invitedShared: Bool = true,
+        isInitiator: Bool = false
     ) {
         guard let coordinators else { return }
         Task {
@@ -469,12 +520,47 @@ public struct RootView: View {
             self.showingInitiator = false
             self.activeQuiz = QuizContext(
                 coordinator: assembled.coordinator,
+                roomID: roomID,
+                userID: userID,
+                isInitiator: isInitiator,
                 invitedShared: invitedShared
             )
             // Clear the deep link so closing the quiz returns to S00
             // Landing rather than re-routing back into Join.
             self.deepLink = nil
         }
+    }
+
+    /// TB-19 — hand the just-submitted session to the post-Q5 router.
+    /// Called from `QuizScreen`'s `onSubmitted` callback. Builds a
+    /// `PostQuizHost` whose verdict poll is backed by a live
+    /// `VerdictStore`, then swaps the precedence chain from the quiz
+    /// onto the host in a single scope so SwiftUI batches the update
+    /// and the chain never momentarily falls through to S00 Landing.
+    ///
+    /// Closes bug-07: the prior `onSubmitted` handler just cleared
+    /// `activeQuiz`, and with nothing else set the precedence chain
+    /// dead-ended on S00 Landing. Now the host owns the session through
+    /// to the verdict.
+    private func enterPostQuiz(quiz: QuizContext, client: SupabaseClient) {
+        let store = VerdictStore(client: client)
+        let context = PostQuizSessionContext(
+            roomID: quiz.roomID,
+            userID: quiz.userID,
+            isInitiator: quiz.isInitiator,
+            invitedShared: quiz.invitedShared
+        )
+        let host = PostQuizHost(
+            context: context,
+            // The verdict fires server-side on the lone Q5-complete
+            // vote (tb-13); the row lands a short moment later. The
+            // poller calls `fetchVerdict` until it does.
+            fetchVerdict: { roomID in
+                try await store.fetchVerdict(roomID: roomID)
+            }
+        )
+        self.postQuizHost = host
+        self.activeQuiz = nil
     }
 
     /// Resolve the `(coordinate, radiusMeters)` pair PlacesService
@@ -566,6 +652,16 @@ public struct RootView: View {
 
     private struct QuizContext {
         let coordinator: QuizCoordinator
+        /// The room this quiz is bound to. TB-19 — carried so the
+        /// post-Q5 router can build a `PostQuizSessionContext` without
+        /// reaching into the coordinator's private fields.
+        let roomID: UUID
+        /// The signed-in user submitting the quiz.
+        let userID: UUID
+        /// TB-19 — whether this device created the room (initiator) or
+        /// joined it. Drives `VerdictScreen`'s `isInitiator` flag on the
+        /// post-Q5 verdict surface.
+        let isInitiator: Bool
         /// TB-13 — whether the room was created via the share-and-invite
         /// path (`true`) or the solo tertiary (`false`). The post-Q5
         /// router consults `SoloPath.shouldSkipWaiting(memberCount:invitedShared:)`

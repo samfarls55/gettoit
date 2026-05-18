@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); tb-18 Q4-vibe triaged 2026-05-18 to ready-for-agent + research-02 allowlist spike split out (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107)
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); tb-18 Q4-vibe triaged 2026-05-18 to ready-for-agent + research-02 allowlist spike split out (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR on afk/tb-19)
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -129,7 +129,7 @@ Decomposed via `/to-issues` after a dogfood session surfaced [[issues/bug-07-pos
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| TB-19 (v1.1) | [[issues/tb-19-solo-verdict-route\|Solo session reaches the verdict — post-Q5 router skeleton]] | AFK | [#106](https://github.com/samfarls55/gettoit/issues/106) | — |
+| TB-19 (v1.1) | [[issues/tb-19-solo-verdict-route\|Solo session reaches the verdict — post-Q5 router skeleton]] ✅ done | AFK | [#106](https://github.com/samfarls55/gettoit/issues/106) | — |
 | TB-20 (v1.1) | [[issues/tb-20-group-waiting-route\|Group session shows S04 Waiting and advances to S05]] | AFK | [#107](https://github.com/samfarls55/gettoit/issues/107) | TB-19 |
 
 Build order: tb-19 first (stands up the post-quiz host + `RootView` wiring on the solo path), then tb-20 (adds the group S04 Waiting surface on the same host).
