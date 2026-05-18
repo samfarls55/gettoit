@@ -1,7 +1,7 @@
 ---
 issue: tb-23
 title: Score every member's preference function over the full union, server-side, into the verdict engine
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 121
 prd: v1.1-quiz-redesign-prd
@@ -52,3 +52,13 @@ Note: full *auto*-fire end-to-end also needs [[bug-09-verdict-fire-dispatch-guc-
 ## Comments
 
 **2026-05-18 — filed.** Decomposed from [[bug-08-verdict-pipeline-integration-unwired|bug-08]] after the Option 2 fork was decided. Triaged `ready-for-agent` / AFK — clear end-to-end contract; the closing slice that makes the verdict preference-correct.
+
+**2026-05-18 — done (PR #129).** Server-side preference scoring wired into `compute-verdict`. Three slices:
+
+1. **`_shared/venue-classifier.ts`** — a faithful TypeScript port of the Swift `Q5VenueClassifier`. `classifyVenuePool(candidates, now)` turns the full `options` pool into per-venue `Q5VenueProfile`s (cuisine / reputation / vibe). Reputation is pool-relative, so classification is one whole-pool call. tb-22 ported only the *scorer*; this is the missing *classifier* half it explicitly left out of scope.
+2. **`mapVotesRowToPreferenceInputs`** in `_shared/votes-schema.ts` — the schema-driven extractor for the soft preference axes: `cuisine_craving` / `reputation` / `vibe` slots → the member's `Q5MemberProfile`, and the `regret` slot's `answer.ratings` → the three `Q5Rating` factorial cards (the preference *probe*).
+3. **Handler wiring** — `compute-verdict/handler.ts` classifies the full pool once, builds each member's `prefFn` (`buildPreferenceFunction`) from their `preference_inputs`, and injects `MemberVote.prefFn`. The engine's `scoreFor` reads `prefFn` over the whole union, not the three Q5 cards.
+
+All six acceptance criteria met and covered by `compute-verdict/index-prefn-scoring.test.ts` — AC3 ("winner can be a venue no member saw at Q5") is the load-bearing test. 298 edge-function tests green (+32 from this slice). `deno check` also fixed a pre-existing missing `HardVeto` import in `index.ts`.
+
+**Adjacency flagged (iOS follow-up).** The iOS Q5 write path (`QuizCoordinator.q5Ratings`) still writes a per-venue `[String: Int]` score map, not the canonical `{ droppedAxis, score }` factorial ratings the `regret` slot now expects. The server handler degrades gracefully — an empty `q5Ratings` leaves the prefFn's equal-weight prior intact, so Q1/Q3/Q4 still score — but the Q5 probe's re-weight signal is dark until iOS emits the factorial-rating shape. See [[../../../01_raw/tb-23-ios-q5-ratings-wire-gap|tb-23-ios-q5-ratings-wire-gap]].

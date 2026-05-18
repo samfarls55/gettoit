@@ -23,9 +23,13 @@ import {
 } from "./handler.ts";
 import {
   mapVotesRowToMemberVote,
+  mapVotesRowToPreferenceInputs,
   type QuestionSlot,
   type VotesRow,
 } from "../_shared/votes-schema.ts";
+// `HardVeto` is referenced by the `fetchProfileVetoes` adapter method
+// below; import it so `deno check` resolves the type.
+import type { HardVeto } from "../_shared/verdict-engine.ts";
 
 function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter {
   const supabaseUrl = env.SUPABASE_URL ?? "";
@@ -142,6 +146,13 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         // `vetoes_extra` into `q1_vetoes`, so the handler's
         // `q1_vetoes_extra` merge is a harmless no-op here.
         const vote = mapVotesRowToMemberVote(votesRow);
+        // TB-23 — the preference inputs (stated Q1/Q3/Q4 profile + the
+        // three Q5 factorial ratings). The handler builds the member's
+        // `prefFn` from these and scores the full candidate pool with
+        // it. The same schema-driven mapper dispatches on
+        // `meta.question_kind`, so quiz content can still change without
+        // a migration.
+        const preferenceInputs = mapVotesRowToPreferenceInputs(votesRow);
         return {
           user_id: vote.user_id,
           display_name: vote.display_name,
@@ -149,6 +160,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
           q2_budget: vote.q2_budget,
           hard_vetoes: vote.hard_vetoes,
           scores: vote.scores ?? {},
+          preference_inputs: preferenceInputs,
         } satisfies MemberVoteRow;
       });
     },
