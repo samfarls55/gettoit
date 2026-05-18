@@ -123,6 +123,123 @@ final class VerdictPollerTests: XCTestCase {
             // expected
         }
     }
+
+    // MARK: - bug-10: the poll is bounded — it gives up
+
+    func testPollerGivesUpAfterTheBoundWhenNoVerdictEverLands() async throws {
+        let attempts = Counter()
+        // A 12s ceiling at a 3s cadence ⇒ 4 fetch attempts, then give up.
+        let poller = VerdictPoller(
+            roomID: UUID(),
+            interval: 3,
+            maxWait: 12,
+            fetch: { _ in
+                _ = await attempts.increment()
+                return nil  // the verdict row never lands
+            },
+            sleep: { _ in /* no real wait */ }
+        )
+
+        do {
+            _ = try await poller.run()
+            XCTFail("an unbounded poll must not run forever — it must give up")
+        } catch is VerdictPoller.PollExhausted {
+            // expected — the loop bounded itself and signalled give-up.
+        }
+
+        let count = await attempts.value
+        XCTAssertEqual(count, 4,
+            "a 12s ceiling at a 3s cadence must give up after exactly 4 fetch attempts")
+    }
+
+    func testPollExhaustionIsDistinctFromAFetchError() async throws {
+        // The give-up sentinel must be its own type so the host can tell
+        // give-up from a transport error if it ever wants to — both route
+        // to .failed today, but the contract is a distinct signal.
+        let poller = VerdictPoller(
+            roomID: UUID(),
+            interval: 1,
+            maxWait: 2,
+            fetch: { _ in nil },
+            sleep: { _ in }
+        )
+
+        do {
+            _ = try await poller.run()
+            XCTFail("the poller must give up")
+        } catch is VerdictPoller.PollExhausted {
+            // expected
+        } catch {
+            XCTFail("give-up must surface as PollExhausted, not \(type(of: error))")
+        }
+    }
+
+    func testVerdictFoundBeforeTheBoundStillResolves() async throws {
+        let attempts = Counter()
+        let view = Self.verdictView()
+        // The verdict lands on attempt 3 — well inside a 30s / 3s ⇒ 10
+        // attempt ceiling. The bound must never truncate a healthy resolve.
+        let poller = VerdictPoller(
+            roomID: UUID(),
+            interval: 3,
+            maxWait: 30,
+            fetch: { _ in
+                let n = await attempts.increment()
+                return n >= 3 ? view : nil
+            },
+            sleep: { _ in }
+        )
+
+        let found = try await poller.run()
+
+        XCTAssertEqual(found.mode, .solo,
+            "a verdict that lands inside the bound must still resolve normally")
+        let count = await attempts.value
+        XCTAssertEqual(count, 3,
+            "the bound must not add round-trips to a healthy resolve")
+    }
+
+    func testBoundedPollerStillStopsOnTaskCancellation() async throws {
+        // A timeout must not fight cancellation — teardown still unwinds
+        // the loop with a CancellationError, not a PollExhausted.
+        let attempts = Counter()
+        let poller = VerdictPoller(
+            roomID: UUID(),
+            interval: 3,
+            maxWait: 90,
+            fetch: { _ in
+                _ = await attempts.increment()
+                return nil
+            },
+            sleep: { _ in
+                try Task.checkCancellation()
+                await Task.yield()
+            }
+        )
+
+        let task = Task { try await poller.run() }
+        try await Task.sleep(nanoseconds: 5_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("a cancelled poller must throw CancellationError")
+        } catch is CancellationError {
+            // expected — cancellation wins over the timeout.
+        } catch is VerdictPoller.PollExhausted {
+            XCTFail("teardown must unwind as CancellationError, not PollExhausted")
+        }
+    }
+
+    func testDefaultBoundIsGenerousEnoughForASlowResolve() {
+        // The production default must sit in the issue's 60–90s window so
+        // a healthy slow resolve is never cut off.
+        let poller = VerdictPoller(roomID: UUID(), fetch: { _ in nil })
+        XCTAssertGreaterThanOrEqual(poller.maxWait, 60,
+            "the default ceiling must be at least 60s — never truncate a slow resolve")
+        XCTAssertLessThanOrEqual(poller.maxWait, 90,
+            "the default ceiling must be at most 90s — a real failure surfaces promptly")
+    }
 }
 
 /// Minimal actor counter so the injected `fetch` closure can tally

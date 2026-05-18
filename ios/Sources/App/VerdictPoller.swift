@@ -30,6 +30,18 @@
 //     `CancellationError`. No leaked timer / task.
 //   * A fetch error propagates out of `run()` so the host can move to
 //     its failure phase.
+//   * The loop is BOUNDED (bug-10). After `maxWait` seconds of total
+//     wait with no verdict row, `run()` throws `PollExhausted` instead
+//     of looping forever. The verdict-fire dispatch is fire-and-forget
+//     (`pg_net`); a failed or never-invoked engine produces neither a
+//     verdict row nor a fetch error, so without this bound the loop
+//     would spin indefinitely and the post-Q5 "no spinners forever"
+//     promise could not be honoured. `PollExhausted` is a distinct
+//     sentinel — the host routes it to its failed phase exactly as it
+//     does a fetch error, but the two are tellable apart by type.
+//     The bound is expressed as wall-clock seconds (not a raw attempt
+//     count) so it stays meaningful when `interval` changes; the loop
+//     gives up once the next sleep would push total wait past `maxWait`.
 
 import Foundation
 
@@ -46,10 +58,29 @@ public typealias VerdictPollSleep =
 /// Polls `verdicts` for a room until the engine's row lands.
 public struct VerdictPoller: Sendable {
 
+    /// Thrown by `run()` when the poll's wall-clock bound is reached
+    /// with no verdict row. A distinct sentinel — the post-Q5 host
+    /// routes it to its failed (retry) phase exactly as it does a fetch
+    /// error, while staying tellable apart from a transport error by
+    /// type. NOT a verdict and NOT a crash.
+    public struct PollExhausted: Error {
+        /// The room whose verdict never landed inside the bound.
+        public let roomID: UUID
+        /// The wall-clock ceiling (seconds) that was reached.
+        public let maxWait: TimeInterval
+    }
+
     public let roomID: UUID
     /// Seconds between poll attempts. The upper bound on how long after
     /// the engine fires the verdict can take to surface.
     public let interval: TimeInterval
+    /// Total wall-clock seconds the poll will wait before giving up.
+    /// A healthy verdict resolves within a few seconds of the engine
+    /// firing, so the default is generous (75s) — long enough never to
+    /// truncate a slow-but-healthy resolve, short enough that a real
+    /// silent failure surfaces as a retryable error, not an infinite
+    /// spinner. See bug-10.
+    public let maxWait: TimeInterval
 
     private let fetch: VerdictFetch
     private let sleep: VerdictPollSleep
@@ -57,6 +88,7 @@ public struct VerdictPoller: Sendable {
     public init(
         roomID: UUID,
         interval: TimeInterval = 3,
+        maxWait: TimeInterval = 75,
         fetch: @escaping VerdictFetch,
         sleep: @escaping VerdictPollSleep = { seconds in
             try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
@@ -64,6 +96,7 @@ public struct VerdictPoller: Sendable {
     ) {
         self.roomID = roomID
         self.interval = interval
+        self.maxWait = maxWait
         self.fetch = fetch
         self.sleep = sleep
     }
@@ -72,14 +105,28 @@ public struct VerdictPoller: Sendable {
     ///
     /// - Returns: the `VerdictView` for the room's verdict.
     /// - Throws: `CancellationError` if the owning task is cancelled
-    ///   (host teardown), or any error the `fetch` closure throws.
+    ///   (host teardown — cancellation always wins over the timeout);
+    ///   `PollExhausted` once `maxWait` seconds of total wait elapse
+    ///   with no verdict row; or any error the `fetch` closure throws.
     public func run() async throws -> VerdictStore.VerdictView {
+        // Accumulated wall-clock wait, advanced by `interval` on every
+        // completed inter-poll sleep. The loop gives up before a sleep
+        // that would push the total past `maxWait`, so a verdict that
+        // lands on any attempt inside the bound still resolves normally.
+        var elapsed: TimeInterval = 0
         while true {
             try Task.checkCancellation()
             if let verdict = try await fetch(roomID) {
                 return verdict
             }
+            // Cancellation is checked before the bound so host teardown
+            // unwinds as CancellationError, never as PollExhausted.
+            try Task.checkCancellation()
+            if elapsed + interval >= maxWait {
+                throw PollExhausted(roomID: roomID, maxWait: maxWait)
+            }
             try await sleep(interval)
+            elapsed += interval
         }
     }
 }
