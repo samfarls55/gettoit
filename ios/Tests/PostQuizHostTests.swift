@@ -318,6 +318,7 @@ final class PostQuizHostTests: XCTestCase {
         // poll for the session's phase — and a verdict that lands on the
         // retry still resolves.
         let calls = Counter()
+        let view = Self.verdictView()
         let host = PostQuizHost(
             context: soloContext(),
             verdictPollMaxWait: 12,
@@ -325,7 +326,7 @@ final class PostQuizHostTests: XCTestCase {
                 // First poll run (4 attempts at a 3s cadence inside a 12s
                 // ceiling) finds nothing; the retry run finds the verdict.
                 let n = await calls.increment()
-                return n > 4 ? Self.verdictView() : nil
+                return n > 4 ? view : nil
             },
             sleep: { _ in
                 try Task.checkCancellation()
@@ -357,12 +358,13 @@ final class PostQuizHostTests: XCTestCase {
         // A verdict that lands inside the bound resolves normally — the
         // timeout never cuts off a slow-but-healthy resolve.
         let attempts = Counter()
+        let view = Self.verdictView()
         let host = PostQuizHost(
             context: soloContext(),
             verdictPollMaxWait: 30,
             fetchVerdict: { _ in
                 let n = await attempts.increment()
-                return n >= 3 ? Self.verdictView() : nil
+                return n >= 3 ? view : nil
             },
             sleep: { _ in }
         )
