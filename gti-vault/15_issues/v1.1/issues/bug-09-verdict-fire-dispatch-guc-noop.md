@@ -1,7 +1,7 @@
 ---
 issue: bug-09
 title: Verdict engine is never auto-invoked — dispatch_compute_verdict silently no-ops because the app.* database GUCs are unset
-status: needs-triage
+status: ready-for-agent
 type: AFK
 github_issue: 117
 created: 2026-05-18
@@ -36,54 +36,65 @@ v1 masked this: the iOS client used to invoke `compute-verdict` directly via the
 
 A room whose trigger fires but whose dispatch no-ops is wedged in `firing` forever — `fire_verdict` then returns `already_firing` because status ≠ `open`, so there is no recovery path. (Existing such rows are unrecoverable and can be left; this issue is about new sessions.)
 
-## Fix — robust plan
+## Fix — re-scoped plan (triaged 2026-05-18)
 
-The two GUCs have different secret profiles; treat them separately so the fix is durable, version-controlled, and never exposes the service-role key in a committed file.
+The original plan — set the two values as Postgres `app.*` GUCs via `ALTER DATABASE postgres SET` — is **abandoned**. That statement requires a Postgres superuser, and Supabase's `postgres` role (used by `supabase db push` and the Management API) is not one; committing it would have reded the shared `supabase-db` CI lane. Full evidence: [[../../../60_engineering/verdict-dispatch-guc-superuser-blocker|verdict-dispatch-guc-superuser-blocker]].
 
-- **`app.supabase_url` — not secret.** Set it in a **committed migration**: `ALTER DATABASE postgres SET app.supabase_url = 'https://<project-ref>.supabase.co'`. Migrations replay on any fresh database, so this half survives a project re-provision automatically — zero human action, full version-controlled trail.
-- **`app.service_role_key` — secret.** Must not be committed. Make it durable via a **step in the existing CI database-deploy job** that re-applies `ALTER DATABASE postgres SET app.service_role_key` from a **GitHub Actions secret** on every deploy. A re-provision then self-heals on the next deploy — no runbook step a human must remember.
+Re-scoped fix: stop using GUCs entirely. `dispatch_compute_verdict` reads its URL and key from an ordinary `app_config(key, value)` table. Writing a table row needs no special privilege, so the whole fix is a normal migration + CI PR — version-controlled, agent-executable, and self-healing across a project re-provision.
 
-With both in place the fix applies itself through the normal deploy pipeline on merge: the migration sets the URL GUC, the CI step sets the key GUC. No out-of-band manual production write is required (an agent may still apply both immediately via the Management API so the fix does not wait for the next deploy — optional).
+- **`app_config` table.** A new committed migration creates `app_config(key text primary key, value text not null)`, enables RLS with **no policies**, and `REVOKE`s all access from `anon` / `authenticated` — so the row holding the service-role key is unreachable over PostgREST.
+- **`dispatch_compute_verdict` reads the table.** The function is changed to `SELECT value FROM app_config WHERE key = ...` instead of `current_setting('app.*')`. It keeps its silent-return-when-empty behavior so a local/CI database with no rows still no-ops cleanly. The function **must be `SECURITY DEFINER`**, owned by a role that owns `app_config`, so it bypasses the table's RLS when the `votes` trigger fires under an end-user's role — the one behavior dependency the GUC version did not have.
+- **`supabase_url` — not secret.** Seeded by the same committed migration: `INSERT INTO app_config VALUES ('supabase_url', 'https://<ref>.supabase.co') ON CONFLICT (key) DO UPDATE ...`. Replays on any fresh database — zero human action, full version-controlled trail.
+- **`service_role_key` — secret.** Never committed. Re-applied on every deploy by a step in the existing CI database-deploy job that `INSERT ... ON CONFLICT`s the key from the `SUPABASE_SERVICE_ROLE_KEY` GitHub Actions secret. A re-provision self-heals on the next deploy.
 
-**Durability decision (resolved 2026-05-18).** AC3 allows a runbook step or an automated CI step. Automated CI is chosen: a runbook relies on a human remembering to re-run `ALTER DATABASE` after a re-provision — exactly the silent-regression failure mode AC3 names. The marginal exposure of adding the service-role key as a GitHub Actions secret is bounded — the repo is private, the deploy job does not run for fork PRs, and the key already transits CI conceptually (Supabase injects it into the deployed Edge Function runtime). Self-healing durability outweighs it.
+**Durability decision (resolved 2026-05-18).** Automated CI over a runbook — a runbook relies on a human remembering to re-seed the key after a re-provision, exactly the silent-regression failure mode the durability AC names. The `SUPABASE_SERVICE_ROLE_KEY` Actions secret was created by the maintainer on 2026-05-18 (one-time setup, done — the agent does not create it). Exposure is bounded: the repo is private, the deploy job does not run for fork PRs, and the key already transits CI (Supabase injects it into the deployed Edge Function runtime).
 
-**Alternative considered and rejected:** restore an iOS-side `compute-verdict` invoke in the post-Q5 router. Rejected — it reverses the deliberate tb-13 / tb-19 decision to move verdict firing server-side, and re-introduces the client as a load-bearing part of the fire path.
+**Alternatives considered and rejected:**
+- *HITL — a human sets the two values once in the Supabase dashboard's Custom Postgres config, `dispatch_compute_verdict` unchanged.* Rejected at triage: dashboard config does not survive a project re-provision — exactly the silent-regression failure mode this issue exists to prevent.
+- *Restore an iOS-side `compute-verdict` invoke in the post-Q5 router.* Rejected — reverses the deliberate tb-13 / tb-19 decision to move verdict firing server-side, and re-introduces the client as a load-bearing part of the fire path.
 
 ## Agent Brief
 
 **Category:** bug / ops-config
-**Summary:** The verdict-fire dispatch no-ops because two Postgres `app.*` GUCs are unset on the live project. Set them and make both durable — the non-secret URL via a committed migration, the secret service-role key via a CI deploy step fed by a new GitHub Actions secret.
+**Summary:** The verdict-fire dispatch no-ops because `dispatch_compute_verdict` reads two unset Postgres `app.*` GUCs that cannot be set without superuser. Re-scope: replace the GUC reads with reads from a new `app_config` table, which any role can populate.
+
+**Prerequisite (already done — verify, do not redo):** the `SUPABASE_SERVICE_ROLE_KEY` GitHub Actions secret on `samfarls55/gettoit` was created by the maintainer on 2026-05-18. Confirm with `gh secret list`. If it is somehow missing, escalate — do not attempt to create it (the agent token lacks the scope).
 
 **Steps:**
 
-1. **Create the GitHub Actions secret.** Add `SUPABASE_SERVICE_ROLE_KEY` as a repo Actions secret on `samfarls55/gettoit`, value sourced from `/workspace/.env` (`gh secret set`; the `.env` `GH_TOKEN` has the `repo` scope this needs). One-time setup, outside the PR. Skip if it already exists.
-2. **Migration — the URL GUC.** Add a new migration under `supabase/migrations/` running `ALTER DATABASE postgres SET app.supabase_url = 'https://<project-ref>.supabase.co';`. The project ref is in `/workspace/.env` (`SUPABASE_PROJECT_REF`). No secret in this file.
-3. **CI step — the key GUC.** In the existing database-deploy job in `.github/workflows/ci.yml` (the job already using `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF` to push the DB), add a step — after migrations apply — that runs `ALTER DATABASE postgres SET app.service_role_key = '<key>';` against the live DB using `${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}`. Reuse the job's existing access path; the Management API `/database/query` endpoint is simplest (the job already has `SUPABASE_ACCESS_TOKEN`). Mask the value; never echo it. This is a step in an existing job, not a new lane.
-4. **Apply immediately (optional).** Optionally set both GUCs on the live DB right away via the Management API (values from `/workspace/.env`) so the fix does not wait for the next deploy. Reversible via `ALTER DATABASE postgres RESET ...`.
-5. **Verify.** Confirm `current_setting('app.supabase_url', true)` and `current_setting('app.service_role_key', true)` both return non-empty on the live project.
+1. **Migration — `app_config` table.** Add a migration under `supabase/migrations/` that:
+   - `CREATE TABLE app_config (key text PRIMARY KEY, value text NOT NULL);`
+   - `ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;` with **no policies**, and `REVOKE ALL ON app_config FROM anon, authenticated;` — the service-role-key row must be unreachable over PostgREST.
+   - Seed the non-secret URL: `INSERT INTO app_config (key, value) VALUES ('supabase_url', 'https://<project-ref>.supabase.co') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`. Project ref is in `/workspace/.env` (`SUPABASE_PROJECT_REF`). No secret in this file.
+2. **Migration — rewrite `dispatch_compute_verdict`.** `CREATE OR REPLACE FUNCTION dispatch_compute_verdict()` reading both values from `app_config` (`SELECT value INTO ... FROM app_config WHERE key = 'supabase_url'` / `'service_role_key'`) instead of `current_setting('app.*')`. Preserve the silent-return-when-empty guard — a NULL/missing row returns, never fails the votes INSERT. Ensure the function is `SECURITY DEFINER` and owned by a role that owns `app_config`, so it bypasses the table's RLS when the `votes` trigger fires under an end-user role. Everything else — the `pg_net` POST, the payload — is unchanged.
+3. **CI step — seed the secret key.** In the existing database-deploy job in `.github/workflows/ci.yml` (the job that already pushes the DB with `SUPABASE_ACCESS_TOKEN` / `SUPABASE_PROJECT_REF`), add a step *after* migrations apply that runs, against the live DB via the Management API `/database/query` endpoint, `INSERT INTO app_config (key, value) VALUES ('service_role_key', '<key>') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;` with the value from `${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}`. Mask the value; never echo it. A step in an existing job — not a new lane. (This INSERT needs no superuser — the whole point of the re-scope.)
+4. **Apply live now.** Set both rows on the live DB immediately via the Management API (values from `/workspace/.env`: `SUPABASE_PROJECT_URL`, `SUPABASE_SERVICE_ROLE_KEY`; auth with `SUPABASE_ACCESS_TOKEN`) so the fix does not wait for the next deploy. Plain `INSERT ... ON CONFLICT` — works as the non-superuser `postgres` role.
+5. **Verify.** Confirm `SELECT value FROM app_config WHERE key IN ('supabase_url','service_role_key')` returns both non-empty on the live project, and that `anon` cannot read the table.
 
 **Key interfaces:**
-- `dispatch_compute_verdict()` — the function that reads the two GUCs and POSTs to `compute-verdict` via `pg_net`. Unchanged by this fix; it simply starts seeing non-empty GUCs.
+- `dispatch_compute_verdict()` — rewritten to read `app_config` instead of GUCs; `pg_net` POST logic unchanged.
+- A new `app_config` table + migration under `supabase/migrations/`.
 - `.github/workflows/ci.yml` — the database-deploy job; one step added, no new job/lane.
-- A new migration file under `supabase/migrations/`.
 
 **Out of scope:**
-- The empty candidate pool — [[bug-08-verdict-pipeline-integration-unwired|bug-08]] / tb-21–tb-23. A verdict still will not resolve until those land; this issue only makes the engine *reachable*.
+- The empty candidate pool — [[bug-08-verdict-pipeline-integration-unwired|bug-08]] / tb-21–tb-23. A verdict still will not resolve until those land; this issue only makes the engine *reachable*. (tb-21 has since merged.)
 - Recovering rooms already wedged in `firing` — unrecoverable, leave them.
-- Any change to `dispatch_compute_verdict`'s logic or the iOS fire path.
+- The iOS fire path — unchanged; firing stays server-side.
 
 **Notes / gotchas:**
-- `ALTER DATABASE ... SET` applies to new connections only; `pg_net`'s background worker picks it up on its next connection, so new dispatches read it without a restart.
-- Verifying AC's end-to-end criterion (an actual `verdicts` row) needs a non-empty candidate pool — only checkable once bug-08's tb-21/tb-23 merge. Not a gate for closing bug-09; cross-check then.
+- The GUC → table switch introduces an RLS dependency the GUC version did not have: if `dispatch_compute_verdict` is `SECURITY INVOKER`, the trigger runs under the voting end-user's role, which RLS blocks from reading `app_config` → silent no-op again. `SECURITY DEFINER` (step 2) is load-bearing, not optional.
+- `CREATE TABLE` / `CREATE OR REPLACE FUNCTION` / `ENABLE ROW LEVEL SECURITY` are all within the `postgres` role's ordinary rights — no superuser, unlike the abandoned `ALTER DATABASE SET`.
+- Verifying the end-to-end criterion (an actual `verdicts` row) needs a non-empty candidate pool — only checkable once bug-08's tb-21/tb-23 land. Not a gate for closing bug-09; cross-check then.
 
-## Why this is AFK, not HITL
+## Why this is AFK
 
-Originally triaged `ready-for-human` on the assumption that setting a GUC containing the service-role key needs a human at the dashboard. That assumption does not hold here: the service-role key and the Management API token are already in `/workspace/.env` — readable by an agent via that absolute path, even from an isolated worktree — and the `gh` token carries the `repo` scope needed to create the Actions secret. Every step above is mechanically agent-executable, and the fix lands as a normal migration + CI PR. Re-triaged `ready-for-agent` / AFK on 2026-05-18.
+Re-confirmed AFK at the 2026-05-18 re-triage, after the first AFK run escalated. The escalation cause — `ALTER DATABASE SET app.*` needs a superuser — is removed entirely by the re-scope: every step is now a table write or a `CREATE`/`REPLACE` within the `postgres` role's ordinary rights, plus one CI step. The single non-agent action — creating the `SUPABASE_SERVICE_ROLE_KEY` Actions secret — was done by the maintainer at triage. The fix lands as a normal migration + CI PR.
 
 ## Acceptance criteria
 
-- [ ] `current_setting('app.supabase_url', true)` and `current_setting('app.service_role_key', true)` both return non-empty values on the live project.
-- [ ] The `app.supabase_url` GUC is set by a committed migration; the `app.service_role_key` GUC is re-applied by a step in the CI database-deploy job from a GitHub Actions secret — both survive a project re-provision with no manual action.
+- [ ] An `app_config(key, value)` table exists, created by a committed migration, with RLS enabled and unreadable by `anon` / `authenticated`.
+- [ ] `dispatch_compute_verdict` reads `supabase_url` and `service_role_key` from `app_config` (not `current_setting('app.*')`), is `SECURITY DEFINER`, and still silently no-ops when a value is missing.
+- [ ] On the live project, `app_config` holds non-empty `supabase_url` and `service_role_key` rows; the URL is seeded by the committed migration, the key re-applied by a step in the CI database-deploy job from the `SUPABASE_SERVICE_ROLE_KEY` Actions secret — both survive a project re-provision with no manual action.
 - [ ] No service-role key value appears in any committed file (migration, workflow, or otherwise).
 - [ ] After a quiz completes — once bug-08's candidate-pool slices land — `dispatch_compute_verdict` reaches `compute-verdict` and a `verdicts` row is written. Cross-checked when tb-21/tb-23 merge; not a gate for closing this issue.
 
@@ -111,3 +122,5 @@ Not blocked. Necessary but not sufficient on its own: with [[bug-08-verdict-pipe
 - The two secondary ACs (no committed key; both halves survive a re-provision) are moot once the primary mechanism is unavailable.
 
 Full evidence + the recommended re-scope are in [[../../../60_engineering/verdict-dispatch-guc-superuser-blocker|verdict-dispatch-guc-superuser-blocker]]. Two viable paths, both needing a triage decision: (1) **HITL** — a human sets the two values once in the Supabase dashboard's *Custom Postgres config*, `dispatch_compute_verdict` unchanged; (2) **AFK, re-scoped** — change `dispatch_compute_verdict` to read its URL/key from an ordinary `app_config` table instead of `current_setting()`, which removes the superuser dependency entirely (any role can `INSERT`/`SELECT` a table) — but this needs a `dispatch_compute_verdict` change, which the current "Out of scope" section forbids, so it is a spec change. No code merged on `afk/bug-09`; the run produced only the engineering diagnosis note. Re-triaged `needs-triage`.
+
+**2026-05-18 — re-triaged needs-triage → ready-for-agent (Option 2, re-scoped).** Maintainer chose the AFK re-scope over the HITL dashboard route. The fix abandons the `app.*` GUCs (unsettable without a superuser) and moves the URL/key into an `app_config` table that `dispatch_compute_verdict` reads — a plain table write, no superuser. The `dispatch_compute_verdict` change is now in scope (a deliberate spec change made at triage; the iOS fire path stays out of scope). The `SUPABASE_SERVICE_ROLE_KEY` GitHub Actions secret was created by the maintainer on 2026-05-18, so the issue is cleanly agent-executable end to end. "Fix — re-scoped plan", Agent Brief, and acceptance criteria rewritten for the table approach. Re-triaged `ready-for-agent` / AFK on the vault and GitHub.
