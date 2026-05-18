@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101), tb-18 Q4-vibe filed needs-triage (GitHub #102)
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); tb-18 Q4-vibe triaged 2026-05-18 to ready-for-agent + research-02 allowlist spike split out (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107)
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -26,6 +26,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | bug-04 | [[issues/bug-04-question-transition-motion-lag\|Question transition motion lag]] ✅ done | AFK | [#44](https://github.com/samfarls55/gettoit/issues/44) | — |
 | bug-05 | [[issues/bug-05-info-plist-missing-location-purpose-string\|Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125]] — fixed-in-branch (not filed to GitHub) | AFK | — | — |
 | bug-06 | [[issues/bug-06-legacy-anon-bypasses-s00a-gate\|Legacy v1 anonymous session bypasses S00a sign-in gate on launch]] ✅ done | AFK | [#63](https://github.com/samfarls55/gettoit/issues/63) | — |
+| bug-07 | [[issues/bug-07-post-q5-router-unwired\|Quiz submit dead-ends to landing — post-Q5 router (S04/S05) unwired]] ✅ closed — decomposed into tb-19/tb-20; fix tracked there | HITL | [#109](https://github.com/samfarls55/gettoit/issues/109) | — |
 
 ### Spec gaps
 
@@ -115,9 +116,25 @@ After the Foursquare account moved to a paid (credit-backed) plan, a session dia
 
 | # | Title | Type | GitHub | Status |
 |---|---|---|---|---|
-| TB-18 (v1.1) | [[issues/tb-18-q4-vibe-tastes-signal\|Q4 vibe energy from the Foursquare tastes signal]] | — | [#102](https://github.com/samfarls55/gettoit/issues/102) | needs-triage — needs a research pass before ready-for-agent |
+| research-02 (v1.1) | [[issues/research-02-tastes-vibe-token-allowlist\|Foursquare tastes vibe-token allowlist — sample + curate]] | AFK | [#108](https://github.com/samfarls55/gettoit/issues/108) | ready-for-agent |
+| TB-18 (v1.1) | [[issues/tb-18-q4-vibe-tastes-signal\|Q4 vibe energy from the Foursquare tastes signal]] | AFK | [#102](https://github.com/samfarls55/gettoit/issues/102) | ready-for-agent — triaged 2026-05-18; blocked by research-02 |
+
+**Triaged 2026-05-18.** A `/triage` + `/grill-with-docs` session resolved tb-18's three design questions (vibe = category-archetype baseline + bounded ±1 `tastes` nudge; price tie-break demoted to last-resort; graded-axis already closed by [[research-01-foursquare-filter-surface|research-01]] §6). The live-data allowlist build was split out as `research-02`. tb-18 is now the implementation tracer-bullet, blocked by it. The research-01 report §5 was corrected — the 2026-05-17 audit reversed its `attributes`/`tastes` ranking.
 
 **Adjacency flagged, not filed.** Foursquare's `attributes` field (`outdoor_seating`, `delivery`, `reservations`) could back the service-shape session parameter (PRD story 8), which currently has no Foursquare backing — see [[service-shape-attributes-unbacked|service-shape-attributes-unbacked]]. A parameter, not a quiz question; needs a triage decision before it becomes an issue.
+
+## Post-Q5 router fix (2026-05-18)
+
+Decomposed via `/to-issues` after a dogfood session surfaced [[issues/bug-07-post-q5-router-unwired|bug-07]] — submitting Q5 on iOS dead-ends to the S00 Landing screen because the post-Q5 router (S04 Waiting → S05 Verdict) was never wired into `RootView`. The S04/S05 surfaces and stores exist and are unit-tested but are constructed nowhere in production. Two vertical slices; verdict-ready detection is by polling, not Realtime (a few-seconds delay after the final answer is acceptable — see bug-07 §Fix scope).
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| TB-19 (v1.1) | [[issues/tb-19-solo-verdict-route\|Solo session reaches the verdict — post-Q5 router skeleton]] | AFK | [#106](https://github.com/samfarls55/gettoit/issues/106) | — |
+| TB-20 (v1.1) | [[issues/tb-20-group-waiting-route\|Group session shows S04 Waiting and advances to S05]] | AFK | [#107](https://github.com/samfarls55/gettoit/issues/107) | TB-19 |
+
+Build order: tb-19 first (stands up the post-quiz host + `RootView` wiring on the solo path), then tb-20 (adds the group S04 Waiting surface on the same host).
+
+**Adjacencies flagged on bug-07, not filed.** Realtime upgrade for live S04 peer updates; S06 Locked / S07 Reroll / S08 Check-in routing — the same unwired-surface pattern, separate follow-ups.
 
 ## Cross-references
 
