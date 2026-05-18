@@ -25,6 +25,7 @@ import {
 import {
   buildVotesSlotsFromLegacyAnswers,
   mapVotesRowToMemberVote,
+  mapVotesRowToPreferenceInputs,
   QUESTION_KINDS,
   type QuestionSlot,
   type VotesRow,
@@ -318,7 +319,11 @@ Deno.test("buildVotesSlotsFromLegacyAnswers round-trips through the mapper", () 
     cuisines: ["thai"],
     reputation: "popular",
     q4_vibe: 1,
-    q5_scores: { a: 4, b: 2 },
+    q5_ratings: [
+      { droppedAxis: "cuisine" as const, score: 4 },
+      { droppedAxis: "reputation" as const, score: 2 },
+      { droppedAxis: "vibe" as const, score: 5 },
+    ],
   };
   const slots = buildVotesSlotsFromLegacyAnswers(legacy);
   const row: VotesRow = {
@@ -332,9 +337,71 @@ Deno.test("buildVotesSlotsFromLegacyAnswers round-trips through the mapper", () 
   };
   const vote = mapVotesRowToMemberVote(row);
   assertEquals(vote.q2_budget, legacy.q2_budget);
-  assertEquals(vote.scores, legacy.q5_scores);
   // Q1 wraps as cuisine_craving (soft) — it produces no hard veto.
   assertEquals(vote.q1_vetoes, []);
   assert(slots.q1.meta.question_kind === "cuisine_craving");
   assert(slots.q3.meta.question_kind === "reputation");
+});
+
+// ───────────────────────────────────────────────────────────────────────
+// TB-24 — the Q5 regret slot emits `answer.ratings`, the factorial shape.
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("buildVotesSlotsFromLegacyAnswers emits the Q5 regret slot as answer.ratings", () => {
+  const slots = buildVotesSlotsFromLegacyAnswers({
+    q1_vetoes: [],
+    q2_budget: 2,
+    cuisines: ["mexican"],
+    reputation: "hidden_gem",
+    q4_vibe: 3,
+    q5_ratings: [
+      { droppedAxis: "cuisine", score: 5 },
+      { droppedAxis: "reputation", score: 1 },
+      { droppedAxis: "vibe", score: 4 },
+    ],
+  });
+
+  // The slot carries the canonical factorial probe shape — one
+  // `{ droppedAxis, score }` entry per card, NOT a per-venue score map.
+  assertEquals(slots.q5.meta.question_kind, "regret");
+  assertEquals(slots.q5.answer.ratings, [
+    { droppedAxis: "cuisine", score: 5 },
+    { droppedAxis: "reputation", score: 1 },
+    { droppedAxis: "vibe", score: 4 },
+  ]);
+  // The pre-TB-23 per-venue `scores` map is gone — the producer emits
+  // only the canonical probe shape.
+  assertEquals(slots.q5.answer.scores, undefined);
+});
+
+Deno.test("buildVotesSlotsFromLegacyAnswers Q5 ratings feed a non-empty preference probe", () => {
+  // The whole point of TB-24: the regret slot a write path produces must
+  // round-trip into a non-empty `q5Ratings` probe through the tb-23
+  // read path, so the per-member prefFn re-weight is no longer a no-op.
+  const slots = buildVotesSlotsFromLegacyAnswers({
+    q1_vetoes: [],
+    q2_budget: 4,
+    cuisines: [],
+    reputation: "no_preference",
+    q4_vibe: 2,
+    q5_ratings: [
+      { droppedAxis: "cuisine", score: 2 },
+      { droppedAxis: "reputation", score: 5 },
+      { droppedAxis: "vibe", score: 3 },
+    ],
+  });
+  const inputs = mapVotesRowToPreferenceInputs({
+    user_id: "u9",
+    display_name: "robin",
+    q1: slots.q1,
+    q2: slots.q2,
+    q3: slots.q3,
+    q4: slots.q4,
+    q5: slots.q5,
+  });
+  assertEquals(inputs.q5Ratings, [
+    { droppedAxis: "cuisine", score: 2 },
+    { droppedAxis: "reputation", score: 5 },
+    { droppedAxis: "vibe", score: 3 },
+  ]);
 });

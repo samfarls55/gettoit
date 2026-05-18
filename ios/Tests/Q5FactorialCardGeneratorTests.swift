@@ -374,5 +374,16 @@ final class Q5FactorialCardGeneratorTests: XCTestCase {
         }
         // Meta formats identically to a plain loader card.
         XCTAssertTrue(candidates.contains { $0.meta == "Thai - $$ - 6 min" })
+        // TB-24: each shaped candidate carries its card's `droppedAxis`
+        // so the Q5 vote write can emit the factorial probe. The triple
+        // covers all three distinct axes; the per-candidate axis matches
+        // its source card.
+        XCTAssertEqual(Set(candidates.compactMap(\.droppedAxis)),
+                       Set([.cuisine, .reputation, .vibe]),
+                       "the shaped candidates carry the three factorial axes")
+        for (card, candidate) in zip(cards, candidates) {
+            XCTAssertEqual(candidate.droppedAxis, card.droppedAxis,
+                           "each candidate keeps its source card's dropped axis")
+        }
     }
 }

@@ -107,4 +107,66 @@ final class VerdictStoreTests: XCTestCase {
     func testAudienceCopyForLargeGroupFallsBackToNumber() {
         XCTAssertEqual(VerdictStore.audienceCopy(forMemberCount: 12), "All 12 of you")
     }
+
+    // MARK: - VoteRow decoder — Q5 slot tolerance (TB-24)
+
+    /// TB-24 moved the Q5 write to the factorial probe shape
+    /// (`answer.ratings`), dropping the pre-tb-23 per-venue
+    /// `answer.scores` map. `VerdictStore.VoteRow` reads live `votes`
+    /// rows for the verdict screen, so its decoder must tolerate a Q5
+    /// slot with no `scores` key — otherwise reading any freshly
+    /// written vote row would throw.
+    func testVoteRowDecodesAQ5SlotCarryingTheFactorialRatingsShape() throws {
+        let json = """
+        {
+          "user_id": "00000000-0000-0000-0000-000000000001",
+          "q1": { "meta": { "question_kind": "cuisine_craving" },
+                  "answer": { "cuisines": ["thai"], "no_preference": false } },
+          "q2": { "meta": { "question_kind": "budget_cap" },
+                  "answer": { "tier": 3 } },
+          "q3": { "meta": { "question_kind": "reputation" },
+                  "answer": { "reputation": "popular" } },
+          "q4": { "meta": { "question_kind": "vibe" },
+                  "answer": { "level": 2 } },
+          "q5": { "meta": { "question_kind": "regret" },
+                  "answer": { "ratings": [
+                    { "droppedAxis": "cuisine", "score": 4 },
+                    { "droppedAxis": "reputation", "score": 2 },
+                    { "droppedAxis": "vibe", "score": 5 }
+                  ] } }
+        }
+        """.data(using: .utf8)!
+
+        // The decode must not throw on the missing `answer.scores`.
+        let row = try JSONDecoder().decode(VerdictStore.VoteRow.self, from: json)
+        XCTAssertEqual(row.q2Budget, 3)
+        XCTAssertEqual(row.q4Vibe, 2)
+        // The verdict screen never reads `q5Regret` — server-side
+        // scoring, tb-23 — so an absent `scores` map resolves to empty.
+        XCTAssertEqual(row.q5Regret, [:],
+            "a factorial-shape Q5 slot yields an empty legacy score map")
+    }
+
+    /// A surviving legacy row that still carries `answer.scores` keeps
+    /// decoding into `q5Regret` — the decoder stays back-compatible.
+    func testVoteRowStillDecodesALegacyQ5ScoresSlot() throws {
+        let json = """
+        {
+          "user_id": "00000000-0000-0000-0000-000000000002",
+          "q1": { "meta": { "question_kind": "cuisine_craving" },
+                  "answer": { "cuisines": [], "no_preference": true } },
+          "q2": { "meta": { "question_kind": "budget_cap" },
+                  "answer": { "tier": 4 } },
+          "q3": { "meta": { "question_kind": "reputation" },
+                  "answer": { "reputation": "no_preference" } },
+          "q4": { "meta": { "question_kind": "vibe" },
+                  "answer": { "level": 1 } },
+          "q5": { "meta": { "question_kind": "regret" },
+                  "answer": { "scores": { "fsq-a": 5, "fsq-b": 2 } } }
+        }
+        """.data(using: .utf8)!
+
+        let row = try JSONDecoder().decode(VerdictStore.VoteRow.self, from: json)
+        XCTAssertEqual(row.q5Regret, ["fsq-a": 5, "fsq-b": 2])
+    }
 }

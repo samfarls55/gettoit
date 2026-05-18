@@ -541,7 +541,17 @@ public final class VerdictStore {
         }
         private struct TierAnswer: Decodable { let tier: Int }
         private struct LevelAnswer: Decodable { let level: Int }
-        private struct ScoresAnswer: Decodable { let scores: [String: Int] }
+        /// Tolerant Q5 answer. TB-24 moved the Q5 write to the factorial
+        /// probe shape (`answer.ratings: [{ droppedAxis, score }]`); the
+        /// pre-tb-23 per-venue `answer.scores` map is no longer written.
+        /// Both fields are optional so the decoder accepts the new
+        /// `ratings` rows (and any surviving legacy `scores` rows)
+        /// without throwing. The verdict screen does not read `q5Regret`
+        /// — verdict scoring moved server-side in tb-23 — so an absent
+        /// `scores` simply resolves to an empty map.
+        private struct Q5Answer: Decodable {
+            let scores: [String: Int]?
+        }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: RowKey.self)
@@ -564,7 +574,11 @@ public final class VerdictStore {
             q3Reputation = q3.reputation
 
             q4Vibe = try c.decode(Slot<LevelAnswer>.self, forKey: .q4).answer.level
-            q5Regret = try c.decode(Slot<ScoresAnswer>.self, forKey: .q5).answer.scores
+            // TB-24: the Q5 slot now carries the factorial `ratings`
+            // probe, not a per-venue `scores` map. `q5Regret` defaults
+            // to empty when `scores` is absent — the verdict screen
+            // never reads it (server-side scoring, tb-23).
+            q5Regret = try c.decode(Slot<Q5Answer>.self, forKey: .q5).answer.scores ?? [:]
         }
     }
 

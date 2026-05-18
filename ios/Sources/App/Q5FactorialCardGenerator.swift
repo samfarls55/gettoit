@@ -351,12 +351,18 @@ public extension Q5FactorialCardGenerator {
     /// `QuizCandidate.id` stays the venue's `fsq_place_id` so the
     /// `votes.q5` jsonb slot keys ratings on real venue ids — the bug-03
     /// "no placeholder venues" guarantee carried through to the write.
+    ///
+    /// TB-24: each shaped candidate carries its card's `droppedAxis` so
+    /// the vote write can emit `votes.q5.answer.ratings` as the factorial
+    /// `[{ droppedAxis, score }]` array the `compute-verdict` preference
+    /// re-weight reads.
     static func quizCandidates(from cards: [Q5FactorialCard]) -> [QuizCandidate] {
         cards.map { card in
             QuizCandidate(
                 id: card.venue.place.fsqPlaceId,
                 name: card.venue.place.name,
-                meta: Q5CandidatesLoader.metaString(for: card.venue.place)
+                meta: Q5CandidatesLoader.metaString(for: card.venue.place),
+                droppedAxis: card.droppedAxis
             )
         }
     }

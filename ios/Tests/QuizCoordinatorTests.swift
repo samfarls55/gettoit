@@ -238,9 +238,16 @@ final class QuizCoordinatorTests: XCTestCase {
         XCTAssertEqual(row.q2Budget, 3)
         XCTAssertEqual(row.q3Reputation, QuizReputation.hiddenGem)
         XCTAssertEqual(row.q4Vibe, 1)
-        XCTAssertEqual(row.q5Regret[QuizDummyCandidates.all[0].id], 5)
-        XCTAssertEqual(row.q5Regret[QuizDummyCandidates.all[1].id], 2)
-        XCTAssertEqual(row.q5Regret[QuizDummyCandidates.all[2].id], 4)
+        // TB-24: the Q5 probe is the factorial `[{ droppedAxis, score }]`
+        // array — one entry per card. The legacy dummy-fixture
+        // candidates carry no factorial axis, so the three axes are
+        // assigned positionally (cuisine, reputation, vibe) following
+        // the candidate order; each entry carries the rated score.
+        XCTAssertEqual(row.q5Ratings.count, 3,
+            "one Q5 rating entry per factorial card")
+        XCTAssertEqual(row.q5Ratings.map(\.droppedAxis), [.cuisine, .reputation, .vibe],
+            "the three cards cover the three distinct factorial axes")
+        XCTAssertEqual(row.q5Ratings.map(\.score), [5, 2, 4])
     }
 
     func testSubmitCarriesNoPreferenceCuisineAnswer() async {
@@ -351,7 +358,11 @@ final class QuizCoordinatorTests: XCTestCase {
             q2Budget: 2,
             q3Reputation: QuizReputation.hiddenGem,
             q4Vibe: 3,
-            q5Regret: ["dummy-pico": 5]
+            q5Ratings: [
+                .init(droppedAxis: .cuisine, score: 5),
+                .init(droppedAxis: .reputation, score: 2),
+                .init(droppedAxis: .vibe, score: 4),
+            ]
         )
         let data = try JSONEncoder().encode(row)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -391,9 +402,18 @@ final class QuizCoordinatorTests: XCTestCase {
         XCTAssertEqual(q3Answer["reputation"] as? String, QuizReputation.hiddenGem)
         let q4Answer = try XCTUnwrap((json["q4"] as? [String: Any])?["answer"] as? [String: Any])
         XCTAssertEqual(q4Answer["level"] as? Int, 3)
+        // TB-24: the Q5 probe encodes `answer.ratings` — the factorial
+        // `[{ droppedAxis, score }]` array — not the pre-tb-23 per-venue
+        // `answer.scores` map. Each entry is tagged with the axis its
+        // card deviates on, the shape `compute-verdict` reads.
         let q5Answer = try XCTUnwrap((json["q5"] as? [String: Any])?["answer"] as? [String: Any])
-        let scores = try XCTUnwrap(q5Answer["scores"] as? [String: Any])
-        XCTAssertEqual(scores["dummy-pico"] as? Int, 5)
+        let ratings = try XCTUnwrap(q5Answer["ratings"] as? [[String: Any]])
+        XCTAssertEqual(ratings.count, 3, "one entry per factorial card")
+        XCTAssertEqual(ratings.map { $0["droppedAxis"] as? String },
+                       ["cuisine", "reputation", "vibe"])
+        XCTAssertEqual(ratings.map { $0["score"] as? Int }, [5, 2, 4])
+        XCTAssertNil(q5Answer["scores"],
+            "the pre-tb-23 per-venue score map is gone — only answer.ratings is written")
 
         // The old typed columns must NOT appear on the wire.
         XCTAssertNil(json["q1_vetoes"], "typed columns are gone in the v1.1 jsonb schema")
@@ -415,7 +435,7 @@ final class QuizCoordinatorTests: XCTestCase {
             q2Budget: 4,
             q3Reputation: QuizReputation.noPreference,
             q4Vibe: 2,
-            q5Regret: [:]
+            q5Ratings: []
         )
         let data = try JSONEncoder().encode(row)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])

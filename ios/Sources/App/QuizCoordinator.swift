@@ -53,11 +53,27 @@ public struct QuizCandidate: Equatable, Sendable, Identifiable {
     public let id: String
     public let name: String
     public let meta: String   // e.g. "Mexican · $$ · 8 min"
+    /// TB-24: the factorial axis this card deviates on. Set when the
+    /// candidate is a `Q5FactorialCardGenerator` card — each of the
+    /// three factorial cards drops exactly one distinct axis. `nil` on
+    /// the legacy / dummy-fixture candidates that did not come from the
+    /// factorial; the vote write then assigns axes positionally so the
+    /// `votes.q5.answer.ratings` array is still well-formed (one entry
+    /// per axis). Carried for the verdict's per-member preference
+    /// re-weight — `compute-verdict` reads each axis's weight from its
+    /// drop-card-vs-keep-card rating spread. The Q5 surface ignores it.
+    public let droppedAxis: Q5FactorialCard.Axis?
 
-    public init(id: String, name: String, meta: String) {
+    public init(
+        id: String,
+        name: String,
+        meta: String,
+        droppedAxis: Q5FactorialCard.Axis? = nil
+    ) {
         self.id = id
         self.name = name
         self.meta = meta
+        self.droppedAxis = droppedAxis
     }
 }
 
@@ -522,6 +538,29 @@ public final class QuizCoordinator {
     /// JSON is the generic envelope. `Encodable` only — the row is
     /// write-only (reads go through a separate `Decodable` readback
     /// shape).
+    /// One Q5 factorial card's rating on the wire — the card's
+    /// `droppedAxis` paired with the member's 1…5 excitement score.
+    ///
+    /// TB-24: this is the canonical v1.1 Q5 probe shape. The vote write
+    /// emits `votes.q5.answer.ratings` as `[Q5RatingEntry]` — one entry
+    /// per factorial card — so `compute-verdict` (`readQ5Ratings` /
+    /// `mapVotesRowToPreferenceInputs`, merged in tb-23) builds a real
+    /// per-member weight-hierarchy probe instead of falling back to the
+    /// equal-weight 1/3 prior. It replaces the pre-tb-23 per-venue score
+    /// map (`votes.q5.answer.scores`), which the server no longer reads
+    /// as the live verdict signal.
+    public struct Q5RatingEntry: Equatable, Sendable {
+        /// The factorial axis the rated card deviates on.
+        public let droppedAxis: Q5FactorialCard.Axis
+        /// The member's 1…5 excitement rating for that card.
+        public let score: Int
+
+        public init(droppedAxis: Q5FactorialCard.Axis, score: Int) {
+            self.droppedAxis = droppedAxis
+            self.score = score
+        }
+    }
+
     public struct VoteRow: Encodable, Equatable, Sendable {
         public let roomID: UUID
         public let userID: UUID
@@ -530,7 +569,10 @@ public final class QuizCoordinator {
         public let q2Budget: Int
         public let q3Reputation: String
         public let q4Vibe: Int
-        public let q5Regret: [String: Int]
+        /// TB-24: the Q5 factorial probe — one `{ droppedAxis, score }`
+        /// entry per factorial card. Encoded into
+        /// `votes.q5.answer.ratings`.
+        public let q5Ratings: [Q5RatingEntry]
 
         public init(
             roomID: UUID,
@@ -540,7 +582,7 @@ public final class QuizCoordinator {
             q2Budget: Int,
             q3Reputation: String,
             q4Vibe: Int,
-            q5Regret: [String: Int]
+            q5Ratings: [Q5RatingEntry]
         ) {
             self.roomID = roomID
             self.userID = userID
@@ -549,7 +591,7 @@ public final class QuizCoordinator {
             self.q2Budget = q2Budget
             self.q3Reputation = q3Reputation
             self.q4Vibe = q4Vibe
-            self.q5Regret = q5Regret
+            self.q5Ratings = q5Ratings
         }
 
         private enum RowKey: String, CodingKey {
@@ -597,6 +639,22 @@ public final class QuizCoordinator {
             }
         }
 
+        /// One `{ droppedAxis, score }` entry of the Q5 `regret` slot's
+        /// `answer.ratings` array. `droppedAxis` encodes to the axis's
+        /// raw string (`"cuisine"` / `"reputation"` / `"vibe"`) — the
+        /// shape `compute-verdict`'s `readQ5Ratings` consumes. The key
+        /// is intentionally camel-case (`droppedAxis`, not
+        /// `dropped_axis`) to match the canonical server-side reader.
+        private struct RatingAnswerEntry: Encodable {
+            let droppedAxis: String
+            let score: Int
+        }
+
+        /// The Q5 `regret` slot's answer payload — the factorial probe.
+        private struct RegretAnswer: Encodable {
+            let ratings: [RatingAnswerEntry]
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: RowKey.self)
             try container.encode(roomID, forKey: .roomID)
@@ -626,11 +684,24 @@ public final class QuizCoordinator {
                 prompt: "What's the energy you're after?",
                 answer: ["level": q4Vibe]
             )
+            // TB-24: the Q5 probe writes `answer.ratings` — the
+            // factorial `[{ droppedAxis, score }]` array — not the
+            // pre-tb-23 per-venue `answer.scores` map. Each entry is one
+            // factorial card, tagged with the axis that card deviates
+            // on, so `compute-verdict` can re-weight the member's
+            // preference function per axis.
             try encodeSlot(
                 into: &container, key: .q5,
                 questionKind: "regret",
                 prompt: "How excited does each of these make you?",
-                answer: ["scores": q5Regret]
+                answer: RegretAnswer(
+                    ratings: q5Ratings.map {
+                        RatingAnswerEntry(
+                            droppedAxis: $0.droppedAxis.rawValue,
+                            score: $0.score
+                        )
+                    }
+                )
             )
         }
     }
@@ -646,8 +717,40 @@ public final class QuizCoordinator {
             q2Budget: q2Budget,
             q3Reputation: q3Reputation,
             q4Vibe: q4Vibe,
-            q5Regret: q5Ratings
+            q5Ratings: buildQ5Ratings()
         )
+    }
+
+    /// Assemble the Q5 factorial probe — one `{ droppedAxis, score }`
+    /// entry per candidate — from the per-venue `q5Ratings` score map
+    /// and each candidate's `droppedAxis`.
+    ///
+    /// TB-24: `q5Ratings` is captured per venue id (the surface rates
+    /// venues, not axes); the wire shape `compute-verdict` reads is the
+    /// factorial `[{ droppedAxis, score }]`. The join happens here, at
+    /// the write boundary, so the surface and the in-memory capture
+    /// state stay venue-keyed.
+    ///
+    /// Axis source: the factorial path tags each `QuizCandidate` with
+    /// its card's `droppedAxis`. The legacy / dummy-fixture path leaves
+    /// it `nil` (those candidates never went through the factorial); the
+    /// three axes are then assigned positionally — `cuisine`,
+    /// `reputation`, `vibe` — so the write is still a well-formed
+    /// one-entry-per-axis probe. Order follows the candidate list, which
+    /// is the factorial's emit order (cuisine-drop, reputation-drop,
+    /// vibe-drop) on the real path.
+    private func buildQ5Ratings() -> [Q5RatingEntry] {
+        let fallbackAxes = Q5FactorialCard.Axis.allCases
+        var entries: [Q5RatingEntry] = []
+        for (index, candidate) in candidates.enumerated() {
+            let score = q5Ratings[candidate.id] ?? 3
+            let axis = candidate.droppedAxis
+                ?? fallbackAxes[index % fallbackAxes.count]
+            entries.append(
+                Q5RatingEntry(droppedAxis: axis, score: score)
+            )
+        }
+        return entries
     }
 
     // MARK: - retry classification

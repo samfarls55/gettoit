@@ -198,9 +198,57 @@ final class QuizCandidateFetchTests: XCTestCase {
         coord.setRegret(candidateID: "fsq-a", score: 5)
         coord.setRegret(candidateID: "fsq-b", score: 2)
         let row = coord.buildRow()
-        XCTAssertEqual(row.q5Regret["fsq-a"], 5)
-        XCTAssertEqual(row.q5Regret["fsq-b"], 2)
-        XCTAssertEqual(row.q5Regret["fsq-c"], 3, "untouched fetched venue keeps the seeded default")
+        // TB-24: the vote write emits the Q5 factorial probe — one
+        // `{ droppedAxis, score }` entry per candidate, in candidate
+        // order. Each rated venue's score lands on its entry; an
+        // untouched venue keeps the seeded default (3).
+        XCTAssertEqual(row.q5Ratings.count, 3)
+        XCTAssertEqual(row.q5Ratings.map(\.score), [5, 2, 3],
+            "untouched fetched venue keeps the seeded default")
+        // These recording-double candidates carry no factorial axis, so
+        // the three axes are assigned positionally.
+        XCTAssertEqual(row.q5Ratings.map(\.droppedAxis), [.cuisine, .reputation, .vibe])
+    }
+
+    // MARK: - the factorial axis threads onto the vote row (TB-24)
+
+    func testFactorialDroppedAxisThreadsOntoTheVoteRow() async {
+        // When the fetched candidates ARE the strict-factorial cards,
+        // each carries its `droppedAxis`; the vote write must emit
+        // `votes.q5.answer.ratings` tagged with those real axes — not
+        // the positional fallback — so `compute-verdict` reads a real
+        // per-member weight-hierarchy probe.
+        let fetch = RecordingCandidateFetch()
+        fetch.result = QuizCandidateFetchResult(
+            candidates: [
+                QuizCandidate(id: "fsq-rep", name: "Rep Drop", meta: "m",
+                              droppedAxis: .reputation),
+                QuizCandidate(id: "fsq-cui", name: "Cuisine Drop", meta: "m",
+                              droppedAxis: .cuisine),
+                QuizCandidate(id: "fsq-vib", name: "Vibe Drop", meta: "m",
+                              droppedAxis: .vibe),
+            ],
+            source: .fetched
+        )
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidateFetch: fetch, writer: { _ in }
+        )
+        coord.advance(); coord.advance(); coord.advance(); coord.advance()
+        await coord.awaitCandidateFetch()
+
+        coord.setRegret(candidateID: "fsq-rep", score: 1)
+        coord.setRegret(candidateID: "fsq-cui", score: 5)
+        coord.setRegret(candidateID: "fsq-vib", score: 4)
+
+        let row = coord.buildRow()
+        // The probe carries each card's real factorial axis, in
+        // candidate (= factorial emit) order.
+        XCTAssertEqual(row.q5Ratings, [
+            .init(droppedAxis: .reputation, score: 1),
+            .init(droppedAxis: .cuisine, score: 5),
+            .init(droppedAxis: .vibe, score: 4),
+        ])
     }
 
     // MARK: - pool-starvation result flips the state

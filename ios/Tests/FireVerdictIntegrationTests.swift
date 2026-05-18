@@ -140,7 +140,7 @@ final class FireVerdictIntegrationTests: XCTestCase {
             q2Budget: 4,
             q3Reputation: QuizReputation.noPreference,
             q4Vibe: 2,
-            q5Regret: [:]
+            q5Ratings: []
         )
         try await client
             .from("votes")

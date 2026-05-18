@@ -327,8 +327,13 @@ export interface LegacyTypedAnswers {
   reputation?: string;
   /** Q4 vibe energy index 0..4. Soft preference. */
   q4_vibe?: number;
-  /** Q5 per-candidate excitement ratings, keyed by venue id. */
-  q5_scores: Record<string, number>;
+  /** Q5 factorial preference probe — one `{ droppedAxis, score }` entry
+   *  per factorial card (cuisine-drop / reputation-drop / vibe-drop).
+   *  TB-24: the canonical v1.1 probe shape, replacing the pre-TB-23
+   *  per-venue `q5_scores` score map. `compute-verdict` reads this via
+   *  `mapVotesRowToPreferenceInputs` to re-weight each member's
+   *  preference function. */
+  q5_ratings: Q5Rating[];
 }
 
 /** The five generic slots, ready to insert into `votes.q1`..`q5`. */
@@ -343,7 +348,15 @@ export interface VotesSlotInsert {
 /** Wrap typed quiz answers in the generic `{ meta, answer }` envelopes.
  *  Q1 carries the v1.1 `cuisine_craving` kind; Q3 carries `reputation`.
  *  The `meta.prompt` strings are illustrative session copy — carried
- *  for audit, never read by the mapper. */
+ *  for audit, never read by the mapper.
+ *
+ *  TB-24: the Q5 `regret` slot emits `answer.ratings` — the canonical
+ *  v1.1 factorial probe shape `[{ droppedAxis, score }]` that
+ *  `mapVotesRowToPreferenceInputs` / `readQ5Ratings` consume. The
+ *  pre-TB-23 per-venue `answer.scores` map is NOT emitted: tb-23 moved
+ *  verdict scoring server-side and the Q5 ratings are now the
+ *  preference *probe*, not the candidate scores, so a parallel
+ *  `answer.scores` would be a dead second shape on the slot. */
 export function buildVotesSlotsFromLegacyAnswers(
   answers: LegacyTypedAnswers,
 ): VotesSlotInsert {
@@ -381,7 +394,7 @@ export function buildVotesSlotsFromLegacyAnswers(
         question_kind: "regret",
         prompt: "How excited does each of these make you?",
       },
-      answer: { scores: answers.q5_scores },
+      answer: { ratings: answers.q5_ratings },
     },
   };
 }
