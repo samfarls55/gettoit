@@ -40,6 +40,16 @@ import {
   type VerdictEngineOutput,
   type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
+import {
+  type MemberFetchRow,
+  type OptionInsertRow,
+  unionMemberFetches,
+} from "../_shared/member-fetch-union.ts";
+
+// TB-21 — re-export the union primitive's row types so the Edge entry
+// point (`index.ts`) and the handler tests can bind them without a
+// second import of `_shared/member-fetch-union.ts`.
+export type { MemberFetchRow, OptionInsertRow };
 
 /** Hard upper bound for `radius_meters_override`. S05's widen-radius
  *  slider exposes 1..10 mi (1609..16093 m); the handler clamps
@@ -62,6 +72,17 @@ export interface ComputeVerdictDataAdapter {
   fetchRoom(room_id: string): Promise<{ id: string } | null>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
+  /** TB-21 — fetch every member's persisted raw Foursquare fetch for
+   *  the room (`member_fetches` rows). The handler unions these into
+   *  the candidate pool and writes the union into `options` before the
+   *  engine reads. Optional — tests that seed `options` directly omit
+   *  it; the handler treats absence as "no persisted fetches." */
+  fetchMemberFetches?(room_id: string): Promise<MemberFetchRow[]>;
+  /** TB-21 — write the unioned candidate pool into `options`. Called
+   *  only when `options` is empty for the room and `member_fetches`
+   *  yielded a non-empty union. Optional — omitted by tests that seed
+   *  `options` directly. */
+  insertOptions?(rows: OptionInsertRow[]): Promise<void>;
   /** Fetch member votes for the room. `display_name` is sourced from
    *  the call-site (the Edge Function reads the join with members /
    *  auth.users; the test seeds it directly). */
@@ -414,7 +435,36 @@ export async function handleRequest(
     });
   }
 
-  const optionRows = await data.fetchOptions(roomId);
+  // TB-21 — populate `options` from the per-member persisted fetches.
+  //
+  // Parent bug-08: `QuizCandidateFetch` (iOS) fetched each member's
+  // full Foursquare venue union, picked the three Q5 factorial cards
+  // from it, and discarded the union — nothing ever wrote `options`,
+  // so the engine had no pool and every room returned `no_candidates`.
+  // The bug-08 fork (2026-05-18) put the union server-side: the iOS
+  // quiz now persists each member's raw fetch into `member_fetches`,
+  // and here — at verdict fire time — the server assembles the running
+  // union of every member's fetch (first-seen dedup by `fsq_place_id`)
+  // and writes it into `options` before the engine reads the pool.
+  //
+  // The server is the single owner of the union — iOS never writes
+  // `options`. The union runs only when `options` is empty: a room
+  // whose pool was already populated (a prior fire, a reroll re-run)
+  // is left untouched, so the union is idempotent across re-invokes.
+  let optionRows = await data.fetchOptions(roomId);
+  if (
+    optionRows.length === 0 &&
+    data.fetchMemberFetches &&
+    data.insertOptions
+  ) {
+    const memberFetches = await data.fetchMemberFetches(roomId);
+    const unionRows = unionMemberFetches(roomId, memberFetches);
+    if (unionRows.length > 0) {
+      await data.insertOptions(unionRows);
+      optionRows = await data.fetchOptions(roomId);
+    }
+  }
+
   const voteRows = await data.fetchVotes(roomId);
 
   if (optionRows.length === 0) {

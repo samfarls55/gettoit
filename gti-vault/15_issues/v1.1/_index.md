@@ -150,7 +150,7 @@ Decomposed via `/to-issues` from [[issues/bug-08-verdict-pipeline-integration-un
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| TB-21 (v1.1) | [[issues/tb-21-persist-fetch-server-union\|Persist raw per-member fetch; server unions it into `options` at fire time]] 🟢 ready-for-agent | AFK | [#119](https://github.com/samfarls55/gettoit/issues/119) | — |
+| TB-21 (v1.1) | [[issues/tb-21-persist-fetch-server-union\|Persist raw per-member fetch; server unions it into `options` at fire time]] ✅ done — `member_fetches` table + server-side union shipped | AFK | [#119](https://github.com/samfarls55/gettoit/issues/119) | — |
 | TB-22 (v1.1) | [[issues/tb-22-port-preference-function-ts\|Port the preference function (PRD modules A/E) Swift → TypeScript]] 🟢 ready-for-agent | AFK | [#120](https://github.com/samfarls55/gettoit/issues/120) | — |
 | TB-23 (v1.1) | [[issues/tb-23-server-prefn-scoring\|Server-side prefFn scoring over the full union, into the verdict engine]] 🟢 ready-for-agent | AFK | [#121](https://github.com/samfarls55/gettoit/issues/121) | TB-21, TB-22 |
 

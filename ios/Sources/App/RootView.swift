@@ -514,6 +514,11 @@ public struct RootView: View {
                 // defaults when the column is NULL / room unreadable.
                 sessionParameters: resolved?.sessionParameters ?? SessionParameters.default,
                 places: places,
+                // TB-21 — persist the member's full raw Foursquare
+                // fetch into `member_fetches`; the compute-verdict Edge
+                // Function unions every member's fetch into `options`
+                // at verdict fire time.
+                memberFetchWriter: MemberFetchSupabaseWriter.make(client: client),
                 writer: QuizSupabaseWriter.make(client: client)
             )
             // Flip into the quiz and tear down S01 routing state in
