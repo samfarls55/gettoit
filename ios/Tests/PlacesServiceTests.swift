@@ -257,6 +257,40 @@ final class PlacesServiceTests: XCTestCase {
         XCTAssertEqual(result.places.count, 3)
     }
 
+    // MARK: - ShapedPlace `tastes` decoding (TB-18)
+
+    func testShapedPlaceDecodesTastesFromWire() throws {
+        // TB-18: the proxy's `tastes` tag cloud must decode onto the
+        // iOS venue model so the Q5 vibe classifier can read it.
+        let json = """
+        {
+          "fsq_place_id": "abc",
+          "name": "Loud Spot",
+          "lat": 40.0,
+          "lng": -74.0,
+          "tastes": ["lively", "good for groups", "trendy"]
+        }
+        """.data(using: .utf8)!
+        let place = try JSONDecoder().decode(ShapedPlace.self, from: json)
+        XCTAssertEqual(place.tastes, ["lively", "good for groups", "trendy"])
+    }
+
+    func testShapedPlaceDecodesAbsentTastesAsEmpty() throws {
+        // An older Edge Function build (or a venue with no tags) omits
+        // the `tastes` key — it decodes as `[]`, not a throw. Forward-
+        // and backward-compatible, exactly like the TB-16 fields.
+        let json = """
+        {
+          "fsq_place_id": "abc",
+          "name": "Quiet Spot",
+          "lat": 40.0,
+          "lng": -74.0
+        }
+        """.data(using: .utf8)!
+        let place = try JSONDecoder().decode(ShapedPlace.self, from: json)
+        XCTAssertEqual(place.tastes, [])
+    }
+
     // MARK: - Helpers
 
     private static func makeShapedPlaces(count: Int) -> [ShapedPlace] {

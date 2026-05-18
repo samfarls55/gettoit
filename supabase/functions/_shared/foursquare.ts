@@ -85,6 +85,17 @@ export interface ShapedPlace {
   rating: number | null;
   total_ratings: number | null;
   date_created: string | null;
+  /** TB-18 (v1.1) — vibe-axis signal. Foursquare's crowd-sourced
+   *  `tastes` tag cloud, passed through verbatim. The iOS
+   *  `Q5VenueClassifier` matches these tokens against the research-02
+   *  curated allowlist to apply a bounded ±1 nudge to the category-
+   *  archetype vibe baseline — see
+   *  gti-vault/60_engineering/research/foursquare-tastes-vibe-2026-05.
+   *  `tastes` is already in the proxy's `fields` list (paid for by the
+   *  TB-09 dietary `tastes`-strategy filter) so projecting it adds no
+   *  API cost. Shapes as `[]` when Foursquare returns no tags — an
+   *  older client simply ignores the key. */
+  tastes: string[];
 }
 
 export interface PlaceHours {
@@ -601,6 +612,11 @@ export function shapeFoursquareResult(
       ? result.stats.total_ratings
       : null,
     date_created: result.date_created ?? null,
+    // TB-18 (v1.1) — vibe-axis signal. Pass the raw `tastes` tag cloud
+    // through verbatim (lower-casing and allowlist matching happen
+    // client-side in the iOS Q5VenueClassifier). Absent `tastes`
+    // shapes as `[]`.
+    tastes: result.tastes ?? [],
   };
 }
 

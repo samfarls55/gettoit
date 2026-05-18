@@ -328,6 +328,26 @@ Deno.test("shapeFoursquareResult — reputation fields shape as null when absent
   assertEquals(shaped.date_created, null);
 });
 
+Deno.test("shapeFoursquareResult — projects the tastes vibe signal", () => {
+  // TB-18: the raw `tastes` tag cloud passes through onto the shaped
+  // row so the iOS Q5VenueClassifier can read it for the Q4 vibe axis.
+  const shaped = shapeFoursquareResult(SAMPLE_RESULT, []);
+  assertExists(shaped);
+  assertEquals(shaped.tastes, ["vegan menu", "plant-based"]);
+});
+
+Deno.test("shapeFoursquareResult — tastes shapes as [] when absent", () => {
+  // A venue Foursquare returns no `tastes` for shapes as an empty
+  // array — no minimum-coverage drop, the classifier just gets nothing
+  // to nudge on.
+  const shaped = shapeFoursquareResult(
+    { ...SAMPLE_RESULT, tastes: undefined },
+    [],
+  );
+  assertExists(shaped);
+  assertEquals(shaped.tastes, []);
+});
+
 Deno.test("buildFoursquareQuery — requests the reputation-axis fields", () => {
   // TB-16: the fields param must ask Foursquare for rating / stats /
   // date_created or the reputation axis has nothing to classify on.
