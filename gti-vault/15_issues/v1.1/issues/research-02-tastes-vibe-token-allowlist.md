@@ -1,7 +1,7 @@
 ---
 issue: research-02
 title: Foursquare tastes vibe-token allowlist — sample and curate
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 108
 prd: v1.1-quiz-redesign-prd
@@ -33,11 +33,11 @@ The allowlist's *consumption* contract is already fixed by tb-18 (see tb-18 §"D
 
 ## Acceptance criteria
 
-- [ ] A vault research note is filed under `60_engineering/research/` and linked from this issue and the v1.1 issue index.
-- [ ] The note includes a live-sampled `tastes` token-frequency table from a representative venue pool — not a guessed token set.
-- [ ] The note ships the curated vibe-token allowlist as a flat list, every token tagged exactly `+1` or `-1`, noise excluded.
-- [ ] The note records the observed `tastes` coverage rate over the sample.
-- [ ] No application code changed.
+- [x] A vault research note is filed under `60_engineering/research/` and linked from this issue and the v1.1 issue index.
+- [x] The note includes a live-sampled `tastes` token-frequency table from a representative venue pool — not a guessed token set.
+- [x] The note ships the curated vibe-token allowlist as a flat list, every token tagged exactly `+1` or `-1`, noise excluded.
+- [x] The note records the observed `tastes` coverage rate over the sample.
+- [x] No application code changed.
 
 ## Blocked by
 
@@ -46,6 +46,8 @@ None — can start immediately. The places-proxy already requests the `tastes` f
 ## Comments
 
 **2026-05-18 — triaged (`ready-for-agent`).** Split out of [[tb-18-q4-vibe-tastes-signal|tb-18]] after a `/grill-with-docs` session. Agent brief below.
+
+**2026-05-18 — done (PR #113).** Research note filed at [[../../../60_engineering/research/foursquare-tastes-vibe-2026-05/report|foursquare-tastes-vibe-2026-05/report]]. Live sample: 1090 unique venues across 8 US metros x 3 categories, pulled from the live Foursquare `/places/search` surface. Deliverables: a 2732-token `tastes` frequency table, a curated **30-token vibe-token allowlist** (16 `+1` loud-leaning / 14 `-1` quiet-leaning, folksonomy noise and energy-ambiguous tokens excluded), and the machine artifact `data/vibe-token-allowlist.json` for tb-18 to transcribe. **Observed `tastes` coverage is 66.8%** — this corrects the ~76% estimate the tb-18 ticket and research-01 cited. Coverage is category-dependent (restaurants 83%, bars 75%, cafes 44%). A Deno validation suite asserts the acceptance criteria against the sampled data — green. No application code changed. tb-18 (#102) is now unblocked.
 
 ### Agent Brief
 
@@ -69,7 +71,7 @@ A vault research note exists that fixes the token set tb-18 will consume: a cura
 - [ ] Note contains a live-sampled `tastes` token-frequency table from a representative venue pool.
 - [ ] Note ships the curated allowlist as a flat list, every token tagged exactly `+1` or `-1`.
 - [ ] Note records the observed `tastes` coverage rate over the sample.
-- [ ] No application code changed.
+- [x] No application code changed.
 
 **Out of scope:**
 - Touching `Q5VenueClassifier` or any classifier code — that is tb-18.

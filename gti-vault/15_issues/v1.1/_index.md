@@ -116,8 +116,10 @@ After the Foursquare account moved to a paid (credit-backed) plan, a session dia
 
 | # | Title | Type | GitHub | Status |
 |---|---|---|---|---|
-| research-02 (v1.1) | [[issues/research-02-tastes-vibe-token-allowlist\|Foursquare tastes vibe-token allowlist — sample + curate]] | AFK | [#108](https://github.com/samfarls55/gettoit/issues/108) | ready-for-agent |
+| research-02 (v1.1) | [[issues/research-02-tastes-vibe-token-allowlist\|Foursquare tastes vibe-token allowlist — sample + curate]] ✅ done | AFK | [#108](https://github.com/samfarls55/gettoit/issues/108) | done — PR #113; allowlist in [[../../60_engineering/research/foursquare-tastes-vibe-2026-05/report\|foursquare-tastes-vibe-2026-05]] |
 | TB-18 (v1.1) | [[issues/tb-18-q4-vibe-tastes-signal\|Q4 vibe energy from the Foursquare tastes signal]] | AFK | [#102](https://github.com/samfarls55/gettoit/issues/102) | ready-for-agent — triaged 2026-05-18; blocked by research-02 |
+
+**research-02 done 2026-05-18 (PR #113).** The live-data spike is filed at [[../../60_engineering/research/foursquare-tastes-vibe-2026-05/_index|foursquare-tastes-vibe-2026-05]]: a 1090-venue sample of the live Foursquare `tastes` field, a 2732-token frequency table, and a curated **30-token vibe-token allowlist** (16 `+1` / 14 `-1`). Measured `tastes` coverage is **66.8%**, correcting the ~76% estimate the tb-18 ticket and research-01 carried. tb-18 (#102) is now unblocked — it transcribes the allowlist verbatim.
 
 **Triaged 2026-05-18.** A `/triage` + `/grill-with-docs` session resolved tb-18's three design questions (vibe = category-archetype baseline + bounded ±1 `tastes` nudge; price tie-break demoted to last-resort; graded-axis already closed by [[research-01-foursquare-filter-surface|research-01]] §6). The live-data allowlist build was split out as `research-02`. tb-18 is now the implementation tracer-bullet, blocked by it. The research-01 report §5 was corrected — the 2026-05-17 audit reversed its `attributes`/`tastes` ranking.
 
