@@ -37,6 +37,16 @@ final class PlacesServiceTests: XCTestCase {
         }
     }
 
+    final class StubClosureVerifier: VenueClosureVerifier {
+        /// `fsqPlaceId`s the stub should treat as closed and drop.
+        var dropIds: Set<String> = []
+        var invocations = 0
+        func filterOutClosed(_ places: [ShapedPlace]) async -> [ShapedPlace] {
+            invocations += 1
+            return places.filter { !dropIds.contains($0.fsqPlaceId) }
+        }
+    }
+
     // MARK: - Tests
 
     func testReturnsFoursquareResultsWhenNotThin() async throws {
@@ -165,6 +175,86 @@ final class PlacesServiceTests: XCTestCase {
         // "couldn't load options nearby" empty state.
         XCTAssertEqual(result.places.count, 0)
         XCTAssertEqual(result.source, .mapKitFallback)
+    }
+
+    func testClosureVerifierDropsClosedVenuesOnFoursquarePath() async throws {
+        let proxy = StubProxyClient()
+        proxy.response = PlacesProxyResponse(
+            places: PlacesServiceTests.makeShapedPlaces(count: 5),
+            disclaimers: [],
+            isThin: false,
+            servedFromCache: false
+        )
+        let verifier = StubClosureVerifier()
+        verifier.dropIds = ["place-1", "place-3"]
+        let service = PlacesService(
+            proxy: proxy,
+            mapKitFallback: StubMapKitFallback(),
+            closureVerifier: verifier
+        )
+
+        let result = try await service.fetchPlaces(
+            near: .init(latitude: 40.7128, longitude: -74.0060),
+            radiusMeters: 1600,
+            filters: .init()
+        )
+
+        XCTAssertEqual(verifier.invocations, 1,
+                       "the closure verifier must run on the Foursquare path")
+        XCTAssertEqual(result.source, .foursquare)
+        XCTAssertEqual(result.places.map(\.fsqPlaceId),
+                       ["place-0", "place-2", "place-4"],
+                       "closed venues must be removed, original order kept")
+    }
+
+    func testClosureVerifierDoesNotRunOnMapKitFallbackPath() async throws {
+        let proxy = StubProxyClient()
+        proxy.response = PlacesProxyResponse(
+            places: [], disclaimers: [], isThin: true, servedFromCache: false
+        )
+        let mapKit = StubMapKitFallback()
+        mapKit.places = PlacesServiceTests.makeShapedPlaces(count: 4)
+        let verifier = StubClosureVerifier()
+        let service = PlacesService(
+            proxy: proxy,
+            mapKitFallback: mapKit,
+            closureVerifier: verifier
+        )
+
+        let result = try await service.fetchPlaces(
+            near: .init(latitude: 40.7128, longitude: -74.0060),
+            radiusMeters: 1600,
+            filters: .init()
+        )
+
+        // MapKit only ever returns live POIs — closure cross-checking
+        // its own output would be redundant work.
+        XCTAssertEqual(verifier.invocations, 0)
+        XCTAssertEqual(result.source, .mapKitFallback)
+        XCTAssertEqual(result.places.count, 4)
+    }
+
+    func testClosureVerifierDoesNotRunWhenProxyThrows() async throws {
+        let proxy = StubProxyClient()
+        proxy.error = NSError(domain: "test", code: -1)
+        let mapKit = StubMapKitFallback()
+        mapKit.places = PlacesServiceTests.makeShapedPlaces(count: 3)
+        let verifier = StubClosureVerifier()
+        let service = PlacesService(
+            proxy: proxy,
+            mapKitFallback: mapKit,
+            closureVerifier: verifier
+        )
+
+        let result = try await service.fetchPlaces(
+            near: .init(latitude: 40.7128, longitude: -74.0060),
+            radiusMeters: 1600,
+            filters: .init()
+        )
+
+        XCTAssertEqual(verifier.invocations, 0)
+        XCTAssertEqual(result.source, .mapKitFallback)
+        XCTAssertEqual(result.places.count, 3)
     }
 
     // MARK: - Helpers
