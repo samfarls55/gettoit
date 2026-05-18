@@ -17,9 +17,9 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
 
 | Issue | GitHub | State | Branch | PR | Notes |
 |---|---|---|---|---|---|
-| research-02 | #108 | escalated | — | — | needs FOURSQUARE_API_KEY — not in agent env |
+| research-02 | #108 | merged | afk/research-02 | #113 | retry succeeded — key sourced from /workspace/.env |
 | tb-19 | #106 | merged | afk/tb-19 | #110 | wave 1 |
-| tb-18 | #102 | stranded | — | — | blocked by research-02 (escalated, not done) |
+| tb-18 | #102 | merged | afk/tb-18 | #114 | wave 3 — unblocked by research-02 merge |
 | tb-20 | #107 | merged | afk/tb-20 | #111 (+#112 docs) | wave 2 |
 
 ## Event log
@@ -49,3 +49,23 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
 **Escalated/failed CI:** none
 
 2 of 4 issues merged. The other 2 (research-02, tb-18) are gated on a single missing credential.
+
+## Addendum — escalation resolved
+
+- 15:40 — Operator clarified: `FOURSQUARE_API_KEY` is present in `/workspace/.env` (gitignored, so it was absent from the subagent's isolated worktree — the cause of the escalation). Re-opening the run.
+- 15:40 — research-02 re-spawned with an instruction to copy the key in from the primary `.env`.
+- 15:50 — research-02 MERGED: PR #113. Live-sampled 30-token vibe-token allowlist; coverage corrected ~76% -> 66.8%. tb-18 unblocked.
+- 15:50 — Wave 3 spawned: tb-18 (last remaining issue).
+- 16:05 — tb-18 MERGED: PR #114. Q4 vibe-energy nudge from the Foursquare tastes signal.
+- 16:05 — Final scan: ready=0, waiting=0, excluded=0. Backlog fully drained. Run complete.
+
+## Final outcome — all 4 issues merged
+
+| Issue | PR | Summary |
+|---|---|---|
+| tb-19 (#106) | #110 | post-Q5 router skeleton, solo verdict route |
+| tb-20 (#107) | #111 (+#112 docs) | group S04 Waiting route, advances to S05 |
+| research-02 (#108) | #113 | live-sampled 30-token vibe-token allowlist; coverage corrected to 66.8% |
+| tb-18 (#102) | #114 | Q4 vibe-energy nudge from the Foursquare tastes signal |
+
+research-02 escalated once on a missing `FOURSQUARE_API_KEY` (gitignored `.env` not copied into the isolated worktree); operator confirmed the key location, the retry sourced it from `/workspace/.env` and succeeded. No other escalations or failures. AFK backlog clear.
