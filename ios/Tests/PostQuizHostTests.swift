@@ -93,9 +93,9 @@ final class PostQuizHostTests: XCTestCase {
     }
 
     func testGroupSessionAlsoReachesTheVerdict() async throws {
-        // tb-19: a group session holds on the neutral resolving surface
-        // (the full S04 Waiting surface is tb-20) but still reaches S05
-        // — it must not dead-end on S00 Landing.
+        // tb-19: a group session with no snapshot fetch falls back to
+        // the verdict poll directly but still reaches S05 — it must not
+        // dead-end on S00 Landing.
         let view = Self.verdictView()
         let host = PostQuizHost(
             context: groupContext(),
@@ -108,6 +108,171 @@ final class PostQuizHostTests: XCTestCase {
         guard case .verdict = host.phase else {
             return XCTFail("group session must still reach .verdict, got \(host.phase)")
         }
+    }
+
+    // MARK: - tb-20: group routing into S04 Waiting
+
+    func testGroupSessionEntersTheWaitingPhase() {
+        // A group session opens on the S04 Waiting surface — NOT
+        // resolving, NOT straight to verdict, NOT S00 Landing.
+        let host = PostQuizHost(
+            context: groupContext(),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in nil },
+            sleep: { _ in }
+        )
+        guard case .waiting = host.phase else {
+            return XCTFail("a group session must open on .waiting, got \(host.phase)")
+        }
+        XCTAssertNotNil(host.waitingStore,
+            "the group host owns a WaitingStore for the S04 surface")
+    }
+
+    func testSoloSessionDoesNotEnterTheWaitingPhase() {
+        let host = PostQuizHost(
+            context: soloContext(),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in nil },
+            sleep: { _ in }
+        )
+        guard case .resolving = host.phase else {
+            return XCTFail("a solo session must open on .resolving, got \(host.phase)")
+        }
+        XCTAssertNil(host.waitingStore,
+            "a solo session has no S04 surface and no WaitingStore")
+    }
+
+    // MARK: - tb-20: snapshot poll re-bootstraps the WaitingStore
+
+    func testWaitingPhaseReflectsPeersJoiningAndAnsweringWithinAPollCycle() async throws {
+        let owner = UUID()
+        let joiner = UUID()
+        let attempts = Counter()
+        let view = Self.verdictView()
+
+        // Poll 1: just the owner, nobody answered. Poll 2: a joiner has
+        // landed and both have answered. Then the verdict fires.
+        let host = PostQuizHost(
+            context: PostQuizSessionContext(
+                roomID: UUID(),
+                userID: owner,
+                isInitiator: true,
+                invitedShared: true
+            ),
+            fetchVerdict: { _ in
+                // No verdict until the third cycle so the snapshot has
+                // two cycles to evolve the avatar row first.
+                let n = await attempts.value
+                return n >= 3 ? view : nil
+            },
+            fetchSnapshot: { _ in
+                let n = await attempts.increment()
+                if n == 1 {
+                    return SessionSnapshot(
+                        members: [WaitingMember(id: owner, role: "owner")],
+                        answered: [],
+                        status: .open
+                    )
+                }
+                return SessionSnapshot(
+                    members: [
+                        WaitingMember(id: owner, role: "owner"),
+                        WaitingMember(id: joiner, role: "participant"),
+                    ],
+                    answered: [owner, joiner],
+                    status: .open
+                )
+            },
+            sleep: { _ in }
+        )
+
+        guard case .waiting(let store) = host.phase else {
+            return XCTFail("group session must open on .waiting")
+        }
+        // Before any poll the store is un-bootstrapped.
+        XCTAssertEqual(store.memberCount, 0)
+
+        await host.start()
+
+        // The store reflects the peer who joined + answered between
+        // poll cycles — the avatar row is live.
+        XCTAssertEqual(store.memberCount, 2,
+            "the avatar row reflects a peer joining within a poll cycle")
+        XCTAssertEqual(store.answeredCount, 2,
+            "the avatar row reflects peers answering within a poll cycle")
+    }
+
+    func testWaitingPhaseAdvancesToTheVerdict() async throws {
+        let owner = UUID()
+        let view = Self.verdictView()
+        let host = PostQuizHost(
+            context: PostQuizSessionContext(
+                roomID: UUID(),
+                userID: owner,
+                isInitiator: true,
+                invitedShared: true
+            ),
+            fetchVerdict: { _ in view },
+            fetchSnapshot: { _ in
+                SessionSnapshot(
+                    members: [WaitingMember(id: owner, role: "owner")],
+                    answered: [owner],
+                    status: .open
+                )
+            },
+            sleep: { _ in }
+        )
+
+        await host.start()
+
+        guard case .verdict = host.phase else {
+            return XCTFail("the waiting surface must advance to .verdict when the engine fires, got \(host.phase)")
+        }
+    }
+
+    func testWaitingPhaseSnapshotErrorMovesTheHostToFailed() async throws {
+        struct Boom: Error {}
+        let host = PostQuizHost(
+            context: groupContext(),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in throw Boom() },
+            sleep: { _ in }
+        )
+
+        await host.start()
+
+        guard case .failed = host.phase else {
+            return XCTFail("a snapshot poll error must move the host to .failed, got \(host.phase)")
+        }
+    }
+
+    func testRetryFromGroupFailureReEntersWaiting() async throws {
+        struct Boom: Error {}
+        let calls = Counter()
+        let host = PostQuizHost(
+            context: groupContext(),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in
+                let n = await calls.increment()
+                if n == 1 { throw Boom() }
+                return nil
+            },
+            sleep: { _ in
+                try Task.checkCancellation()
+                await Task.yield()
+            }
+        )
+
+        await host.start()
+        guard case .failed = host.phase else {
+            return XCTFail("first poll must fail")
+        }
+
+        host.retry()
+        guard case .waiting = host.phase else {
+            return XCTFail("a group retry must re-enter .waiting, got \(host.phase)")
+        }
+        host.teardown()
     }
 
     // MARK: - phase machine: resolving → failed

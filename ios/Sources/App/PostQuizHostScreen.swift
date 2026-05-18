@@ -3,12 +3,14 @@
 // The SwiftUI surface for the post-Q5 router. Renders whatever phase
 // `PostQuizHost` is in:
 //
-//   * .resolving — a neutral hold surface. NOT S00 Landing — the
-//     session no longer dead-ends here (bug-07). For tb-19 this is a
-//     minimal "lining up the verdict" hold; the full S04 Waiting
-//     surface (avatar row, countdown, nudge) is the next slice, tb-20.
-//     A solo session passes through it in the moment it takes the
-//     engine to commit the row.
+//   * .resolving — a neutral hold surface for a SOLO session. NOT S00
+//     Landing — the session no longer dead-ends here (bug-07). A solo
+//     session passes through it in the moment it takes the engine to
+//     commit the row.
+//   * .waiting — the S04 Waiting surface for a GROUP session (tb-20).
+//     `WaitingScreen` renders the avatar row + headline, driven by the
+//     host's `WaitingStore` which the snapshot poll re-bootstraps on a
+//     few-second cadence.
 //   * .verdict — `VerdictScreen` renders the engine's verdict. A solo
 //     session renders in `.solo` mode (the mode `VerdictStore`
 //     resolved).
@@ -32,12 +34,22 @@ public struct PostQuizHostScreen: View {
     private let host: PostQuizHost
     /// Routes the caller back to S00 Landing. Wired by `RootView`.
     private let onEndSession: () -> Void
+    /// Auth coordinator + prompt store for the C-22 Auth Upgrade Chip
+    /// the S04 Waiting surface hosts. Optional — when nil (the tb-19
+    /// solo-only call sites + the snapshot tests) the `.waiting` phase
+    /// is never reached, so the chip dependencies are never needed.
+    private let auth: AuthCoordinator?
+    private let promptStore: AuthPromptStore?
 
     public init(
         host: PostQuizHost,
+        auth: AuthCoordinator? = nil,
+        promptStore: AuthPromptStore? = nil,
         onEndSession: @escaping () -> Void = {}
     ) {
         self.host = host
+        self.auth = auth
+        self.promptStore = promptStore
         self.onEndSession = onEndSession
     }
 
@@ -46,6 +58,8 @@ public struct PostQuizHostScreen: View {
             switch host.phase {
             case .resolving:
                 resolvingSurface
+            case .waiting(let store):
+                waitingSurface(store: store)
             case .verdict(let view):
                 VerdictScreen(
                     verdict: view.verdict,
@@ -97,6 +111,33 @@ public struct PostQuizHostScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .accessibilityIdentifier("postQuiz.resolving")
+    }
+
+    // MARK: - waiting (S04 — group path)
+
+    /// The S04 Waiting surface for a group session. `WaitingScreen` is
+    /// driven by the host's `WaitingStore`, which the snapshot poll
+    /// re-bootstraps every cadence tick. `WaitingScreen` publishes the
+    /// verdict-ready bit via its own `onAdvanceToVerdict`, but the
+    /// canonical advance here is the host's snapshot+verdict poll
+    /// flipping `phase` to `.verdict` — so the `onAdvanceToVerdict`
+    /// callback is a no-op (the host owns the routing).
+    @ViewBuilder
+    private func waitingSurface(store: WaitingStore) -> some View {
+        if let auth, let promptStore {
+            WaitingScreen(
+                auth: auth,
+                promptStore: promptStore,
+                waitingStore: store,
+                onAdvanceToVerdict: { _ in },
+                onStartOver: onEndSession
+            )
+        } else {
+            // No chip dependencies wired — fall back to the neutral
+            // hold rather than crash. A real group session always
+            // supplies them via `RootView`.
+            resolvingSurface
+        }
     }
 
     // MARK: - failed
