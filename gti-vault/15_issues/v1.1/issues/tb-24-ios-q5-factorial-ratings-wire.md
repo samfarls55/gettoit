@@ -1,7 +1,7 @@
 ---
 issue: tb-24
 title: Wire the iOS Q5 write path to emit factorial {droppedAxis, score} ratings
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 130
 prd: v1.1-quiz-redesign-prd
@@ -48,3 +48,9 @@ Not blocked. tb-23 already merged the server side that consumes this shape.
 ## Comments
 
 **2026-05-18 — filed.** Triaged from the tb-23 adjacency note (`01_raw/tb-23-ios-q5-ratings-wire-gap.md`, now compiled into this issue). `ready-for-agent` / AFK — well-scoped data-path wiring, server contract already merged, no design decision, no UI redesign. One call left to the executing agent's autonomy: whether `buildVotesSlotsFromLegacyAnswers` keeps a back-compat shim for `answer.scores` or cuts over outright.
+
+**2026-05-18 — done (PR #131).** The iOS Q5 write path now emits `votes.q5.answer.ratings` as the factorial `[{ droppedAxis, score }]` array. `QuizCandidate` carries an optional `droppedAxis`; `Q5FactorialCardGenerator.quizCandidates(from:)` threads each card's axis through; `QuizCoordinator.VoteRow` replaced its per-venue `q5Regret` score map with `q5Ratings: [Q5RatingEntry]`, joined at the write boundary. Shared TS: `buildVotesSlotsFromLegacyAnswers` emits the `regret` slot as `answer.ratings`.
+
+Autonomy call resolved: **cut over outright — no back-compat `answer.scores` shim**. tb-23 moved verdict scoring server-side and the Q5 ratings are now the preference *probe*, not the candidate scores; a parallel `answer.scores` would be a dead second shape inviting drift. `mapVotesRowToMemberVote`'s `regret` reader still reads `answer.scores` for any surviving genuine-legacy / audit rows.
+
+Adjacency fixed in scope: `VerdictStore.VoteRow`'s decoder read `votes.q5.answer.scores` with a non-optional decode and would have thrown on a freshly written factorial-shape row. Made the Q5 slot decode tolerant — `q5Regret` defaults to empty when `scores` is absent (the verdict screen never reads it post-tb-23). No ADR — the decision is local to this slice and documented here and in the PR.
