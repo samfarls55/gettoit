@@ -222,7 +222,74 @@ Direction-only tagging (no magnitude) means these borderline calls are low-stake
 - The classifier lowercases the venue's `tastes` strings, intersects with the allowlist, sums the directions, takes the sign, caps at +/-1, applies it to the archetype baseline. That mechanism is tb-18's; this spike does not touch it.
 - The 66.8% coverage figure (section 3) should replace the ~76% estimate wherever tb-18 or research-01 cite it.
 
-## 7. Quirks recorded
+## 7. Nudge fire-rate — the real number behind 66.8% (research-03)
+
+> Added 2026-05-18 by issue [[../../../15_issues/v1.1/issues/research-03-vibe-nudge-hit-rate|research-03]]. Same canonical 2026-05-18 sample, no new Foursquare calls — a pure offline replay of the merged tb-18 classifier logic.
+
+Section 3's **66.8% `tastes` coverage** is the *ceiling* on how often the tb-18 vibe nudge can fire, not the fire-rate. A venue inside that 66.8% still gets **no nudge** when (1) none of its `tastes` tokens are on the 30-token allowlist, or (2) its matched tokens net to zero — equal `+1`/`-1` tags cancel under the sign-of-sum rule. This section measures the **fire-rate**: the fraction of venues whose category-archetype baseline actually moves.
+
+### 7.1 Method
+
+The analysis script — [`nudge-firerate.ts`](nudge-firerate.ts) — replays `Q5VenueClassifier.tastesNudge(for:)` (`ios/Sources/App/Q5VenueClassifier.swift`) over all 1090 sampled venues. Parity with production is exact: each `tastes` token is lower-cased and looked up by **whole-token equality** in the allowlist dictionary (multi-word tokens like `good for groups` are single keys, never substring-matched), the ±1 directions are summed, and the **sign** of the sum (`-1`/`0`/`+1`) is the nudge. The Swift `tastesNudge` lower-cases but does not `.trim()` — and it need not: the 2026-05-18 raw sample carries **zero** tokens with leading/trailing whitespace (verified), so lower-casing alone reproduces it. The computed report is persisted to [`data/nudge-firerate.json`](data/nudge-firerate.json); [`validate-nudge-firerate.test.ts`](validate-nudge-firerate.test.ts) asserts the funnel is monotone and the artifact matches a fresh recompute.
+
+```
+deno run --allow-read --allow-write \
+  gti-vault/60_engineering/research/foursquare-tastes-vibe-2026-05/nudge-firerate.ts
+deno test --allow-read \
+  gti-vault/60_engineering/research/foursquare-tastes-vibe-2026-05/validate-nudge-firerate.test.ts
+```
+
+### 7.2 Overall fire-rate
+
+> **The nudge fires for 46.3% of sampled venues** (505 of 1090) — a non-zero `tastes` nudge moves the archetype baseline. The other 53.7% classify exactly as TB-16 did.
+
+46.3% is the real number; 66.8% was the ceiling above it. The nudge loses **20.5 points** of venues between "has `tastes` data" and "data actually moves the baseline" — roughly **one in three tastes-bearing venues** produces no nudge.
+
+### 7.3 The funnel
+
+Every drop-off step quantified:
+
+| Step | Venues | % of sample | Drop from prior step |
+|---|---:|---:|---|
+| Sampled | 1090 | 100.0% | — |
+| Have `tastes` data | 728 | 66.8% | −362 (no `tastes` array) |
+| Match ≥1 allowlist token | 571 | 52.4% | −157 (all tokens are folksonomy noise) |
+| Net a non-zero sum → **nudge fires** | 505 | **46.3%** | −66 (matched tokens cancelled to zero) |
+
+The biggest single drop is the first — 362 venues with no `tastes` array at all, exactly the section 3 coverage gap. The second-biggest is **157 venues that carry `tastes` data but whose tokens are *all* off-allowlist** — pure folksonomy noise (dish names, meal slots, ingredients; section 2). That step alone is 14.4 points of the sample and is the larger of the two "data present but inert" losses.
+
+### 7.4 By category
+
+Fire-rate is sharply category-dependent, mirroring the section 3 coverage split:
+
+| Category | Sampled | Tastes-bearing | Token-matched | Fired | **Fire-rate** | Fired / tastes-bearing |
+|---|---:|---:|---:|---:|---:|---:|
+| Restaurant | 400 | 333 | 268 | 235 | **58.8%** | 70.6% |
+| Bar | 302 | 226 | 199 | 182 | **60.3%** | 80.5% |
+| Cafe / Coffee Shop | 388 | 169 | 104 | 88 | **22.7%** | 52.1% |
+
+Restaurants and bars fire for roughly **3 in 5** venues; the nudge is a meaningful signal there. **Cafes fire for barely 1 in 5.** The cafe weakness compounds two effects: low `tastes` coverage (43.6%, section 3) *and* a lower hit-rate within the cafes that do have data (52.1% vs 70–80% for restaurants/bars) — the allowlist is restaurant/bar-shaped (`happy hour`, `dancing`, `live music`, `good for groups`), and a quiet coffee shop's tags lean toward `good for working`/`study area` noise that more often nets zero or matches nothing. For cafes the category-archetype baseline carries almost the entire load.
+
+### 7.5 Direction split
+
+Of the 505 venues that fire:
+
+| Direction | Venues | Share of fired |
+|---|---:|---:|
+| `+1` louder | 415 | 82.2% |
+| `-1` quieter | 90 | 17.8% |
+
+The nudge is **overwhelmingly a loud-ward push** — 4.6 louder nudges for every quieter one. This is consistent with the allowlist's own shape (16 `+1` vs 14 `-1` tokens) and, more so, with the `+1` tokens being far higher-frequency in the cloud: `trendy` (281 venues), `good for groups` (229), `crowded` (241), `happy hour` (194) dwarf the quiet tokens (`quiet` 35, `cozy` 6, `romantic` 3). The one high-frequency `-1` token, `good for dates` (267 venues), is not enough to balance the loud side. Practical implication: the nudge mostly pushes venues *up* the energy scale, rarely down — it widens the loud tail of the distribution more than the quiet one.
+
+### 7.6 Net-zero cancellation
+
+**66 venues** matched ≥1 allowlist token but were cancelled to a zero net sum — they had data, hit the allowlist, and still got no nudge. That is 11.6% of the 571 token-matched venues, split Restaurant 33 / Bar 17 / Cafe 16. This is **modest** — cancellation is not a major leak. It is a real but second-order effect: most of the inert venues are lost at the *no-match* step (157), not the *cancellation* step (66). Direction-only tagging makes a tie genuinely possible (a venue tagged both `good for groups` and `good for dates` nets zero), but the loud-skewed cloud means true ties are uncommon. No action needed on cancellation specifically.
+
+### 7.7 Verdict — is the nudge worth keeping?
+
+**Keep the nudge as specified.** It fires for 46.3% of all venues and for ~60% of restaurants and bars — that is a real, frequent signal that splits two same-category venues, which is exactly its job under the locked tb-18 design. It is not mostly inert: nearly half of every pool moves, and within the categories the nudge was designed for it moves a clear majority. The classifier complexity it adds is small (one dictionary, a sum, a sign) and the fallback path is the well-understood TB-16 archetype baseline, so the downside of the inert half is zero — those venues simply classify as they did before. **One caveat worth a follow-up, not a blocker:** the nudge is near-dead for cafes (22.7%) and strongly loud-skewed (82% of fires push louder). If a future cohort shows the quiz under-serving "quiet" verdicts, the lever is a **wider, cafe-and-quiet-aware allowlist** (more `-1` tokens, tokens that survive in coffee-shop clouds) — not removing the nudge. As specified, it earns its place.
+
+## 8. Quirks recorded
 
 - **Foursquare `tastes` coverage was over-estimated.** The ~76% figure that propagated through tb-18 and research-01 was never measured. Live rate is **66.8%**, and it collapses to ~44% for cafes/coffee shops. Any future design that leans on `tastes` should assume a third of venues have none.
 - **`tastes` carries amenities too.** `outdoor seating`, `wifi`, `parking`, `takes reservations` appear inside `tastes`, overlapping the `attributes` field. The cloud is not purely menu/atmosphere data — it is a catch-all crowd tag cloud.
