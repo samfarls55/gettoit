@@ -62,6 +62,13 @@ public struct ResolvedPlace: Equatable, Sendable, Identifiable {
     public let sub: String
     public let coordinate: CLLocationCoordinate2D
     public let source: Source
+    /// Timezone of the *search area* — resolved from the placemark when
+    /// the coordinate is committed. The Foursquare fetch planner reads
+    /// this (NOT the device timezone) because a manually-picked area can
+    /// sit in a different zone than the user's phone, and Foursquare's
+    /// `open_at` filter is venue-local. Falls back to the device
+    /// timezone only when no placemark timezone is available.
+    public let timeZone: TimeZone
 
     public enum Source: String, Sendable {
         case gps
@@ -73,13 +80,15 @@ public struct ResolvedPlace: Equatable, Sendable, Identifiable {
         name: String,
         sub: String,
         coordinate: CLLocationCoordinate2D,
-        source: Source
+        source: Source,
+        timeZone: TimeZone = .current
     ) {
         self.id = id
         self.name = name
         self.sub = sub
         self.coordinate = coordinate
         self.source = source
+        self.timeZone = timeZone
     }
 
     public static func == (lhs: ResolvedPlace, rhs: ResolvedPlace) -> Bool {
@@ -88,7 +97,8 @@ public struct ResolvedPlace: Equatable, Sendable, Identifiable {
         lhs.sub == rhs.sub &&
         lhs.coordinate.latitude == rhs.coordinate.latitude &&
         lhs.coordinate.longitude == rhs.coordinate.longitude &&
-        lhs.source == rhs.source
+        lhs.source == rhs.source &&
+        lhs.timeZone == rhs.timeZone
     }
 }
 
@@ -292,15 +302,45 @@ public final class LocationCoordinator: NSObject {
                     completion?(false)
                     return
                 }
-                let resolved = ResolvedPlace(
-                    id: suggestion.id,
-                    name: suggestion.name,
-                    sub: suggestion.sub,
-                    coordinate: item.placemark.coordinate,
-                    source: .manual
-                )
-                self.commit(place: resolved)
-                completion?(true)
+                let coordinate = item.placemark.coordinate
+                let commitResolved: (TimeZone) -> Void = { timeZone in
+                    self.commit(place: ResolvedPlace(
+                        id: suggestion.id,
+                        name: suggestion.name,
+                        sub: suggestion.sub,
+                        coordinate: coordinate,
+                        source: .manual,
+                        timeZone: timeZone
+                    ))
+                    completion?(true)
+                }
+                // The map result usually carries the area timezone
+                // directly. When it doesn't, fall back to a reverse-
+                // geocode of the coordinate (the same step the GPS path
+                // runs) — the planner needs the picked area's timezone,
+                // not the device's, since a manual pick can be in
+                // another zone.
+                if let timeZone = item.timeZone ?? item.placemark.timeZone {
+                    commitResolved(timeZone)
+                } else {
+                    self.resolveTimeZone(for: coordinate, completion: commitResolved)
+                }
+            }
+        }
+    }
+
+    /// Reverse-geocode a coordinate solely to recover its timezone.
+    /// Used by the manual-pick path when the map search result carried
+    /// no timezone. Always completes — falls back to the device
+    /// timezone if the geocode yields none.
+    private func resolveTimeZone(
+        for coordinate: CLLocationCoordinate2D,
+        completion: @escaping (TimeZone) -> Void
+    ) {
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        geocoder.reverseGeocodeLocation(location) { placemarks, _ in
+            DispatchQueue.main.async {
+                completion(placemarks?.first?.timeZone ?? .current)
             }
         }
     }
@@ -351,7 +391,8 @@ public final class LocationCoordinator: NSObject {
                     name: name,
                     sub: sub,
                     coordinate: coordinate,
-                    source: .gps
+                    source: .gps,
+                    timeZone: mark?.timeZone ?? .current
                 )
                 // GPS path: never overwrite a manual pick the user
                 // already committed in the same session — they may

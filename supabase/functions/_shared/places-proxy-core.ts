@@ -13,6 +13,7 @@ import {
   FOURSQUARE_API_VERSION,
   FOURSQUARE_BASE_URL,
   type FoursquareSearchResponse,
+  OPEN_AT_PATTERN,
   type PlacesProxyInput,
   shapeFoursquareResult,
   type ShapedPlace,
@@ -130,9 +131,20 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const price_tier = typeof filters.price_tier === "number"
     ? filters.price_tier
     : undefined;
-  const open_at = typeof filters.open_at === "string"
-    ? filters.open_at
-    : undefined;
+  // `open_at` is Foursquare's `[1-7]THHMM` weekday + local-time token.
+  // A present-but-malformed value is a client bug — reject it loudly
+  // (400) rather than swallowing it, the same failure mode that hid the
+  // epoch-format outage. An absent value is fine: the filter is optional.
+  let open_at: string | undefined;
+  if (typeof filters.open_at === "string") {
+    if (!OPEN_AT_PATTERN.test(filters.open_at)) {
+      throw new PlacesProxyInputError(
+        "filters.open_at must be a Foursquare [1-7]THHMM token " +
+          `(weekday 1-7 + local wall-clock HHMM), got: ${filters.open_at}`,
+      );
+    }
+    open_at = filters.open_at;
+  }
   // Cuisine advisory tag (tb-17) — a `QuizCuisine` id on a per-cuisine
   // call, absent on the general call. A non-string / missing value
   // drops to undefined: decode stays tolerant, the call degrades to

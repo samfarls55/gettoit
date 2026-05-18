@@ -129,6 +129,7 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
     private let executor: FoursquareFetchExecutor
     private let coordinate: CLLocationCoordinate2D
     private let radiusMeters: Double
+    private let timeZone: TimeZone
 
     /// - Parameters:
     ///   - executor: the tb-07 fetch executor (`FoursquareFetchExecutor`)
@@ -136,14 +137,19 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
     ///   - coordinate: the session geo anchor (resolved from the shared
     ///     `LocationCoordinator` on both the initiator and joiner path).
     ///   - radiusMeters: the transport-radius circle.
+    ///   - timeZone: the search area's timezone — drives the venue-local
+    ///     `open_at` token. Resolved from the same `ResolvedPlace` as
+    ///     `coordinate` so initiator and joiner plan identically.
     public init(
         executor: FoursquareFetchExecutor,
         coordinate: CLLocationCoordinate2D,
-        radiusMeters: Double
+        radiusMeters: Double,
+        timeZone: TimeZone = .current
     ) {
         self.executor = executor
         self.coordinate = coordinate
         self.radiusMeters = radiusMeters
+        self.timeZone = timeZone
     }
 
     public func fetchCandidates(
@@ -157,7 +163,8 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
                 budgetTier: answers.budgetTier,
                 parameters: parameters,
                 coordinate: coordinate,
-                radiusMeters: radiusMeters
+                radiusMeters: radiusMeters,
+                timeZone: timeZone
             )
             union = result.places
         } catch {

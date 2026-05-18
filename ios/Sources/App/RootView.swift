@@ -445,6 +445,9 @@ public struct RootView: View {
                 userID: userID,
                 coordinate: resolved?.coordinate,
                 radiusMeters: resolved?.radiusMeters ?? RoomStore.defaultRadiusMeters,
+                // The search area's timezone — drives the venue-local
+                // `open_at` token in the per-member fetch planner.
+                timeZone: resolved?.timeZone ?? .current,
                 // TB-05 (v1.1) — hydrate the session parameters from
                 // the room. On the joiner path this is the initiator's
                 // S01b bucket read back off `rooms.session_params`, so
@@ -494,7 +497,7 @@ public struct RootView: View {
     private func resolvePlacesQuery(
         roomID: UUID,
         coordinators: Coordinators
-    ) async -> (coordinate: CLLocationCoordinate2D, radiusMeters: Int, sessionParameters: SessionParameters)? {
+    ) async -> (coordinate: CLLocationCoordinate2D, radiusMeters: Int, sessionParameters: SessionParameters, timeZone: TimeZone)? {
         let room: RoomStore.Room?
         do {
             room = try await coordinators.roomStore.fetchRoom(id: roomID)
@@ -505,25 +508,30 @@ public struct RootView: View {
         let sessionParameters = room?.sessionParameters ?? SessionParameters.default
 
         if let place = coordinators.locationCoordinator.place {
-            return (place.coordinate, radiusMeters, sessionParameters)
+            return (place.coordinate, radiusMeters, sessionParameters, place.timeZone)
         }
         if let location = room?.location {
             // Joiner path: hydrate the coordinator from the initiator's
             // pick so downstream surfaces (and a future re-fetch) see
-            // the same place.
+            // the same place — including the area timezone the
+            // initiator resolved, so the joiner's `open_at` token is
+            // planned against the SAME zone (an empty stored identifier,
+            // from a pre-`location_tz` room, falls back to the device).
             let coordinate = CLLocationCoordinate2D(
                 latitude: location.lat,
                 longitude: location.lng
             )
+            let timeZone = TimeZone(identifier: location.timeZoneIdentifier) ?? .current
             let resolved = ResolvedPlace(
                 id: "room:\(roomID.uuidString)",
                 name: location.name,
                 sub: "",
                 coordinate: coordinate,
-                source: location.source == .gps ? .gps : .manual
+                source: location.source == .gps ? .gps : .manual,
+                timeZone: timeZone
             )
             coordinators.locationCoordinator.commit(place: resolved)
-            return (coordinate, radiusMeters, sessionParameters)
+            return (coordinate, radiusMeters, sessionParameters, timeZone)
         }
         return nil
     }

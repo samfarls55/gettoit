@@ -57,7 +57,8 @@ public final class FoursquareFetchExecutor: Sendable {
         parameters: SessionParameters,
         coordinate: CLLocationCoordinate2D,
         radiusMeters: Double,
-        now: Date = Date()
+        now: Date = Date(),
+        timeZone: TimeZone = .current
     ) async throws -> Result {
         let specs = FoursquareFetchPlanner.plan(
             cuisines: cuisines,
@@ -65,7 +66,8 @@ public final class FoursquareFetchExecutor: Sendable {
             parameters: parameters,
             coordinate: coordinate,
             radiusMeters: radiusMeters,
-            now: now
+            now: now,
+            timeZone: timeZone
         )
         return try await execute(specs)
     }

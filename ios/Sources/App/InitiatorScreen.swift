@@ -518,7 +518,8 @@ public struct InitiatorScreen: View {
             name: place.name,
             lat: place.coordinate.latitude,
             lng: place.coordinate.longitude,
-            source: source
+            source: source,
+            timeZoneIdentifier: place.timeZone.identifier
         )
     }
 

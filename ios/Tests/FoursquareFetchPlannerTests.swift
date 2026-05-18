@@ -176,16 +176,44 @@ final class FoursquareFetchPlannerTests: XCTestCase {
             radiusMeters: 2400,
             now: fixedNow
         )
+        // Every spec carries open_at as a Foursquare `[1-7]THHMM` token
+        // — weekday 1-7, then a 24h HHMM wall-clock time. Foursquare
+        // 400s on any other shape (it expects `[1-7]T[00-24][00-59]`);
+        // sending an ISO-8601 instant or a unix epoch is exactly the
+        // bug this regression guard locks out.
+        let tokenPattern = try! NSRegularExpression(
+            pattern: "^[1-7]T(2[0-4]|[01][0-9])[0-5][0-9]$"
+        )
         for spec in specs {
-            XCTAssertNotNil(spec.filters?.openAt,
-                            "meal-time is a hard filter — every spec carries an open_at instant")
+            let token = spec.filters?.openAt ?? ""
+            let range = NSRange(token.startIndex..., in: token)
+            XCTAssertNotNil(
+                tokenPattern.firstMatch(in: token, range: range),
+                "open_at must be a Foursquare [1-7]THHMM token, got: \(token)"
+            )
         }
-        // The open_at instant is a valid ISO-8601 string.
-        let iso = ISO8601DateFormatter()
-        for spec in specs {
-            XCTAssertNotNil(iso.date(from: spec.filters?.openAt ?? ""),
-                            "open_at must be a parseable ISO-8601 instant")
-        }
+    }
+
+    func testOpenAtTokenUsesTheProvidedAreaTimeZone() {
+        // fixedNow is 2026-05-15 16:53 UTC — a Friday. In New York
+        // (UTC-4) it is still Friday 12:53; in Tokyo (UTC+9) it has
+        // already rolled to Saturday 01:53. open_at is venue-local, so
+        // the planner must compute the weekday in the SEARCH AREA's
+        // timezone — the token's day digit differs accordingly.
+        let newYork = FoursquareFetchPlanner.plan(
+            cuisines: [], budgetTier: 2, parameters: .default,
+            coordinate: coordinate, radiusMeters: 2400, now: fixedNow,
+            timeZone: TimeZone(identifier: "America/New_York")!
+        )
+        let tokyo = FoursquareFetchPlanner.plan(
+            cuisines: [], budgetTier: 2, parameters: .default,
+            coordinate: coordinate, radiusMeters: 2400, now: fixedNow,
+            timeZone: TimeZone(identifier: "Asia/Tokyo")!
+        )
+        // `.default` meal time is dinner → representative hour 19:00.
+        // Foursquare weekday: Friday = 5, Saturday = 6.
+        XCTAssertEqual(newYork[0].filters?.openAt, "5T1900")
+        XCTAssertEqual(tokyo[0].filters?.openAt, "6T1900")
     }
 
     func testMealTimeOpenAtTracksTheSelectedMeal() {
@@ -213,7 +241,7 @@ final class FoursquareFetchPlannerTests: XCTestCase {
             now: fixedNow
         )
         XCTAssertNotEqual(breakfast[0].filters?.openAt, dinner[0].filters?.openAt,
-                          "different meal times must resolve to different open_at instants")
+                          "different meal times must resolve to different open_at tokens")
     }
 
     // MARK: - cuisine / reputation never strict-filter (research-01 §3)

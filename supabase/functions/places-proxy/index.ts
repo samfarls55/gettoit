@@ -14,7 +14,7 @@
 //     "filters": {
 //       "dietary": string[]?,            // profile dietary chip ids
 //       "price_tier": 1|2|3|4 ?,         // Q2 cap
-//       "open_at": "<ISO-8601>"?,        // meal-time wall-clock
+//       "open_at": "[1-7]THHMM"?,        // Foursquare weekday + local time
 //       "cuisine": "<QuizCuisine id>"?   // tb-17: per-cuisine call tag;
 //     }                                 //   absent on the general call
 //   }

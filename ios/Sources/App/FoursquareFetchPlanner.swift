@@ -19,7 +19,8 @@
 //   * geo      — `lat` / `lng`, the `ll` anchor.
 //   * radius   — `radiusMeters`, the transport-radius circle.
 //   * price    — Q2 spend cap → `PlacesFilters.priceTier` → `max_price`.
-//   * open_at  — the session meal-time instant → `PlacesFilters.openAt`.
+//   * open_at  — the session meal-time as a Foursquare `[1-7]THHMM`
+//                weekday+local-time token → `PlacesFilters.openAt`.
 //
 // Cuisine and reputation are deliberately NOT strict filters here —
 // see research-01 §3.1 / §3.2. The planner never folds the craved
@@ -48,9 +49,14 @@ public enum FoursquareFetchPlanner {
     ///     field drives the `open_at` instant.
     ///   - coordinate: the session geo anchor.
     ///   - radiusMeters: the transport-radius circle.
-    ///   - now: the clock the meal-time instant is resolved against.
+    ///   - now: the clock the meal-time token is resolved against.
     ///     Injected so the `open_at` derivation is deterministic in
     ///     tests; defaults to the wall clock.
+    ///   - timeZone: the timezone of the SEARCH AREA — the `open_at`
+    ///     weekday + hour are computed in this zone because Foursquare
+    ///     interprets `open_at` in the venue's local time. Production
+    ///     callers must pass the picked area's timezone; the `.current`
+    ///     default is a test-only convenience.
     /// - Returns: N+1 `PlacesProxyRequest` specs — N cuisine-tagged
     ///   plus exactly one general call. Order: cuisine calls (in the
     ///   de-duplicated input order) then the general call.
@@ -60,11 +66,12 @@ public enum FoursquareFetchPlanner {
         parameters: SessionParameters,
         coordinate: CLLocationCoordinate2D,
         radiusMeters: Double,
-        now: Date = Date()
+        now: Date = Date(),
+        timeZone: TimeZone = .current
     ) -> [PlacesProxyRequest] {
         let cravedCuisines = dedupedCappedCuisines(cuisines)
         let priceCap = max(1, min(4, budgetTier))
-        let openAt = openAtInstant(for: parameters.mealTime, now: now)
+        let openAt = openAtToken(for: parameters.mealTime, now: now, timeZone: timeZone)
 
         // One category-tagged call per craved cuisine.
         var specs: [PlacesProxyRequest] = cravedCuisines.map { cuisine in
@@ -132,9 +139,9 @@ public enum FoursquareFetchPlanner {
     // MARK: - Meal-time → open_at
 
     /// The local hour each meal-time resolves to. Foursquare's
-    /// `open_at` filters to venues open at a specific instant; the
-    /// planner picks a representative hour for the session's meal so
-    /// only venues actually open at that meal are fetched.
+    /// `open_at` filters to venues open at a specific weekday + time;
+    /// the planner picks a representative hour for the session's meal
+    /// so only venues actually open at that meal are fetched.
     ///
     /// Hours chosen to sit comfortably inside each meal's service
     /// window (so a venue with a typical kitchen schedule reads as
@@ -149,21 +156,26 @@ public enum FoursquareFetchPlanner {
         }
     }
 
-    /// Resolve the meal-time to a concrete ISO-8601 `open_at` instant.
-    /// The instant is on the same calendar day as `now` (the session is
-    /// being planned for the current day's meal) at the meal's
-    /// representative hour, in the current calendar's local time zone —
-    /// the PlacesProxy converts the ISO string to the unix-seconds
-    /// `open_at` Foursquare expects.
-    static func openAtInstant(for mealTime: SessionParameters.MealTime, now: Date) -> String {
-        let calendar = Calendar.current
+    /// Resolve the meal-time to a Foursquare `open_at` token —
+    /// `[1-7]THHMM`, a recurring weekday + local wall-clock time (e.g.
+    /// `5T1900` for Friday 19:00). Foursquare interprets `open_at` in
+    /// the venue's local time, so the weekday and hour are computed in
+    /// `timeZone` — the timezone of the search area, not the device.
+    ///
+    /// Foursquare's weekday is `1=Mon … 7=Sun`; `Calendar`'s `.weekday`
+    /// component is `1=Sun … 7=Sat`. `((w + 5) % 7) + 1` converts
+    /// between them (Sun 1 → 7, Mon 2 → 1, … Sat 7 → 6).
+    static func openAtToken(
+        for mealTime: SessionParameters.MealTime,
+        now: Date,
+        timeZone: TimeZone
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
         let slot = representativeHour(for: mealTime)
-        var components = calendar.dateComponents([.year, .month, .day], from: now)
-        components.hour = slot.hour
-        components.minute = slot.minute
-        components.second = 0
-        let instant = calendar.date(from: components) ?? now
-        let formatter = ISO8601DateFormatter()
-        return formatter.string(from: instant)
+        let calendarWeekday = calendar.component(.weekday, from: now)
+        let foursquareDay = ((calendarWeekday + 5) % 7) + 1
+        let pad: (Int) -> String = { $0 < 10 ? "0\($0)" : "\($0)" }
+        return "\(foursquareDay)T\(pad(slot.hour))\(pad(slot.minute))"
     }
 }
