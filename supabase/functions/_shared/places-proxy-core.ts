@@ -78,6 +78,13 @@ export interface ProxyResponse {
   /** Whether this response was served from cache. Informational for
    *  observability — clients should not branch behavior on it. */
   served_from_cache: boolean;
+  /** Set when Foursquare was reached but answered a non-2xx the proxy
+   *  degrades over (a 4xx/5xx other than the hard-failing 410). The
+   *  value is `foursquare_upstream_<status>` — e.g. `foursquare_upstream_429`
+   *  on credit exhaustion. Absent on a healthy response. Lets the client
+   *  and the deploy diagnostic tell an upstream fault apart from a
+   *  genuine empty result set. */
+  error?: string;
 }
 
 /** Returned when validation rejects the input. */
@@ -200,11 +207,19 @@ export async function handlePlacesProxy(
         `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${body.slice(0, 200)}`,
       );
     }
+    // Non-410 upstream failure. Degrade to a thin response, but surface
+    // the upstream status as a named error + a loud log — a swallowed
+    // 4xx is what hid the 2026-05-16 credit-exhaustion outage (the proxy
+    // answered an unmarked empty 200 and looked like "no venues here").
+    console.error(
+      `Foursquare upstream ${response.status}: ${body.slice(0, 200)}`,
+    );
     return {
       places: [],
       disclaimers: plan.post_filters.disclaimers,
       is_thin: true,
       served_from_cache: false,
+      error: `foursquare_upstream_${response.status}`,
     };
   }
 

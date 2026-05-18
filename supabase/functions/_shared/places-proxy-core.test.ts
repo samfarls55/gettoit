@@ -39,7 +39,9 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       name: "Halal Hut",
       latitude: 40.7130,
       longitude: -74.0062,
-      categories: [{ id: "13352", name: "Halal Restaurant" }],
+      categories: [
+        { fsq_category_id: "52e81612bcbc57f1066b79ff", name: "Halal Restaurant" },
+      ],
       location: { formatted_address: "1 Main St, NYC" },
       price: 2,
       hours: { display: "11am–10pm", open_now: true },
@@ -52,7 +54,9 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       name: "Kosher Korner",
       latitude: 40.7135,
       longitude: -74.0068,
-      categories: [{ id: "13351", name: "Kosher Restaurant" }],
+      categories: [
+        { fsq_category_id: "52e81612bcbc57f1066b79fc", name: "Kosher Restaurant" },
+      ],
       location: { formatted_address: "2 Main St, NYC" },
       price: 3,
       hours: { display: "noon–9pm", open_now: false },
@@ -65,7 +69,9 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       name: "Gluten-Smart Bistro",
       latitude: 40.7140,
       longitude: -74.0080,
-      categories: [{ id: "13146", name: "American Restaurant" }],
+      categories: [
+        { fsq_category_id: "4bf58dd8d48988d14e941735", name: "American Restaurant" },
+      ],
       location: { formatted_address: "3 Main St, NYC" },
       price: 2,
       hours: { display: "5pm–11pm", open_now: true },
@@ -240,7 +246,10 @@ Deno.test("dietary filter — halal chip puts category id on the Foursquare wire
   const { fetchCalls, deps } = buildDeps();
   await handlePlacesProxy(TYPICAL_INPUT, deps);
   const url = new URL(fetchCalls[0].url);
-  assertEquals(url.searchParams.get("fsq_category_ids"), "13352");
+  assertEquals(
+    url.searchParams.get("fsq_category_ids"),
+    "52e81612bcbc57f1066b79ff",
+  );
 });
 
 Deno.test("dietary filter — gluten chip is applied post-fetch, not on the wire", async () => {
@@ -289,8 +298,11 @@ Deno.test("cuisine tag — per-cuisine call puts the mapped category on the Four
     filters: { cuisine: "italian" },
   }, deps);
   const url = new URL(fetchCalls[0].url);
-  // Italian Restaurant maps to Foursquare category 13236.
-  assertEquals(url.searchParams.get("fsq_category_ids"), "13236");
+  // Italian Restaurant maps to Foursquare category 4bf58dd8d48988d110941735.
+  assertEquals(
+    url.searchParams.get("fsq_category_ids"),
+    "4bf58dd8d48988d110941735",
+  );
 });
 
 Deno.test("cuisine tag — mandatory general call is NOT category-scoped", async () => {
@@ -387,6 +399,28 @@ Deno.test("thin-results — Foursquare 5xx returns is_thin=true (graceful fallba
   });
   assertEquals(result.is_thin, true);
   assertEquals(result.places.length, 0);
+  assertEquals(result.error, "foursquare_upstream_503");
+});
+
+Deno.test("upstream 4xx — surfaces a soft error, not a silent empty 200", async () => {
+  // A 429 (Foursquare credit exhaustion) or a 401/403 must not be
+  // swallowed into an unmarked empty 200 — the client and the deploy
+  // diagnostic need a named error to tell "no credits" apart from
+  // "genuinely no venues nearby". Regression guard for the 2026-05-16
+  // empty-places incident.
+  const cache = new MemoryCache();
+  const stub = stubFetch(
+    new Response("no API credits remaining", { status: 429 }),
+  );
+  const result = await handlePlacesProxy(TYPICAL_INPUT, {
+    cache,
+    fetch: stub.fetch,
+    apiKey: "test-api-key",
+    now: () => new Date("2026-05-13T12:00:00Z"),
+  });
+  assertEquals(result.is_thin, true);
+  assertEquals(result.places.length, 0);
+  assertEquals(result.error, "foursquare_upstream_429");
 });
 
 Deno.test("thin-results — Foursquare 410 fails loud (version pin slipped)", async () => {

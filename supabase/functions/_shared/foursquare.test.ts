@@ -90,7 +90,12 @@ Deno.test("buildFoursquareQuery — halal + kosher chips emit category ids", () 
   const ids = plan.query.get("fsq_category_ids");
   assertExists(ids);
   // Sort-stable list — order doesn't depend on chip input order.
-  assertEquals(ids, "13351,13352");
+  // Live Foursquare hex taxonomy ids (probed 2026-05-17): kosher
+  // 52e81612bcbc57f1066b79fc sorts before halal 52e81612bcbc57f1066b79ff.
+  assertEquals(
+    ids,
+    "52e81612bcbc57f1066b79fc,52e81612bcbc57f1066b79ff",
+  );
   assertEquals(plan.emitted_tags.sort(), ["halal", "kosher"]);
 });
 
@@ -260,7 +265,9 @@ const SAMPLE_RESULT: FoursquareSearchResult = Object.freeze({
   name: "Vegan Hut",
   latitude: 40.7130,
   longitude: -74.0061,
-  categories: [{ id: "13377", name: "Vegan Restaurant" }],
+  categories: [
+    { fsq_category_id: "4bf58dd8d48988d1d3941735", name: "Vegan and Vegetarian Restaurant" },
+  ],
   location: { formatted_address: "123 Main St" },
   price: 2,
   hours: { display: "Open until 10pm", open_now: true },
@@ -283,7 +290,7 @@ Deno.test("shapeFoursquareResult — maps the documented fields", () => {
   assertEquals(shaped.price_tier, 2);
   assertEquals(shaped.walk_minutes_estimate, 3); // ceil(240/80) = 3
   assertEquals(shaped.address, "123 Main St");
-  assertEquals(shaped.categories, ["Vegan Restaurant"]);
+  assertEquals(shaped.categories, ["Vegan and Vegetarian Restaurant"]);
   assertEquals(shaped.hours?.display, "Open until 10pm");
   assertEquals(shaped.hours?.open_now, true);
   assertEquals(shaped.photos[0], "https://img.fsq.com/400x400/abc.jpg");
@@ -348,7 +355,7 @@ Deno.test("shapeFoursquareResult — skips rows missing required fields", () => 
 });
 
 Deno.test("shapeFoursquareResult — dietary tags pull from emitted_tags + categories", () => {
-  // The vegan category id (13377) on the result alone is enough to
+  // The vegan/vegetarian category id on the result alone is enough to
   // emit the tag even if the caller didn't query for it.
   const shaped = shapeFoursquareResult(SAMPLE_RESULT, []);
   assertExists(shaped);
@@ -474,6 +481,50 @@ Deno.test("DIETARY_CHIP_MAP — no duplicate chip names", () => {
   assertEquals(chips.length, new Set(chips).size);
 });
 
+// Regression guard for the 2026-05-17 category-id fix. The legacy short
+// numeric ids (e.g. "13303") return HTTP 400 from the post-2025
+// Foursquare surface; every taxonomy id must be a 24-char hex string.
+const HEX24_CATEGORY_ID = /^[0-9a-f]{24}$/;
+
+Deno.test("CUISINE_CATEGORY_MAP — every id is a live hex taxonomy id", () => {
+  for (const m of CUISINE_CATEGORY_MAP) {
+    assertEquals(
+      HEX24_CATEGORY_ID.test(m.fsq_category_id),
+      true,
+      `cuisine ${m.cuisine} id "${m.fsq_category_id}" is not a 24-char hex id`,
+    );
+  }
+});
+
+Deno.test("DIETARY_CHIP_MAP — every category-strategy id is a live hex taxonomy id", () => {
+  for (const m of DIETARY_CHIP_MAP) {
+    if (m.strategy !== "category" || !m.fsq_category_ids) continue;
+    for (const id of m.fsq_category_ids.split(",")) {
+      assertEquals(
+        HEX24_CATEGORY_ID.test(id),
+        true,
+        `dietary ${m.chip} id "${id}" is not a 24-char hex id`,
+      );
+    }
+  }
+});
+
+Deno.test("extractDietaryTags — reads the post-2025 fsq_category_id field", () => {
+  // The category-id key migrated from `id` to `fsq_category_id` on the
+  // 2025 Foursquare surface; a halal-category venue must still tag.
+  const tags = extractDietaryTags(
+    {
+      ...SAMPLE_RESULT,
+      tastes: [],
+      categories: [
+        { fsq_category_id: "52e81612bcbc57f1066b79ff", name: "Halal Restaurant" },
+      ],
+    },
+    [],
+  );
+  assertEquals(tags.includes("halal"), true);
+});
+
 // ---------------------------------------------------------------------------
 // Cuisine advisory tag (tb-17) — per-call category scoping.
 // ---------------------------------------------------------------------------
@@ -568,7 +619,7 @@ Deno.test("buildFoursquareQuery — cuisine + dietary categories both reach the 
   assertExists(ids);
   const idSet = new Set(ids.split(","));
   assertEquals(idSet.has(mexican.fsq_category_id), true);
-  assertEquals(idSet.has("13352"), true); // halal category
+  assertEquals(idSet.has("52e81612bcbc57f1066b79ff"), true); // halal category
 });
 
 Deno.test("buildQuerySignature — cuisine tag changes the cache signature", () => {
