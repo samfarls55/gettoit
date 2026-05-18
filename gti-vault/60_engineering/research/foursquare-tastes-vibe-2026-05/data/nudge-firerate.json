@@ -1,0 +1,46 @@
+{
+  "source": {
+    "raw_sample": "data/raw-sample.json",
+    "allowlist": "data/vibe-token-allowlist.json",
+    "classifier_parity": "ios/Sources/App/Q5VenueClassifier.swift — tastesNudge(for:)"
+  },
+  "funnel": {
+    "sampled": 1090,
+    "tastesBearing": 728,
+    "tokenMatched": 571,
+    "nonZeroNet": 505
+  },
+  "fireRate": 0.463302752293578,
+  "noNudge": 585,
+  "netZeroCancelled": 66,
+  "byCategory": [
+    {
+      "category": "Bar",
+      "sampled": 302,
+      "tastesBearing": 226,
+      "tokenMatched": 199,
+      "fired": 182,
+      "fireRate": 0.6026490066225165
+    },
+    {
+      "category": "Cafe / Coffee Shop",
+      "sampled": 388,
+      "tastesBearing": 169,
+      "tokenMatched": 104,
+      "fired": 88,
+      "fireRate": 0.2268041237113402
+    },
+    {
+      "category": "Restaurant",
+      "sampled": 400,
+      "tastesBearing": 333,
+      "tokenMatched": 268,
+      "fired": 235,
+      "fireRate": 0.5875
+    }
+  ],
+  "direction": {
+    "louder": 415,
+    "quieter": 90
+  }
+}
