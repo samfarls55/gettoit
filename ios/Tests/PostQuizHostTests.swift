@@ -148,6 +148,7 @@ final class PostQuizHostTests: XCTestCase {
         let owner = UUID()
         let joiner = UUID()
         let attempts = Counter()
+        let view = Self.verdictView()
 
         // Poll 1: just the owner, nobody answered. Poll 2: a joiner has
         // landed and both have answered. Then the verdict fires.
@@ -162,7 +163,7 @@ final class PostQuizHostTests: XCTestCase {
                 // No verdict until the third cycle so the snapshot has
                 // two cycles to evolve the avatar row first.
                 let n = await attempts.value
-                return n >= 3 ? Self.verdictView() : nil
+                return n >= 3 ? view : nil
             },
             fetchSnapshot: { _ in
                 let n = await attempts.increment()
@@ -203,6 +204,7 @@ final class PostQuizHostTests: XCTestCase {
 
     func testWaitingPhaseAdvancesToTheVerdict() async throws {
         let owner = UUID()
+        let view = Self.verdictView()
         let host = PostQuizHost(
             context: PostQuizSessionContext(
                 roomID: UUID(),
@@ -210,7 +212,7 @@ final class PostQuizHostTests: XCTestCase {
                 isInitiator: true,
                 invitedShared: true
             ),
-            fetchVerdict: { _ in Self.verdictView() },
+            fetchVerdict: { _ in view },
             fetchSnapshot: { _ in
                 SessionSnapshot(
                     members: [WaitingMember(id: owner, role: "owner")],
