@@ -1,10 +1,13 @@
 ---
 note: placesproxy-empty-foursquare-results
-status: needs-triage
+status: done
 created: 2026-05-16
 related:
   - "[[issues/tb-14-restore-placesproxy-foursquare-path]]"
+  - "[[issues/tb-17-edge-function-cuisine-tag]]"
 ---
+
+> **RESOLVED 2026-05-17.** Root cause was not a bad key or a version pin — see [[#Resolution (2026-05-17)]] at the bottom. The diagnosis section below is preserved as the original hypothesis record; it was partly wrong.
 
 # Follow-up — places-proxy deployed but Foursquare returns zero rows
 
@@ -43,3 +46,15 @@ Triage as a bug. Diagnosis pass:
 2. If 401/403 → the key is bad: regenerate at foursquare.com/developers, update the `FOURSQUARE_API_KEY` GitHub secret (and `.env`). This is the credentials problem tb-14 ruled out.
 3. If 4xx with a version complaint → bump `FOURSQUARE_API_VERSION` in `_shared/foursquare.ts` and re-verify against ADR 0002's live-surface notes.
 4. Once fixed, promote Tier 2 of the live test from diagnostic warnings to hard asserts so the founder check (acceptance criterion #5) is also CI-guarded.
+
+## Resolution (2026-05-17)
+
+Diagnosed directly against the live Foursquare API. The hypothesis above was wrong on the specifics — the key was valid and the version pin was current. **Two independent faults**, both swallowed by the handler's silent-4xx path:
+
+1. **No API credits.** The proxy's `fields` list requests six *premium* fields (`price`, `hours`, `photos`, `tastes`, `rating`, `stats`). Any call requesting a premium field is a billable "Premium call", and the Foursquare account had **zero credits** — so every live call returned **HTTP 429** ("no API credits remaining"). Free-field-only calls returned 200; that is why one historical v1-dev call had succeeded. Not a bad key — a billing state. **Resolved:** the operator added credits / enabled billing on the Foursquare account on 2026-05-17; premium fields now flow (verified — a deployed-function call returns 50 venues with `price`/`rating` populated).
+
+2. **Wrong category ids.** `CUISINE_CATEGORY_MAP` and `DIETARY_CHIP_MAP` used legacy short numeric ids (`13303` etc.). The post-2025 surface rejects those with **HTTP 400** — so every per-cuisine and every dietary-category call returned empty, even after credits were restored. **Resolved:** PR [#101](https://github.com/samfarls55/gettoit/pull/101) replaced all 12 ids with live-probed 24-char hex ids, renamed `FoursquareCategory.id` → `fsq_category_id`, and **hardened the handler to surface a `foursquare_upstream_<status>` error** instead of the silent empty 200 that hid both faults. See [[issues/tb-17-edge-function-cuisine-tag|tb-17]] (cuisine scoping) and ADR 0002 (corrected).
+
+End state: the deployed `places-proxy` returns Foursquare-sourced venues for general, per-cuisine, and dietary calls — verified 2026-05-17 against the live deployment (`cuisine=mexican` → 50 Mexican venues; `dietary=halal` → 50 halal venues).
+
+**Remaining open thread:** Tier 2 of the live integration test is still diagnostic-only. Promoting it to a hard CI assert (original next-step #4) is worth doing now that data flows — left as a small follow-up, not tracked as a blocker.

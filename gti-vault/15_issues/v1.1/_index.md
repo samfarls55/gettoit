@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), ready-for-agent
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101), tb-18 Q4-vibe filed needs-triage (GitHub #102)
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -101,9 +101,23 @@ Build order: tb-14, tb-15, tb-17 can start immediately; tb-16 after tb-15. tb-15
 
 **Adjacency flagged, not filed.** `RunningUnionPoolManager` (tb-10) shows the same not-wired-in smell on the *verdict* side — see [[verdict-pipeline-pool-manager-unwired|verdict-pipeline-pool-manager-unwired]]. Out of scope for the Q5 fix; needs its own diagnosis pass before it becomes an issue.
 
-**Follow-up surfaced by tb-14 (2026-05-16).** tb-14 closed the deploy gap — the `places-proxy` Edge Function is now deployed and configured (live invocation returns HTTP 200, not `404` / `places_proxy_misconfigured`). But the deployed function returns an *empty* `places` array: Foursquare data still does not flow. Filed as [[placesproxy-empty-foursquare-results|placesproxy-empty-foursquare-results]] — a bad/expired key or a stale API-version pin, outside tb-14's deploy-only scope, needs a diagnosis pass with the Edge Function runtime logs.
+**Follow-up surfaced by tb-14 (2026-05-16) — RESOLVED 2026-05-17.** tb-14 closed the deploy gap, but the deployed function returned an *empty* `places` array. Diagnosed against the live API: two faults, not the hypothesised bad-key/version-pin — (1) the Foursquare account had no API credits, so every premium-field call 429'd; (2) the cuisine/dietary category ids were legacy short numerics the post-2025 surface rejects with 400. Both were swallowed by a silent-4xx handler path. Resolved: operator added Foursquare credits + PR #101 (correct hex ids, handler now surfaces the error). See [[placesproxy-empty-foursquare-results|placesproxy-empty-foursquare-results]] §Resolution.
 
 **Adjacency flagged during the tb-14 run (2026-05-16).** The `ios` CI lane's integration tests (`RoomStore` / `Verdict` / `Votes` `IntegrationTests`) flake against the shared live Supabase DB — same commit passed and failed on re-run across the rapid tb-14 PR cadence. Pre-existing, not a tb-14 regression (tb-14 changed no Swift). Flagged in [[ios-integration-tests-flaky-on-shared-db|ios-integration-tests-flaky-on-shared-db]]; needs CI-hardening triage.
+
+## Premium-data follow-ups (2026-05-17)
+
+After the Foursquare account moved to a paid (credit-backed) plan, a session diagnosed the empty-`places` follow-up and audited whether the premium fields could retrieve the Q1-Q4 quiz inputs better than the free-tier-era workarounds.
+
+**Shipped — category-id fix (PR [#101](https://github.com/samfarls55/gettoit/pull/101)).** The cuisine + dietary category ids were legacy short numerics the post-2025 Foursquare surface rejects with HTTP 400; replaced with live-probed hex ids, `FoursquareCategory.id` → `fsq_category_id`, and the handler now surfaces a `foursquare_upstream_<status>` error instead of a silent empty 200. Closes the [[placesproxy-empty-foursquare-results|placesproxy-empty-foursquare-results]] follow-up (with the operator's Foursquare credit top-up). Not filed as a tracked issue — fixed directly. ADR 0002 corrected.
+
+**Audit result — only Q4 still on a workaround.** Q1 cuisine (category-id filter), Q2 spend cap (`max_price` + `price`), Q3 reputation (`rating`/`stats`/`date_created`, already migrated by tb-16) are all on the right mechanism. Q4 vibe is the only quiz axis still inferred from a free-tier-era workaround (category archetype + price tie-break).
+
+| # | Title | Type | GitHub | Status |
+|---|---|---|---|---|
+| TB-18 (v1.1) | [[issues/tb-18-q4-vibe-tastes-signal\|Q4 vibe energy from the Foursquare tastes signal]] | — | [#102](https://github.com/samfarls55/gettoit/issues/102) | needs-triage — needs a research pass before ready-for-agent |
+
+**Adjacency flagged, not filed.** Foursquare's `attributes` field (`outdoor_seating`, `delivery`, `reservations`) could back the service-shape session parameter (PRD story 8), which currently has no Foursquare backing — see [[service-shape-attributes-unbacked|service-shape-attributes-unbacked]]. A parameter, not a quiz question; needs a triage decision before it becomes an issue.
 
 ## Cross-references
 
