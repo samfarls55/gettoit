@@ -160,12 +160,26 @@ public final class RoomStore {
         public let lat: Double
         public let lng: Double
         public let source: Source
+        /// IANA timezone identifier of the picked area (e.g.
+        /// `America/New_York`). Persisted so a joiner's per-member
+        /// Foursquare fetch plans `open_at` against the SAME area
+        /// timezone as the initiator, rather than the joiner's own
+        /// device. Empty string when the area's timezone could not be
+        /// resolved.
+        public let timeZoneIdentifier: String
 
-        public init(name: String, lat: Double, lng: Double, source: Source) {
+        public init(
+            name: String,
+            lat: Double,
+            lng: Double,
+            source: Source,
+            timeZoneIdentifier: String
+        ) {
             self.name = name
             self.lat = lat
             self.lng = lng
             self.source = source
+            self.timeZoneIdentifier = timeZoneIdentifier
         }
     }
 
@@ -287,6 +301,7 @@ public final class RoomStore {
             case locationLat = "location_lat"
             case locationLng = "location_lng"
             case locationSource = "location_source"
+            case locationTz = "location_tz"
             case sessionParameters = "session_params"
             case createdAt = "created_at"
         }
@@ -306,7 +321,15 @@ public final class RoomStore {
             let sourceRaw = try c.decodeIfPresent(String.self, forKey: .locationSource)
             if let name, let lat, let lng,
                let sourceRaw, let source = RoomLocation.Source(rawValue: sourceRaw) {
-                self.location = RoomLocation(name: name, lat: lat, lng: lng, source: source)
+                // `location_tz` is nullable — a room created before the
+                // column existed leaves it absent. An absent timezone
+                // must not drop the whole location; the planner falls
+                // back to the device timezone on an empty identifier.
+                let tz = try c.decodeIfPresent(String.self, forKey: .locationTz) ?? ""
+                self.location = RoomLocation(
+                    name: name, lat: lat, lng: lng,
+                    source: source, timeZoneIdentifier: tz
+                )
             } else {
                 self.location = nil
             }
@@ -333,6 +356,7 @@ public final class RoomStore {
             try c.encodeIfPresent(location?.lat, forKey: .locationLat)
             try c.encodeIfPresent(location?.lng, forKey: .locationLng)
             try c.encodeIfPresent(location?.source.rawValue, forKey: .locationSource)
+            try c.encodeIfPresent(location?.timeZoneIdentifier, forKey: .locationTz)
             try c.encodeIfPresent(sessionParameters, forKey: .sessionParameters)
         }
     }
@@ -362,6 +386,7 @@ public final class RoomStore {
             case locationLat = "location_lat"
             case locationLng = "location_lng"
             case locationSource = "location_source"
+            case locationTz = "location_tz"
             case sessionParameters = "session_params"
         }
 
@@ -385,6 +410,7 @@ public final class RoomStore {
             try container.encodeIfPresent(location?.lat, forKey: .locationLat)
             try container.encodeIfPresent(location?.lng, forKey: .locationLng)
             try container.encodeIfPresent(location?.source.rawValue, forKey: .locationSource)
+            try container.encodeIfPresent(location?.timeZoneIdentifier, forKey: .locationTz)
             // TB-05 (v1.1) — `session_params` is a nullable jsonb
             // column. Omit the key when nil so a room created before
             // the S01b surface lands with a NULL column (readers fall

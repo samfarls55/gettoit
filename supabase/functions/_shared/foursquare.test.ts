@@ -156,21 +156,24 @@ Deno.test("buildFoursquareQuery — price_tier becomes max_price (clamped 1..4)"
   assertEquals(tier99.query.get("max_price"), "4");
 });
 
-Deno.test("buildFoursquareQuery — open_at ISO converts to unix seconds", () => {
+Deno.test("buildFoursquareQuery — open_at DHHMM token passes through verbatim", () => {
   const plan = buildFoursquareQuery({
     lat: 0, lng: 0, radius_meters: 100,
-    filters: { open_at: "2026-05-13T18:00:00Z" },
+    filters: { open_at: "3T1900" },
   });
-  // 1778695200 = 2026-05-13T18:00:00Z (unix seconds, UTC)
-  assertEquals(plan.query.get("open_at"), "1778695200");
+  // Foursquare wants the recurring weekday + local-time token as-is —
+  // never a timestamp. `3T1900` = Wednesday 19:00.
+  assertEquals(plan.query.get("open_at"), "3T1900");
 });
 
-Deno.test("buildFoursquareQuery — invalid open_at is silently dropped", () => {
-  const plan = buildFoursquareQuery({
-    lat: 0, lng: 0, radius_meters: 100,
-    filters: { open_at: "not-a-date" },
-  });
-  assertEquals(plan.query.has("open_at"), false);
+Deno.test("buildFoursquareQuery — malformed open_at is dropped by the pattern guard", () => {
+  for (const bad of ["not-a-date", "2026-05-13T18:00:00Z", "1778695200", "0T1900", "3T2500"]) {
+    const plan = buildFoursquareQuery({
+      lat: 0, lng: 0, radius_meters: 100,
+      filters: { open_at: bad },
+    });
+    assertEquals(plan.query.has("open_at"), false, `expected drop for "${bad}"`);
+  }
 });
 
 // ---------------------------------------------------------------------------

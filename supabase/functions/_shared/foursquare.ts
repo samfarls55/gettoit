@@ -36,8 +36,13 @@ export interface PlacesProxyFilters {
   /** Q2 price cap. 1..4 mapped to Foursquare's `min_price` / `max_price`
    *  scale (also 1..4). */
   price_tier?: number;
-  /** Q3 open-at filter. ISO-8601 timestamp; Foursquare understands
-   *  `open_at` as a unix-seconds value, so we convert before the call. */
+  /** Open-at filter. Foursquare's `open_at` is a recurring weekday +
+   *  wall-clock token — `[1-7]THHMM`, day 1=Mon..7=Sun, e.g. `3T1900`
+   *  for Wed 19:00. It is NOT a timestamp: Foursquare interprets it in
+   *  the *venue's local time* (it filters against the venue's posted
+   *  `hours.regular`, which are local). The iOS planner therefore
+   *  resolves the meal instant in the search area's timezone and emits
+   *  the token directly; the proxy passes it straight through. */
   open_at?: string;
   /** TB-07/TB-17 (v1.1) — the craved cuisine this per-member fetch call
    *  is tagged for: a `QuizCuisine` id (e.g. `"mexican"`), enumerated in
@@ -312,6 +317,12 @@ export function findCuisineCategory(
   return CUISINE_CATEGORY_MAP.find((m) => m.cuisine === normalized);
 }
 
+/** Foursquare's accepted `open_at` shape: `[1-7]THHMM` — a weekday
+ *  (1=Mon..7=Sun), a literal `T`, then a 24-hour wall-clock time. The
+ *  hour band is `00`–`24` and the minute band `00`–`59`, matching the
+ *  upstream 400 message (`expected [1-7]T[00-24][00-59]`). */
+export const OPEN_AT_PATTERN = /^[1-7]T(2[0-4]|[01]\d)[0-5]\d$/;
+
 /** Translate the proxy's input filters into the query parameters
  *  Foursquare's `/places/search` accepts. Returns the parameters split
  *  into `query` (sent on the wire) and `post_filters` (applied to the
@@ -412,11 +423,13 @@ export function buildFoursquareQuery(input: PlacesProxyInput): FoursquareQueryPl
     params.set("max_price", String(clamped));
   }
 
-  if (filters.open_at !== undefined) {
-    const epochSeconds = Math.floor(Date.parse(filters.open_at) / 1000);
-    if (Number.isFinite(epochSeconds) && epochSeconds > 0) {
-      params.set("open_at", String(epochSeconds));
-    }
+  // `open_at` is Foursquare's recurring weekday + local-time token
+  // (`[1-7]THHMM`) — passed straight through, never a timestamp. A
+  // malformed value is rejected upstream by `validateInput`; the
+  // pattern guard here keeps the pure builder self-defending when it is
+  // called directly (tests, `buildQuerySignature`).
+  if (filters.open_at !== undefined && OPEN_AT_PATTERN.test(filters.open_at)) {
+    params.set("open_at", filters.open_at);
   }
 
   // Ask Foursquare for the fields we actually consume — keeps the

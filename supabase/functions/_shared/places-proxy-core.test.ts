@@ -7,6 +7,7 @@ import {
   assertEquals,
   assertExists,
   assertRejects,
+  assertThrows,
   assert,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
@@ -353,6 +354,37 @@ Deno.test("validateInput — tolerates a missing / non-string cuisine key", () =
     filters: { cuisine: 42 },
   });
   assertEquals(badType.filters?.cuisine, undefined);
+});
+
+Deno.test("validateInput — keeps a valid open_at DHHMM token", () => {
+  const v = validateInput({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { open_at: "3T1900" },
+  });
+  assertEquals(v.filters?.open_at, "3T1900");
+});
+
+Deno.test("validateInput — tolerates a missing open_at key", () => {
+  const v = validateInput({ lat: 0, lng: 0, radius_meters: 100, filters: {} });
+  assertEquals(v.filters?.open_at, undefined);
+});
+
+Deno.test("validateInput — rejects a malformed open_at loudly", () => {
+  // A present-but-malformed open_at is a client bug. Reject with a 400
+  // rather than swallowing it — a swallowed bad open_at (the unix-epoch
+  // format) is exactly what silently broke the Q5 fetch pipeline.
+  for (const bad of ["2026-05-13T18:00:00Z", "1778695200", "0T1900", "3T2500", "3T1960"]) {
+    assertThrows(
+      () =>
+        validateInput({
+          lat: 0, lng: 0, radius_meters: 100,
+          filters: { open_at: bad },
+        }),
+      PlacesProxyInputError,
+      "open_at",
+      `expected reject for "${bad}"`,
+    );
+  }
 });
 
 // ---------------------------------------------------------------------------

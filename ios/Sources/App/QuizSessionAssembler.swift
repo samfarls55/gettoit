@@ -71,6 +71,7 @@ public enum QuizSessionAssembler {
         userID: UUID,
         coordinate: CLLocationCoordinate2D?,
         radiusMeters: Int,
+        timeZone: TimeZone = .current,
         sessionParameters: SessionParameters = .default,
         places: PlacesService,
         writer: @escaping QuizVoteWriter
@@ -83,7 +84,8 @@ public enum QuizSessionAssembler {
             candidateFetch = FoursquareQuizCandidateFetch(
                 executor: FoursquareFetchExecutor(places: places),
                 coordinate: coordinate,
-                radiusMeters: Double(radiusMeters)
+                radiusMeters: Double(radiusMeters),
+                timeZone: timeZone
             )
             candidateSource = .perMemberFetch
         } else {
