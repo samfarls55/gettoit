@@ -739,15 +739,15 @@ public final class QuizCoordinator {
     /// one-entry-per-axis probe. Order follows the candidate list, which
     /// is the factorial's emit order (cuisine-drop, reputation-drop,
     /// vibe-drop) on the real path.
-    private func buildQ5Ratings() -> [VoteRow.Q5RatingEntry] {
+    private func buildQ5Ratings() -> [Q5RatingEntry] {
         let fallbackAxes = Q5FactorialCard.Axis.allCases
-        var entries: [VoteRow.Q5RatingEntry] = []
+        var entries: [Q5RatingEntry] = []
         for (index, candidate) in candidates.enumerated() {
             let score = q5Ratings[candidate.id] ?? 3
             let axis = candidate.droppedAxis
                 ?? fallbackAxes[index % fallbackAxes.count]
             entries.append(
-                VoteRow.Q5RatingEntry(droppedAxis: axis, score: score)
+                Q5RatingEntry(droppedAxis: axis, score: score)
             )
         }
         return entries
