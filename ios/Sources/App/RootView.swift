@@ -438,7 +438,10 @@ public struct RootView: View {
             let proxy = SupabaseFunctionsPlacesProxyClient(client: client)
             let places = PlacesService(
                 proxy: proxy,
-                mapKitFallback: MapKitPlacesFallback()
+                mapKitFallback: MapKitPlacesFallback(),
+                // Cross-check Foursquare candidates against MapKit and
+                // drop out-of-business venues — see VenueClosureVerifier.
+                closureVerifier: MapKitClosureVerifier()
             )
             let assembled = QuizSessionAssembler.assembleCoordinator(
                 roomID: roomID,

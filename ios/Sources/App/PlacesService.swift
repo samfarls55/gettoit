@@ -5,6 +5,12 @@
 // (empty or below the server-emitted threshold) or the call errors,
 // falls back to Apple MapKit POI search on-device per ADR 0002.
 //
+// Foursquare-sourced results are additionally cross-checked against
+// MapKit to drop out-of-business venues — Foursquare's surface carries
+// no usable closure signal (see VenueClosureVerifier.swift and
+// gti-vault/60_engineering/foursquare-venue-closure-signal.md). MapKit
+// fallback results need no such check: MapKit only returns live POIs.
+//
 // The Foursquare API key lives on the server and never reaches the
 // client; PlacesProxyRequest is deliberately a pure-data struct that
 // does not carry any auth secrets.
@@ -262,10 +268,19 @@ public struct PlacesFetchResult: Equatable, Sendable {
 public final class PlacesService: Sendable {
     private let proxy: PlacesProxyClient
     private let mapKitFallback: PlacesMapKitFallback
+    private let closureVerifier: VenueClosureVerifier
 
-    public init(proxy: PlacesProxyClient, mapKitFallback: PlacesMapKitFallback) {
+    /// `closureVerifier` defaults to a no-op passthrough so existing
+    /// call sites keep their pre-cross-check behaviour; the production
+    /// composition root (`RootView`) injects `MapKitClosureVerifier`.
+    public init(
+        proxy: PlacesProxyClient,
+        mapKitFallback: PlacesMapKitFallback,
+        closureVerifier: VenueClosureVerifier = PassthroughClosureVerifier()
+    ) {
         self.proxy = proxy
         self.mapKitFallback = mapKitFallback
+        self.closureVerifier = closureVerifier
     }
 
     /// Fetch candidate places near the given coordinate. Returns the
@@ -285,8 +300,15 @@ public final class PlacesService: Sendable {
         do {
             let response = try await proxy.search(request)
             if !response.isThin {
+                // Foursquare can return long-closed venues — its
+                // surface has no closure signal. Cross-check against
+                // MapKit and drop the ones very likely out of
+                // business before handing the pool downstream.
+                let verified = await closureVerifier.filterOutClosed(
+                    response.places
+                )
                 return PlacesFetchResult(
-                    places: response.places,
+                    places: verified,
                     disclaimers: response.disclaimers,
                     source: .foursquare
                 )
