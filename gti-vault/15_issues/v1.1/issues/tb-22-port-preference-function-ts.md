@@ -1,7 +1,7 @@
 ---
 issue: tb-22
 title: Port the preference function (PRD modules A/E) from Swift to TypeScript
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 120
 prd: v1.1-quiz-redesign-prd
@@ -51,3 +51,5 @@ None — can start immediately, in parallel with [[tb-21-persist-fetch-server-un
 ## Comments
 
 **2026-05-18 — filed.** Decomposed from [[bug-08-verdict-pipeline-integration-unwired|bug-08]] after the Option 2 fork was decided. Triaged `ready-for-agent` / AFK — pure-logic port, verifiable on its own via ported test vectors. The one horizontal slice in the bug-08 decomposition; kept separate (vs merged into tb-23) for parallelism and a focused port-vs-wiring review split.
+
+**2026-05-18 — done (PR #126).** Ported to `supabase/functions/_shared/preference-function.ts` — the three axis scorers (`scoreCuisineAxis` / `scoreReputationAxis` / `scoreVibeAxis`) and `buildPreferenceFunction`, with the cohort-zero constants byte-identical to the Swift module (`MATCH_SCORE` 5.0, `SOFT_NON_MATCH_SCORE` 2.0, `THRESHOLD_T` 3.0, `ALPHA` 0.5). The Swift test suite is ported in full and the suite adds an explicit exact-score vector table (`SCORE_VECTORS`) — fully-specified `(member, q5Ratings, venue) -> expected` rows with the Swift arithmetic pinned to `1e-9` — proving the port reproduces the Swift scores exactly. 22 tests green in the edge lane; full `supabase/functions/` suite still 238 passed / 0 failed (no `compute-verdict` regression). The module is self-contained — its own `Q5VenueProfile` / `Q5MemberProfile` / `Q5Rating` types — so it stays reviewable in isolation; joining it to `verdict-engine.ts`'s `prefFn` seam is tb-23. Module G (the incremental Swift `RunningUnionPoolManager`) deliberately not ported.
