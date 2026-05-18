@@ -103,7 +103,8 @@ export interface FoursquareSearchResult {
   name: string;
   latitude: number;
   longitude: number;
-  /** Per-result `categories[]`. Each carries an `id` plus a human name. */
+  /** Per-result `categories[]`. Each carries an `fsq_category_id` plus a
+   *  human name. */
   categories?: FoursquareCategory[];
   /** Address payload — only `formatted_address` is reliably populated. */
   location?: { formatted_address?: string };
@@ -133,7 +134,10 @@ export interface FoursquareSearchResult {
 }
 
 export interface FoursquareCategory {
-  id?: string | number;
+  /** Foursquare taxonomy category id. The post-2025 surface returns
+   *  this as `fsq_category_id` (a 24-char hex string, e.g.
+   *  `4bf58dd8d48988d1c1941735`) — it was `id` on the legacy v3 API. */
+  fsq_category_id?: string;
   name: string;
   short_name?: string;
 }
@@ -177,32 +181,38 @@ export interface DietaryMapping {
 export const DIETARY_CHIP_MAP: readonly DietaryMapping[] = Object.freeze([
   {
     // Halal-only — single high-confidence category in Foursquare taxonomy.
+    // Live-probed hex taxonomy id (2026-05-17).
     chip: "halal",
     strategy: "category",
-    fsq_category_ids: "13352",
+    fsq_category_ids: "52e81612bcbc57f1066b79ff",
     emit_tag: "halal",
   },
   {
     // Kosher — category-level, geographically concentrated but reliable.
+    // Live-probed hex taxonomy id (2026-05-17).
     chip: "kosher",
     strategy: "category",
-    fsq_category_ids: "13351",
+    fsq_category_ids: "52e81612bcbc57f1066b79fc",
     emit_tag: "kosher",
   },
   {
     // Vegan options — category undercounts omnivore venues that serve
     // vegan dishes; the report (Option C) accepts the undercount and
     // surfaces a disclaimer on the verdict rule chip downstream.
+    // Foursquare merged vegan + vegetarian into ONE taxonomy category
+    // ("Vegan and Vegetarian Restaurant"), so vegan and vegetarian
+    // share the same `fsq_category_ids` — a venue in it emits BOTH tags.
     chip: "vegan",
     strategy: "category",
-    fsq_category_ids: "13377",
+    fsq_category_ids: "4bf58dd8d48988d1d3941735",
     emit_tag: "vegan_friendly",
   },
   {
-    // Vegetarian — same shape as vegan; pre-filter at category.
+    // Vegetarian — shares Foursquare's merged Vegan/Vegetarian category
+    // (see the vegan entry above).
     chip: "vegetarian",
     strategy: "category",
-    fsq_category_ids: "13378",
+    fsq_category_ids: "4bf58dd8d48988d1d3941735",
     emit_tag: "vegetarian_friendly",
   },
   {
@@ -262,23 +272,13 @@ export function findDietaryMapping(chip: string): DietaryMapping | undefined {
  *  call, so the fetch as a whole is never cuisine-strict-filtered
  *  (research-01 §3.2 + tb-07/tb-17 tickets).
  *
- *  Category-id sourcing — the same posture as `DIETARY_CHIP_MAP`:
- *  the ids below are taken from the published Foursquare "Dining and
- *  Drinking > Restaurant" taxonomy (the post-2025 surface keeps the
- *  legacy v3 numeric ids; see ADR 0002). They are NOT yet verified
- *  against a live API probe — see
- *  `gti-vault/60_engineering/research/foursquare-dietary-tags-2026-05/`
- *  which carries the same `verified_against_api: false` caveat for the
- *  dietary ids. A live-probe verification before beta cohort 1 is
- *  tracked as an adjacency on tb-17.
- *
- *  Known overlap to flag: `american` is mapped to `13146`, the same id
- *  the proxy's own test fixtures label "American Restaurant"; `thai`'s
- *  id `13352` overlaps with the dietary map's `halal` category id. The
- *  overlap is harmless at runtime — each per-cuisine call is an
- *  independent category-scoped query, and a mis-pinned id only widens
- *  or narrows that one call's result set, never errors — but the live
- *  probe should resolve which value Foursquare actually assigns.
+ *  Category-id sourcing: every id below is a 24-char hex Foursquare
+ *  taxonomy id, live-probed against `/places/search` on 2026-05-17 —
+ *  each confirmed to return HTTP 200 with results when passed as
+ *  `fsq_category_ids`. The legacy short numeric ids (e.g. `13303`) were
+ *  a free-tier-era guess; the post-2025 surface rejects them with
+ *  HTTP 400, which the proxy was silently swallowing into an empty
+ *  result set. They were replaced wholesale in the 2026-05-17 fix.
  */
 export interface CuisineCategoryMapping {
   /** `QuizCuisine` id as emitted by the iOS Q1 surface. Lowercased +
@@ -291,14 +291,14 @@ export interface CuisineCategoryMapping {
 
 export const CUISINE_CATEGORY_MAP: readonly CuisineCategoryMapping[] = Object
   .freeze([
-    { cuisine: "mexican", fsq_category_id: "13303" },
-    { cuisine: "italian", fsq_category_id: "13236" },
-    { cuisine: "japanese", fsq_category_id: "13263" },
-    { cuisine: "chinese", fsq_category_id: "13099" },
-    { cuisine: "thai", fsq_category_id: "13352" },
-    { cuisine: "indian", fsq_category_id: "13199" },
-    { cuisine: "american", fsq_category_id: "13146" },
-    { cuisine: "mediterranean", fsq_category_id: "13302" },
+    { cuisine: "mexican", fsq_category_id: "4bf58dd8d48988d1c1941735" },
+    { cuisine: "italian", fsq_category_id: "4bf58dd8d48988d110941735" },
+    { cuisine: "japanese", fsq_category_id: "4bf58dd8d48988d111941735" },
+    { cuisine: "chinese", fsq_category_id: "4bf58dd8d48988d145941735" },
+    { cuisine: "thai", fsq_category_id: "4bf58dd8d48988d149941735" },
+    { cuisine: "indian", fsq_category_id: "4bf58dd8d48988d10f941735" },
+    { cuisine: "american", fsq_category_id: "4bf58dd8d48988d14e941735" },
+    { cuisine: "mediterranean", fsq_category_id: "4bf58dd8d48988d1c0941735" },
   ]);
 
 /** Resolve a `QuizCuisine` id to its Foursquare category mapping.
@@ -533,7 +533,7 @@ export function extractDietaryTags(
 ): string[] {
   const tags = new Set<string>(emittedTags);
   const categoryIds = (result.categories ?? []).flatMap((c) =>
-    c.id !== undefined ? [String(c.id)] : []
+    c.fsq_category_id !== undefined ? [c.fsq_category_id] : []
   );
   for (const mapping of DIETARY_CHIP_MAP) {
     if (mapping.strategy === "category" && mapping.fsq_category_ids) {

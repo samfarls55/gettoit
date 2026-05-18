@@ -53,7 +53,7 @@ Implemented in [[../../15_issues/v1/issues/tb-05-foursquare-placesproxy|TB-05]];
 | `results[].fsq_place_id` | string | The post-2025 identifier. Was `fsq_id`. |
 | `results[].name` | string | Display name. |
 | `results[].latitude` / `results[].longitude` | number | Top-level on each result. Was nested under `geocodes` on the v3 surface. |
-| `results[].categories[]` | object[] | Each carries `id` + `name`. `id` is the Foursquare taxonomy id (e.g. `13352` halal, `13351` kosher, `13377` vegan). |
+| `results[].categories[]` | object[] | Each carries `fsq_category_id` + `name`. `fsq_category_id` is a 24-char hex Foursquare taxonomy id (e.g. `52e81612bcbc57f1066b79ff` halal, `4bf58dd8d48988d1c1941735` Mexican). **Correction (2026-05-17):** an earlier revision claimed the post-2025 surface keeps the legacy short numeric ids (`13352` etc.) — it does not. The short ids return HTTP 400; the live field is `fsq_category_id` carrying hex ids. Verified by live `/places/search` probe 2026-05-17. |
 | `results[].location.formatted_address` | string | Pre-rendered single-line address. Other `location.*` fields (`address`, `locality`) ignored — `formatted_address` is reliable. |
 | `results[].price` | integer 1..4 | Optional. Maps directly to Q2 cap. |
 | `results[].hours.display` | string | Human-readable. |
