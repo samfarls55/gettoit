@@ -400,11 +400,17 @@ final class PostQuizHostTests: XCTestCase {
         try await Task.sleep(nanoseconds: 5_000_000)
         host.teardown()
 
+        // Cancellation is cooperative: an iteration already in flight
+        // when `teardown()` lands finishes its single poll before the
+        // loop observes cancellation. Drain that in-flight iteration
+        // before sampling, so the count is measured from a settled
+        // loop rather than racing the final poll.
+        try await Task.sleep(nanoseconds: 50_000_000)
         let countAtTeardown = await attempts.value
         XCTAssertGreaterThan(countAtTeardown, 0, "the host should have polled before teardown")
 
         // After teardown the loop is dead — no further polls land.
-        try await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 50_000_000)
         let countAfter = await attempts.value
         XCTAssertEqual(countAtTeardown, countAfter,
             "teardown must stop the poll loop — no leaked task continuing to poll")
