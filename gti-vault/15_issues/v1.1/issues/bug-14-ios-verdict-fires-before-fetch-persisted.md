@@ -1,7 +1,7 @@
 ---
 issue: bug-14
 title: iOS fires the verdict before the member's candidate fetch is persisted
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 144
 created: 2026-05-19
@@ -70,3 +70,11 @@ None — self-contained iOS change. Independent of bug-13; either slice ships al
 ## Comments
 
 **2026-05-19 — filed.** Found during the 2026-05-19 verdict-spinner diagnosis. Triaged `ready-for-agent` / AFK — self-contained iOS change, testable through the coordinator's existing seams, no design fork (an empty pool is handled by bug-13's no-survivor outcome).
+
+**2026-05-19 — done (PR #150).** All three compounding defects fixed in `QuizCoordinator`:
+
+1. **Fire-before-persist race.** `submit()` now `await`s the in-flight per-member candidate fetch and its `member_fetches` persist before the verdict-firing `votes` write. The fetch task `await`s `persistRawFetch` as its last step and clears its own `fetchTask` handle only afterwards — so a single `awaitCandidateFetch()` covers both phases. Previously the handle was cleared mid-task (in `applyFetchResult`), which would have let `submit()` race past an in-flight persist; that ordering bug was fixed too.
+2. **Empty raw fetch silently skipped.** `persistRawFetch` no longer guards out an empty `rawFetch` — a genuinely empty fetch is persisted as a real `member_fetches` row with an empty `payload` (the `payload jsonb not null` column accepts `[]`), so the server can tell "this member has no candidates" apart from "the write never ran".
+3. **Swallowed persist errors.** A failed `member_fetches` write is recorded on the new `QuizCoordinator.lastMemberFetchPersist` (`notAttempted` / `written` / `failed`) and forwarded to an injected `MemberFetchPersistFailureSink`. `RootView` binds the sink to a `member_fetch_persist_failed` telemetry emission via `SupabaseTelemetrySink` — the persist stays best-effort but the failure is no longer invisible.
+
+**Decisions:** the failure-surfacing seam is a closure (`MemberFetchPersistFailureSink`), mirroring the existing `QuizVoteWriter` / `MemberFetchWriter` pattern, rather than plumbing a full `TelemetryWriter` into `RootView` (none exists there today). The new `member_fetch_persist_failed` event is emitted via the raw `SupabaseTelemetrySink` (the documented `events`-table seam, ADR 0005) rather than a typed `TelemetryWriter` helper — confined to this one failure path until it earns a first-class helper. The rapid-tap submit fold and the `submitting`/`submitted`/`failed` step machine are unchanged. iOS test lane green in CI.

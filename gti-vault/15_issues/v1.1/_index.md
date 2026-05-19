@@ -208,7 +208,7 @@ returning a verdict cleanly). `/to-issues` decomposed the fix into 4 AFK issues.
 |---|---|---|---|---|
 | bug-12 | [[issues/bug-12-verdict-spinner-orphaned-host\|Verdict screen never renders — a double onSubmitted orphans the polling host]] — done (PR #147) | AFK | [#142](https://github.com/samfarls55/gettoit/issues/142) | — |
 | bug-13 | [[issues/bug-13-engine-no-survivor-on-empty-pool\|Engine wedges the room on an empty candidate pool]] — done (PR #146) | AFK | [#143](https://github.com/samfarls55/gettoit/issues/143) | — |
-| bug-14 | [[issues/bug-14-ios-verdict-fires-before-fetch-persisted\|iOS fires the verdict before the member's candidate fetch is persisted]] — ready-for-agent | AFK | [#144](https://github.com/samfarls55/gettoit/issues/144) | — |
+| bug-14 | [[issues/bug-14-ios-verdict-fires-before-fetch-persisted\|iOS fires the verdict before the member's candidate fetch is persisted]] — done (PR #150) | AFK | [#144](https://github.com/samfarls55/gettoit/issues/144) | — |
 | ops-01 | [[issues/ops-01-wedged-firing-rooms-cleanup\|Re-fire the rooms wedged in status='firing']] — ready-for-agent | AFK | [#145](https://github.com/samfarls55/gettoit/issues/145) | bug-13 |
 
 Build order: bug-12, bug-13, bug-14 are independent and can run in parallel;
