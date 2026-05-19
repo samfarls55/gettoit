@@ -8,6 +8,12 @@ Prefix `BREAKING:` for any change that requires code or downstream consumers to 
 
 ---
 
+## 2026-05-19
+
+- **S03 Quiz Q5:** added `no-results` mode to the Q5 preference-probe surface (`surfaces/03-quiz.md` §Q5 + `code/screens/ScreenQ5Regret.jsx`). Renders when the per-member venue fetch produced no factorial-usable pool — there are no real candidates to rate. A 2026-05-19 design session removed all fictitious venues (the iOS `QuizDummyCandidates` filler); the app must never surface a made-up place, so an empty pool now renders a real specced state. Mode shows the C-02 TopBar (segment 5 active), a centered C-03 headline + body block, and a sun-fill C-05 CTA `"Head to the verdict"`; the three factorial rater cards and the `"Drop the verdict"` CTA are suppressed. Structured the same way the verdict `no-survivor` mode is — its Q5-flow analogue. `ScreenQ5Regret.jsx` renders the variant via a `mode` prop (`default` | `no-results`), mirroring `ScreenVerdict.jsx`'s mode handling. No new component, no new token — composes from existing C-01 / C-02 / C-03 / C-05 and existing tokens. The iOS consumption is the paired tracer bullet tb-26. (sg-05 v1.1, #136.)
+
+---
+
 ## 2026-05-15
 
 - **New surface S01b · Pre-quiz parameters setup** (`surfaces/01b-parameters.md` + `code/screens/ScreenParameters.jsx`). The iOS home of the v1.1 *parameters* bucket — the session initiator sets meal time, group context, service shape and transport mode (geography is captured on S01 and echoed read-only here) between the S01 share step and the quiz. Joiners never see it; they read the parameters off the room. No new component — built entirely from the existing C-04 Chip (single-select variant), Glass row, Eyebrow, CTADock and PillCTA, per the v1.1 PRD module (K) note that the pre-quiz surface "consumes existing tokens and components." (TB-05 v1.1, #66.)
