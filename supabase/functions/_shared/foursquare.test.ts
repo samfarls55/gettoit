@@ -11,6 +11,7 @@ import {
   applyPostFilters,
   buildFoursquareQuery,
   buildQuerySignature,
+  CANDIDATE_POOL_FLOOR_CATEGORY_IDS,
   computeGeoBucket,
   CUISINE_CATEGORY_MAP,
   DIETARY_CHIP_MAP,
@@ -123,7 +124,13 @@ Deno.test("buildFoursquareQuery — shellfish chip becomes a disclaimer, not a f
     radius_meters: 1600,
     filters: { dietary: ["shellfish"] },
   });
-  assertEquals(plan.query.has("fsq_category_ids"), false);
+  // tb-25 / ADR 0012: a disclaimer-only chip contributes no category id,
+  // so the candidate-pool floor is seeded — fsq_category_ids is the
+  // eight-category floor, never empty.
+  assertEquals(
+    plan.query.get("fsq_category_ids"),
+    [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(","),
+  );
   assertEquals(plan.post_filters.require_taste_tokens, []);
   assertEquals(plan.post_filters.disclaimers, ["no_shellfish_unverified"]);
 });
@@ -135,7 +142,12 @@ Deno.test("buildFoursquareQuery — 'Nothing tonight' chip is a no-op", () => {
     radius_meters: 1600,
     filters: { dietary: ["Nothing tonight"] },
   });
-  assertEquals(plan.query.has("fsq_category_ids"), false);
+  // tb-25 / ADR 0012: the no-op chip contributes no category id, so the
+  // category-id set is empty and the candidate-pool floor is seeded.
+  assertEquals(
+    plan.query.get("fsq_category_ids"),
+    [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(","),
+  );
   assertEquals(plan.post_filters.disclaimers, []);
   assertEquals(plan.emitted_tags, []);
 });
@@ -604,26 +616,36 @@ Deno.test("buildFoursquareQuery — cuisine tag applies the mapped category to t
   assertEquals(plan.query.get("fsq_category_ids"), mexican.fsq_category_id);
 });
 
-Deno.test("buildFoursquareQuery — general call (no cuisine tag) stays un-category-scoped", () => {
+Deno.test("buildFoursquareQuery — general call (no cuisine tag) stays un-cuisine-scoped but carries the floor", () => {
   // research-01 §3.2: the mandatory general call supplies non-craved
-  // breadth and must NOT be category-filtered.
+  // breadth and must NOT be cuisine-filtered. tb-25 / ADR 0012: it IS
+  // venue-class floored — the floor is orthogonal to cuisine (every
+  // cuisine is a Restaurant child, so the Q5 cuisine-drop card survives).
   const plan = buildFoursquareQuery({
     lat: 40.7128,
     lng: -74.0060,
     radius_meters: 1600,
   });
-  assertEquals(plan.query.has("fsq_category_ids"), false);
+  assertEquals(
+    plan.query.get("fsq_category_ids"),
+    [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(","),
+  );
 });
 
 Deno.test("buildFoursquareQuery — unknown cuisine degrades to the general query (no error)", () => {
   // An unknown cuisine id must not throw and must not leak onto the wire.
+  // tb-25 / ADR 0012: with no resolvable cuisine category, the set is
+  // empty and degrades to the floored general query.
   const plan = buildFoursquareQuery({
     lat: 40.7128,
     lng: -74.0060,
     radius_meters: 1600,
     filters: { cuisine: "klingon" },
   });
-  assertEquals(plan.query.has("fsq_category_ids"), false);
+  assertEquals(
+    plan.query.get("fsq_category_ids"),
+    [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(","),
+  );
 });
 
 Deno.test("buildFoursquareQuery — cuisine + dietary categories both reach the wire", () => {
@@ -674,4 +696,131 @@ Deno.test("buildQuerySignature — unknown cuisine signs identically to the gene
     filters: { cuisine: "klingon" },
   });
   assertEquals(general, unknown);
+});
+
+// ---------------------------------------------------------------------------
+// Candidate-pool floor (tb-25 / ADR 0012) — the venue-type allowlist seeded
+// onto any Foursquare call whose category-id set is otherwise empty.
+// ---------------------------------------------------------------------------
+
+/** The eight live-probed (2026-05-19) hex taxonomy ids of the floor:
+ *  Restaurant, Sports Bar, Food Court, Food Truck, Food Stand, Cafeteria,
+ *  Breakfast Spot, Bagel Shop. Kept here so the test asserts the exact
+ *  membership the ADR specifies, independently of the module constant. */
+const FLOOR_IDS_EXPECTED = [
+  "4d4b7105d754a06374d81259", // Restaurant (parent — descendant-inclusive)
+  "4bf58dd8d48988d11d941735", // Sports Bar
+  "4bf58dd8d48988d120951735", // Food Court
+  "4bf58dd8d48988d1cb941735", // Food Truck
+  "5283c7b4e4b094cb91ad6b1b", // Food Stand
+  "4bf58dd8d48988d128941735", // Cafeteria
+  "4bf58dd8d48988d143941735", // Breakfast Spot
+  "4bf58dd8d48988d179941735", // Bagel Shop
+];
+
+Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS — is a single exported eight-id constant", () => {
+  // ADR 0012: the floor lives in one named, exported constant — the
+  // canonical source of truth alongside CUISINE_CATEGORY_MAP.
+  assertEquals(CANDIDATE_POOL_FLOOR_CATEGORY_IDS.length, 8);
+  assertEquals(
+    [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort(),
+    [...FLOOR_IDS_EXPECTED].sort(),
+  );
+});
+
+Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS — every member is a live hex taxonomy id", () => {
+  for (const id of CANDIDATE_POOL_FLOOR_CATEGORY_IDS) {
+    assertEquals(
+      HEX24_CATEGORY_ID.test(id),
+      true,
+      `floor id "${id}" is not a 24-char hex id`,
+    );
+  }
+});
+
+Deno.test("buildFoursquareQuery — general call seeds the eight-category floor", () => {
+  // ADR 0012: a general call carries no cuisine and no dietary category,
+  // so its category-id set is empty and the floor is seeded.
+  const plan = buildFoursquareQuery({
+    lat: 40.7128,
+    lng: -74.0060,
+    radius_meters: 1600,
+  });
+  const ids = plan.query.get("fsq_category_ids");
+  assertExists(ids);
+  assertEquals(
+    ids,
+    [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(","),
+  );
+});
+
+Deno.test("buildFoursquareQuery — per-cuisine call carries only the cuisine id, floor NOT OR-appended", () => {
+  // ADR 0012: fsq_category_ids is OR semantics — appending the floor to
+  // a per-cuisine call would OR-broaden it straight back to all
+  // restaurants. The floor is a fallback, never an addition.
+  const mexican = findCuisineCategory("mexican");
+  assertExists(mexican);
+  const plan = buildFoursquareQuery({
+    lat: 40.7128,
+    lng: -74.0060,
+    radius_meters: 1600,
+    filters: { cuisine: "mexican" },
+  });
+  assertEquals(plan.query.get("fsq_category_ids"), mexican.fsq_category_id);
+});
+
+Deno.test("buildFoursquareQuery — dietary category present means the floor is NOT added", () => {
+  // ADR 0012: a dietary category is a hard veto, correctly narrower than
+  // the floor. A non-empty category set suppresses the floor.
+  const plan = buildFoursquareQuery({
+    lat: 40.7128,
+    lng: -74.0060,
+    radius_meters: 1600,
+    filters: { dietary: ["halal"] },
+  });
+  // Only the halal category id — no floor members.
+  assertEquals(plan.query.get("fsq_category_ids"), "52e81612bcbc57f1066b79ff");
+});
+
+Deno.test("buildFoursquareQuery — fsq_category_ids is never emitted empty", () => {
+  // The core invariant: every call shape emits a non-empty category id
+  // list. General, disclaimer-only, no-op, and unknown-cuisine calls all
+  // fall back to the floor.
+  const shapes = [
+    {},
+    { dietary: ["shellfish"] }, // disclaimer-only — no category id
+    { dietary: ["Nothing tonight"] }, // no-op chip
+    { cuisine: "klingon" }, // unknown cuisine
+  ];
+  for (const filters of shapes) {
+    const plan = buildFoursquareQuery({
+      lat: 0, lng: 0, radius_meters: 100, filters,
+    });
+    const ids = plan.query.get("fsq_category_ids");
+    assertExists(ids, `expected fsq_category_ids for ${JSON.stringify(filters)}`);
+    assertEquals(ids.length > 0, true);
+  }
+});
+
+Deno.test("buildQuerySignature — floor seeding is signature-stable across the change", () => {
+  // The floor is deterministic, so two general calls at the same geo
+  // still produce the identical signature — the floor must not introduce
+  // any cache-key churn.
+  const a = buildQuerySignature({ lat: 0, lng: 0, radius_meters: 100 });
+  const b = buildQuerySignature({ lat: 0, lng: 0, radius_meters: 100 });
+  assertEquals(a, b);
+  // An unknown-cuisine call degrades to the general query and must still
+  // share the general call's cache row even with the floor seeded.
+  const unknown = buildQuerySignature({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { cuisine: "klingon" },
+  });
+  assertEquals(a, unknown);
+  // A per-cuisine call (floor NOT seeded) still signs distinctly from
+  // the general/floored call.
+  const mexican = buildQuerySignature({
+    lat: 0, lng: 0, radius_meters: 100,
+    filters: { cuisine: "mexican" },
+  });
+  assertEquals(a === mexican, false);
 });

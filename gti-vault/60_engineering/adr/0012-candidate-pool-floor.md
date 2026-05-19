@@ -11,7 +11,7 @@ superseded_by: null
 
 ## Status
 
-Accepted — 2026-05-19. Decision recorded; the code change is not yet built (see Open items / Implementation).
+Accepted — 2026-05-19. Implemented by tb-25 (2026-05-19) — see Implementation.
 
 ## Context
 
@@ -80,16 +80,31 @@ Both the Q5 candidate pool and the verdict candidate set derive from this single
 
 ## Open items
 
-- **Parent-inclusive verification.** Confirm that passing the `Restaurant` parent category id returns all cuisine children. The 2026-05-17 fix found that legacy short numeric ids return HTTP 400; hierarchical filtering on the post-2025 surface is unverified. If `Restaurant` is not descendant-inclusive, that floor member becomes an explicit cuisine-id list.
-- **Live-probe the eight floor category ids** against `/places/search`, as the cuisine ids were probed on 2026-05-17.
-- **MapKit bucketing.** Confirm whether Apple Maps files bagel shops / breakfast spots / cafeterias under `.restaurant`. If not, they are under-included in degraded mode — unverified, not asserted either way.
+All three probes resolved by tb-25 on **2026-05-19** (live `/places/search`, post-2025 surface, API version `2025-06-17`).
+
+- **Parent-inclusive verification — RESOLVED.** The `Restaurant` parent category id `4d4b7105d754a06374d81259` **is** descendant-inclusive on the post-2025 surface. A parent-only search returned venues tagged with cuisine-child category ids — Japanese `4bf58dd8d48988d111941735`, Italian `4bf58dd8d48988d110941735`, Chinese `4bf58dd8d48988d145941735`, American `4bf58dd8d48988d14e941735`, all members of `CUISINE_CATEGORY_MAP`. The floor therefore carries the single `Restaurant` parent id; the cuisine children are not enumerated.
+- **Live-probe the eight floor category ids — RESOLVED.** All eight returned HTTP 200:
+
+  | Member | Category id | HTTP | Result rows (probe geo) |
+  |---|---|---|---|
+  | Restaurant | `4d4b7105d754a06374d81259` | 200 | 5 (NYC) |
+  | Sports Bar | `4bf58dd8d48988d11d941735` | 200 | 3 (NYC) |
+  | Food Court | `4bf58dd8d48988d120951735` | 200 | 55 (NYC) |
+  | Food Truck | `4bf58dd8d48988d1cb941735` | 200 | 8 (NYC) |
+  | Food Stand | `5283c7b4e4b094cb91ad6b1b` | 200 | 0 (NYC + LA) |
+  | Cafeteria | `4bf58dd8d48988d128941735` | 200 | 3 (NYC) |
+  | Breakfast Spot | `4bf58dd8d48988d143941735` | 200 | 4 (NYC) |
+  | Bagel Shop | `4bf58dd8d48988d179941735` | 200 | 5 (NYC) |
+
+  `Food Stand` returned zero rows at both probe geos (NYC and a wide LA radius). The id is valid (HTTP 200, not 400) — it is a genuinely sparse Foursquare category, not a bad id. It stays in the floor: it contributes nothing where empty and is harmless, and is correct where venues exist. The resolved ids are now the canonical `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` constant in `supabase/functions/_shared/foursquare.ts`.
+- **MapKit bucketing — accepted as documented degraded mode.** Whether Apple Maps files bagel shops / breakfast spots / cafeterias under `.restaurant` is not verifiable from this environment (MapKit needs a device / simulator). Per the ADR's stated tolerance, this is left as accepted degraded-mode imprecision: if those venue classes are not under `.restaurant`, they are under-included in MapKit fallback only. Not a blocker; documented in the `MapKitPlacesFallback.swift` comment.
 
 ## Implementation
 
-Two-file code change, not yet built:
+Built by tb-25 (2026-05-19):
 
-- `supabase/functions/_shared/foursquare.ts` — the seed-when-empty rule in `buildFoursquareQuery`.
-- `ios/Sources/App/MapKitPlacesFallback.swift` — tighten the POI filter to `[.restaurant]`.
+- `supabase/functions/_shared/foursquare.ts` — `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` exported constant (the eight live-probed ids) plus the seed-when-empty rule in `buildFoursquareQuery`: after assembling `categoryIds`, the floor is seeded iff the set is empty. `fsq_category_ids` is now always emitted non-empty.
+- `ios/Sources/App/MapKitPlacesFallback.swift` — POI filter tightened from `[.restaurant, .cafe, .foodMarket]` to `[.restaurant]`.
 
 ## References
 

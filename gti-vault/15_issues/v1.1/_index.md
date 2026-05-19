@@ -165,7 +165,7 @@ A `/grill-with-docs` session pinned down a leak found in an earlier undocumented
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| TB-25 (v1.1) | [[issues/tb-25-candidate-pool-floor\|Apply the candidate-pool floor — Restaurant + Sports Bar allowlist on every Foursquare call]] — ready-for-agent | AFK | [#133](https://github.com/samfarls55/gettoit/issues/133) | — |
+| TB-25 (v1.1) | [[issues/tb-25-candidate-pool-floor\|Apply the candidate-pool floor — Restaurant + Sports Bar allowlist on every Foursquare call]] ✅ done — `buildFoursquareQuery` seeds the eight-id `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` constant when the category set is empty (fallback, never an OR-addition); `fsq_category_ids` is never emitted empty; `MapKitPlacesFallback` POI filter tightened to `[.restaurant]`; eight floor ids live-probed (all HTTP 200, `Restaurant` parent confirmed descendant-inclusive) — ADR 0012 Open items resolved (PR #135) | AFK | [#133](https://github.com/samfarls55/gettoit/issues/133) | — |
 
 ## Cross-references
 

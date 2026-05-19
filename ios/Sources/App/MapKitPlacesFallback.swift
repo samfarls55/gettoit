@@ -39,8 +39,18 @@ public final class MapKitPlacesFallback: PlacesMapKitFallback {
         )
         request.region = region
         request.resultTypes = [.pointOfInterest]
+        // Candidate-pool floor (tb-25 / ADR 0012) — degraded-mode
+        // approximation. `.cafe` and `.foodMarket` sit outside the floor
+        // (cafes and grocery / food markets are not meal venues), so the
+        // filter is tightened to `.restaurant` only. The floor's
+        // `Sports Bar` carve-out is inexpressible in MapKit's POI
+        // taxonomy and is dropped in fallback mode; this is documented
+        // degraded-mode behavior, not a defect. Whether Apple Maps files
+        // bagel shops / breakfast spots / cafeterias under `.restaurant`
+        // is unverified — if it does not, those are under-included in
+        // degraded mode, which ADR 0012 accepts.
         request.pointOfInterestFilter = MKPointOfInterestFilter(
-            including: [.restaurant, .cafe, .foodMarket]
+            including: [.restaurant]
         )
 
         let search = MKLocalSearch(request: request)
