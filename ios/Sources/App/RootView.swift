@@ -519,6 +519,16 @@ public struct RootView: View {
                 // Function unions every member's fetch into `options`
                 // at verdict fire time.
                 memberFetchWriter: MemberFetchSupabaseWriter.make(client: client),
+                // bug-14 — a failed `member_fetches` write is no longer
+                // swallowed: emit a `member_fetch_persist_failed`
+                // telemetry event so a dropped persist is visible (the
+                // verdict could otherwise fire against a pool missing
+                // this member's fetch with nothing recording why).
+                memberFetchFailureSink: Self.makeMemberFetchFailureSink(
+                    client: client,
+                    roomID: roomID,
+                    userID: userID
+                ),
                 writer: QuizSupabaseWriter.make(client: client)
             )
             // Flip into the quiz and tear down S01 routing state in
@@ -537,6 +547,42 @@ public struct RootView: View {
             // Clear the deep link so closing the quiz returns to S00
             // Landing rather than re-routing back into Join.
             self.deepLink = nil
+        }
+    }
+
+    /// bug-14 — build the `MemberFetchPersistFailureSink` the quiz
+    /// coordinator invokes when a `member_fetches` write fails.
+    ///
+    /// Before bug-14 a failed `member_fetches` persist was caught and
+    /// dropped, so a dropped persist was invisible — and the verdict
+    /// could fire against an `options` union missing this member's
+    /// fetch with nothing recording why. This sink emits a
+    /// `member_fetch_persist_failed` row into the `events` table
+    /// (`SupabaseTelemetrySink`, the documented telemetry seam per ADR
+    /// 0005) so the failure is observable in the Supabase telemetry the
+    /// runtime diagnosis relies on.
+    ///
+    /// `member_fetch_persist_failed` is outside the documented
+    /// `TelemetryWriter` event vocabulary; it is emitted through the
+    /// raw sink rather than a typed helper, which keeps the new event
+    /// confined to this failure path until it earns a first-class
+    /// helper. The emission is best-effort — a telemetry write that
+    /// itself fails is dropped, exactly as the other client-side
+    /// telemetry emissions are.
+    private static func makeMemberFetchFailureSink(
+        client: SupabaseClient,
+        roomID: UUID,
+        userID: UUID
+    ) -> MemberFetchPersistFailureSink {
+        let sink = SupabaseTelemetrySink(client: client)
+        return { error in
+            let row = TelemetryRow(
+                eventType: "member_fetch_persist_failed",
+                roomID: roomID,
+                userID: userID,
+                properties: ["error": .string(String(describing: error))]
+            )
+            Task { try? await sink.write(row) }
         }
     }
 

@@ -95,6 +95,23 @@ public enum QuizSubmitOutcome: Equatable, Sendable {
 /// that exercises a recorded fixture.
 public typealias QuizVoteWriter = @Sendable (QuizCoordinator.VoteRow) async throws -> Void
 
+/// bug-14 (v1.1) — the failure-surfacing seam for the `member_fetches`
+/// persist. Before bug-14 a failed `member_fetches` write was caught
+/// and dropped inside `persistRawFetch`, so a failed or slow persist
+/// was invisible: no telemetry, no retry, no signal — and the verdict
+/// could fire against a `member_fetches` table missing the member's
+/// row with nothing recording why.
+///
+/// The coordinator invokes this closure with the thrown error whenever
+/// the `member_fetches` write fails. Production binds it to a
+/// telemetry emission (`member_fetch_persist_failed`); the unit tests
+/// bind a capture spy. Optional — when nil the failure is still
+/// observable via `QuizCoordinator.lastMemberFetchPersist`.
+///
+/// `@Sendable` so it can be invoked from inside the coordinator's
+/// fetch task, which crosses an actor hop.
+public typealias MemberFetchPersistFailureSink = @Sendable (Error) -> Void
+
 @MainActor
 @Observable
 public final class QuizCoordinator {
@@ -136,6 +153,27 @@ public final class QuizCoordinator {
     }
 
     public private(set) var q5CandidatesState: Q5CandidatesState = .idle
+
+    /// bug-14 (v1.1) — the outcome of the member's `member_fetches`
+    /// persist. The verdict must never fire against a `member_fetches`
+    /// table missing this member's row because of a race or a dropped
+    /// error; this makes the persist's result observable so `submit()`
+    /// (which now awaits the persist) and the tests can reason about it.
+    ///
+    /// `notAttempted` — no `memberFetchWriter` injected (legacy init /
+    /// unit tests), or the per-member fetch never ran.
+    /// `written` — the `member_fetches` row landed. The payload may be
+    /// empty: bug-14 records a genuinely empty fetch as a real row so
+    /// the server can tell "no candidates" from "write never ran".
+    /// `failed` — the write threw. Surfaced, never swallowed: the
+    /// `MemberFetchPersistFailureSink` (if injected) also fired.
+    public enum MemberFetchPersist: Equatable, Sendable {
+        case notAttempted
+        case written
+        case failed(String)
+    }
+
+    public private(set) var lastMemberFetchPersist: MemberFetchPersist = .notAttempted
 
     /// The cuisine-craving cap. Q1 allows at most this many cuisine
     /// picks before further selections are prevented (PRD user story
@@ -191,6 +229,13 @@ public final class QuizCoordinator {
     /// tests); the persistence step is then simply skipped.
     private let memberFetchWriter: MemberFetchWriter?
 
+    /// bug-14 (v1.1) — the failure-surfacing seam for the
+    /// `member_fetches` persist. Invoked with the thrown error when the
+    /// write fails. Optional: the live quiz path binds it to a
+    /// telemetry emission; unit / boundary tests omit it (the failure
+    /// is still observable via `lastMemberFetchPersist`).
+    private let memberFetchFailureSink: MemberFetchPersistFailureSink?
+
     /// In-flight per-member fetch task, so a re-entrant Q4 -> Q5
     /// transition (or a defensive double-`advance()`) folds into the
     /// already-running fetch instead of firing the N+1 calls twice.
@@ -233,6 +278,7 @@ public final class QuizCoordinator {
         self.sessionParameters = sessionParameters
         self.candidateFetch = nil
         self.memberFetchWriter = nil
+        self.memberFetchFailureSink = nil
         self.writer = writer
         // Seed Q5 ratings at the spec'd default (3 — middle of the
         // 1–5 scale) so the surface renders with a chosen state per
@@ -253,11 +299,17 @@ public final class QuizCoordinator {
     /// quiz path supplies one (`QuizSessionAssembler` injects a
     /// `MemberFetchSupabaseWriter`); the boundary tests omit it and the
     /// persistence step is skipped.
+    ///
+    /// bug-14 (v1.1) — `memberFetchFailureSink` surfaces a failed
+    /// `member_fetches` write (the live quiz path binds it to a
+    /// telemetry emission). Optional: unit / boundary tests omit it and
+    /// the failure stays observable via `lastMemberFetchPersist`.
     public init(
         roomID: UUID,
         userID: UUID,
         candidateFetch: QuizCandidateFetch,
         memberFetchWriter: MemberFetchWriter? = nil,
+        memberFetchFailureSink: MemberFetchPersistFailureSink? = nil,
         sessionParameters: SessionParameters = .default,
         writer: @escaping QuizVoteWriter
     ) {
@@ -267,6 +319,7 @@ public final class QuizCoordinator {
         self.sessionParameters = sessionParameters
         self.candidateFetch = candidateFetch
         self.memberFetchWriter = memberFetchWriter
+        self.memberFetchFailureSink = memberFetchFailureSink
         self.writer = writer
         self.q5Ratings = [:]
     }
@@ -415,7 +468,16 @@ public final class QuizCoordinator {
             // `options` at verdict fire time. Awaited inside the fetch
             // task so `awaitCandidateFetch()` covers the persistence
             // too; best-effort, so a write failure never strands Q5.
+            //
+            // bug-14: the persist is awaited as the LAST step of the
+            // task body and `fetchTask` is cleared only here, after the
+            // persist resolves — never inside `applyFetchResult`. A
+            // `submit()` that calls `awaitCandidateFetch()` must wait
+            // for the persist, not just the fetch; clearing the handle
+            // mid-task would let `submit()` race past an in-flight
+            // `member_fetches` write and fire the verdict early.
             await self.persistRawFetch(result.rawFetch)
+            self.fetchTask = nil
         }
     }
 
@@ -428,17 +490,31 @@ public final class QuizCoordinator {
     /// `compute-verdict` Edge Function unions every member's persisted
     /// fetch into `options` at verdict fire time.
     ///
-    /// Skipped when no `memberFetchWriter` was injected (legacy init /
-    /// unit tests) or when the raw fetch is empty (a genuinely empty
-    /// fetch — every call came back empty, or the fetch threw — has no
-    /// real venues to contribute to the room's union).
+    /// bug-14 (v1.1) — two changes to the pre-bug-14 behavior:
     ///
-    /// Best-effort: a write failure is swallowed. The member must
-    /// still reach Q5 and submit — a missing `member_fetches` row
-    /// degrades that member's fetch out of the room's `options` union,
-    /// which is recoverable, whereas blocking the quiz is not.
+    ///   * **An empty raw fetch is now recorded, not skipped.** Before
+    ///     bug-14 an empty `rawFetch` was guarded out entirely, so no
+    ///     `member_fetches` row was written — indistinguishable
+    ///     downstream from "the write never ran." A genuinely empty
+    ///     fetch (every call came back empty / the fetch threw) is now
+    ///     persisted as a real row with an empty `payload`, so the
+    ///     server can tell "this member has no candidates" apart from
+    ///     "this member's write never landed."
+    ///   * **A write failure is surfaced, not swallowed.** The thrown
+    ///     error is recorded on `lastMemberFetchPersist` and forwarded
+    ///     to the `memberFetchFailureSink` (telemetry on the live
+    ///     path). The persist stays best-effort — the member is never
+    ///     stranded — but the failure is no longer invisible.
+    ///
+    /// Skipped only when no `memberFetchWriter` was injected (legacy
+    /// init / unit tests); `lastMemberFetchPersist` then stays
+    /// `.notAttempted`.
     private func persistRawFetch(_ rawFetch: [ShapedPlace]) async {
-        guard let memberFetchWriter, !rawFetch.isEmpty else { return }
+        guard let memberFetchWriter else { return }
+        // bug-14: the row is written even when `rawFetch` is empty. An
+        // empty `payload` is a deliberate "this member fetched nothing"
+        // record — the server reads the row's presence to distinguish a
+        // genuinely empty fetch from a write that never ran.
         let row = MemberFetchRow(
             roomID: roomID,
             userID: userID,
@@ -446,16 +522,27 @@ public final class QuizCoordinator {
         )
         do {
             try await memberFetchWriter(row)
+            lastMemberFetchPersist = .written
         } catch {
-            // Best-effort — the quiz flow is never blocked on this
-            // write. The member still reaches Q5; the only cost is
-            // their fetch missing from the room's `options` union.
+            // bug-14: the failure is surfaced — recorded for callers to
+            // observe and forwarded to the failure sink (telemetry on
+            // the live path) — never silently swallowed. The persist
+            // stays best-effort: the member still reaches Q5 and can
+            // submit even though their fetch missed `options`.
+            lastMemberFetchPersist = .failed(String(describing: error))
+            memberFetchFailureSink?(error)
         }
     }
 
     /// Fold a resolved per-member fetch into the coordinator: install
     /// the candidate list, seed the Q5 ratings, and flip
     /// `q5CandidatesState` so Q5 swaps the loading state for the cards.
+    ///
+    /// bug-14: this no longer clears `fetchTask`. The handle is cleared
+    /// only after `persistRawFetch` resolves (see
+    /// `startCandidateFetchIfNeeded`) so `awaitCandidateFetch()` — and
+    /// therefore `submit()` — waits for the `member_fetches` persist,
+    /// not just the fetch.
     private func applyFetchResult(_ result: QuizCandidateFetchResult) {
         candidates = result.candidates
         q5Ratings = QuizCoordinator.seededRatings(for: result.candidates)
@@ -463,12 +550,18 @@ public final class QuizCoordinator {
         case .fetched:    q5CandidatesState = .ready
         case .noResults:  q5CandidatesState = .noResults
         }
-        fetchTask = nil
     }
 
-    /// Await the in-flight per-member fetch, if any. Exposed so the
-    /// boundary tests can deterministically observe the post-fetch
-    /// candidate list without polling. A no-op when no fetch is running.
+    /// Await the in-flight per-member fetch AND its `member_fetches`
+    /// persist, if any. Exposed so the boundary tests can
+    /// deterministically observe the post-fetch candidate list without
+    /// polling. A no-op when no fetch is running.
+    ///
+    /// bug-14: `submit()` calls this before the verdict-firing `votes`
+    /// write, so the verdict never fires against a `member_fetches`
+    /// table missing this member's row. The awaited task body runs the
+    /// fetch, applies the result, then awaits `persistRawFetch` — so a
+    /// single await here covers both phases.
     public func awaitCandidateFetch() async {
         await fetchTask?.value
     }
@@ -476,6 +569,17 @@ public final class QuizCoordinator {
     /// Submit the assembled vote row. Idempotent on retry — a unique-
     /// constraint reject from a prior successful write resolves as
     /// `.idempotent`.
+    ///
+    /// bug-14 (v1.1) — the verdict-firing `votes` write is gated behind
+    /// the member's candidate fetch AND its `member_fetches` persist.
+    /// The `votes` insert triggers the server-side verdict fire; before
+    /// bug-14 `submit()` did not await the per-member fetch task, so a
+    /// member who completed Q5 faster than their background fetch could
+    /// fire the verdict before their `member_fetches` row existed — the
+    /// `options` union then assembled a pool that did not reflect that
+    /// member. Awaiting `fetchTask` here closes that race: the fetch
+    /// task awaits `persistRawFetch` internally, so a single
+    /// `awaitCandidateFetch()` covers both the fetch and the persist.
     @discardableResult
     public func submit() async -> Result<QuizSubmitOutcome, Error> {
         // Fold rapid-tap submits into a single write.
@@ -485,6 +589,12 @@ public final class QuizCoordinator {
         }
 
         step = .submitting
+        // bug-14: gate the verdict-firing write on the member's
+        // candidate fetch + `member_fetches` persist. A no-op when no
+        // fetch is in flight (legacy explicit-`candidates:` init, or
+        // the fetch already resolved before Q5 submit) — the rapid-tap
+        // fold above and the step machine below are untouched.
+        await awaitCandidateFetch()
         let row = buildRow()
         let task = Task<QuizSubmitOutcome, Error> { [writer] in
             do {

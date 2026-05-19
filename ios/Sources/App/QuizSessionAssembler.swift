@@ -76,6 +76,11 @@ public enum QuizSessionAssembler {
     /// `options` at verdict fire time. Optional — when nil (or when the
     /// session has no coordinate, so there is no live fetch) the
     /// coordinator simply skips the persistence step.
+    ///
+    /// bug-14 (v1.1) — `memberFetchFailureSink` surfaces a failed
+    /// `member_fetches` write (the live path binds it to a telemetry
+    /// emission). Optional — when nil the failure stays observable via
+    /// `QuizCoordinator.lastMemberFetchPersist`.
     public static func assembleCoordinator(
         roomID: UUID,
         userID: UUID,
@@ -85,6 +90,7 @@ public enum QuizSessionAssembler {
         sessionParameters: SessionParameters = .default,
         places: PlacesService,
         memberFetchWriter: MemberFetchWriter? = nil,
+        memberFetchFailureSink: MemberFetchPersistFailureSink? = nil,
         writer: @escaping QuizVoteWriter
     ) -> Assembled {
         let candidateFetch: QuizCandidateFetch
@@ -116,6 +122,10 @@ public enum QuizSessionAssembler {
             // into `member_fetches`. Carried through so the per-member
             // fetch result flows to the server-side `options` union.
             memberFetchWriter: memberFetchWriter,
+            // bug-14 — surface a failed `member_fetches` write instead
+            // of swallowing it; the live path binds this to a
+            // telemetry emission.
+            memberFetchFailureSink: memberFetchFailureSink,
             sessionParameters: sessionParameters,
             writer: writer
         )

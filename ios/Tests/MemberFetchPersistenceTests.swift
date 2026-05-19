@@ -143,11 +143,16 @@ final class MemberFetchPersistenceTests: XCTestCase {
         XCTAssertEqual(coord.q5CandidatesState, .noResults)
     }
 
-    // MARK: - an empty raw fetch persists nothing
+    // MARK: - an empty raw fetch is recorded distinguishably (bug-14)
 
-    func testEmptyRawFetchPersistsNoRow() async {
-        // A genuinely empty fetch (every call came back empty / the
-        // fetch threw) has no real venues — nothing to persist.
+    func testEmptyRawFetchStillPersistsAnEmptyRow() async {
+        // bug-14: a genuinely empty fetch (every call came back empty /
+        // the fetch threw) is now persisted as a real `member_fetches`
+        // row with an empty `payload` — NOT silently skipped. The
+        // server reads the row's presence to distinguish "this member
+        // has no candidates" from "this member's write never ran."
+        let roomID = UUID()
+        let userID = UUID()
         let fetch = StubCandidateFetch(result: QuizCandidateFetchResult(
             candidates: [],
             source: .noResults,
@@ -155,7 +160,7 @@ final class MemberFetchPersistenceTests: XCTestCase {
         ))
         let recorder = RecordingMemberFetchWriter()
         let coord = QuizCoordinator(
-            roomID: UUID(), userID: UUID(),
+            roomID: roomID, userID: userID,
             candidateFetch: fetch,
             memberFetchWriter: recorder.writer,
             writer: { _ in }
@@ -164,8 +169,14 @@ final class MemberFetchPersistenceTests: XCTestCase {
         coord.advance(); coord.advance(); coord.advance(); coord.advance()
         await coord.awaitCandidateFetch()
 
-        XCTAssertTrue(recorder.rows.isEmpty,
-            "an empty raw fetch contributes no venues — nothing is persisted")
+        XCTAssertEqual(recorder.rows.count, 1,
+            "an empty fetch still writes one member_fetches row — recorded, not skipped")
+        XCTAssertEqual(recorder.rows.first?.roomID, roomID)
+        XCTAssertEqual(recorder.rows.first?.userID, userID)
+        XCTAssertTrue(recorder.rows.first?.payload.isEmpty ?? false,
+            "an empty fetch persists a row with an empty payload — a deliberate 'no candidates' record")
+        XCTAssertEqual(coord.lastMemberFetchPersist, .written,
+            "the empty-fetch row write succeeded — the persist is marked written")
     }
 
     // MARK: - a persistence write failure never strands the member
@@ -193,5 +204,195 @@ final class MemberFetchPersistenceTests: XCTestCase {
         XCTAssertEqual(coord.allCandidates.map(\.id), ["a"],
             "a failed persistence write still leaves Q5 with its candidate list")
         XCTAssertEqual(coord.q5CandidatesState, .ready)
+    }
+
+    // MARK: - bug-14: a failed persist is surfaced, never swallowed
+
+    func testPersistWriteFailureIsSurfacedToTheFailureSink() async {
+        // bug-14 root cause #3: a failed `member_fetches` write was
+        // caught and dropped — no telemetry, no signal. The failure is
+        // now forwarded to the injected `memberFetchFailureSink` AND
+        // recorded on `lastMemberFetchPersist`.
+        struct WriteError: Error, CustomStringConvertible {
+            var description: String { "member_fetches insert rejected" }
+        }
+        let fetch = StubCandidateFetch(result: QuizCandidateFetchResult(
+            candidates: [QuizCandidate(id: "a", name: "a", meta: "")],
+            source: .fetched,
+            rawFetch: [place("a")]
+        ))
+        let captured = CapturedFailures()
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidateFetch: fetch,
+            memberFetchWriter: { _ in throw WriteError() },
+            memberFetchFailureSink: captured.sink,
+            writer: { _ in }
+        )
+
+        coord.advance(); coord.advance(); coord.advance(); coord.advance()
+        await coord.awaitCandidateFetch()
+
+        XCTAssertEqual(captured.errors.count, 1,
+            "a failed member_fetches write is surfaced to the failure sink exactly once")
+        XCTAssertTrue(
+            String(describing: captured.errors.first as Any)
+                .contains("member_fetches insert rejected"),
+            "the failure sink receives the thrown write error")
+        guard case .failed = coord.lastMemberFetchPersist else {
+            return XCTFail("expected lastMemberFetchPersist to be .failed, got \(coord.lastMemberFetchPersist)")
+        }
+    }
+
+    func testSuccessfulPersistMarksLastMemberFetchPersistWritten() async {
+        // The happy-path complement: a clean write records `.written`.
+        let fetch = StubCandidateFetch(result: QuizCandidateFetchResult(
+            candidates: [QuizCandidate(id: "a", name: "a", meta: "")],
+            source: .fetched,
+            rawFetch: [place("a")]
+        ))
+        let recorder = RecordingMemberFetchWriter()
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidateFetch: fetch,
+            memberFetchWriter: recorder.writer,
+            writer: { _ in }
+        )
+
+        coord.advance(); coord.advance(); coord.advance(); coord.advance()
+        await coord.awaitCandidateFetch()
+
+        XCTAssertEqual(coord.lastMemberFetchPersist, .written)
+    }
+
+    func testPersistIsNotAttemptedWithoutAWriter() async {
+        // The legacy / boundary path injects no writer — the persist is
+        // skipped and `lastMemberFetchPersist` stays `.notAttempted`.
+        let fetch = StubCandidateFetch(result: QuizCandidateFetchResult(
+            candidates: [QuizCandidate(id: "a", name: "a", meta: "")],
+            source: .fetched,
+            rawFetch: [place("a")]
+        ))
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidateFetch: fetch,
+            writer: { _ in }
+        )
+
+        coord.advance(); coord.advance(); coord.advance(); coord.advance()
+        await coord.awaitCandidateFetch()
+
+        XCTAssertEqual(coord.lastMemberFetchPersist, .notAttempted)
+    }
+
+    // MARK: - bug-14: submit awaits the fetch + persist before firing
+
+    func testSubmitAwaitsThePersistBeforeTheVerdictFiringWrite() async {
+        // bug-14 root cause #1: the verdict-firing `votes` write must
+        // not run until the member's candidate fetch AND its
+        // `member_fetches` persist have completed. A slow persist must
+        // still land before the votes write.
+        let order = EventLog()
+        let fetch = SlowCandidateFetch(
+            result: QuizCandidateFetchResult(
+                candidates: [QuizCandidate(id: "a", name: "a", meta: "")],
+                source: .fetched,
+                rawFetch: [place("a")]
+            ),
+            log: order
+        )
+        let memberWriter: MemberFetchWriter = { _ in
+            // A slow persist — yields so a non-awaiting submit would
+            // race ahead of it.
+            for _ in 0..<20 { await Task.yield() }
+            order.append("persist")
+        }
+        let votesWriter: QuizVoteWriter = { _ in
+            order.append("votes")
+        }
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidateFetch: fetch,
+            memberFetchWriter: memberWriter,
+            writer: votesWriter
+        )
+
+        coord.advance(); coord.advance(); coord.advance(); coord.advance()
+        // Submit immediately — the per-member fetch is still in flight.
+        let result = await coord.submit()
+
+        guard case .success = result else {
+            return XCTFail("expected submit to succeed, got \(result)")
+        }
+        XCTAssertEqual(order.events, ["fetch", "persist", "votes"],
+            "the verdict-firing votes write must run only after the fetch and member_fetches persist complete")
+        XCTAssertEqual(coord.step, .submitted)
+    }
+
+    func testSubmitWithoutAnInFlightFetchStillWrites() async {
+        // The legacy explicit-`candidates:` init fires no fetch — the
+        // submit-awaits-fetch gate must be a clean no-op there.
+        let recorder = RecordingWriterDouble()
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidates: [QuizCandidate(id: "a", name: "a", meta: "")],
+            writer: recorder.writer
+        )
+        let result = await coord.submit()
+        guard case .success = result else {
+            return XCTFail("expected submit to succeed, got \(result)")
+        }
+        XCTAssertEqual(recorder.rows.count, 1,
+            "submit still writes when there is no in-flight fetch to await")
+        XCTAssertEqual(coord.step, .submitted)
+    }
+
+    // MARK: - bug-14 test doubles
+
+    /// Captures every error the coordinator surfaces to its failure sink.
+    final class CapturedFailures: @unchecked Sendable {
+        var errors: [Error] = []
+        var sink: MemberFetchPersistFailureSink {
+            { [weak self] error in self?.errors.append(error) }
+        }
+    }
+
+    /// Ordered append-only log so a test can assert the relative order
+    /// of the fetch, the persist, and the votes write.
+    final class EventLog: @unchecked Sendable {
+        private let lock = NSLock()
+        private(set) var events: [String] = []
+        func append(_ event: String) {
+            lock.lock(); defer { lock.unlock() }
+            events.append(event)
+        }
+    }
+
+    /// A `QuizCandidateFetch` that yields a few times before resolving
+    /// (so a non-awaiting `submit()` would race ahead) and logs when it
+    /// completes.
+    final class SlowCandidateFetch: QuizCandidateFetch, @unchecked Sendable {
+        let result: QuizCandidateFetchResult
+        let log: EventLog
+        init(result: QuizCandidateFetchResult, log: EventLog) {
+            self.result = result
+            self.log = log
+        }
+        func fetchCandidates(
+            answers: QuizFetchAnswers,
+            parameters: SessionParameters
+        ) async -> QuizCandidateFetchResult {
+            for _ in 0..<10 { await Task.yield() }
+            log.append("fetch")
+            return result
+        }
+    }
+
+    /// Minimal recording `QuizVoteWriter` double.
+    final class RecordingWriterDouble: @unchecked Sendable {
+        var rows: [QuizCoordinator.VoteRow] = []
+        var writer: QuizVoteWriter {
+            { [weak self] row in self?.rows.append(row) }
+        }
     }
 }
