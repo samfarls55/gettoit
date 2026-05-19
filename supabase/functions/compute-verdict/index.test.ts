@@ -221,15 +221,34 @@ Deno.test("compute-verdict — missing room returns 404", async () => {
   assertEquals(res.status, 404);
 });
 
-Deno.test("compute-verdict — no candidates returns 404", async () => {
-  const { adapter } = memoryAdapter({ options: [] });
+Deno.test("compute-verdict — empty candidate pool resolves to a no_survivor verdict (bug-13)", async () => {
+  // bug-13 — an empty `options` pool is a terminal no-survivor
+  // outcome, not a 404. The room must leave `firing` with a verdict
+  // row written so iOS can render the no-survivor screen; the old
+  // `no_candidates` 404 left the room wedged forever.
+  const { adapter, inserts } = memoryAdapter({
+    options: [],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: {},
+      },
+    ],
+  });
   const res = await handleRequest(
     authedPost({ room_id: VALID_ROOM_ID }),
     { env: envOk(), buildDataAdapter: () => adapter },
   );
-  assertEquals(res.status, 404);
+  assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.error, "no_candidates");
+  assertEquals(body.verdict.method, "no_survivor");
+  assertEquals(body.verdict.option_id, null);
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].method, "no_survivor");
 });
 
 Deno.test("compute-verdict — no votes returns 404", async () => {

@@ -27,9 +27,11 @@
 // Error responses:
 //   400 — invalid input
 //   401 — missing JWT
-//   404 — room not found (no options / no votes / RLS hides the room)
+//   404 — room not found / no votes / RLS hides the room. NOTE: an
+//         empty candidate pool is NOT a 404 — bug-13 made it a terminal
+//         `no_survivor` verdict (200), so the room never wedges in
+//         `firing`.
 //   409 — verdict already computed for this room
-//   422 — TB-06 scope-out: no survivors (TB-09 lands the terminal)
 //   500 — engine misconfigured
 
 import {
@@ -498,18 +500,24 @@ export async function handleRequest(
 
   const voteRows = await data.fetchVotes(roomId);
 
-  if (optionRows.length === 0) {
-    return jsonResponse({ error: "no_candidates" }, {
-      status: 404,
-      headers: corsHeaders(),
-    });
-  }
+  // A room with no member votes can't yield a verdict at all — there
+  // is no group to render the result for. That stays a hard 404.
   if (voteRows.length === 0) {
     return jsonResponse({ error: "no_votes" }, {
       status: 404,
       headers: corsHeaders(),
     });
   }
+
+  // bug-13 — an EMPTY candidate pool is NOT an error. It is a valid
+  // terminal outcome: the engine short-circuits an empty pool to a
+  // `no_survivor` output (verdict-engine.ts: empty EBA survivors →
+  // buildNoSurvivorOutput), and the code below persists that terminal
+  // verdict row + advances the room out of `firing`, exactly as a
+  // normal verdict does. Returning `no_candidates` as a 404 here is
+  // what wedged ~29% of rooms on 2026-05-19: no `verdicts` row ever
+  // landed, so the room stayed `firing` forever and iOS polled a
+  // verdict that never resolved. The empty pool now flows through.
 
   // Start with the override when supplied; fall back to the stored
   // room radius for the standard fire path.

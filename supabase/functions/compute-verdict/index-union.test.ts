@@ -241,11 +241,17 @@ Deno.test("compute-verdict — the options pool is the full fetched union (more 
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// Degenerate — no fetches at all still surfaces no_candidates
+// Degenerate — no fetches at all resolves to a terminal no_survivor
+// verdict (bug-13). An empty pool is no longer a 404 wedge.
 // ───────────────────────────────────────────────────────────────────────
 
-Deno.test("compute-verdict — a room with no persisted fetches still returns no_candidates", async () => {
-  const { adapter } = unionAdapter({
+Deno.test("compute-verdict — a room with no persisted fetches resolves to a no_survivor verdict (bug-13)", async () => {
+  // The union yields nothing, so `options` stays empty. bug-13 — an
+  // empty candidate pool is a terminal no-survivor outcome, not a
+  // `no_candidates` 404: the engine short-circuits to `no_survivor`
+  // and the handler persists the terminal verdict so the room leaves
+  // `firing` instead of wedging.
+  const { adapter, inserts } = unionAdapter({
     memberFetches: [],
     votes: votesFor("u1"),
   });
@@ -255,9 +261,13 @@ Deno.test("compute-verdict — a room with no persisted fetches still returns no
     { env: envOk(), buildDataAdapter: () => adapter },
   );
 
-  assertEquals(res.status, 404);
+  assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.error, "no_candidates");
+  assertEquals(body.error, undefined);
+  assertEquals(body.verdict.method, "no_survivor");
+  assertEquals(body.verdict.option_id, null);
+  assertEquals(inserts.length, 1);
+  assertEquals(inserts[0].method, "no_survivor");
 });
 
 // ───────────────────────────────────────────────────────────────────────
