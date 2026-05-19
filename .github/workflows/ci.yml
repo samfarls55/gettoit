@@ -36,8 +36,24 @@ name: ci
 on:
   push:
     branches: [main]
+    # Docs-only changes never affect any build lane, so skip the whole
+    # workflow for them — no runners spun up, and (the real win) a
+    # docs-only push can't cancel a code build already in flight via the
+    # `concurrency` group below. `gti-vault/**` is the Obsidian knowledge
+    # base (issue files, AFK run logs, _index.md churn — never source);
+    # `docs/**` is agent/runbook docs; `*.md` is root-only (CLAUDE.md,
+    # CONTEXT.md, README) — deliberately NOT `**/*.md`, because
+    # `design-system/surfaces/*.md` feeds verify.mjs surface↔jsx pairing.
+    paths-ignore:
+      - 'gti-vault/**'
+      - 'docs/**'
+      - '*.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'gti-vault/**'
+      - 'docs/**'
+      - '*.md'
   # Manual re-trigger surface for the `testflight` job (and any other
   # lane that's idempotent enough to re-run safely). Useful when a
   # transient App Store Connect upload failure needs a retry without

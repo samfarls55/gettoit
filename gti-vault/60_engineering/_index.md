@@ -24,6 +24,7 @@ Architecture, conventions, runbooks, ADRs.
 - [[apple-keys-setup|apple-keys-setup.md]] — Runbook for obtaining and wiring the Apple credentials v1 needs (App Store Connect API key → CI, Sign in with Apple key → Supabase; MapKit JS skipped).
 - [[supabase-setup|supabase-setup.md]] — Runbook for provisioning the v1 Supabase project (Pro plan, extensions postgis/pg_cron/pgmq, anonymous auth, CLI link, GH Actions secret mirror).
 - [[ios-ci-setup|ios-ci-setup.md]] — Runbook for the iOS CI lane (XcodeGen-driven project generation, macOS-14 runner, Xcode 15.4 pin, Supabase env injection, no-local-Xcode constraint).
+- [[ci-trigger-filtering|ci-trigger-filtering.md]] — 2026-05-19: `ci.yml` `paths-ignore` skips docs-only changes (`gti-vault/**`, `docs/**`, root `*.md`); why the list is conservative (not blanket `**/*.md`); per-lane filtering deferred.
 - [[auth-apple-link-testing|auth-apple-link-testing.md]] — TB-12 testing split: what CI's state-machine + DB-integration tests cover vs. what only TestFlight (TB-17) can verify against a real Apple Sign-in round-trip.
 - [[web-fallback-setup|web-fallback-setup.md]] — TB-15 operational notes: Vercel `NEXT_PUBLIC_*` env vars, Realtime channel contract, accepted web-side gaps per ADR 0003 / 0007.
 - [[asc-privacy-labels|asc-privacy-labels.md]] — TB-16 final HITL gate: line-by-line answers for App Store Connect's App Privacy nutrition-labels form, derived from the deployed Privacy Policy + ADR 0006.
