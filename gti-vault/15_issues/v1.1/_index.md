@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared; verdict-pipeline diagnosis 2026-05-18 — 3 bugs filed (bug-08–bug-10, GitHub #116–#118): the verdict path has never produced a row — candidate-pool integration unwired (bug-08), fire dispatch no-ops on unset GUCs (bug-09), resolving poll never times out (bug-10); bug-08 fork decided 2026-05-18 (Option 2, server-side) and decomposed into AFK slices tb-21–tb-23 (GitHub #119–#121); verdict pipeline wired end to end 2026-05-18 — tb-21/tb-22/tb-23 + bug-10 + bug-09 (re-scoped to an `app_config` table) all merged; tb-24 (iOS Q5 factorial-ratings write-path adjacency) merged 2026-05-18 (PR #131) — iOS now emits `votes.q5.answer.ratings`, the per-member Q5 re-weight is no longer dark; candidate-pool floor (2026-05-19) — a `/grill-with-docs` session ratified [[../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] and filed tb-25 (GitHub #133, ready-for-agent) to floor every Foursquare call to an 8-category venue-type allowlist
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared; verdict-pipeline diagnosis 2026-05-18 — 3 bugs filed (bug-08–bug-10, GitHub #116–#118): the verdict path has never produced a row — candidate-pool integration unwired (bug-08), fire dispatch no-ops on unset GUCs (bug-09), resolving poll never times out (bug-10); bug-08 fork decided 2026-05-18 (Option 2, server-side) and decomposed into AFK slices tb-21–tb-23 (GitHub #119–#121); verdict pipeline wired end to end 2026-05-18 — tb-21/tb-22/tb-23 + bug-10 + bug-09 (re-scoped to an `app_config` table) all merged; tb-24 (iOS Q5 factorial-ratings write-path adjacency) merged 2026-05-18 (PR #131) — iOS now emits `votes.q5.answer.ratings`, the per-member Q5 re-weight is no longer dark; candidate-pool floor (2026-05-19) — a `/grill-with-docs` session ratified [[../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] and filed tb-25 (GitHub #133, ready-for-agent) to floor every Foursquare call to an 8-category venue-type allowlist; remove-fictitious-venues batch (2026-05-19) — `/to-issues` decomposed the dummy-venue removal into sg-05 + tb-26 (GitHub #136, #137, both ready-for-agent): Q5 gets a `no-results` mode in place of the `QuizDummyCandidates` fixture so the app never surfaces a fictitious place
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -166,6 +166,25 @@ A `/grill-with-docs` session pinned down a leak found in an earlier undocumented
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
 | TB-25 (v1.1) | [[issues/tb-25-candidate-pool-floor\|Apply the candidate-pool floor — Restaurant + Sports Bar allowlist on every Foursquare call]] ✅ done — `buildFoursquareQuery` seeds the eight-id `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` constant when the category set is empty (fallback, never an OR-addition); `fsq_category_ids` is never emitted empty; `MapKitPlacesFallback` POI filter tightened to `[.restaurant]`; eight floor ids live-probed (all HTTP 200, `Restaurant` parent confirmed descendant-inclusive) — ADR 0012 Open items resolved (PR #135) | AFK | [#133](https://github.com/samfarls55/gettoit/issues/133) | — |
+
+## Remove fictitious fallback venues (2026-05-19)
+
+Decomposed via `/to-issues` from a design session. The iOS app papers over an
+empty Q5 candidate pool with three hardcoded fictitious restaurants
+(`QuizDummyCandidates` — Pico's Taqueria / Ren Soba House / Bar Pastoral), a
+tb-04-era scaffold. Decision: remove all fictitious venues — the app must never
+surface a made-up place to a user. Q5 instead renders a `no-results` mode with a
+forward CTA so the member is never stranded ("skip ahead"). Two slices, the
+established spec-gap → tracer-bullet pairing (cf. `sg-02`→`tb-01`).
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| sg-05 | [[issues/sg-05-q5-no-results-mode\|Q5 no-results mode — design-system surface spec]] | AFK | [#136](https://github.com/samfarls55/gettoit/issues/136) | — |
+| TB-26 (v1.1) | [[issues/tb-26-remove-fictitious-fallback-venues\|Remove fictitious fallback venues; render the Q5 no-results screen]] | AFK | [#137](https://github.com/samfarls55/gettoit/issues/137) | sg-05 |
+
+Build order: sg-05 first (specs the `no-results` Q5 mode in `design-system/`),
+then tb-26 (deletes `QuizDummyCandidates`, renders the no-results screen against
+the spec, wires the skip-ahead submit path, files the decision as an ADR).
 
 ## Cross-references
 
