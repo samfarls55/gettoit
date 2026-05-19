@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared; verdict-pipeline diagnosis 2026-05-18 — 3 bugs filed (bug-08–bug-10, GitHub #116–#118): the verdict path has never produced a row — candidate-pool integration unwired (bug-08), fire dispatch no-ops on unset GUCs (bug-09), resolving poll never times out (bug-10); bug-08 fork decided 2026-05-18 (Option 2, server-side) and decomposed into AFK slices tb-21–tb-23 (GitHub #119–#121); verdict pipeline wired end to end 2026-05-18 — tb-21/tb-22/tb-23 + bug-10 + bug-09 (re-scoped to an `app_config` table) all merged; tb-24 (iOS Q5 factorial-ratings write-path adjacency) merged 2026-05-18 (PR #131) — iOS now emits `votes.q5.answer.ratings`, the per-member Q5 re-weight is no longer dark; candidate-pool floor (2026-05-19) — a `/grill-with-docs` session ratified [[../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] and filed tb-25 (GitHub #133, ready-for-agent) to floor every Foursquare call to an 8-category venue-type allowlist; remove-fictitious-venues batch (2026-05-19) — `/to-issues` decomposed the dummy-venue removal into sg-05 + tb-26 (GitHub #136, #137, both ready-for-agent): Q5 gets a `no-results` mode in place of the `QuizDummyCandidates` fixture so the app never surfaces a fictitious place; verdict-spinner diagnosis (2026-05-19) — `/diagnose` against TestFlight build 267 split the stuck-verdict report into two defects and `/to-issues` filed 4 AFK issues (GitHub #142–#145, all ready-for-agent): post-Q5 router orphaned-host bug (bug-12), empty-pool engine wedge (bug-13 server / bug-14 client), wedged-room re-fire (ops-01, blocked by bug-13)
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared; verdict-pipeline diagnosis 2026-05-18 — 3 bugs filed (bug-08–bug-10, GitHub #116–#118): the verdict path has never produced a row — candidate-pool integration unwired (bug-08), fire dispatch no-ops on unset GUCs (bug-09), resolving poll never times out (bug-10); bug-08 fork decided 2026-05-18 (Option 2, server-side) and decomposed into AFK slices tb-21–tb-23 (GitHub #119–#121); verdict pipeline wired end to end 2026-05-18 — tb-21/tb-22/tb-23 + bug-10 + bug-09 (re-scoped to an `app_config` table) all merged; tb-24 (iOS Q5 factorial-ratings write-path adjacency) merged 2026-05-18 (PR #131) — iOS now emits `votes.q5.answer.ratings`, the per-member Q5 re-weight is no longer dark; candidate-pool floor (2026-05-19) — a `/grill-with-docs` session ratified [[../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] and filed tb-25 (GitHub #133, ready-for-agent) to floor every Foursquare call to an 8-category venue-type allowlist; remove-fictitious-venues batch (2026-05-19) — `/to-issues` decomposed the dummy-venue removal into sg-05 + tb-26 (GitHub #136, #137, both ready-for-agent): Q5 gets a `no-results` mode in place of the `QuizDummyCandidates` fixture so the app never surfaces a fictitious place; verdict-spinner diagnosis (2026-05-19) — `/diagnose` against TestFlight build 267 split the stuck-verdict report into two defects and `/to-issues` filed 4 AFK issues (GitHub #142–#145, all ready-for-agent): post-Q5 router orphaned-host bug (bug-12), empty-pool engine wedge (bug-13 server / bug-14 client), wedged-room re-fire (ops-01, blocked by bug-13); solo-session post-mortem (2026-05-19 evening) — `/diagnose` against prod room `d11b3983` surfaced the multi-category bar leak: the ADR 0012 floor is a query-time OR allowlist and cannot exclude a bar that also carries a floor-eligible category (Robert's Western World tagged `["Bar","Burger Joint","Rock Club"]` won the verdict); filed `bug-15` (GitHub #152, ready-for-agent) — shape-time primary-class gate + entertainment-venue backstop enforced in `shapeFoursquareResult`, plus ADR 0012 amendment
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -214,6 +214,29 @@ returning a verdict cleanly). `/to-issues` decomposed the fix into 4 AFK issues.
 Build order: bug-12, bug-13, bug-14 are independent and can run in parallel;
 ops-01 runs after bug-13. bug-12 also reverts the PR #141 `debug_trace`
 instrumentation (delete `DebugTrace.swift` + call sites, drop the prod table).
+
+### Solo-session post-mortem (2026-05-19 evening)
+
+A solo TestFlight session produced the verdict `Robert's Western World` — a
+Nashville honky-tonk. Confirmed in prod (`gettoit-prod` room `d11b3983`,
+verdict `2026-05-19T20:41:15Z`): the winning option's `payload.categories` =
+`["Bar","Burger Joint","Rock Club"]`. The ADR 0012 candidate-pool floor is a
+query-time OR allowlist on Foursquare's `fsq_category_ids` — it scopes which
+categories *can match*, but it cannot exclude a venue that *also* carries a
+floor-eligible category. Robert's matched the `Restaurant` parent via its
+`Burger Joint` tag and entered the pool legitimately; `categories.first`
+rendered the verdict as a Bar.
+
+- **bug-15** — pool-floor allows multi-category bars; the structural companion
+  to ADR 0012 / tb-25. Fix is a shape-time primary-class gate + an
+  entertainment-venue backstop, enforced in `shapeFoursquareResult` (one
+  point reaches Q5 probe, candidate-pool union, and verdict pool). ADR 0012
+  amended to record the new contract and its known limitations
+  (Foursquare-ordering noise, cross-time instability).
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| bug-15 | [[issues/bug-15-pool-floor-allows-multicategory-bars\|Pool-floor allows multi-category bars; primary "Bar" leaks into verdict]] — ready-for-agent | AFK | [#152](https://github.com/samfarls55/gettoit/issues/152) | — |
 
 ## Cross-references
 
