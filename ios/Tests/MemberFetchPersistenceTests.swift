@@ -113,16 +113,18 @@ final class MemberFetchPersistenceTests: XCTestCase {
             "the persisted union is the full fetched pool, not just the three Q5 cards")
     }
 
-    // MARK: - a fallbackDummy fetch carrying real venues still persists them
+    // MARK: - a no-results fetch carrying real venues still persists them
 
-    func testFallbackDummyWithRealVenuesStillPersistsThem() async {
-        // A union too thin / uniform for the Q5 factorial still
-        // surfaces as `fallbackDummy` on the surface — but the venues
-        // are real and belong in the room's `options` pool.
+    func testNoResultsWithRealVenuesStillPersistsThem() async {
+        // A union too thin / uniform for the Q5 factorial surfaces as
+        // `.noResults` (Q5 renders the no-results screen) — but the
+        // venues are real and belong in the room's `options` pool.
+        // TB-26: removing the dummy changes only what Q5 displays, not
+        // the verdict candidate pool.
         let raw = [place("x"), place("y")]
         let fetch = StubCandidateFetch(result: QuizCandidateFetchResult(
-            candidates: QuizDummyCandidates.all,
-            source: .fallbackDummy,
+            candidates: [],
+            source: .noResults,
             rawFetch: raw
         ))
         let recorder = RecordingMemberFetchWriter()
@@ -137,7 +139,8 @@ final class MemberFetchPersistenceTests: XCTestCase {
         await coord.awaitCandidateFetch()
 
         XCTAssertEqual(recorder.rows.first?.payload.map(\.fsqPlaceId), ["x", "y"],
-            "real venues persist even when the Q5 factorial fell back to the dummy fixture")
+            "real venues persist even when Q5 renders the no-results screen")
+        XCTAssertEqual(coord.q5CandidatesState, .noResults)
     }
 
     // MARK: - an empty raw fetch persists nothing
@@ -146,8 +149,8 @@ final class MemberFetchPersistenceTests: XCTestCase {
         // A genuinely empty fetch (every call came back empty / the
         // fetch threw) has no real venues — nothing to persist.
         let fetch = StubCandidateFetch(result: QuizCandidateFetchResult(
-            candidates: QuizDummyCandidates.all,
-            source: .fallbackDummy,
+            candidates: [],
+            source: .noResults,
             rawFetch: []
         ))
         let recorder = RecordingMemberFetchWriter()

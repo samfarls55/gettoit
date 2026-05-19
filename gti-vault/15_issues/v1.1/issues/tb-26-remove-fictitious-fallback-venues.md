@@ -1,7 +1,7 @@
 ---
 issue: tb-26
 title: Remove fictitious fallback venues; render the Q5 no-results screen
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 137
 prd: v1.1-quiz-redesign-prd
@@ -105,3 +105,24 @@ the `{droppedAxis, score}` vote shape.
 
 - [[sg-05-q5-no-results-mode|sg-05]] (GitHub #136) — the Q5 no-results mode
   design-system spec. The iOS no-results screen must match it.
+
+## Comments
+
+- 2026-05-19 — Done (AFK, branch `afk/tb-26`). `QuizDummyCandidates` deleted
+  from the iOS app target; the four no-results paths (empty union, `nil`
+  factorial, thrown fetch, no coordinate) now resolve the candidate fetch to
+  a `.noResults` source with an empty candidate list. New `QuizQ5NoResults`
+  view renders sg-05's `no-results` mode with the locked copy; its CTA runs
+  the same submit-then-route path as the normal Q5 CTA (Q1–Q4 + an empty Q5).
+  The `.fallbackDummy` source / state and `DummyQuizCandidateFetch` were
+  renamed to `.noResults` / `NoResultsQuizCandidateFetch`. The test-only
+  candidate fixture moved into the test target as `QuizCandidateFixtures`.
+  `compute-verdict` already tolerated an empty `votes.q5.answer.ratings`
+  array (the equal-weight prior survives) — confirmed by a new Deno test, no
+  server change. Decision recorded in
+  [[../../../60_engineering/adr/0013-no-fictitious-fallback-venues|ADR 0013]].
+  Adjacency flagged: `VerdictScreen` / `CheckinScreen` / `LockedScreen` still
+  ship `static func fixture()` snapshot factories that hardcode fictitious
+  place names ("Pico's Taqueria" etc.) — pre-existing, out of tb-26 scope
+  (those are verdict-side fixtures, not Q5 fallback venues); a future ticket
+  could move them into the test target.

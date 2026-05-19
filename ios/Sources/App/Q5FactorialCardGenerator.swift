@@ -36,9 +36,10 @@
 // Pool starvation (a thin pool that cannot furnish three valid cards)
 // is an explicit PRD "Out of Scope" edge case — the generator surfaces
 // it as a `nil` return rather than inventing a placeholder card, since
-// Q5 must never show a placeholder (the bug-03 hard rule). The Q5
-// loader's existing dummy-fixture fallback covers the stranded-flow
-// case at the surface boundary.
+// Q5 must never show a placeholder. TB-26: a `nil` factorial resolves
+// the candidate fetch to the `.noResults` source, and Q5 renders the
+// no-results screen (sg-05's `no-results` mode) at the surface
+// boundary — the app never surfaces a fictitious venue.
 
 import Foundation
 

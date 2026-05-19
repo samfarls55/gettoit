@@ -17,8 +17,9 @@
 //
 // When `coordinate` is nil (a stale routing where the room row
 // vanished) the assembler builds the coordinator with a
-// `DummyQuizCandidateFetch` so Q5 still renders three rateable rows -
-// the member is never stranded mid-flow.
+// `NoResultsQuizCandidateFetch` so Q5 renders the no-results screen -
+// the member is never stranded mid-flow. TB-26 removed the prior
+// fictitious fixture fallback.
 //
 // Inputs are protocol-typed so tests can inject doubles for
 // PlacesService and the room/location resolution step. RootView is the
@@ -50,8 +51,9 @@ public enum QuizSessionAssembler {
         /// fires when the member completes Q4.
         case perMemberFetch
         /// No session coordinate — the coordinator carries a
-        /// dummy-fixture fetch so Q5 still renders three rows.
-        case fallbackDummy
+        /// `NoResultsQuizCandidateFetch` so Q5 renders the no-results
+        /// screen. TB-26 renamed this from `fallbackDummy`.
+        case noResults
     }
 
     /// Build a `QuizCoordinator` for a session.
@@ -65,7 +67,8 @@ public enum QuizSessionAssembler {
     /// location-resolution step (RootView pulls from the shared
     /// LocationCoordinator, hydrating from `rooms.location_*` on the
     /// joiner path). When `coordinate` is nil the assembler wires a
-    /// dummy-fixture fetch so Q5 still renders three rows.
+    /// `NoResultsQuizCandidateFetch` so Q5 renders the no-results
+    /// screen.
     /// TB-21 (v1.1) — `memberFetchWriter` persists each member's full
     /// raw Foursquare fetch into the server-readable `member_fetches`
     /// table when the per-member fetch resolves. The `compute-verdict`
@@ -97,9 +100,10 @@ public enum QuizSessionAssembler {
             )
             candidateSource = .perMemberFetch
         } else {
-            // No coordinate (stale routing) — Q5 still needs three rows.
-            candidateFetch = DummyQuizCandidateFetch()
-            candidateSource = .fallbackDummy
+            // No coordinate (stale routing) — Q5 renders the no-results
+            // screen so the member is never stranded.
+            candidateFetch = NoResultsQuizCandidateFetch()
+            candidateSource = .noResults
         }
         // TB-05 (v1.1) — the session parameters are carried onto the
         // coordinator so every member's quiz (initiator or joiner)

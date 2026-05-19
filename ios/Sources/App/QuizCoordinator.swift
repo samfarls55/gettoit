@@ -25,10 +25,12 @@
 //     transient network errors hits the same unique-constraint reject
 //     the second time, which the coordinator treats as success.
 //
-// Q5 candidates: TB-04 ships dummy candidates from `dummyCandidates`
-// below. TB-08 wires the real factorial-probe set from the per-member
-// Foursquare fetch — the coordinator's `submit(...)` interface stays
-// the same; only the source of `Candidate.id` strings changes.
+// Q5 candidates: TB-08 wires the real factorial-probe set from the
+// per-member Foursquare fetch. TB-26 removed the legacy fictitious
+// fixture fallback entirely — when the fetch produces no factorial-usable pool
+// the candidate list is empty and Q5 renders the no-results screen
+// (sg-05's `no-results` mode); the app never surfaces a fictitious
+// venue. The coordinator's `submit(...)` interface is unchanged.
 //
 // TB-15 (v1.1) — the per-member Foursquare fetch now fires from the
 // coordinator's quiz step machine: when the member advances Q4 -> Q5,
@@ -47,8 +49,10 @@
 import Foundation
 import Supabase
 
-/// A Q5 candidate (place the user can rate). TB-04 ships dummy ids
-/// from a local fixture; TB-08 wires real `options.id` values.
+/// A Q5 candidate (place the user can rate). Always a real venue —
+/// TB-08 wires real `options.id` values from the per-member Foursquare
+/// fetch. TB-26 removed the fictitious-fixture path; an empty candidate
+/// list now means the no-results screen renders.
 public struct QuizCandidate: Equatable, Sendable, Identifiable {
     public let id: String
     public let name: String
@@ -56,8 +60,8 @@ public struct QuizCandidate: Equatable, Sendable, Identifiable {
     /// TB-24: the factorial axis this card deviates on. Set when the
     /// candidate is a `Q5FactorialCardGenerator` card — each of the
     /// three factorial cards drops exactly one distinct axis. `nil` on
-    /// the legacy / dummy-fixture candidates that did not come from the
-    /// factorial; the vote write then assigns axes positionally so the
+    /// candidates that did not come from the factorial (a test fixture);
+    /// the vote write then assigns axes positionally so the
     /// `votes.q5.answer.ratings` array is still well-formed (one entry
     /// per axis). Carried for the verdict's per-member preference
     /// re-weight — `compute-verdict` reads each axis's weight from its
@@ -75,21 +79,6 @@ public struct QuizCandidate: Equatable, Sendable, Identifiable {
         self.meta = meta
         self.droppedAxis = droppedAxis
     }
-}
-
-/// Default Q5 candidates the iOS app uses until TB-08 wires real
-/// survivors. Three places — matches the JSX fixture in
-/// `design-system/code/screens/ScreenQ5Regret.jsx`.
-///
-/// `// placeholder: marketing-branding pass` applies to the names and
-/// meta strings, not the engine contract.
-public enum QuizDummyCandidates {
-    // placeholder: marketing-branding pass
-    public static let all: [QuizCandidate] = [
-        QuizCandidate(id: "dummy-pico",     name: "Pico's Taqueria", meta: "Mexican · $$ · 8 min"),
-        QuizCandidate(id: "dummy-ren",      name: "Ren Soba House",  meta: "Japanese · $$ · 12 min"),
-        QuizCandidate(id: "dummy-pastoral", name: "Bar Pastoral",    meta: "Italian · $$ · 5 min"),
-    ]
 }
 
 /// Outcome of a Q5 submit. `idempotent` lets callers treat a unique-
@@ -137,10 +126,13 @@ public final class QuizCoordinator {
         /// The fetch resolved with real venues from the executor's
         /// unioned pool.
         case ready
-        /// The fetch resolved to the dummy fixture — genuine pool
-        /// starvation, or no session coordinate. Q5 still renders three
-        /// rateable rows; the member is never stranded.
-        case fallbackDummy
+        /// The fetch produced no factorial-usable pool — an empty
+        /// union, a `nil` factorial, a thrown fetch, or no session
+        /// coordinate. Q5 renders the no-results screen (sg-05's
+        /// `no-results` mode); the member is never stranded. TB-26
+        /// replaced the prior `fallbackDummy` fixture state — the app
+        /// never surfaces a fictitious venue.
+        case noResults
     }
 
     public private(set) var q5CandidatesState: Q5CandidatesState = .idle
@@ -224,11 +216,14 @@ public final class QuizCoordinator {
 
     /// Legacy init — Q5 candidates are supplied up front. Used by the
     /// unit tests and the snapshot harness; the per-member fetch never
-    /// fires on this path (`candidateFetch` is nil).
+    /// fires on this path (`candidateFetch` is nil). `candidates`
+    /// defaults to empty — tests that exercise Q5 rating pass an
+    /// explicit test fixture (`QuizCandidateFixtures.all`). Production
+    /// always uses the `candidateFetch` init below.
     public init(
         roomID: UUID,
         userID: UUID,
-        candidates: [QuizCandidate] = QuizDummyCandidates.all,
+        candidates: [QuizCandidate] = [],
         sessionParameters: SessionParameters = .default,
         writer: @escaping QuizVoteWriter
     ) {
@@ -465,8 +460,8 @@ public final class QuizCoordinator {
         candidates = result.candidates
         q5Ratings = QuizCoordinator.seededRatings(for: result.candidates)
         switch result.source {
-        case .fetched:        q5CandidatesState = .ready
-        case .fallbackDummy:  q5CandidatesState = .fallbackDummy
+        case .fetched:    q5CandidatesState = .ready
+        case .noResults:  q5CandidatesState = .noResults
         }
         fetchTask = nil
     }
@@ -732,13 +727,16 @@ public final class QuizCoordinator {
     /// state stay venue-keyed.
     ///
     /// Axis source: the factorial path tags each `QuizCandidate` with
-    /// its card's `droppedAxis`. The legacy / dummy-fixture path leaves
-    /// it `nil` (those candidates never went through the factorial); the
-    /// three axes are then assigned positionally — `cuisine`,
-    /// `reputation`, `vibe` — so the write is still a well-formed
-    /// one-entry-per-axis probe. Order follows the candidate list, which
-    /// is the factorial's emit order (cuisine-drop, reputation-drop,
-    /// vibe-drop) on the real path.
+    /// its card's `droppedAxis`. A candidate that did not go through the
+    /// factorial (a test fixture) leaves it `nil`; the three axes are
+    /// then assigned positionally — `cuisine`, `reputation`, `vibe` — so
+    /// the write is still a well-formed one-entry-per-axis probe. Order
+    /// follows the candidate list, which is the factorial's emit order
+    /// (cuisine-drop, reputation-drop, vibe-drop) on the real path.
+    ///
+    /// TB-26: on the no-results path the candidate list is empty, so
+    /// this returns an empty `ratings` array — `compute-verdict`'s Q5
+    /// reader tolerates it and degrades to the equal-weight prior.
     private func buildQ5Ratings() -> [Q5RatingEntry] {
         let fallbackAxes = Q5FactorialCard.Axis.allCases
         var entries: [Q5RatingEntry] = []

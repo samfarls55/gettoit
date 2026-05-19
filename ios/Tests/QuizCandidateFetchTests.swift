@@ -253,10 +253,13 @@ final class QuizCandidateFetchTests: XCTestCase {
 
     // MARK: - pool-starvation result flips the state
 
-    func testFallbackDummyResultFlipsTheStateToFallback() async {
+    func testNoResultsResultFlipsTheStateToNoResults() async {
+        // TB-26: a starved fetch resolves to the `.noResults` source
+        // with an EMPTY candidate list — Q5 renders the no-results
+        // screen, never a fictitious fixture.
         let fetch = RecordingCandidateFetch()
         fetch.result = QuizCandidateFetchResult(
-            candidates: QuizDummyCandidates.all, source: .fallbackDummy
+            candidates: [], source: .noResults
         )
         let coord = QuizCoordinator(
             roomID: UUID(), userID: UUID(),
@@ -265,9 +268,59 @@ final class QuizCandidateFetchTests: XCTestCase {
         coord.advance(); coord.advance(); coord.advance(); coord.advance()
         await coord.awaitCandidateFetch()
 
-        XCTAssertEqual(coord.q5CandidatesState, .fallbackDummy)
-        XCTAssertEqual(coord.allCandidates, QuizDummyCandidates.all,
-            "a starved fetch still leaves Q5 with three rateable rows")
+        XCTAssertEqual(coord.q5CandidatesState, .noResults)
+        XCTAssertTrue(coord.allCandidates.isEmpty,
+            "a starved fetch leaves Q5 with no candidates — the no-results screen renders")
+    }
+
+    // MARK: - TB-26: the no-results CTA submits an empty Q5 and routes
+
+    /// The no-results screen's CTA runs the same submit-then-route path
+    /// as the normal Q5 CTA. After a no-results fetch the member can
+    /// still submit: the quiz writes a `votes` row carrying the Q1-Q4
+    /// answers plus an EMPTY Q5 ratings array, and the coordinator
+    /// lands in `.submitted` so the host routes to Waiting / verdict.
+    func testNoResultsCtaSubmitsAnEmptyQ5AndAdvances() async throws {
+        let fetch = RecordingCandidateFetch()
+        fetch.result = QuizCandidateFetchResult(candidates: [], source: .noResults)
+
+        var written: QuizCoordinator.VoteRow?
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidateFetch: fetch,
+            writer: { row in written = row }
+        )
+
+        // Walk Q1-Q4 with real picks, then land on Q5 (no-results).
+        coord.toggleCuisine(QuizCuisine.thai)
+        coord.advance()
+        coord.setBudget(2)
+        coord.advance()
+        coord.setReputation(QuizReputation.hiddenGem)
+        coord.advance()
+        coord.setVibe(4)
+        coord.advance()
+        await coord.awaitCandidateFetch()
+        XCTAssertEqual(coord.q5CandidatesState, .noResults)
+
+        // The no-results CTA runs `submit()` — the member is not stranded.
+        let result = await coord.submit()
+        guard case .success(let outcome) = result else {
+            return XCTFail("the no-results CTA must submit successfully, got \(result)")
+        }
+        XCTAssertEqual(outcome, .written)
+        XCTAssertEqual(coord.step, .submitted,
+            "after the no-results CTA submits, the host routes to Waiting / verdict")
+
+        // The vote row carries the Q1-Q4 answers and an empty Q5 probe.
+        let row = try XCTUnwrap(written)
+        XCTAssertEqual(row.q1Cuisines, [QuizCuisine.thai])
+        XCTAssertEqual(row.q2Budget, 2)
+        XCTAssertEqual(row.q3Reputation, QuizReputation.hiddenGem)
+        XCTAssertEqual(row.q4Vibe, 4)
+        XCTAssertTrue(row.q5Ratings.isEmpty,
+            "a no-results Q5 writes an empty ratings array — compute-verdict "
+            + "degrades to the equal-weight prior")
     }
 }
 
@@ -346,8 +399,7 @@ final class FactorialCardSelectionTests: XCTestCase {
             XCTAssertTrue(poolIDs.contains(candidate.id),
                 "every factorial card keys on a real fetched fsq_place_id")
         }
-        let dummyIDs = Set(QuizDummyCandidates.all.map(\.id))
-        XCTAssertTrue(result.candidates.allSatisfy { !dummyIDs.contains($0.id) },
+        XCTAssertTrue(result.candidates.allSatisfy { !$0.id.hasPrefix("dummy-") },
             "no placeholder venue leaks into a fetched factorial triple")
     }
 
@@ -384,22 +436,28 @@ final class FactorialCardSelectionTests: XCTestCase {
         }
     }
 
-    // MARK: - AC4: pool starvation falls back to three rateable rows
+    // MARK: - AC4 (TB-26): pool starvation resolves to no-results
 
-    func testEmptyPoolFallsBackToThreeRateableRows() {
+    func testEmptyPoolResolvesToNoResults() {
+        // TB-26: an empty pool resolves to the `.noResults` source with
+        // an empty candidate list — Q5 renders the no-results screen.
+        // No fictitious venue is ever surfaced.
         let result = FoursquareQuizCandidateFetch.selectFactorialCards(
             from: [], member: mexicanSocial, now: now
         )
-        XCTAssertEqual(result.source, .fallbackDummy)
-        XCTAssertEqual(result.candidates, QuizDummyCandidates.all,
-            "an empty pool still leaves Q5 with three rateable rows")
+        XCTAssertEqual(result.source, .noResults)
+        XCTAssertTrue(result.candidates.isEmpty,
+            "an empty pool yields no candidates — the no-results screen renders")
+        XCTAssertTrue(result.rawFetch.isEmpty,
+            "an empty union contributes nothing to the verdict pool")
     }
 
-    func testTooUniformPoolCannotFurnishAFactorialTripleAndFallsBack() {
+    func testTooUniformPoolCannotFurnishAFactorialTripleAndResolvesToNoResults() {
         // Three venues all the same cuisine + vibe — the factorial
         // cannot furnish a cuisine-drop or vibe-drop card. No
-        // placeholder venue is invented; the surface-boundary fallback
-        // renders three rateable rows instead.
+        // placeholder venue is invented; Q5 renders the no-results
+        // screen. But the real venues still ride on `rawFetch` so the
+        // verdict candidate pool is unaffected (the thin-pool case).
         let uniform = [
             place("a", categories: ["Mexican Restaurant"]),
             place("b", categories: ["Mexican Restaurant"]),
@@ -408,7 +466,10 @@ final class FactorialCardSelectionTests: XCTestCase {
         let result = FoursquareQuizCandidateFetch.selectFactorialCards(
             from: uniform, member: mexicanSocial, now: now
         )
-        XCTAssertEqual(result.source, .fallbackDummy)
-        XCTAssertEqual(result.candidates, QuizDummyCandidates.all)
+        XCTAssertEqual(result.source, .noResults)
+        XCTAssertTrue(result.candidates.isEmpty,
+            "a too-uniform pool renders the no-results screen — no fictitious cards")
+        XCTAssertEqual(result.rawFetch.map(\.fsqPlaceId), ["a", "b", "c"],
+            "the real fetched venues still reach the verdict pool via rawFetch")
     }
 }

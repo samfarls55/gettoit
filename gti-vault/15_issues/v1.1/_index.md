@@ -180,7 +180,7 @@ established spec-gap → tracer-bullet pairing (cf. `sg-02`→`tb-01`).
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
 | sg-05 | [[issues/sg-05-q5-no-results-mode\|Q5 no-results mode — design-system surface spec]] ✅ done | AFK | [#136](https://github.com/samfarls55/gettoit/issues/136) | — |
-| TB-26 (v1.1) | [[issues/tb-26-remove-fictitious-fallback-venues\|Remove fictitious fallback venues; render the Q5 no-results screen]] | AFK | [#137](https://github.com/samfarls55/gettoit/issues/137) | sg-05 |
+| TB-26 (v1.1) | [[issues/tb-26-remove-fictitious-fallback-venues\|Remove fictitious fallback venues; render the Q5 no-results screen]] ✅ done — `QuizDummyCandidates` deleted from the iOS app target; the four no-results paths resolve the candidate fetch to a `.noResults` source with an empty candidate list; new `QuizQ5NoResults` view renders sg-05's `no-results` mode (locked copy) with a forward CTA that submits Q1–Q4 + an empty Q5; `compute-verdict` already tolerated the empty `votes.q5.answer.ratings` array (equal-weight prior) — confirmed by a Deno test, no server change; decision in [[../../60_engineering/adr/0013-no-fictitious-fallback-venues\|ADR 0013]] | AFK | [#137](https://github.com/samfarls55/gettoit/issues/137) | sg-05 |
 
 Build order: sg-05 first (specs the `no-results` Q5 mode in `design-system/`),
 then tb-26 (deletes `QuizDummyCandidates`, renders the no-results screen against
