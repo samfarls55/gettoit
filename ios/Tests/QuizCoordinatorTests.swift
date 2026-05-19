@@ -203,7 +203,8 @@ final class QuizCoordinatorTests: XCTestCase {
         let roomID = UUID()
         let userID = UUID()
         let coord = QuizCoordinator(
-            roomID: roomID, userID: userID, writer: writer.writer()
+            roomID: roomID, userID: userID,
+            candidates: QuizCandidateFixtures.all, writer: writer.writer()
         )
 
         // Walk a full quiz with non-default picks so we can verify the
@@ -217,9 +218,9 @@ final class QuizCoordinatorTests: XCTestCase {
         coord.advance()
         coord.setVibe(1)
         coord.advance()
-        coord.setRegret(candidateID: QuizDummyCandidates.all[0].id, score: 5)
-        coord.setRegret(candidateID: QuizDummyCandidates.all[1].id, score: 2)
-        coord.setRegret(candidateID: QuizDummyCandidates.all[2].id, score: 4)
+        coord.setRegret(candidateID: QuizCandidateFixtures.all[0].id, score: 5)
+        coord.setRegret(candidateID: QuizCandidateFixtures.all[1].id, score: 2)
+        coord.setRegret(candidateID: QuizCandidateFixtures.all[2].id, score: 4)
 
         let result = await coord.submit()
 

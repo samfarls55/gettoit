@@ -144,9 +144,16 @@ public struct QuizScreen: View {
         case .q5:
             // TB-15 (v1.1) — the per-member Foursquare fetch fires on
             // the Q4 -> Q5 transition. While it is in flight Q5 shows a
-            // loading state; once the answer-tailored pool lands (or
-            // degrades to the dummy fixture) the rateable cards render.
-            if coordinator.q5CandidatesState == .loading {
+            // loading state.
+            //
+            // TB-26 (v1.1) — once the fetch resolves Q5 routes on the
+            // result: a real factorial pool renders the rateable cards;
+            // a no-factorial-usable pool (empty union, `nil` factorial,
+            // thrown fetch, or no session coordinate) renders the
+            // no-results screen. The app never surfaces a fictitious
+            // venue.
+            switch coordinator.q5CandidatesState {
+            case .loading:
                 VStack(spacing: GTISpacing.step3) {
                     ProgressView()
                         .tint(GTIColor.TextOnGradient.primary)
@@ -157,7 +164,13 @@ public struct QuizScreen: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .accessibilityIdentifier("quiz.q5.loading")
-            } else {
+            case .noResults:
+                // The no-results CTA runs the SAME submit-then-route
+                // path as the normal Q5 CTA — the member's quiz submits
+                // (Q1-Q4 plus an empty Q5) and they advance to Waiting
+                // (group) or the verdict (solo).
+                QuizQ5NoResults(onAdvance: submitFromQ5)
+            case .idle, .ready:
                 QuizQ5Regret(coordinator: coordinator, onSubmit: submitFromQ5)
             }
         case .submitting:

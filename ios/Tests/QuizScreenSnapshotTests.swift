@@ -22,8 +22,15 @@ import SwiftUI
 @MainActor
 final class QuizScreenSnapshotTests: XCTestCase {
 
+    /// A coordinator seeded with the three-candidate test fixture so
+    /// the Q5 `default`-mode surface has rateable cards. TB-26: the
+    /// fixture lives in the test target — the app target ships no
+    /// fictitious venues.
     private func makeCoordinator() -> QuizCoordinator {
-        QuizCoordinator(roomID: UUID(), userID: UUID(), writer: { _ in })
+        QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidates: QuizCandidateFixtures.all, writer: { _ in }
+        )
     }
 
     /// Force a SwiftUI view body to materialise. If the view's `body`
@@ -106,8 +113,35 @@ final class QuizScreenSnapshotTests: XCTestCase {
     }
 
     func testQ5HasThreeCandidatesPerSpec() {
-        XCTAssertEqual(QuizDummyCandidates.all.count, 3,
-            "S03 §Q5 surfaces exactly 3 candidates")
+        XCTAssertEqual(QuizCandidateFixtures.all.count, 3,
+            "S03 §Q5 default mode surfaces exactly 3 candidates")
+    }
+
+    // MARK: - TB-26: Q5 no-results reference snapshot
+
+    /// The Q5 `no-results` screen (sg-05's `no-results` mode) renders
+    /// without crashing. This is the no-results reference snapshot the
+    /// tb-26 acceptance criteria call for — the surface materialises
+    /// with the locked headline / body / CTA copy and no candidate
+    /// cards.
+    func testQ5NoResultsScreenRendersWithoutCrashing() {
+        render(QuizQ5NoResults(onAdvance: {}))
+    }
+
+    /// `QuizScreen` routes Q5 to the no-results screen when the
+    /// per-member fetch resolved to `.noResults` — no fictitious cards,
+    /// the member can still advance.
+    func testQuizScreenRoutesQ5ToNoResultsScreen() async {
+        // A no-results fetch double resolves Q5 to the no-results state.
+        let coord = QuizCoordinator(
+            roomID: UUID(), userID: UUID(),
+            candidateFetch: NoResultsQuizCandidateFetch(), writer: { _ in }
+        )
+        coord.advance(); coord.advance(); coord.advance(); coord.advance()
+        await coord.awaitCandidateFetch()
+        XCTAssertEqual(coord.q5CandidatesState, .noResults)
+        XCTAssertTrue(coord.allCandidates.isEmpty)
+        render(QuizScreen(coordinator: coord, onClose: {}))
     }
 
     // MARK: - coordinator default state
@@ -121,7 +155,7 @@ final class QuizScreenSnapshotTests: XCTestCase {
         XCTAssertEqual(coord.q3Reputation, QuizReputation.noPreference,
             "Q3 defaults to No preference — the neutral, non-pruning answer")
         XCTAssertEqual(coord.q4Vibe, 2, "Q4 defaults to the mid energy stop")
-        for candidate in QuizDummyCandidates.all {
+        for candidate in QuizCandidateFixtures.all {
             XCTAssertEqual(coord.q5Ratings[candidate.id], 3,
                 "Q5 defaults each candidate to 3 (middle of 1–5 scale)")
         }

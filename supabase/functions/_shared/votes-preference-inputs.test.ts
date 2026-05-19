@@ -21,12 +21,16 @@
 //
 // Design source: gti-vault/50_product/v1.1-quiz-amendments §3.
 
-import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import {
+  assertAlmostEquals,
+  assertEquals,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   mapVotesRowToPreferenceInputs,
   type QuestionSlot,
   type VotesRow,
 } from "./votes-schema.ts";
+import { buildPreferenceFunction } from "./preference-function.ts";
 
 // ───────────────────────────────────────────────────────────────────────
 // Slot fixture helpers
@@ -192,3 +196,72 @@ Deno.test("malformed Q5 rating entries are dropped, valid ones kept", () => {
     { droppedAxis: "reputation", score: 2 },
   ]);
 });
+
+// ───────────────────────────────────────────────────────────────────────
+// TB-26 — an empty Q5 ratings array (the iOS no-results path).
+//
+// When the per-member venue fetch produces no factorial-usable pool the
+// iOS app renders the Q5 no-results screen and submits a `votes` row
+// whose `q5.answer.ratings` is an EMPTY array (no factorial cards were
+// shown, so the member rated nothing). `compute-verdict` must still
+// produce a correct verdict for that member: the Q5 reader tolerates
+// the empty array, and the preference function degrades to the
+// equal-weight prior over the member's stated axes.
+// ───────────────────────────────────────────────────────────────────────
+
+Deno.test("TB-26: an empty Q5 ratings array yields no Q5 ratings", () => {
+  // The Q5 slot is present (the member reached Q5) but the no-results
+  // screen rated nothing — `ratings` is an empty array.
+  const row = canonicalRow({ q5: regretSlot([]) });
+  const inputs = mapVotesRowToPreferenceInputs(row);
+  assertEquals(inputs.q5Ratings, [],
+    "an empty ratings array maps to no Q5 ratings — no throw, no corruption");
+});
+
+Deno.test(
+  "TB-26: an empty Q5 probe degrades the prefFn to the equal-weight prior",
+  () => {
+    // A member who saw the no-results screen: stated Q1/Q3/Q4 answers,
+    // but an empty Q5 probe. The verdict must still rank venues for
+    // them — the prefFn falls back to an equal 1/3 weight across the
+    // member's stated axes (no revealed-weight signal to blend in).
+    const row = canonicalRow({
+      q1: cuisineSlot(["mexican"]),
+      q3: reputationSlot("popular"),
+      q4: vibeSlot(2),
+      q5: regretSlot([]),
+    });
+    const inputs = mapVotesRowToPreferenceInputs(row);
+    assertEquals(inputs.q5Ratings, []);
+
+    // The prefFn built from the empty probe must equal one built from a
+    // flat probe (all cards rated the same) — both reveal zero weight
+    // signal, so both collapse to the equal-weight prior.
+    const emptyProbeFn = buildPreferenceFunction(inputs.member, inputs.q5Ratings);
+    const flatProbeFn = buildPreferenceFunction(inputs.member, [
+      { droppedAxis: "cuisine", score: 3 },
+      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "vibe", score: 3 },
+    ]);
+
+    // Score a spread of venues with both functions — they must agree.
+    const venues = [
+      { cuisine: "mexican", reputation: "popular", vibe: 2 }, // perfect
+      { cuisine: "italian", reputation: "hidden_gem", vibe: 4 }, // all miss
+      { cuisine: "mexican", reputation: "hidden_gem", vibe: 2 }, // one miss
+    ];
+    for (const v of venues) {
+      assertAlmostEquals(
+        emptyProbeFn(v),
+        flatProbeFn(v),
+        0.0001,
+        "an empty Q5 probe scores identically to a flat probe — "
+          + "both degrade to the equal-weight prior",
+      );
+    }
+
+    // And the prior is genuinely active — a perfect venue still scores
+    // the match ceiling, so the member's verdict is not degenerate.
+    assertAlmostEquals(emptyProbeFn(venues[0]), 5.0, 0.0001);
+  },
+);

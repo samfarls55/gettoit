@@ -366,11 +366,11 @@ final class Q5FactorialCardGeneratorTests: XCTestCase {
         // ratings on them, never on placeholder strings.
         XCTAssertEqual(Set(candidates.map(\.id)),
                        Set(["fsq-cuisine-drop", "fsq-rep-drop", "fsq-vibe-drop"]))
-        // None of the dummy-fixture names leak through.
-        let dummyNames = Set(QuizDummyCandidates.all.map(\.name))
+        // No placeholder venue leaks through — TB-26 removed the
+        // fictitious `dummy-` candidate ids entirely.
         for candidate in candidates {
-            XCTAssertFalse(dummyNames.contains(candidate.name),
-                           "a factorial card must render its real venue name, never a placeholder")
+            XCTAssertFalse(candidate.id.hasPrefix("dummy-"),
+                           "a factorial card must key on a real fetched venue id, never a placeholder")
         }
         // Meta formats identically to a plain loader card.
         XCTAssertTrue(candidates.contains { $0.meta == "Thai - $$ - 6 min" })

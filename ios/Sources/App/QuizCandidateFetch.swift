@@ -29,18 +29,19 @@
 //   3. The three cards are shaped into the `[QuizCandidate]` list Q5
 //      renders, carrying real `fsq_place_id`s.
 //
-// Pool-starvation fallback — the bug-03 hard rule, carried forward
-// through every layer:
+// No-results path — TB-26 (was the bug-03 fictitious-fixture fallback):
 //   * the executor union is empty (proxy thin AND MapKit empty across
 //     every call), OR
 //   * the union is non-empty but too thin / too uniform for the
 //     factorial to furnish three one-axis-deviation cards
-//     (`generate` returns `nil`),
-// then the fetch returns `QuizDummyCandidates.all` so Q5 still renders
-// three rateable rows and the member is never stranded mid-flow. The
-// factorial never invents a placeholder venue — pool starvation surfaces
-// as the dummy fixture at this surface boundary, exactly as TB-15's
-// flat-pool starvation did.
+//     (`generate` returns `nil`), OR
+//   * the whole fetch threw.
+// In every such case the fetch returns an EMPTY candidate list with the
+// `.noResults` source, and Q5 renders the no-results screen (sg-05's
+// `no-results` mode). The app never surfaces a fictitious venue. The
+// real fetched union — when it exists — still rides on `rawFetch` and
+// still reaches the verdict candidate pool; only what Q5 *displays*
+// changes.
 
 import Foundation
 import CoreLocation
@@ -55,14 +56,17 @@ public struct QuizCandidateFetchResult: Equatable, Sendable {
         /// `Q5FactorialCardGenerator` selected from the classified,
         /// unioned Foursquare / MapKit pool.
         case fetched
-        /// The dummy fixture — genuine pool starvation (every call came
-        /// back empty, or the pool was too thin / uniform for the
-        /// factorial to furnish three cards), or no session coordinate
-        /// to fetch against.
-        case fallbackDummy
+        /// No factorial-usable pool — genuine pool starvation (every
+        /// call came back empty, the fetch threw, or the pool was too
+        /// thin / uniform for the factorial to furnish three cards), or
+        /// no session coordinate to fetch against. The `candidates`
+        /// list is empty; Q5 renders the no-results screen. TB-26
+        /// replaced the prior `fallbackDummy` fixture source.
+        case noResults
     }
 
-    /// The three shaped Q5 rows the surface renders.
+    /// The shaped Q5 rows the surface renders — three real factorial
+    /// cards on the `.fetched` source, empty on `.noResults`.
     public let candidates: [QuizCandidate]
     public let source: Source
 
@@ -77,7 +81,7 @@ public struct QuizCandidateFetchResult: Equatable, Sendable {
     /// so the `compute-verdict` Edge Function can union every member's
     /// raw fetch into `options` at verdict fire time. This is always
     /// the *real* fetched union — never the dummy fixture. It is
-    /// non-empty even on the `fallbackDummy` source when the union was
+    /// non-empty even on the `noResults` source when the union was
     /// real venues that were merely too thin / uniform for the Q5
     /// factorial to furnish three one-axis-deviation cards: those
     /// venues are still valid verdict candidates. It is empty only
@@ -137,9 +141,10 @@ public protocol QuizCandidateFetch: Sendable {
     ///
     /// - Parameter answers: the member's stated Q1-Q4 answers.
     /// - Parameter parameters: the shared `SessionParameters`.
-    /// - Returns: the three shaped Q5 rows plus the source note. Never
-    ///   throws — a failed / empty / too-thin fetch degrades to the
-    ///   dummy fixture so Q5 always has three rateable rows.
+    /// - Returns: the shaped Q5 rows plus the source note. Never
+    ///   throws — a failed / empty / too-thin fetch resolves to the
+    ///   `.noResults` source with an empty candidate list so Q5 renders
+    ///   the no-results screen.
     func fetchCandidates(
         answers: QuizFetchAnswers,
         parameters: SessionParameters
@@ -193,13 +198,13 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
             )
             union = result.places
         } catch {
-            // The whole fetch threw — degrade to the dummy fixture so
-            // Q5 still has three rateable rows (bug-03 hard rule). The
-            // raw fetch is empty: a thrown fetch produced no real
-            // venues to contribute to the room's `options` union.
+            // The whole fetch threw — Q5 renders the no-results screen
+            // (TB-26). No fictitious venue is ever surfaced. The raw
+            // fetch is empty: a thrown fetch produced no real venues to
+            // contribute to the room's `options` union.
             return QuizCandidateFetchResult(
-                candidates: QuizDummyCandidates.all,
-                source: .fallbackDummy,
+                candidates: [],
+                source: .noResults,
                 rawFetch: []
             )
         }
@@ -219,7 +224,8 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
     ///
     /// On pool starvation — an empty union, or a union the factorial
     /// cannot furnish three one-axis-deviation cards from — this returns
-    /// the dummy fixture. The factorial never invents a placeholder.
+    /// an empty candidate list with the `.noResults` source. The
+    /// factorial never invents a placeholder venue.
     static func selectFactorialCards(
         from union: [ShapedPlace],
         member: Q5MemberProfile,
@@ -237,19 +243,20 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
             member: member,
             pool: profiled
         ) else {
-            // Pool starvation at the factorial boundary — Q5 still
-            // renders three rateable rows; no placeholder venue is ever
-            // invented mid-pool (the bug-03 hard rule).
+            // Pool starvation at the factorial boundary — Q5 renders
+            // the no-results screen (TB-26). No placeholder venue is
+            // ever invented mid-pool.
             //
             // TB-21: the raw fetched `union` is carried through even on
-            // this fallback. A union too thin / uniform for the Q5
+            // this path. A union too thin / uniform for the Q5
             // factorial is still a set of real venues — they belong in
             // the room's `options` pool so the verdict engine can rank
             // them (a verdict winner may be a venue shown to no member
-            // at Q5).
+            // at Q5). Removing the dummy changes only what Q5
+            // *displays*, never the verdict pool.
             return QuizCandidateFetchResult(
-                candidates: QuizDummyCandidates.all,
-                source: .fallbackDummy,
+                candidates: [],
+                source: .noResults,
                 rawFetch: union
             )
         }
@@ -268,11 +275,12 @@ public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
     }
 }
 
-/// A `QuizCandidateFetch` that always resolves to the dummy fixture
+/// A `QuizCandidateFetch` that always resolves to the no-results state
 /// without touching `PlacesService`. Used when the session has no
-/// coordinate to fetch against — Q5 still renders three rateable rows
-/// so the member is never stranded mid-flow.
-public struct DummyQuizCandidateFetch: QuizCandidateFetch {
+/// coordinate to fetch against — Q5 renders the no-results screen so
+/// the member is never stranded mid-flow. TB-26 renamed this from
+/// `DummyQuizCandidateFetch`: it no longer returns a fictitious fixture.
+public struct NoResultsQuizCandidateFetch: QuizCandidateFetch {
     public init() {}
 
     public func fetchCandidates(
@@ -280,8 +288,8 @@ public struct DummyQuizCandidateFetch: QuizCandidateFetch {
         parameters: SessionParameters
     ) async -> QuizCandidateFetchResult {
         QuizCandidateFetchResult(
-            candidates: QuizDummyCandidates.all,
-            source: .fallbackDummy
+            candidates: [],
+            source: .noResults
         )
     }
 }

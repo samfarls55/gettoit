@@ -280,10 +280,9 @@ final class QuizSessionAssemblerTests: XCTestCase {
         XCTAssertEqual(coord.q5CandidatesState, .ready)
         XCTAssertEqual(coord.allCandidates.count, 3,
             "Q5 renders exactly the three factorial cards")
-        let dummyIDs = Set(QuizDummyCandidates.all.map(\.id))
         for candidate in coord.allCandidates {
-            XCTAssertFalse(dummyIDs.contains(candidate.id),
-                "Q5 candidates must be factorial cards from the fetched pool, not the dummy fixture")
+            XCTAssertFalse(candidate.id.hasPrefix("dummy-"),
+                "Q5 candidates must be factorial cards from the fetched pool, not a fixture")
             // Every fetched venue was priced at the cap (tier 2) — the
             // meta string therefore shows "$$".
             XCTAssertTrue(candidate.meta.contains("$$"),
@@ -294,11 +293,11 @@ final class QuizSessionAssemblerTests: XCTestCase {
             "the three factorial cards are distinct real venues")
     }
 
-    // MARK: - pool starvation: three rateable rows, no stranded flow
+    // MARK: - pool starvation: no-results screen, no stranded flow
 
     /// Genuine pool starvation — proxy thin AND MapKit empty across
-    /// every call — still leaves Q5 with three rateable rows.
-    func testPoolStarvationFallsBackToThreeRateableRows() async {
+    /// every call — resolves Q5 to the no-results screen (TB-26).
+    func testPoolStarvationResolvesToNoResults() async {
         let proxy = RecordingProxyClient()
         proxy.responseFor = { _ in
             PlacesProxyResponse(places: [], disclaimers: [], isThin: true, servedFromCache: false)
@@ -319,9 +318,9 @@ final class QuizSessionAssemblerTests: XCTestCase {
         coord.advance() // q4 -> q5
         await coord.awaitCandidateFetch()
 
-        XCTAssertEqual(coord.q5CandidatesState, .fallbackDummy)
-        XCTAssertEqual(coord.allCandidates, QuizDummyCandidates.all,
-            "an empty fetch must leave Q5 with three rateable rows — no stranded flow")
+        XCTAssertEqual(coord.q5CandidatesState, .noResults)
+        XCTAssertTrue(coord.allCandidates.isEmpty,
+            "an empty fetch leaves Q5 with no candidates — the no-results screen renders")
         // The fetch still fired — starvation is observed, not skipped.
         XCTAssertGreaterThanOrEqual(proxy.observed.count, 1)
     }
@@ -329,9 +328,10 @@ final class QuizSessionAssemblerTests: XCTestCase {
     // MARK: - no coordinate: dummy fetch, never hits the proxy
 
     /// No coordinate (a stale routing where the room row vanished). The
-    /// coordinator carries a dummy-fixture fetch; even completing Q4
-    /// never hits the proxy, and Q5 renders three rows.
-    func testNoCoordinateUsesDummyFetchAndNeverHitsTheProxy() async {
+    /// coordinator carries a `NoResultsQuizCandidateFetch`; even
+    /// completing Q4 never hits the proxy, and Q5 renders the
+    /// no-results screen (TB-26).
+    func testNoCoordinateUsesNoResultsFetchAndNeverHitsTheProxy() async {
         let proxy = RecordingProxyClient()
         let assembled = QuizSessionAssembler.assembleCoordinator(
             roomID: UUID(),
@@ -341,7 +341,7 @@ final class QuizSessionAssemblerTests: XCTestCase {
             places: makeService(proxy),
             writer: { _ in }
         )
-        XCTAssertEqual(assembled.candidateSource, .fallbackDummy)
+        XCTAssertEqual(assembled.candidateSource, .noResults)
         let coord = assembled.coordinator
 
         coord.advance() // q1 -> q2
@@ -351,8 +351,9 @@ final class QuizSessionAssemblerTests: XCTestCase {
         await coord.awaitCandidateFetch()
 
         XCTAssertEqual(proxy.observed.count, 0,
-            "no coordinate → no proxy hit; the dummy fallback is the safe degradation")
-        XCTAssertEqual(coord.q5CandidatesState, .fallbackDummy)
-        XCTAssertEqual(coord.allCandidates, QuizDummyCandidates.all)
+            "no coordinate → no proxy hit; the no-results screen is the safe degradation")
+        XCTAssertEqual(coord.q5CandidatesState, .noResults)
+        XCTAssertTrue(coord.allCandidates.isEmpty,
+            "no coordinate → no candidates; Q5 renders the no-results screen")
     }
 }

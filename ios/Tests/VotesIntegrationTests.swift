@@ -156,6 +156,7 @@ final class VotesIntegrationTests: XCTestCase {
         let coord = QuizCoordinator(
             roomID: roomID,
             userID: userID,
+            candidates: QuizCandidateFixtures.all,
             writer: QuizSupabaseWriter.make(client: client)
         )
         coord.toggleCuisine(QuizCuisine.japanese)
@@ -166,9 +167,9 @@ final class VotesIntegrationTests: XCTestCase {
         coord.advance()
         coord.setVibe(3)
         coord.advance()
-        coord.setRegret(candidateID: QuizDummyCandidates.all[0].id, score: 5)
-        coord.setRegret(candidateID: QuizDummyCandidates.all[1].id, score: 2)
-        coord.setRegret(candidateID: QuizDummyCandidates.all[2].id, score: 4)
+        coord.setRegret(candidateID: QuizCandidateFixtures.all[0].id, score: 5)
+        coord.setRegret(candidateID: QuizCandidateFixtures.all[1].id, score: 2)
+        coord.setRegret(candidateID: QuizCandidateFixtures.all[2].id, score: 4)
         return coord
     }
 

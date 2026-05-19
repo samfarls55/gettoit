@@ -51,7 +51,7 @@ final class Q5CandidatesLoaderTests: XCTestCase {
 
     // MARK: - shaped candidates carry the real venue names, not the fixture
 
-    func testShapedCandidatesNeverProduceDummyFixtureNames() {
+    func testShapedCandidatesCarryRealFetchedVenueIds() {
         let places = [
             ShapedPlace(
                 fsqPlaceId: "fsq-real-1", name: "Real Spot 1",
@@ -62,10 +62,12 @@ final class Q5CandidatesLoaderTests: XCTestCase {
         ]
         let shaped = Q5CandidatesLoader.shapeCandidates(from: places)
 
-        let dummyNames = Set(QuizDummyCandidates.all.map { $0.name })
         for candidate in shaped {
-            XCTAssertFalse(dummyNames.contains(candidate.name),
-                "expected real fetched venue names, not the placeholder fixture")
+            // TB-26 removed the fictitious `dummy-` candidate ids; a
+            // shaped card keys on the real fetched `fsq_place_id`.
+            XCTAssertFalse(candidate.id.hasPrefix("dummy-"),
+                "expected real fetched venue ids, not a placeholder fixture")
+            XCTAssertEqual(candidate.id, "fsq-real-1")
         }
     }
 
