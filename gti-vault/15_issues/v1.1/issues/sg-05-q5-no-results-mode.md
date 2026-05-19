@@ -81,7 +81,7 @@ The copy below is locked — reproduce it exactly.
 
 ## Comments
 
-- **2026-05-19 — done (AFK, PR #PR_PLACEHOLDER).** Added the `no-results`
+- **2026-05-19 — done (AFK, PR #138).** Added the `no-results`
   mode to the Q5 surface. `code/screens/ScreenQ5Regret.jsx` now takes a
   `mode` prop (`default` | `no-results`), mirroring `ScreenVerdict.jsx`'s
   mode handling. The `no-results` branch renders the C-02 TopBar (segment 5
