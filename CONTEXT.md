@@ -34,13 +34,23 @@ _Avoid_: account info (too broad), preferences (the cuisine-craving signal is a 
 A quiz question whose answer compiles to a *recipe* of multiple underlying Foursquare filters at once, rather than mapping to a single filter dimension. Users pick a real-world scenario in plain language; the engine assembles the filter set. Distinct from one-question-per-filter design.
 _Avoid_: composite question (mechanically accurate but doesn't convey the "scenario in user voice" framing), bundled question (collides with "bundle" in PR terminology).
 
-**Archetype rater (Q5)**:
-The v1.1 Q5 mechanism. Members rate 3-4 restaurant-type templates (e.g. "the cozy hole-in-the-wall", "the trendy hotspot") on a 1-5 scale. Engine maps archetype scores to candidates via candidate-archetype affinity. Replaces the v1-locked "regret-of-omission per surviving option" mechanism specifically because templates are universal across members while rolling-survivor candidates are not.
-_Avoid_: regret rater (was the v1 mechanism, now historical), restaurant rater (rates types, not actual restaurants).
+**Q5 preference probe**:
+The v1.1 Q5 mechanism. Each member rates three real candidate venues 1-5 on excitement. The three cards are a strict factorial -- each deviates from the member's stated Q1-Q4 profile on exactly one axis (cuisine, reputation, vibe) and matches the other two; never a 100% match. The engine reads the member's axis-weight hierarchy from the ratings and extrapolates a preference function over the full candidate pool. Replaces the v1-locked "regret-of-omission per surviving option" mechanism (signal-unstable under partial quorum) and the briefly-considered archetype rater (rejected: too abstract, rated templates not real venues -- see [[gti-vault/50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §7).
+_Avoid_: archetype rater (rejected design, now historical), regret rater (the v1 mechanism, historical), tiebreaker (Q5 is a probe, not a tiebreaker -- the verdict tiebreak is the maximin rule).
 
 **Cuisine NEVER**:
 A profile-level negative filter -- a cuisine the user will never eat under any circumstance. Hard veto, EBA-style. Distinct from cuisine craving (session-level positive signal, "Italian sounds good tonight").
 _Avoid_: cuisine dislike (too soft; NEVER is hard veto), cuisine veto (collides with the Q1-veto verdict-engine machinery from v1).
+
+### Candidate pool (v1.1, 2026-05-19)
+
+**Candidate pool**:
+The set of real venues a session's verdict ranks -- the running union of every member's per-member Foursquare / MapKit fetch, deduped by `fsq_place_id`. The Q5 preference probe draws its three factorial cards from the same union: the Q5 candidate pool and the verdict candidate pool are one set, not two.
+_Avoid_: options (the `options` table is the pool's persisted form, not a separate concept), results (a raw Foursquare response, pre-union), candidate set (acceptable informally, but "pool" is the canonical noun).
+
+**Candidate-pool floor**:
+The named, shared allowlist of venue *types* eligible for the candidate pool before any quiz answer narrows it. v1.1: eight Foursquare `Dining and Drinking` subcategories -- Restaurant, Sports Bar, Food Court, Food Truck, Food Stand, Cafeteria, Breakfast Spot, Bagel Shop. Applied as a fetch-time hard filter on every Foursquare call (seeded into `fsq_category_ids` when no other category scope is present) and approximated as `.restaurant`-only on the MapKit fallback. The single source of truth that keeps the Q5 candidate pool and the verdict candidate pool from diverging. See [[gti-vault/60_engineering/adr/0012-candidate-pool-floor|ADR 0012]].
+_Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scoping, a different mechanism), restaurant filter ("Restaurant" is one of eight members, not the whole floor).
 
 ## Relationships
 
@@ -49,6 +59,8 @@ _Avoid_: cuisine dislike (too soft; NEVER is hard veto), cuisine veto (collides 
 - A **Linked-Apple session** is durable across reinstalls keyed by the device's Apple identity. An **Anonymous session** is durable only until the keychain is cleared or the app is deleted.
 - A **Parameter** is set on session setup and constrains the entire quiz that follows. A **Scenario question** is asked of every member during the quiz, and its answer is per-member. A **Profile** value is read silently per member without re-asking.
 - The conditional Q3 structure (indoor/outdoor only if dine-in **Parameter**) means quiz question identity depends on session parameters. Schema must support per-session question-slot variability.
+- The **Q5 preference probe** draws its three cards from the **Candidate pool**; the verdict engine ranks the same **Candidate pool**. They are one set — the **Candidate-pool floor** is what guarantees they cannot diverge.
+- The **Candidate-pool floor** is a fetch-time (Stage 1) venue-*class* hard filter, applied alongside geo / radius / price / meal-time. It is orthogonal to cuisine, which is a Stage-2 soft scoring axis in the verdict engine and never strict-filters the fetch.
 
 ## Example dialogue
 
