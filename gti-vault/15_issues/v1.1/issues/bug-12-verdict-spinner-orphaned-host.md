@@ -1,7 +1,7 @@
 ---
 issue: bug-12
 title: Post-Q5 verdict screen never renders — a double onSubmitted orphans the polling host
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 142
 created: 2026-05-19
@@ -96,3 +96,5 @@ None — self-contained iOS change plus one Management-API table drop. Can start
 ## Comments
 
 **2026-05-19 — filed.** Found during the 2026-05-19 verdict-spinner diagnosis against build 267. Triaged `ready-for-agent` / AFK — self-contained, clear behavioral contract, no design fork. Verification is CI + TestFlight reproduction (no unit-test seam — see "Test seam").
+
+**2026-05-19 — done (PR #147).** Idempotency guard landed as a new pure helper `PostQuizRouter.shouldEnterPostQuiz` (mirrors `SoloPath` — keeps the load-bearing rule deterministically testable despite `RootView` having no test seam). `RootView.enterPostQuiz` consults it on `postQuizHost?.context.roomID`: a duplicate `onSubmitted` for a room already routed is a no-op; a genuinely new room still routes. `onSubmitted` collapsed to a single trigger by dropping the explicit call in `QuizScreen.submitFromQ5` — the `.submitted` step's `.task` is the sole trigger and also covers the `.failed`-retry path. Temporary PR #141 instrumentation reverted: `DebugTrace.swift` and every `DebugTrace.mark` call site deleted (`grep -r DebugTrace ios/` empty); the `public.debug_trace` prod table dropped from `gettoit-prod` via the Supabase Management API (`drop table ... cascade`, also clearing the diagnosis-scoped RLS insert policy). New `PostQuizRouterTests` (3 cases) and the `ios` CI test lane both green. End-to-end verification remains the CI build → TestFlight reproduction per "Test seam".
