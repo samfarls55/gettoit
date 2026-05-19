@@ -179,7 +179,7 @@ established spec-gap → tracer-bullet pairing (cf. `sg-02`→`tb-01`).
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| sg-05 | [[issues/sg-05-q5-no-results-mode\|Q5 no-results mode — design-system surface spec]] | AFK | [#136](https://github.com/samfarls55/gettoit/issues/136) | — |
+| sg-05 | [[issues/sg-05-q5-no-results-mode\|Q5 no-results mode — design-system surface spec]] ✅ done | AFK | [#136](https://github.com/samfarls55/gettoit/issues/136) | — |
 | TB-26 (v1.1) | [[issues/tb-26-remove-fictitious-fallback-venues\|Remove fictitious fallback venues; render the Q5 no-results screen]] | AFK | [#137](https://github.com/samfarls55/gettoit/issues/137) | sg-05 |
 
 Build order: sg-05 first (specs the `no-results` Q5 mode in `design-system/`),

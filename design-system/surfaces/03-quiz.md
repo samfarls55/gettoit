@@ -115,6 +115,9 @@ The huge live word at the center is the system saying "yes, this is your vibe." 
 
 **The only surface in the system where multi-option rating is permitted.** Gradient: `q5` (midnight).
 
+> **Code:** [`../code/screens/ScreenQ5Regret.jsx`](../code/screens/ScreenQ5Regret.jsx)
+> Two modes: `default` · `no-results`.
+
 3 *real* candidate venues. The member rates each 1–5 on excitement ("How
 excited does this make you?"). Q5 is a **preference probe**, not a
 tiebreaker — the ratings reveal how much each preference axis truly weighs.
@@ -122,6 +125,46 @@ CTA flips to **sun-yellow `"Drop the verdict"`** — the only quiz screen that
 telegraphs the verdict is coming. The factorial card-generation logic and
 the real-candidate wiring are specified by the v1.1 PRD (module C) and built
 by issue **tb-08** — this surface section is the visual shell only.
+
+### Modes
+
+| Mode | Visible state |
+|---|---|
+| `default` | TopBar (segment 5 active) + C-03 QuestionHeader + three factorial candidate cards with 1–5 excitement raters + sun-fill `"Drop the verdict"` CTA. |
+| `no-results` | TopBar (segment 5 active) + centered headline + body block + sun-fill `"Head to the verdict"` CTA. The three rater cards and the `"Drop the verdict"` CTA are suppressed. |
+
+### `no-results` mode
+
+The Q5-flow analogue of the verdict-side `no-survivor` mode
+(`surfaces/05-verdict.md`) — same structural precedent: a centered
+headline + body block in place of the surface's primary content, an
+action-shaped sun-fill CTA, no fictitious filler.
+
+- **Trigger condition.** The per-member venue fetch produced no
+  factorial-usable pool — there are no real candidates to rate. The app
+  must never surface a made-up place to a user, so an empty pool renders
+  this state rather than fabricated venues. (The factorial-pool fetch and
+  the empty-pool detection are PRD module C; the iOS consumption is the
+  paired tracer bullet **tb-26**.)
+- **Rendered elements.**
+  - C-01 gradient surface — the `q5` gradient stops, unchanged.
+  - C-02 TopBar — `×` + 5-segment progress, segment 5 active.
+  - A centered headline + body block — the C-03 question-header family
+    rendered centered, matching the verdict `no-survivor` centered-block
+    treatment.
+  - C-05 primary pill CTA, **sun fill** — `"Head to the verdict"`.
+- **Suppressed elements.** The three factorial rater cards and the
+  `"Drop the verdict"` CTA. There is nothing to rate, so neither earns a
+  place on the surface.
+- **Composition.** Built entirely from existing primitives — C-01 / C-02 /
+  C-03 / C-05 — and existing tokens. No new component, no new token.
+
+**Locked copy** (`no-results`):
+
+- **Headline:** `No spots to rate near you.`
+- **Body:** `Couldn't line up rateable spots in your radius tonight. Your other answers still count — the verdict lands without this step.`
+- **CTA:** `Head to the verdict` (C-05, sun fill — action-shaped, per the
+  design system's ban on generic `Next` / `Continue` / `OK` CTAs).
 
 ---
 

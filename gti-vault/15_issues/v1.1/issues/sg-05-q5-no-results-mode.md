@@ -1,7 +1,7 @@
 ---
 issue: sg-05
 title: Q5 no-results mode — design-system surface spec
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 136
 prd: v1.1-quiz-redesign-prd
@@ -78,3 +78,18 @@ The copy below is locked — reproduce it exactly.
 ## Blocked by
 
 - None — can start immediately.
+
+## Comments
+
+- **2026-05-19 — done (AFK, PR #138).** Added the `no-results`
+  mode to the Q5 surface. `code/screens/ScreenQ5Regret.jsx` now takes a
+  `mode` prop (`default` | `no-results`), mirroring `ScreenVerdict.jsx`'s
+  mode handling. The `no-results` branch renders the C-02 TopBar (segment 5
+  active), a centered C-03 headline + body block, and a sun-fill C-05 CTA
+  `"Head to the verdict"`; the three factorial rater cards and the
+  `"Drop the verdict"` CTA are suppressed. `surfaces/03-quiz.md` §Q5 gained
+  a Modes table + a `no-results` section documenting the trigger, rendered
+  / suppressed elements, and the locked copy. No new component, no new
+  token — composes from existing C-01 / C-02 / C-03 / C-05 and existing
+  tokens. `node design-system/scripts/verify.mjs` passes all gates. tb-26
+  is now unblocked.
