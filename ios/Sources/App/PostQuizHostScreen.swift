@@ -75,7 +75,9 @@ public struct PostQuizHostScreen: View {
             // SwiftUI cancels this task when the view leaves the
             // hierarchy — the poll loop's `Task.checkCancellation()`
             // catches that and unwinds. No leaked task.
+            DebugTrace.mark("hostScreen.task.start", room: host.context.roomID)
             await host.start()
+            DebugTrace.mark("hostScreen.task.ended", room: host.context.roomID)
         }
     }
 

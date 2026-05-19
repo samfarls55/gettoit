@@ -202,6 +202,11 @@ public final class PostQuizHost {
     // MARK: - poll
 
     private func poll() async {
+        DebugTrace.mark(
+            "host.poll.start",
+            room: context.roomID,
+            detail: "isSolo=\(context.isSolo) hasWaitingStore=\(waitingStore != nil)"
+        )
         do {
             if let store = waitingStore, let fetchSnapshot {
                 try await pollGroup(store: store, fetchSnapshot: fetchSnapshot)
@@ -211,7 +216,9 @@ public final class PostQuizHost {
         } catch is CancellationError {
             // Host teardown — leave the phase as-is. The surface is
             // going away; there's nothing to render.
+            DebugTrace.mark("host.poll.cancelled", room: context.roomID)
         } catch {
+            DebugTrace.mark("host.poll.failed", room: context.roomID, detail: "\(error)")
             phase = .failed
         }
     }
@@ -221,6 +228,7 @@ public final class PostQuizHost {
     /// `verdictPollMaxWait`, `VerdictPoller.run()` throws `PollExhausted`,
     /// which `poll()`'s catch routes to `.failed` (bug-10).
     private func pollSolo() async throws {
+        DebugTrace.mark("host.pollSolo.start", room: context.roomID)
         let poller = VerdictPoller(
             roomID: context.roomID,
             interval: pollInterval,
@@ -229,6 +237,7 @@ public final class PostQuizHost {
             sleep: sleep
         )
         let verdict = try await poller.run()
+        DebugTrace.mark("host.pollSolo.gotVerdict", room: context.roomID)
         phase = .verdict(verdict)
     }
 
@@ -263,7 +272,9 @@ public final class PostQuizHost {
                 )
             }
 
+            DebugTrace.mark("host.pollGroup.beforeFetch", room: context.roomID)
             if let verdict = try await fetchVerdict(context.roomID) {
+                DebugTrace.mark("host.pollGroup.gotVerdict", room: context.roomID)
                 phase = .verdict(verdict)
                 return
             }

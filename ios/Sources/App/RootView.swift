@@ -578,6 +578,11 @@ public struct RootView: View {
         )
         self.postQuizHost = host
         self.activeQuiz = nil
+        DebugTrace.mark(
+            "rootView.enterPostQuiz",
+            room: quiz.roomID,
+            detail: "isInitiator=\(quiz.isInitiator) invitedShared=\(quiz.invitedShared)"
+        )
     }
 
     /// Resolve the `(coordinate, radiusMeters)` pair PlacesService

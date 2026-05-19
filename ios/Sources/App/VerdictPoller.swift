@@ -115,10 +115,39 @@ public struct VerdictPoller: Sendable {
         // that would push the total past `maxWait`, so a verdict that
         // lands on any attempt inside the bound still resolves normally.
         var elapsed: TimeInterval = 0
+        var attempt = 0
+        DebugTrace.mark(
+            "poller.run.start",
+            room: roomID,
+            detail: "interval=\(interval) maxWait=\(maxWait)"
+        )
         while true {
             try Task.checkCancellation()
-            if let verdict = try await fetch(roomID) {
-                return verdict
+            attempt += 1
+            DebugTrace.mark(
+                "poller.beforeFetch",
+                room: roomID,
+                detail: "attempt=\(attempt) elapsed=\(elapsed)"
+            )
+            let fetched: VerdictStore.VerdictView?
+            do {
+                fetched = try await fetch(roomID)
+            } catch {
+                DebugTrace.mark(
+                    "poller.fetchThrew",
+                    room: roomID,
+                    detail: "attempt=\(attempt) error=\(error)"
+                )
+                throw error
+            }
+            DebugTrace.mark(
+                "poller.afterFetch",
+                room: roomID,
+                detail: "attempt=\(attempt) verdict=\(fetched != nil)"
+            )
+            if let fetched {
+                DebugTrace.mark("poller.returningVerdict", room: roomID)
+                return fetched
             }
             // Cancellation is checked before the bound so host teardown
             // unwinds as CancellationError, never as PollExhausted.
@@ -128,8 +157,18 @@ public struct VerdictPoller: Sendable {
             // the loop. The default is finite (75s); `.infinity` is the
             // explicit opt-out used by cancellation-isolation tests.
             if maxWait.isFinite && elapsed + interval >= maxWait {
+                DebugTrace.mark(
+                    "poller.exhausted",
+                    room: roomID,
+                    detail: "attempt=\(attempt) elapsed=\(elapsed)"
+                )
                 throw PollExhausted(roomID: roomID, maxWait: maxWait)
             }
+            DebugTrace.mark(
+                "poller.beforeSleep",
+                room: roomID,
+                detail: "attempt=\(attempt)"
+            )
             try await sleep(interval)
             elapsed += interval
         }
