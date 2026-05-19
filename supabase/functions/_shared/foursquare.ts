@@ -317,6 +317,46 @@ export const CUISINE_CATEGORY_MAP: readonly CuisineCategoryMapping[] = Object
     { cuisine: "mediterranean", fsq_category_id: "4bf58dd8d48988d1c0941735" },
   ]);
 
+/** The candidate-pool floor (ADR 0012) — the venue-type allowlist seeded
+ *  onto any Foursquare call whose `fsq_category_ids` set is otherwise
+ *  empty. This is the single, named, exported source of truth for "which
+ *  venue types are eligible candidates"; the bug it closes existed
+ *  because two code paths each decided that independently.
+ *
+ *  The eight members are `Dining and Drinking` subcategories whose
+ *  primary purpose is eating a meal. `Sports Bar` is the single
+ *  deliberate carve-out from the `Bar` branch (people eat full meals at
+ *  sports bars). Food Court / Truck / Stand / Cafeteria / Breakfast Spot
+ *  / Bagel Shop sit *outside* the `Restaurant` category as siblings
+ *  under `Dining and Drinking`, so each is listed explicitly — a
+ *  `Restaurant` parent filter does not reach them.
+ *
+ *  Category-id sourcing: every id is a 24-char hex Foursquare taxonomy
+ *  id, live-probed against `/places/search` on 2026-05-19 — each
+ *  returned HTTP 200. `Food Stand` returned zero rows at the probe
+ *  geos (a genuinely sparse category, not an invalid id). The
+ *  `Restaurant` id below is the *parent* category id and was confirmed
+ *  descendant-inclusive on the post-2025 surface: a parent-only search
+ *  returned venues tagged with cuisine-child category ids (Japanese,
+ *  Italian, Chinese, American — all in `CUISINE_CATEGORY_MAP`), so the
+ *  cuisine children need not be enumerated. See ADR 0012 Open items.
+ *
+ *  Seeded as a *fallback, never an addition*: `fsq_category_ids` is OR
+ *  semantics, so appending the floor to a per-cuisine call would
+ *  OR-broaden it straight back to all restaurants. `buildFoursquareQuery`
+ *  seeds the floor only when the assembled set is empty. */
+export const CANDIDATE_POOL_FLOOR_CATEGORY_IDS: readonly string[] = Object
+  .freeze([
+    "4d4b7105d754a06374d81259", // Restaurant (parent — descendant-inclusive)
+    "4bf58dd8d48988d11d941735", // Sports Bar
+    "4bf58dd8d48988d120951735", // Food Court
+    "4bf58dd8d48988d1cb941735", // Food Truck
+    "5283c7b4e4b094cb91ad6b1b", // Food Stand
+    "4bf58dd8d48988d128941735", // Cafeteria
+    "4bf58dd8d48988d143941735", // Breakfast Spot
+    "4bf58dd8d48988d179941735", // Bagel Shop
+  ]);
+
 /** Resolve a `QuizCuisine` id to its Foursquare category mapping.
  *  Case- and whitespace-tolerant; returns `undefined` for an unknown or
  *  empty id so the caller can degrade gracefully to the general query. */
@@ -421,11 +461,26 @@ export function buildFoursquareQuery(input: PlacesProxyInput): FoursquareQueryPl
     }
   }
 
-  if (categoryIds.size > 0) {
-    // Foursquare accepts a comma-separated list. We sort so the same
-    // filter set produces the same wire string (cache key stability).
-    params.set("fsq_category_ids", [...categoryIds].sort().join(","));
+  // Candidate-pool floor (tb-25 / ADR 0012). After assembling the
+  // category-id set, seed the floor IF AND ONLY IF the set is empty:
+  //   - per-cuisine call → already carries the cuisine id → floor NOT
+  //     added (it is already inside the floor; appending would
+  //     OR-broaden it back to all restaurants — `fsq_category_ids` is
+  //     OR semantics).
+  //   - general call → set empty → floor seeded.
+  //   - dietary category chip → already carries the dietary id → floor
+  //     NOT added (dietary is a hard veto, correctly narrower).
+  // `fsq_category_ids` is therefore never emitted empty.
+  if (categoryIds.size === 0) {
+    for (const id of CANDIDATE_POOL_FLOOR_CATEGORY_IDS) {
+      categoryIds.add(id);
+    }
   }
+
+  // Foursquare accepts a comma-separated list. We sort so the same
+  // filter set produces the same wire string (cache key stability). The
+  // set is always non-empty here — the floor guarantees it.
+  params.set("fsq_category_ids", [...categoryIds].sort().join(","));
 
   if (filters.price_tier !== undefined) {
     const clamped = Math.max(1, Math.min(4, Math.floor(filters.price_tier)));

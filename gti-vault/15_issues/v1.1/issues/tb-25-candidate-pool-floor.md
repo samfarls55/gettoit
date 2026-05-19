@@ -1,7 +1,7 @@
 ---
 issue: tb-25
 title: Apply the candidate-pool floor — Restaurant + Sports Bar venue-type allowlist on every Foursquare call
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 133
 prd: v1.1-quiz-redesign-prd
@@ -67,3 +67,7 @@ Record the resolved category ids and probe results in ADR 0012's Open items sect
 ## Blocked by
 
 - Nothing. ADR 0012 is a complete spec and the surfaces (`buildFoursquareQuery`, `MapKitPlacesFallback`) already exist.
+
+## Comments
+
+- **2026-05-19 — done (PR #135).** `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` added to `supabase/functions/_shared/foursquare.ts` as the single exported eight-id constant; `buildFoursquareQuery` seeds it iff the assembled category-id set is empty (fallback, never an OR-addition). `fsq_category_ids` is now always emitted non-empty. `MapKitPlacesFallback` POI filter tightened to `[.restaurant]`. All eight floor ids live-probed against `/places/search` on 2026-05-19 — HTTP 200 across the board; the `Restaurant` parent id was confirmed descendant-inclusive (a parent-only search returned cuisine-child category ids), so the floor carries the single parent id rather than the enumerated cuisine list. `Food Stand` returns zero rows at the probe geos but is a valid (HTTP 200) sparse category — kept. ADR 0012 Open items section updated with the resolved ids and the probe table. Full Deno suite green (307 tests); the three pre-existing `places-proxy-core` / `foursquare` tests that asserted `fsq_category_ids` absence were updated to the new floored behavior per ADR 0012. The `ios` change is a one-line POI-filter constant — not unit-testable purely (MapKit needs a device/simulator); the `ios` CI lane covers compilation.

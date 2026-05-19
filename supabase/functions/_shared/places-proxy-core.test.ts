@@ -21,11 +21,17 @@ import {
   validateInput,
 } from "./places-proxy-core.ts";
 import {
+  CANDIDATE_POOL_FLOOR_CATEGORY_IDS,
   FOURSQUARE_API_VERSION,
   type FoursquareSearchResponse,
   type PlacesProxyInput,
   THIN_RESULTS_THRESHOLD,
 } from "./foursquare.ts";
+
+/** The sorted, comma-joined candidate-pool floor (tb-25 / ADR 0012) —
+ *  the wire value of `fsq_category_ids` on any call whose category set
+ *  is otherwise empty. */
+const FLOOR_WIRE = [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(",");
 
 // ---------------------------------------------------------------------------
 // Test fixtures.
@@ -260,7 +266,10 @@ Deno.test("dietary filter — gluten chip is applied post-fetch, not on the wire
     filters: { dietary: ["gluten"] },
   }, deps);
   const url = new URL(fetchCalls[0].url);
-  assertEquals(url.searchParams.has("fsq_category_ids"), false);
+  // tb-25 / ADR 0012: gluten is a `tastes` post-filter and contributes
+  // no category id, so the category set is empty and the candidate-pool
+  // floor is seeded — the wire carries the floor, never empty.
+  assertEquals(url.searchParams.get("fsq_category_ids"), FLOOR_WIRE);
 });
 
 Deno.test("dietary filter — gluten post-filter rejects results without the taste token", async () => {
@@ -306,14 +315,17 @@ Deno.test("cuisine tag — per-cuisine call puts the mapped category on the Four
   );
 });
 
-Deno.test("cuisine tag — mandatory general call is NOT category-scoped", async () => {
+Deno.test("cuisine tag — mandatory general call is NOT cuisine-scoped but carries the floor", async () => {
   const { fetchCalls, deps } = buildDeps();
   await handlePlacesProxy({
     ...TYPICAL_INPUT,
     filters: {},
   }, deps);
   const url = new URL(fetchCalls[0].url);
-  assertEquals(url.searchParams.has("fsq_category_ids"), false);
+  // tb-25 / ADR 0012: the general call carries no cuisine id, so the
+  // candidate-pool floor is seeded — venue-class floored, not
+  // cuisine-scoped. The floor is orthogonal to cuisine.
+  assertEquals(url.searchParams.get("fsq_category_ids"), FLOOR_WIRE);
 });
 
 Deno.test("cuisine tag — unknown cuisine degrades to the general query without error", async () => {
@@ -323,7 +335,9 @@ Deno.test("cuisine tag — unknown cuisine degrades to the general query without
     filters: { cuisine: "klingon" },
   }, deps);
   const url = new URL(fetchCalls[0].url);
-  assertEquals(url.searchParams.has("fsq_category_ids"), false);
+  // tb-25 / ADR 0012: an unresolvable cuisine leaves the category set
+  // empty, so it degrades to the floored general query.
+  assertEquals(url.searchParams.get("fsq_category_ids"), FLOOR_WIRE);
   // Degrades gracefully — full result set, no error surfaced.
   assertEquals(result.places.length, 3);
 });
