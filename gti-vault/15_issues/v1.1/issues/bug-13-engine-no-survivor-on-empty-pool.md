@@ -1,7 +1,7 @@
 ---
 issue: bug-13
 title: compute-verdict wedges the room on an empty candidate pool instead of writing a terminal no-survivor verdict
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 143
 created: 2026-05-19
@@ -67,3 +67,5 @@ None — self-contained edge-function change. Can start immediately.
 ## Comments
 
 **2026-05-19 — filed.** Found during the 2026-05-19 verdict-spinner diagnosis — confirmed by directly re-invoking `compute-verdict` on a wedged room and getting `no_candidates`. Triaged `ready-for-agent` / AFK — self-contained, clear contract, the no-survivor verdict shape already exists end-to-end.
+
+**2026-05-19 — done (PR [#146](https://github.com/samfarls55/gettoit/pull/146)).** AFK agent removed the `no_candidates` 404 branch from the `compute-verdict` handler. An empty candidate pool now flows through to the verdict engine, which already short-circuits an empty pool to a `no_survivor` output; the handler persists the terminal `no_survivor` verdict row (null `option_id`) and runs the same room-status advance the success path runs, so the room leaves `firing`. The `no_votes` 404 was retained and reordered to run before the engine call — a room with zero member votes genuinely has no group to render a verdict for. No iOS change: `VerdictScreen` / `VerdictStore` already render `.noSurvivor`. New `index-empty-pool.test.ts` covers empty-pool → no-survivor verdict, room-advance, non-empty no-regression, and empty-pool-plus-no-votes → `no_votes` 404; two pre-existing tests that asserted the old `no_candidates` contract were updated. Full edge-function suite green (313 passed). bug-14 (iOS fire-before-persist race, the cause of empty pools) and ops-01 (re-fire the 46 already-wedged rooms — now unblocked) remain open.
