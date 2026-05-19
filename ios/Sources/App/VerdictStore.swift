@@ -67,16 +67,8 @@ public final class VerdictStore {
     /// room. Returns nil when no verdict exists yet (the engine hasn't
     /// fired). Throws on transport / decode errors.
     public func fetchVerdict(roomID: UUID) async throws -> VerdictView? {
-        DebugTrace.mark("fetchVerdict.start", room: roomID)
-        DebugTrace.mark("fetchVerdict.beforeVerdictRow", room: roomID)
         let verdictRow = try await fetchVerdictRow(roomID: roomID)
-        DebugTrace.mark(
-            "fetchVerdict.afterVerdictRow",
-            room: roomID,
-            detail: "found=\(verdictRow != nil) method=\(verdictRow?.method ?? "nil")"
-        )
         guard let verdict = verdictRow else {
-            DebugTrace.mark("fetchVerdict.return.noVerdictRow", room: roomID)
             return nil
         }
 
@@ -85,7 +77,6 @@ public final class VerdictStore {
         // "NO SPOT / FITS" and whose meta line carries the surviving
         // hard-needs surfaced by the engine.
         if verdict.method == "no_survivor" {
-            DebugTrace.mark("fetchVerdict.noSurvivor.return", room: roomID)
             async let votesTask = fetchVotes(roomID: roomID)
             let voteRows = try await votesTask
             let survivingHardNeeds = VerdictStore.survivingHardNeeds(forVotes: voteRows)
@@ -107,11 +98,9 @@ public final class VerdictStore {
         guard let optionID = verdict.optionID else {
             // A manual verdict with no option_id is malformed — the
             // engine never writes this; surface nil rather than crash.
-            DebugTrace.mark("fetchVerdict.return.noOptionID", room: roomID)
             return nil
         }
 
-        DebugTrace.mark("fetchVerdict.beforeOptionFetches", room: roomID)
         async let optionsTask = fetchOption(id: optionID)
         async let cutsTask    = fetchCuts(verdictID: verdict.id)
         async let votesTask   = fetchVotes(roomID: roomID)
@@ -121,24 +110,17 @@ public final class VerdictStore {
         let cutRows      = try await cutsTask
         let voteRows     = try await votesTask
         let memberCount  = try await memberCountTask
-        DebugTrace.mark(
-            "fetchVerdict.afterOptionFetches",
-            room: roomID,
-            detail: "option=\(option != nil) cuts=\(cutRows.count) votes=\(voteRows.count) members=\(memberCount)"
-        )
 
         guard let option else {
             // The verdict references an option that's no longer
             // readable — RLS shouldn't allow this for a room member,
             // and the engine never writes such a verdict. Surface nil
             // rather than render a broken hero.
-            DebugTrace.mark("fetchVerdict.return.noOption", room: roomID)
             return nil
         }
 
         // Stitch cuts to option names — the engine writes cuts with
         // `option_id`; the drawer needs the human label.
-        DebugTrace.mark("fetchVerdict.beforeCutsBatch", room: roomID)
         let cutOptionIDs = cutRows.map(\.optionID)
         let cutOptions = try await fetchOptionsBatch(ids: cutOptionIDs)
         let cutMap = Dictionary(uniqueKeysWithValues: cutOptions.map { ($0.id, $0) })
@@ -157,7 +139,6 @@ public final class VerdictStore {
 
         let meta = VerdictStore.metaLine(for: option.payload)
 
-        DebugTrace.mark("fetchVerdict.return.view", room: roomID)
         return VerdictView(
             verdict: VerdictScreen.Verdict(
                 placeName: option.payload.name ?? "Unnamed",

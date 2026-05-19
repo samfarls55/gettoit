@@ -551,7 +551,24 @@ public struct RootView: View {
     /// `activeQuiz`, and with nothing else set the precedence chain
     /// dead-ended on S00 Landing. Now the host owns the session through
     /// to the verdict.
+    ///
+    /// bug-12 — idempotent per room. A successful Q5 submit delivers
+    /// `onSubmitted` twice (the Q5 CTA path and the `.submitted` step's
+    /// `.task`). Without this guard the second call replaced the live,
+    /// polling host with a fresh one whose SwiftUI `.task` never re-ran
+    /// — the verdict resolved on the orphaned first host and the
+    /// resolving spinner span forever. `PostQuizRouter.shouldEnterPostQuiz`
+    /// returns `false` for a duplicate entry into a room already held in
+    /// `postQuizHost`; a genuinely new room still routes.
     private func enterPostQuiz(quiz: QuizContext, client: SupabaseClient) {
+        guard PostQuizRouter.shouldEnterPostQuiz(
+            currentRoomID: postQuizHost?.context.roomID,
+            incomingRoomID: quiz.roomID
+        ) else {
+            // Duplicate `onSubmitted` for the room already routed —
+            // ignore it. Replacing the live host is the bug-12 defect.
+            return
+        }
         let store = VerdictStore(client: client)
         let snapshotStore = SessionSnapshotStore(client: client)
         let context = PostQuizSessionContext(
@@ -578,11 +595,6 @@ public struct RootView: View {
         )
         self.postQuizHost = host
         self.activeQuiz = nil
-        DebugTrace.mark(
-            "rootView.enterPostQuiz",
-            room: quiz.roomID,
-            detail: "isInitiator=\(quiz.isInitiator) invitedShared=\(quiz.invitedShared)"
-        )
     }
 
     /// Resolve the `(coordinate, radiusMeters)` pair PlacesService

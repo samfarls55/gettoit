@@ -217,14 +217,17 @@ public struct QuizScreen: View {
     // MARK: - submit flow
 
     private func submitFromQ5() {
+        // bug-12 — `onSubmitted` is fired from a SINGLE place: the
+        // `.submitted` step's `.task`. A successful `coordinator.submit()`
+        // moves the step machine to `.submitted`, which renders the
+        // `Color.clear` view whose `.task` calls `onSubmitted()`. Calling
+        // it here as well delivered `onSubmitted` twice per submit, which
+        // orphaned the post-Q5 polling host (see `RootView.enterPostQuiz`).
+        // The `.submitted` step's `.task` also covers the `.failed`-retry
+        // path (RETRY → `coordinator.submit()` → `.submitted`), so it is
+        // the correct single trigger.
         Task {
-            let result = await coordinator.submit()
-            switch result {
-            case .success:
-                onSubmitted()
-            case .failure:
-                break  // step is .failed; user can retry
-            }
+            _ = await coordinator.submit()
         }
     }
 
