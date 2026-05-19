@@ -357,6 +357,90 @@ export const CANDIDATE_POOL_FLOOR_CATEGORY_IDS: readonly string[] = Object
     "4bf58dd8d48988d179941735", // Bagel Shop
   ]);
 
+/** Shape-time primary-class gate — companion to the query-time
+ *  `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` (ADR 0012). The floor is an
+ *  OR allowlist on `fsq_category_ids`; it cannot exclude a multi-category
+ *  venue whose primary tag is `Bar` but which also carries a meal
+ *  category (Robert's Western World, `["Bar","Burger Joint","Rock Club"]`
+ *  matched the floor's Restaurant parent via Burger Joint and rode into
+ *  the pool with `Bar` as `categories[0]`, which the iOS verdict surface
+ *  renders verbatim). bug-15 adds a shape-time gate enforced in
+ *  `shapeFoursquareResult` on the human category names. ADR 0012 amended.
+ *
+ *  `NIGHTLIFE_CATEGORY_NAMES` — Foursquare's "Bar"-branch and beverage-
+ *  primary venue names, lower-cased for case-insensitive matching.
+ *  `Sports Bar` and `Gastropub` are the two explicit carve-outs (people
+ *  eat full meals there) — ADR 0012 carved Sports Bar out of the floor
+ *  on the query side; the 2026-05-19 amendment carves Gastropub out
+ *  symmetrically here.
+ *
+ *  `ENTERTAINMENT_VENUE_CATEGORY_NAMES` — the entertainment-venue
+ *  backstop set. A meal-primary venue can still be a functional
+ *  entertainment complex (Pinewood Social, Ole Red, Commodore Grille);
+ *  if its category set contains both a nightlife tag AND an
+ *  entertainment-venue tag, the venue drops. */
+export const NIGHTLIFE_CATEGORY_NAMES: readonly string[] = Object.freeze([
+  "bar",
+  "beer bar",
+  "beer garden",
+  "brewery",
+  "champagne bar",
+  "cocktail bar",
+  "dive bar",
+  "hookah bar",
+  "hotel bar",
+  "karaoke bar",
+  "lounge",
+  "pub",
+  "sake bar",
+  "speakeasy",
+  "tiki bar",
+  "whisky bar",
+  "wine bar",
+  // Sports Bar + Gastropub are deliberately NOT here — meal-class
+  // carve-outs (ADR 0012 amendment 2026-05-19).
+]);
+
+export const ENTERTAINMENT_VENUE_CATEGORY_NAMES: readonly string[] = Object
+  .freeze([
+    "music venue",
+    "rock club",
+    "night club",
+    "bowling alley",
+    "stadium",
+  ]);
+
+/** Apply the bug-15 primary-class gate + entertainment-venue backstop to a
+ *  Foursquare category-name list. Returns `true` when the venue is
+ *  eligible (keep), `false` when it should drop.
+ *
+ *  Rules (both must hold to keep):
+ *    1. Primary-class gate — `categories[0]` is not a nightlife name and
+ *       not an entertainment-venue name.
+ *    2. Entertainment-venue backstop — the category set does not contain
+ *       BOTH a nightlife name AND an entertainment-venue name.
+ *
+ *  Empty / missing category list is kept (taxonomy-drift guard — the
+ *  query-time floor already constrained it). An unrecognised primary
+ *  string is kept for the same reason. */
+export function shouldKeepByVenueClass(categoryNames: readonly string[]): boolean {
+  if (categoryNames.length === 0) return true;
+  const nightlife = new Set(NIGHTLIFE_CATEGORY_NAMES);
+  const entertainment = new Set(ENTERTAINMENT_VENUE_CATEGORY_NAMES);
+  const lc = categoryNames.map((n) => n.toLowerCase());
+
+  // Rule 1 — primary class gate.
+  const primary = lc[0];
+  if (nightlife.has(primary) || entertainment.has(primary)) return false;
+
+  // Rule 2 — entertainment-venue backstop.
+  const hasNightlife = lc.some((n) => nightlife.has(n));
+  const hasEntertainmentVenue = lc.some((n) => entertainment.has(n));
+  if (hasNightlife && hasEntertainmentVenue) return false;
+
+  return true;
+}
+
 /** Resolve a `QuizCuisine` id to its Foursquare category mapping.
  *  Case- and whitespace-tolerant; returns `undefined` for an unknown or
  *  empty id so the caller can degrade gracefully to the general query. */
@@ -640,6 +724,14 @@ export function shapeFoursquareResult(
 ): ShapedPlace | null {
   if (!result.fsq_place_id || !result.name) return null;
   if (result.latitude === undefined || result.longitude === undefined) return null;
+
+  // bug-15 — shape-time primary-class gate + entertainment-venue
+  // backstop. Drops bars whose primary tag is `Bar` (Robert's Western
+  // World, etc.) and food-primary entertainment complexes (Pinewood
+  // Social, Ole Red) that the query-time floor cannot exclude. ADR 0012
+  // amendment 2026-05-19.
+  const categoryNames = (result.categories ?? []).map((c) => c.name);
+  if (!shouldKeepByVenueClass(categoryNames)) return null;
 
   return {
     fsq_place_id: result.fsq_place_id,

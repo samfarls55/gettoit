@@ -1,7 +1,7 @@
 ---
 issue: bug-15
 title: Pool-floor allows multi-category bars; primary "Bar" leaks into verdict
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 152
 created: 2026-05-19
@@ -82,3 +82,7 @@ Enforced in `shapeFoursquareResult` — the row returns `null` (same path the ex
 - Display-side fix to pick a non-Bar category from `categories[]` (lipstick — the bar still wins the verdict).
 - Cleanup of pre-floor `options` rows (Bridgestone Arena, pure honky-tonks). Those came from rooms before TB-25 shipped; the fix is forward-looking.
 - The `MKPOICategoryRestaurant` raw-enum display leak (separate bug — file when convenient).
+
+## Comments
+
+- **2026-05-19 — done (PR forthcoming).** Shape-time primary-class gate + entertainment-venue backstop landed in `supabase/functions/_shared/foursquare.ts`. Two new exported constants (`NIGHTLIFE_CATEGORY_NAMES`, `ENTERTAINMENT_VENUE_CATEGORY_NAMES`), one pure decision helper (`shouldKeepByVenueClass`), one call site in `shapeFoursquareResult`. Eight new pure unit tests cover each rule branch (primary-bar cut, primary-music-venue cut, meal-primary + nightlife-only kept, meal-primary + nightlife + entertainment-venue cut, primary-Sports-Bar carve-out kept, primary-Gastropub carve-out kept, unknown-primary kept, case-insensitive match). A regression test replays the exact 36-option pool from prod room `d11b3983-a8f6-4741-81a5-309ba038a2f6` (queried from the live `options` table) and asserts Robert's Western World drops while both Sports-Bar-primary venues (Neighbors, Losers Bar) stay. ADR 0012 amended with a new "Shape-time primary-class gate" section that records the contract, the two carve-outs, the Foursquare-category-ordering-noise tradeoff, and the cross-time-instability caveat. Full deno suite green (325 tests).

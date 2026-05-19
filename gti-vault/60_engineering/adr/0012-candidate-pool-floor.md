@@ -106,6 +106,56 @@ Built by tb-25 (2026-05-19):
 - `supabase/functions/_shared/foursquare.ts` — `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` exported constant (the eight live-probed ids) plus the seed-when-empty rule in `buildFoursquareQuery`: after assembling `categoryIds`, the floor is seeded iff the set is empty. `fsq_category_ids` is now always emitted non-empty.
 - `ios/Sources/App/MapKitPlacesFallback.swift` — POI filter tightened from `[.restaurant, .cafe, .foodMarket]` to `[.restaurant]`.
 
+## Amendment 2026-05-19 — Shape-time primary-class gate ([[../../15_issues/v1.1/issues/bug-15-pool-floor-allows-multicategory-bars|bug-15]])
+
+### Context
+
+A solo session on 2026-05-19 produced the verdict `Robert's Western World` — a Nashville honky-tonk tagged `["Bar","Burger Joint","Rock Club"]` in prod room `d11b3983-a8f6-4741-81a5-309ba038a2f6`. The iOS verdict surface (`VerdictStore.swift:276`) renders `categories[0]`, so the room saw the verdict displayed as a **Bar** — even though `Bar` is deliberately not in this ADR's eight allowed venue-type categories.
+
+The root cause is a structural limit of this ADR's query-time floor. `fsq_category_ids` is an **OR allowlist** on Foursquare's `/places/search` parameter; it constrains *which categories can match*, not *which venues can be returned*. Foursquare venues are multi-category — Robert's matches the floor as a `Burger Joint` (a child of the `Restaurant` parent id) and rides into the pool. The `Bar` tag is preserved verbatim on the shaped row, and nothing downstream re-checks venue class.
+
+### Decision
+
+Add a **shape-time primary-class gate**, applied in `shapeFoursquareResult`. The gate operates on Foursquare's human category *names* (the data the iOS verdict surface actually renders), case-insensitively.
+
+A shaped row is kept iff **both** hold:
+
+1. **Primary-class gate.** `categories[0]` is not a name in `NIGHTLIFE_CATEGORY_NAMES` and not a name in `ENTERTAINMENT_VENUE_CATEGORY_NAMES`.
+2. **Entertainment-venue backstop.** The category set does not contain *both* a nightlife name *and* an entertainment-venue name.
+
+`shapeFoursquareResult` returns `null` when either branch fires — the same null-return path the existing `fsq_place_id` / `name` / `latitude` guards already use. A venue with no `categories` field, or whose primary is an unrecognised string, is **kept** — the query-time floor already constrained the upstream set and we do not over-cut on taxonomy drift.
+
+### Mechanism
+
+Two new exported constants in `supabase/functions/_shared/foursquare.ts`:
+
+- `NIGHTLIFE_CATEGORY_NAMES` — the Bar / lounge / brewery / wine-bar branch.
+- `ENTERTAINMENT_VENUE_CATEGORY_NAMES` — `Music Venue`, `Rock Club`, `Night Club`, `Bowling Alley`, `Stadium`.
+
+`shouldKeepByVenueClass(categoryNames)` is the pure decision function the shape function calls. Pure unit tests cover each rule branch.
+
+### Carve-outs
+
+`Sports Bar` and `Gastropub` are explicitly **excluded** from `NIGHTLIFE_CATEGORY_NAMES`. ADR 0012 already carved `Sports Bar` out of the query-time floor on the meal-class rationale (people eat full meals at sports bars). The 2026-05-19 amendment carves `Gastropub` out symmetrically — gastropubs are food-primary by definition.
+
+### Single enforcement point
+
+`shapeFoursquareResult` is the single entry to the proxy's output rows. Q5 probe, candidate-pool union, and verdict pool all derive from that output. One enforcement point therefore reaches all three — the same architectural shape the original query-time floor used.
+
+### Accepted tradeoffs
+
+- **Foursquare category-ordering noise.** A real restaurant Foursquare tags `Bar`-first (City House `["Bar","Italian Restaurant"]`, The Hampton Social `["Wine Bar","New American Restaurant"]`, Tennessee Brew Works `["Brewery","American Restaurant"]`) will be cut. Accepted: a `Bar`-first venue rendering as a Bar verdict would be worse.
+- **Cross-time instability.** The same venue can return with different category ordering on different fetches (Kid Rock's came back as `["Bar","Music Venue","Steakhouse"]` and `["Sports Bar","Music Venue"]` in different rooms). Within a single verdict the rule is deterministic; across nights eligibility may flip.
+- **Cuisine-restaurant secondary rescue rejected.** A rule that rescues a Bar-primary venue when any cuisine-restaurant name appears later in the list would save City House and The Hampton Social, but it would also let `Losers Bar Downtown` (`["Bar","Bar Food"]` on some fetches) back in. Trades three false-cuts for one false-keep and adds taxonomy fragility. Revisit post-cohort.
+- **Name-based rescue rejected.** Treating tokens like `Saloon` or `Honky Tonk` in the venue *name* as a nightlife signal was considered as a third gate. Foursquare names are unreliable for taxonomy (Bridgestone Arena's tag set is more reliable than its name) — the gate stays category-only.
+
+### Implementation
+
+Built by bug-15 (2026-05-19):
+
+- `supabase/functions/_shared/foursquare.ts` — `NIGHTLIFE_CATEGORY_NAMES` + `ENTERTAINMENT_VENUE_CATEGORY_NAMES` exported constants, `shouldKeepByVenueClass` pure helper, and the `shouldKeepByVenueClass` call inside `shapeFoursquareResult` that returns `null` on a cut.
+- `supabase/functions/_shared/foursquare.test.ts` — unit tests per rule branch plus a regression-fixture test that replays the exact 36-option pool from prod room `d11b3983` and asserts Robert's Western World drops while both Sports-Bar-primary venues stay.
+
 ## References
 
 - [[0002-places-data-foursquare-mapkit|ADR 0002]] — Foursquare primary / MapKit fallback.
