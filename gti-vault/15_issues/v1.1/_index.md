@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/v1.1
 purpose: v1.1 issues — 2026-05-14 TestFlight dogfood follow-ups (bugs, spec-gaps, surface wiring) + the 2026-05-15 quiz-redesign & verdict-engine PRD build slices
-status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared; verdict-pipeline diagnosis 2026-05-18 — 3 bugs filed (bug-08–bug-10, GitHub #116–#118): the verdict path has never produced a row — candidate-pool integration unwired (bug-08), fire dispatch no-ops on unset GUCs (bug-09), resolving poll never times out (bug-10); bug-08 fork decided 2026-05-18 (Option 2, server-side) and decomposed into AFK slices tb-21–tb-23 (GitHub #119–#121); verdict pipeline wired end to end 2026-05-18 — tb-21/tb-22/tb-23 + bug-10 + bug-09 (re-scoped to an `app_config` table) all merged; tb-24 (iOS Q5 factorial-ratings write-path adjacency) merged 2026-05-18 (PR #131) — iOS now emits `votes.q5.answer.ratings`, the per-member Q5 re-weight is no longer dark; candidate-pool floor (2026-05-19) — a `/grill-with-docs` session ratified [[../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] and filed tb-25 (GitHub #133, ready-for-agent) to floor every Foursquare call to an 8-category venue-type allowlist; remove-fictitious-venues batch (2026-05-19) — `/to-issues` decomposed the dummy-venue removal into sg-05 + tb-26 (GitHub #136, #137, both ready-for-agent): Q5 gets a `no-results` mode in place of the `QuizDummyCandidates` fixture so the app never surfaces a fictitious place
+status: dogfood batch — 13 issues (6 bug / 4 spec-gap / 3 tracer-bullet), all closed except bug-05 (fixed-in-branch, never filed to GitHub); quiz-redesign batch — 11 issues (research-01 + tb-04–tb-13, GitHub #64–#74), all closed; Q5-wiring batch — 4 tracer-bullets (tb-14–tb-17, GitHub #91–#94), all closed; premium-data follow-ups (2026-05-17) — category-id fix shipped (PR #101); research-02 allowlist spike done (PR #113) + tb-18 Q4-vibe `tastes`-nudge shipped (PR #114) — Q4 vibe now off its free-tier-era workaround (GitHub #102, #108); dogfood 2026-05-18 — bug-07 post-Q5 router unwired closed, decomposed into AFK slices tb-19/tb-20 (GitHub #106, #107); tb-19 post-Q5 router skeleton shipped (PR #110); tb-20 group S04 Waiting route shipped (PR #111) — bug-07 backlog fully cleared; verdict-pipeline diagnosis 2026-05-18 — 3 bugs filed (bug-08–bug-10, GitHub #116–#118): the verdict path has never produced a row — candidate-pool integration unwired (bug-08), fire dispatch no-ops on unset GUCs (bug-09), resolving poll never times out (bug-10); bug-08 fork decided 2026-05-18 (Option 2, server-side) and decomposed into AFK slices tb-21–tb-23 (GitHub #119–#121); verdict pipeline wired end to end 2026-05-18 — tb-21/tb-22/tb-23 + bug-10 + bug-09 (re-scoped to an `app_config` table) all merged; tb-24 (iOS Q5 factorial-ratings write-path adjacency) merged 2026-05-18 (PR #131) — iOS now emits `votes.q5.answer.ratings`, the per-member Q5 re-weight is no longer dark; candidate-pool floor (2026-05-19) — a `/grill-with-docs` session ratified [[../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] and filed tb-25 (GitHub #133, ready-for-agent) to floor every Foursquare call to an 8-category venue-type allowlist; remove-fictitious-venues batch (2026-05-19) — `/to-issues` decomposed the dummy-venue removal into sg-05 + tb-26 (GitHub #136, #137, both ready-for-agent): Q5 gets a `no-results` mode in place of the `QuizDummyCandidates` fixture so the app never surfaces a fictitious place; verdict-spinner diagnosis (2026-05-19) — `/diagnose` against TestFlight build 267 split the stuck-verdict report into two defects and `/to-issues` filed 4 AFK issues (GitHub #142–#145, all ready-for-agent): post-Q5 router orphaned-host bug (bug-12), empty-pool engine wedge (bug-13 server / bug-14 client), wedged-room re-fire (ops-01, blocked by bug-13)
 ---
 
 # v1.1 — Dogfood follow-ups
@@ -186,6 +186,34 @@ established spec-gap → tracer-bullet pairing (cf. `sg-02`→`tb-01`).
 Build order: sg-05 first (specs the `no-results` Q5 mode in `design-system/`),
 then tb-26 (deletes `QuizDummyCandidates`, renders the no-results screen against
 the spec, wires the skip-ahead submit path, files the decision as an ADR).
+
+## Verdict-spinner diagnosis (2026-05-19)
+
+`/diagnose` against TestFlight build 267 (with the PR #141 `debug_trace`
+breadcrumb instrumentation) split "the app still gets stuck at the verdict
+screen" into **two independent defects** — and disproved the earlier
+"`fetchVerdict` hangs" hypothesis (the breadcrumb trail showed the fetch
+returning a verdict cleanly). `/to-issues` decomposed the fix into 4 AFK issues.
+
+- **bug-12** — the post-Q5 verdict screen never renders: a double `onSubmitted`
+  makes `RootView` build a second `PostQuizHost`, and SwiftUI binds the screen
+  to a host that is never polled; the verdict resolves on the orphaned host.
+- **bug-13 / bug-14** — the engine wedge: `compute-verdict` 404s on an empty
+  candidate pool (`bug-13`, server) and iOS fires the verdict before the
+  member's fetch is persisted (`bug-14`, client). ~46 of 160 rooms wedged in
+  `firing` on 2026-05-19.
+- **ops-01** — re-fires the already-wedged prod rooms; blocked by bug-13.
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| bug-12 | [[issues/bug-12-verdict-spinner-orphaned-host\|Verdict screen never renders — a double onSubmitted orphans the polling host]] — ready-for-agent | AFK | [#142](https://github.com/samfarls55/gettoit/issues/142) | — |
+| bug-13 | [[issues/bug-13-engine-no-survivor-on-empty-pool\|Engine wedges the room on an empty candidate pool]] — ready-for-agent | AFK | [#143](https://github.com/samfarls55/gettoit/issues/143) | — |
+| bug-14 | [[issues/bug-14-ios-verdict-fires-before-fetch-persisted\|iOS fires the verdict before the member's candidate fetch is persisted]] — ready-for-agent | AFK | [#144](https://github.com/samfarls55/gettoit/issues/144) | — |
+| ops-01 | [[issues/ops-01-wedged-firing-rooms-cleanup\|Re-fire the rooms wedged in status='firing']] — ready-for-agent | AFK | [#145](https://github.com/samfarls55/gettoit/issues/145) | bug-13 |
+
+Build order: bug-12, bug-13, bug-14 are independent and can run in parallel;
+ops-01 runs after bug-13. bug-12 also reverts the PR #141 `debug_trace`
+instrumentation (delete `DebugTrace.swift` + call sites, drop the prod table).
 
 ## Cross-references
 
