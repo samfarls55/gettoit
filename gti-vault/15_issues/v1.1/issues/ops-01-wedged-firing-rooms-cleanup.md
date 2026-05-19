@@ -1,7 +1,7 @@
 ---
 issue: ops-01
 title: Re-fire the rooms wedged in status='firing' so they resolve to a terminal verdict
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 145
 created: 2026-05-19
@@ -42,3 +42,12 @@ All wedged rooms are the founder's own dogfood test rooms — `gettoit-prod` has
 ## Comments
 
 **2026-05-19 — filed.** One-off prod remediation for the bug-13 engine wedge. Triaged `ready-for-agent` / AFK — all wedged rooms are the founder's own dogfood data, no real users, so the prod mutation needs no human gate. Blocked by bug-13.
+
+**2026-05-19 — done (PR #151).** Re-fire executed against `gettoit-prod` via `supabase/scripts/ops-01-refire-wedged-firing-rooms.mjs`.
+
+- **Re-fired: 558 rooms.** Every room that was `status='firing'`, had no `verdicts` row, and had at least one `votes` row.
+- **Resolved verdict-method breakdown: 558 `no_survivor`** (100%). Every wedged room's candidate pool was empty, so the bug-13 engine short-circuited each to a terminal `no_survivor` verdict — confirming the empty-pool wedge was the sole cause and that the now-shipped fix resolves it cleanly.
+- **`firing` room count: 856 → 300.** All 558 re-fired rooms left `firing` (verified by re-enumeration: 0 re-fired rooms still wedged, 0 firing rooms carry a verdict).
+- **No room with a pre-existing verdict was touched** — 0 firing rooms had a verdict before the run; the script also skips any such room.
+- **Deploy:** none needed. A canary re-fire confirmed the deployed `compute-verdict` in `gettoit-prod` already carried the bug-13 fix (returned a 200 `no_survivor` verdict, not a 404 `no_candidates`).
+- **Out of scope — 300 rooms remain `firing`.** These are vote-less abandoned rooms: `compute-verdict` hard-404s a room with no `votes` (`no_votes`) — there is no group to render a verdict for, so they are NOT the bug-13 empty-pool wedge and cannot resolve via re-fire. All 298 enumerated were re-fired and confirmed `no_votes` 404; the residual count is 300 (2 vote-less rooms drifted in during the run). Tracked as a separate finding — see [[../../../60_engineering/2026-05-19-voteless-firing-rooms|vote-less firing rooms]].
