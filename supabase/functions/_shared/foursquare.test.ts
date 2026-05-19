@@ -15,6 +15,7 @@ import {
   computeGeoBucket,
   CUISINE_CATEGORY_MAP,
   DIETARY_CHIP_MAP,
+  ENTERTAINMENT_VENUE_CATEGORY_NAMES,
   estimateWalkMinutes,
   extractDietaryTags,
   findCuisineCategory,
@@ -22,6 +23,7 @@ import {
   FOURSQUARE_API_VERSION,
   FOURSQUARE_BASE_URL,
   type FoursquareSearchResult,
+  NIGHTLIFE_CATEGORY_NAMES,
   photoToUrl,
   shapeFoursquareResult,
   THIN_RESULTS_THRESHOLD,
@@ -418,6 +420,239 @@ Deno.test("shapeFoursquareResult — disclaimer tags pass through from emitted s
     shaped.dietary_tags.includes("no_shellfish_unverified"),
     true,
   );
+});
+
+// ---------------------------------------------------------------------------
+// bug-15 — shape-time primary-class gate + entertainment-venue backstop.
+//
+// ADR 0012 amendment: the query-time floor is an OR allowlist on
+// `fsq_category_ids` and cannot exclude a multi-category bar that also
+// carries a meal category (Robert's Western World tagged
+// `["Bar","Burger Joint","Rock Club"]` matches the floor's Restaurant parent
+// via Burger Joint and rides into the candidate pool with Bar as
+// `categories[0]`, which `VerdictStore.swift:276` then renders as the
+// verdict's venue type). This gate is the structural companion: enforced
+// at shape-time on the human category names, returning null for any venue
+// whose primary is nightlife or an entertainment venue, and for any venue
+// whose category set crosses nightlife with an entertainment-venue tag.
+// ---------------------------------------------------------------------------
+
+Deno.test("NIGHTLIFE_CATEGORY_NAMES carves Sports Bar + Gastropub out", () => {
+  // ADR 0012 carve-out — Sports Bar is the meal-class member of the Bar
+  // branch (people eat full meals there); Gastropub is the food-primary
+  // member of the gastronomy branch. Ratified 2026-05-19.
+  const lc = NIGHTLIFE_CATEGORY_NAMES.map((n) => n.toLowerCase());
+  assertEquals(lc.includes("sports bar"), false);
+  assertEquals(lc.includes("gastropub"), false);
+  // Sanity-check the rule is meaningful: the canonical leak category is in.
+  assertEquals(lc.includes("bar"), true);
+});
+
+Deno.test("ENTERTAINMENT_VENUE_CATEGORY_NAMES contains the spec's five members", () => {
+  // bug-15 desired-behavior list: Music Venue, Rock Club, Night Club,
+  // Bowling Alley, Stadium.
+  const lc = ENTERTAINMENT_VENUE_CATEGORY_NAMES.map((n) => n.toLowerCase());
+  assertEquals(lc.includes("music venue"), true);
+  assertEquals(lc.includes("rock club"), true);
+  assertEquals(lc.includes("night club"), true);
+  assertEquals(lc.includes("bowling alley"), true);
+  assertEquals(lc.includes("stadium"), true);
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — primary 'Bar' cut", () => {
+  // Robert's Western World shape: categories[0]='Bar' falls into the
+  // nightlife set → row drops to null. Burger Joint riding along does
+  // not rescue it.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Robert's Western World",
+    categories: [
+      { name: "Bar" },
+      { name: "Burger Joint" },
+      { name: "Rock Club" },
+    ],
+  }, []);
+  assertEquals(shaped, null);
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — primary 'Music Venue' cut", () => {
+  // A music-venue-primary row drops on the entertainment-venue branch.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Exit/In",
+    categories: [
+      { name: "Music Venue" },
+      { name: "American Restaurant" },
+    ],
+  }, []);
+  assertEquals(shaped, null);
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — meal primary + nightlife-only kept (Trattoria Il Mulino)", () => {
+  // A food-primary restaurant that happens to have a bar inside — the
+  // 19-venue bucket from the bug. Stays in the pool.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Trattoria Il Mulino",
+    categories: [
+      { name: "Italian Restaurant" },
+      { name: "Bar" },
+    ],
+  }, []);
+  assertExists(shaped);
+  assertEquals(shaped.name, "Trattoria Il Mulino");
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — meal primary + nightlife + entertainment-venue cut (Pinewood Social)", () => {
+  // Entertainment-venue backstop — even though the primary is a
+  // restaurant category, the combination of a nightlife tag and an
+  // entertainment-venue tag marks the venue as a functional
+  // entertainment complex and drops it.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Pinewood Social",
+    categories: [
+      { name: "American Restaurant" },
+      { name: "Bar" },
+      { name: "Bowling Alley" },
+    ],
+  }, []);
+  assertEquals(shaped, null);
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — primary 'Sports Bar' kept (carve-out)", () => {
+  // Sports Bar is the explicit meal-class carve-out from the Bar branch.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Neighbors",
+    categories: [{ name: "Sports Bar" }],
+  }, []);
+  assertExists(shaped);
+  assertEquals(shaped.name, "Neighbors");
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — primary 'Gastropub' kept (carve-out)", () => {
+  // Gastropub is the second explicit carve-out.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Husk",
+    categories: [{ name: "Gastropub" }],
+  }, []);
+  assertExists(shaped);
+  assertEquals(shaped.name, "Husk");
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — unknown primary kept", () => {
+  // Taxonomy-drift guard: a primary name the gate does not recognise is
+  // kept. The query-time floor already constrained the upstream set so
+  // we do not over-cut on unfamiliar category strings.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Brand New Concept",
+    categories: [{ name: "Mystery Category That Does Not Exist Yet" }],
+  }, []);
+  assertExists(shaped);
+  assertEquals(shaped.name, "Brand New Concept");
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — case-insensitive name match", () => {
+  // Foursquare display strings have stable casing today, but the gate
+  // matches on lower-cased names so a future surface that returns
+  // 'BAR' or 'bar' still drops.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Lowercase Bar",
+    categories: [{ name: "bar" }, { name: "burger joint" }],
+  }, []);
+  assertEquals(shaped, null);
+});
+
+Deno.test("shapeFoursquareResult — bug-15 — primary 'Sports Bar' + entertainment-venue is NOT cut by primary branch", () => {
+  // Sports Bar is not in the nightlife set, so the entertainment-venue
+  // backstop (which requires both a nightlife AND an entertainment-venue
+  // hit) does not trigger from a Sports-Bar-only nightlife signal.
+  // Documents the deliberate carve-out behaviour.
+  const shaped = shapeFoursquareResult({
+    ...SAMPLE_RESULT,
+    name: "Carve-out Sports Bar Stadium",
+    categories: [{ name: "Sports Bar" }, { name: "Stadium" }],
+  }, []);
+  assertExists(shaped);
+  assertEquals(shaped.name, "Carve-out Sports Bar Stadium");
+});
+
+// Regression — the exact 36-option pool that produced the Robert's verdict
+// in prod room d11b3983-a8f6-4741-81a5-309ba038a2f6 on 2026-05-19T20:41:15Z.
+// Reconstructed minimally as a fixture (fsq_place_id, name, lat, lng,
+// categories) — those are the only fields the bug-15 gate reads.
+const PROD_ROOM_D11B3983_POOL: ReadonlyArray<FoursquareSearchResult> = Object
+  .freeze([
+    { fsq_place_id: "fsq-1", name: "Chick-fil-A", latitude: 36.156, longitude: -86.795, categories: [{ name: "Fried Chicken Joint" }] },
+    { fsq_place_id: "fsq-2", name: "Coco Greens", latitude: 36.152, longitude: -86.805, categories: [{ name: "Vegan and Vegetarian Restaurant" }, { name: "Massage Clinic" }, { name: "Spa" }] },
+    { fsq_place_id: "fsq-3", name: "Chick-fil-A", latitude: 36.193, longitude: -86.800, categories: [{ name: "Fast Food Restaurant" }] },
+    { fsq_place_id: "fsq-4", name: "Jack Brown's Beer & Burger Joint", latitude: 36.176, longitude: -86.786, categories: [{ name: "Burger Joint" }] },
+    { fsq_place_id: "fsq-5", name: "Hattie B's Hot Chicken", latitude: 36.160, longitude: -86.779, categories: [{ name: "Fried Chicken Joint" }] },
+    // The leak — categories[0] = 'Bar' (nightlife).
+    { fsq_place_id: "fsq-6", name: "Robert's Western World", latitude: 36.161, longitude: -86.778, categories: [{ name: "Bar" }, { name: "Burger Joint" }, { name: "Rock Club" }] },
+    { fsq_place_id: "fsq-7", name: "Morton's The Steakhouse", latitude: 36.16, longitude: -86.78, categories: [{ name: "Steakhouse" }] },
+    { fsq_place_id: "fsq-8", name: "Tin Roof Broadway", latitude: 36.16, longitude: -86.78, categories: [{ name: "Diner" }] },
+    // Sports Bar carve-out — kept.
+    { fsq_place_id: "fsq-9", name: "Neighbors", latitude: 36.16, longitude: -86.78, categories: [{ name: "Sports Bar" }] },
+    // Primary 'Brewery' is in the nightlife set — cut. Accepted false-cut.
+    { fsq_place_id: "fsq-10", name: "Tennessee Brew Works", latitude: 36.16, longitude: -86.78, categories: [{ name: "Brewery" }, { name: "American Restaurant" }] },
+    { fsq_place_id: "fsq-11", name: "Cook Out", latitude: 36.16, longitude: -86.78, categories: [{ name: "Burger Joint" }, { name: "Fast Food Restaurant" }] },
+    { fsq_place_id: "fsq-12", name: "Folk", latitude: 36.16, longitude: -86.78, categories: [{ name: "Pizzeria" }] },
+    { fsq_place_id: "fsq-13", name: "Redheaded Stranger", latitude: 36.16, longitude: -86.78, categories: [{ name: "Taco Restaurant" }, { name: "Breakfast Spot" }] },
+    { fsq_place_id: "fsq-14", name: "Velvet Taco", latitude: 36.16, longitude: -86.78, categories: [{ name: "Taco Restaurant" }] },
+    { fsq_place_id: "fsq-15", name: "Slim & Husky's Pizza Beeria", latitude: 36.16, longitude: -86.78, categories: [{ name: "Pizzeria" }, { name: "Food and Beverage Service" }] },
+    { fsq_place_id: "fsq-16", name: "San Antonio Taco Co.", latitude: 36.16, longitude: -86.78, categories: [{ name: "Taco Restaurant" }, { name: "Mexican Restaurant" }, { name: "Tex-Mex Restaurant" }] },
+    // Meal-primary + nightlife (no entertainment-venue) — kept.
+    { fsq_place_id: "fsq-17", name: "The Slider House", latitude: 36.16, longitude: -86.78, categories: [{ name: "Burger Joint" }, { name: "Bar" }] },
+    { fsq_place_id: "fsq-18", name: "Waldo's Chicken & Beer", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fried Chicken Joint" }] },
+    { fsq_place_id: "fsq-19", name: "Torchy's Tacos", latitude: 36.16, longitude: -86.78, categories: [{ name: "Taco Restaurant" }] },
+    { fsq_place_id: "fsq-20", name: "Mellow Mushroom", latitude: 36.16, longitude: -86.78, categories: [{ name: "Pizzeria" }] },
+    { fsq_place_id: "fsq-21", name: "Chipotle Mexican Grill", latitude: 36.16, longitude: -86.78, categories: [{ name: "Mexican Restaurant" }, { name: "Burrito Restaurant" }, { name: "Taco Restaurant" }] },
+    { fsq_place_id: "fsq-22", name: "Chipotle Mexican Grill", latitude: 36.16, longitude: -86.78, categories: [{ name: "Mexican Restaurant" }] },
+    { fsq_place_id: "fsq-23", name: "Joyland", latitude: 36.16, longitude: -86.78, categories: [{ name: "Burger Joint" }, { name: "Fried Chicken Joint" }] },
+    { fsq_place_id: "fsq-24", name: "The Diner", latitude: 36.16, longitude: -86.78, categories: [{ name: "Diner" }] },
+    // Meal-primary + nightlife — kept.
+    { fsq_place_id: "fsq-25", name: "Batters Box Bar & Grill", latitude: 36.16, longitude: -86.78, categories: [{ name: "Restaurant" }, { name: "Bar" }] },
+    // Sports Bar primary — kept.
+    { fsq_place_id: "fsq-26", name: "Losers Bar", latitude: 36.16, longitude: -86.78, categories: [{ name: "Sports Bar" }, { name: "Dive Bar" }] },
+    { fsq_place_id: "fsq-27", name: "Sonic Drive-In", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fast Food Restaurant" }, { name: "Burger Joint" }] },
+    { fsq_place_id: "fsq-28", name: "Wingstop", latitude: 36.16, longitude: -86.78, categories: [{ name: "Wings Joint" }] },
+    { fsq_place_id: "fsq-29", name: "Jersey Mike's Subs", latitude: 36.16, longitude: -86.78, categories: [{ name: "Sandwich Spot" }, { name: "Deli" }] },
+    { fsq_place_id: "fsq-30", name: "Al Taglio Pizzeria", latitude: 36.16, longitude: -86.78, categories: [{ name: "Pizzeria" }] },
+    { fsq_place_id: "fsq-31", name: "White Castle", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fast Food Restaurant" }, { name: "American Restaurant" }, { name: "Burger Joint" }] },
+    { fsq_place_id: "fsq-32", name: "Emmy Squared Pizza", latitude: 36.16, longitude: -86.78, categories: [{ name: "Pizzeria" }] },
+    { fsq_place_id: "fsq-33", name: "KFC", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fried Chicken Joint" }, { name: "Fast Food Restaurant" }] },
+    { fsq_place_id: "fsq-34", name: "Chicken & Wings", latitude: 36.16, longitude: -86.78, categories: [{ name: "Wings Joint" }] },
+    { fsq_place_id: "fsq-35", name: "Subway", latitude: 36.16, longitude: -86.78, categories: [{ name: "Sandwich Spot" }, { name: "Fast Food Restaurant" }] },
+    { fsq_place_id: "fsq-36", name: "Burger King", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fast Food Restaurant" }] },
+  ]);
+
+Deno.test("shapeFoursquareResult — bug-15 — regression: prod room d11b3983 pool drops Robert's, keeps both Sports Bars", () => {
+  // The exact 36-option pool that produced the Robert's Western World
+  // verdict in prod room d11b3983-a8f6-4741-81a5-309ba038a2f6 on
+  // 2026-05-19. Source row: supabase `options` table (queried 2026-05-19).
+  const survivors = PROD_ROOM_D11B3983_POOL
+    .map((r) => shapeFoursquareResult(r, []))
+    .filter((s): s is NonNullable<typeof s> => s !== null)
+    .map((s) => s.name);
+
+  // The leak vanishes.
+  assertEquals(survivors.includes("Robert's Western World"), false);
+  // The two Sports-Bar-primary venues stay.
+  assertEquals(survivors.includes("Neighbors"), true);
+  assertEquals(survivors.includes("Losers Bar"), true);
+  // Tennessee Brew Works (Brewery-primary) is an accepted false-cut.
+  assertEquals(survivors.includes("Tennessee Brew Works"), false);
+  // Meal-primary + nightlife-only bars are kept (19-venue bucket).
+  assertEquals(survivors.includes("The Slider House"), true);
+  assertEquals(survivors.includes("Batters Box Bar & Grill"), true);
+  // Non-bar restaurants untouched.
+  assertEquals(survivors.includes("Hattie B's Hot Chicken"), true);
+  assertEquals(survivors.includes("Velvet Taco"), true);
 });
 
 // ---------------------------------------------------------------------------
