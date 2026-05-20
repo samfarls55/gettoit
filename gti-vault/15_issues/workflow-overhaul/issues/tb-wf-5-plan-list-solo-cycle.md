@@ -1,11 +1,12 @@
 ---
 issue: tb-WF-5
 title: iOS Plan list — Solo creation cycle (foundation slice)
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 174
 created: 2026-05-20
+closed: 2026-05-20
 ---
 
 # tb-WF-5 — iOS Plan list: Solo creation cycle (foundation)
@@ -74,3 +75,17 @@ None. tb-WF-1 already shipped the Plans table + PlansStore; this slice just adds
 
 - [[sg-wf-4-plan-list-surface|sg-WF-4]] — design-system spec + JSX must land first to provide the visual blueprint (#157).
 - [[tb-wf-4-wire-plan-setup-surface|tb-WF-4]] — amended Setup screen with `.solo` mode (#163). This slice invokes `SetupScreen(mode: .solo)`; that constructor must exist.
+
+## Comments
+
+### 2026-05-20 — AFK execution closed
+
+Merged via PR pending green CI. Foundation slice landed end-to-end:
+
+- `PlanListScreen.swift` ships with three states (empty hero, one-Pending, multi-Pending) backed by render smoke tests + pure-helper coverage. The 1-line Pending card matches the C-19 glass row treatment from the surface doc.
+- `PlansStore.plansForList(userID:)` added — read-side query filtered to `status = 'pending'`, ordered `created_at DESC` per surface §Q7.
+- `LandingScreen.swift` deleted; `RootView.swift` routes the post-sign-in idle session through `PlanListScreen` directly.
+- `QuizChromePostExitDestination` flipped from `.landing` → `.planList`; the post-Exit chain now lands on the Plan list. `QuizChromePostExitTests` updated to pin the new value.
+- Hero pill + temp `+` chrome glyph both route to `SetupScreen(mode: .solo)` per the issue body. Pending card tap routes to `.edit + <Plan.scope-derived mode>`.
+
+Known adjacency surfaced: the legacy `LandingScreen.swift` was the only entry point to `showingSettings` (Account Settings CTA). Settings access from the Plan list is not in this slice — the `showingSettings` state slot stays in `RootView` for a follow-up affordance (Plan list chrome menu or settings sheet from inside Setup). Flagged in the PR Decisions section.
