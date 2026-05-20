@@ -2,11 +2,12 @@
 
 issue: tb-WF-1
 title: Plans table + lifecycle schema + Plan store
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 160
 created: 2026-05-19
+closed: 2026-05-20
 ---
 
 # tb-WF-1 — Plans table + lifecycle schema
@@ -92,15 +93,23 @@ A `Plan` struct mirrors the schema. Codable, Sendable, with a `LifecycleState` e
 
 ## Acceptance criteria
 
-- [ ] `public.plans` table exists in the linked Supabase project with the schema above, RLS enabled, the appropriate indexes.
-- [ ] `public.rooms.plan_id` exists as a nullable FK; existing rows are unaffected.
-- [ ] `set_plan_decided_active` function exists and is invoked by `compute-verdict` on successful verdict-fire (only when `room.plan_id` is non-null).
-- [ ] `PlansStore` exists on iOS with the operations listed; covered by unit tests against a fake client.
-- [ ] A Postgres test covers RLS (non-creator cannot read/write) and the state-transition function.
-- [ ] CI `supabase-db` lane is green; the migration applies cleanly.
-- [ ] `ios` CI lane is green; no regression to existing tests.
-- [ ] The existing S01 + S01b flow continues to work unchanged for users (Plans are not yet user-visible).
+- [x] `public.plans` table exists in the linked Supabase project with the schema above, RLS enabled, the appropriate indexes.
+- [x] `public.rooms.plan_id` exists as a nullable FK; existing rows are unaffected.
+- [x] `set_plan_decided_active` function exists and is invoked by `compute-verdict` on successful verdict-fire (only when `room.plan_id` is non-null).
+- [x] `PlansStore` exists on iOS with the operations listed; covered by unit tests against a fake client.
+- [x] A Postgres test covers RLS (non-creator cannot read/write) and the state-transition function.
+- [x] CI `supabase-db` lane is green; the migration applies cleanly.
+- [x] `ios` CI lane is green; no regression to existing tests.
+- [x] The existing S01 + S01b flow continues to work unchanged for users (Plans are not yet user-visible).
 
 ## Blocked by
 
 None — schema can land independently of any spec-gap. The user-facing wiring happens in tb-WF-4.
+
+## Comments
+
+- **2026-05-20** — Merged via [PR #167](https://github.com/samfarls55/gettoit/pull/167). Schema applied to `gettoit-prod` by the `supabase-db` CI lane. iOS / Deno / web / design-system lanes all green; `ios` lane caught and fixed an `Optional<Double>` accuracy-overload type error in the test file. PostgreSQL function `set_plan_decided_active` ships with a placeholder `now() + interval '2 days'` for `reroll_window_closes_at`; sg-WF-6 owns the exact TZ-aware computation. `observe(planID:)` shipped as a 5-second foreground poll per the issue spec's fallback option; Realtime swap is a follow-up tracer-bullet.
+
+  Two non-obvious calls worth tagging for future readers:
+  - **`Location.source` typed as `String` (not enum) on `PlansStore.Location`** — keeps the Plan-side decoder tolerant of any future source value without forcing a Plan struct revision. Canonical enum stays on `RoomStore.RoomLocation.Source`.
+  - **`plans_creator_id_updated_at_idx` is composite, not a plain `creator_id` index** — covers the "my plans" list query `where creator_id = auth.uid() order by updated_at desc` without a sort step.
