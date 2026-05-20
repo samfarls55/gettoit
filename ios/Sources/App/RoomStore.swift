@@ -61,7 +61,8 @@ public final class RoomStore {
         timerMinutes: Int? = nil,
         radiusMeters: Int? = nil,
         location: RoomLocation? = nil,
-        sessionParameters: SessionParameters? = nil
+        sessionParameters: SessionParameters? = nil,
+        planID: UUID? = nil
     ) async throws -> Room {
         let roomID = UUID()
         let insert = RoomInsert(
@@ -72,7 +73,8 @@ public final class RoomStore {
             timerMinutes: timerMinutes,
             radiusMeters: radiusMeters,
             location: location,
-            sessionParameters: sessionParameters
+            sessionParameters: sessionParameters,
+            planID: planID
         )
         try await client
             .from("rooms")
@@ -365,6 +367,13 @@ public final class RoomStore {
     /// `radiusMeters` are `Optional<Int>` and skipped from the JSON
     /// when `nil` so the column defaults take effect — the
     /// `Encodable` impl below honors that.
+    ///
+    /// tb-WF-4 (workflow-overhaul) — `planID` is the FK to a parent
+    /// `plans` row. Nullable: legacy rooms (created before workflow-
+    /// overhaul, or any future debug RPC) still write `null`, and the
+    /// `compute-verdict` Edge Function skips `set_plan_decided_active`
+    /// when the column is NULL. SetupScreen is the only caller that
+    /// supplies a non-nil value today.
     private struct RoomInsert: Encodable {
         let id: UUID
         let creatorUserID: UUID
@@ -374,6 +383,7 @@ public final class RoomStore {
         let radiusMeters: Int?
         let location: RoomLocation?
         let sessionParameters: SessionParameters?
+        let planID: UUID?
 
         enum CodingKeys: String, CodingKey {
             case id
@@ -388,6 +398,7 @@ public final class RoomStore {
             case locationSource = "location_source"
             case locationTz = "location_tz"
             case sessionParameters = "session_params"
+            case planID = "plan_id"
         }
 
         func encode(to encoder: Encoder) throws {
@@ -419,6 +430,10 @@ public final class RoomStore {
             // after the room exists, but `createRoom` accepts them too
             // for a future fused create-and-set path.
             try container.encodeIfPresent(sessionParameters, forKey: .sessionParameters)
+            // tb-WF-4 (workflow-overhaul) — `plan_id` is nullable.
+            // Omit the key when nil so legacy rooms keep the NULL the
+            // column already has.
+            try container.encodeIfPresent(planID, forKey: .planID)
         }
     }
 
