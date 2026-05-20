@@ -40,16 +40,20 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
 
   return {
     async fetchRoom(room_id) {
+      // tb-WF-1 — select `plan_id` too so the handler can transition
+      // the parent Plan to `decided-active` on a successful verdict.
+      // The column exists on every row post-migration (NULL on legacy
+      // S01-created rooms); the handler treats a NULL as "no Plan."
       const { data, error } = await client
         .from("rooms")
-        .select("id")
+        .select("id, plan_id")
         .eq("id", room_id)
         .maybeSingle();
       if (error) {
         console.warn("compute-verdict fetchRoom failed:", error.message);
         return null;
       }
-      return (data ?? null) as { id: string } | null;
+      return (data ?? null) as { id: string; plan_id: string | null } | null;
     },
     async fetchOptions(room_id): Promise<RoomOptionRow[]> {
       const { data, error } = await client
@@ -329,6 +333,25 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .in("status", ["open", "firing"]);
       if (error) {
         console.warn("compute-verdict markRoomVerdictReady failed:", error.message);
+        throw error;
+      }
+    },
+    async setPlanDecidedActive(plan_id: string): Promise<void> {
+      // tb-WF-1 — invoke the `set_plan_decided_active(p_plan_id uuid)`
+      // SECURITY DEFINER function. The function flips the Plan's
+      // status to `decided-active` and stamps `reroll_window_closes_at`.
+      // Idempotent: a non-pending Plan is a no-op inside the function
+      // body, so a duplicate dispatch (broadcast retry, late firing
+      // trigger re-fire) does not double-write.
+      const { error } = await client.rpc(
+        "set_plan_decided_active",
+        { p_plan_id: plan_id },
+      );
+      if (error) {
+        console.warn(
+          "compute-verdict setPlanDecidedActive failed:",
+          error.message,
+        );
         throw error;
       }
     },
