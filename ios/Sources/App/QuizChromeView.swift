@@ -91,19 +91,21 @@ public struct QuizChromeCopy: Equatable, Sendable {
 }
 
 /// The destination the QuizChrome's `onExit` callback hands up to the
-/// host once the member-drop write completes. Currently `.landing`
-/// (S00 Landing) — until tb-WF-4 lands the visible Plan list surface,
-/// the iOS post-exit destination is S00. Carrying it as a typed value
-/// (rather than a magic enum case buried in `RootView`) means a future
-/// flip to `.planList` is a single-line change with the test in
+/// host once the member-drop write completes. tb-WF-5 flipped this
+/// from `.landing` (S00 Landing) to `.planList` — the Plan list is
+/// the canonical post-sign-in surface now that `LandingScreen.swift`
+/// is retired. Carrying it as a typed value (rather than a magic enum
+/// case buried in `RootView`) means a future change to the post-exit
+/// destination is a single-line change with the test in
 /// `QuizChromePostExitTests` catching the drift.
 public enum QuizChromePostExitDestination: Equatable, Sendable {
-    case landing
-    // case planList  // tb-WF-4
+    /// S00 Plan list — the canonical post-sign-in idle destination.
+    case planList
 
-    /// The destination tb-WF-2 ships with. Reads as "land on S00
-    /// Landing for now."
-    public static let current: QuizChromePostExitDestination = .landing
+    /// The destination tb-WF-5 ships with. Reads as "land on S00
+    /// Plan list (empty state on first launch, populated list once
+    /// the user has at least one Plan)."
+    public static let current: QuizChromePostExitDestination = .planList
 }
 
 @MainActor

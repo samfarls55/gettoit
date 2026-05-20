@@ -58,7 +58,7 @@ public struct LocationPermissionScreen: View {
 
     // MARK: - sub-views
 
-    /// GTI mark stand-in. Same 22pt tile as LandingScreen — the
+    /// GTI mark stand-in. Same 22pt tile as PlanListScreen — the
     /// pre-public-launch polish ticket will swap in the real wordmark.
     private var gtiMark: some View {
         ZStack {

@@ -11,14 +11,13 @@
 //     Linked-Apple session) and `linkApple` (upgrade the existing
 //     anonymous session, preserving `user_id`). Closes the iOS half
 //     of ADR 0007's anonymous-default for v1.1.
-//   * S00 LandingScreen — post-sign-in entry surface (v1.1, TB-01).
-//     Every cold launch with an active auth session lands here first;
-//     the user picks Start a Decision (→ S01 Setup) or Account
-//     Settings (→ S09). Idle until tap. See surfaces/00-landing.md.
-//     tb-WF-5 lands the Plan list as the canonical post-sign-in
-//     surface (per `surfaces/00-plan-list.md`) — until then S00 Landing
-//     stays the default with the Setup screen as the "Start a Decision"
-//     destination.
+//   * S00 PlanListScreen — post-sign-in entry surface (tb-WF-5,
+//     workflow-overhaul). Every cold launch with an active auth
+//     session lands here. Empty state renders a hero pill that
+//     opens Solo Setup; populated state renders 1-line Pending cards
+//     + a temp top-trailing `+` chrome glyph (replaced by the C-26
+//     FAB in tb-WF-6). Replaces the retired `LandingScreen.swift`.
+//     See surfaces/00-plan-list.md.
 //   * S01 SetupScreen — tb-WF-4 (workflow-overhaul). The canonical
 //     Plan creation + Plan edit surface — collapses the retired S01
 //     Initiator + S01b Parameters screens into one. Two lifecycle
@@ -37,18 +36,19 @@
 //
 // State precedence (inner-most wins): `activeQuiz` → `postQuizHost`
 // → `readOnlyView` → `deepLink` → settings → S01 Setup (when
-// `setupContext` is non-nil) → S00 Landing (the default for a
+// `setupContext` is non-nil) → S00 Plan list (the default for a
 // signed-in idle session). The S00a gate sits outside this chain — it
 // is the launch destination iff no session exists. Once the user
 // signs in, the gate dismisses and the standard precedence chain
-// takes over (idle landing on S00, not S01). Re-opening a deep link
-// mid-quiz doesn't force-rejoin.
+// takes over (idle landing on the Plan list, not Setup). Re-opening
+// a deep link mid-quiz doesn't force-rejoin.
 //
 // TB-19 — `postQuizHost` is the post-Q5 router. A successful Q5
 // submit clears `activeQuiz` and sets `postQuizHost`, so the chain
 // hands the session to the verdict-resolving surface (S04 resolving →
-// S05 verdict) rather than falling through to S00 Landing. Before
-// TB-19 the chain dead-ended on S00 after a submit — that was bug-07.
+// S05 verdict) rather than falling through to the Plan list. Before
+// TB-19 the chain dead-ended on the post-sign-in surface after a
+// submit — that was bug-07.
 
 import SwiftUI
 import Supabase
@@ -62,42 +62,47 @@ public struct RootView: View {
     /// TB-19 — set when the quiz reports a successful Q5 submit. Owns
     /// the post-Q5 session lifecycle (resolving → verdict → failed) and
     /// closes bug-07: before this, a Q5 submit just cleared `activeQuiz`
-    /// and the precedence chain fell through to S00 Landing — the
-    /// session dead-ended. The host polls the `verdicts` table until
-    /// the engine's row lands, then renders `VerdictScreen`. Cleared
-    /// when the user ends the session (→ S00 Landing, now the correct
-    /// destination).
+    /// and the precedence chain fell through to the post-sign-in
+    /// idle surface — the session dead-ended. The host polls the
+    /// `verdicts` table until the engine's row lands, then renders
+    /// `VerdictScreen`. Cleared when the user ends the session (→
+    /// S00 Plan list, now the correct destination).
     @State private var postQuizHost: PostQuizHost?
     @State private var readOnlyView: ReadOnlyContext?
-    /// TB-16 — set when the user taps "Settings" on S01 or the S00
-    /// landing surface's "Account Settings" CTA. Renders the S09
-    /// Settings surface; the route clears on Done or after a successful
-    /// delete + re-bootstrap.
+    /// TB-16 — set when the user taps a "Settings" affordance. tb-WF-5
+    /// retired the legacy `LandingScreen.swift` entry point ("Account
+    /// Settings" CTA); the Plan list surface doc carries no top-level
+    /// Settings affordance, so until a follow-up wires a new entry
+    /// (Plan list chrome menu or settings sheet from inside Setup),
+    /// this state slot is reachable only when an external caller flips
+    /// it true. Renders the S09 Settings surface; the route clears on
+    /// Done or after a successful delete + re-bootstrap.
     @State private var showingSettings = false
-    /// tb-WF-4 — set when the user taps "Start a Decision" on the S00
-    /// landing surface. While non-nil, the host renders the S01
-    /// SetupScreen in the carried lifecycle + group mode. Defaults to
-    /// nil so a cold, signed-in launch lands on S00 per surfaces/00-
-    /// landing.md.
+    /// tb-WF-4 → tb-WF-5 — set when the user opens the Plan setup
+    /// surface. While non-nil, the host renders the S01 SetupScreen
+    /// in the carried lifecycle + group mode. Defaults to nil so a
+    /// cold, signed-in launch lands on the Plan list per
+    /// surfaces/00-plan-list.md.
     ///
-    /// Mode-picking entry point note: the disambig sheet (tb-WF-6) that
-    /// lifts solo vs group out of Setup is not yet wired. Until the
-    /// disambig sheet + Plan list (tb-WF-5 / tb-WF-6) land, the
-    /// temporary "Start a Decision" entry point opens Setup in
-    /// `.create + .group` — the canonical first-paint of the JSX, with
-    /// the primary CTA reading `Drop the invite link`. A user who
-    /// wants to solo today must wait for tb-WF-6 to wire the explicit
-    /// solo route; per the issue body this is a known interim state.
+    /// Mode-picking entry point: tb-WF-5 wires the Plan list's hero
+    /// pill + temp `+` glyph to `.create + .solo`. tb-WF-6 will land
+    /// the disambig sheet (FAB → Solo / Group) so the Group route
+    /// gets its own entry point alongside Solo.
     @State private var setupContext: SetupContext?
-    /// TB-03 (v1.1) — set when the user taps "Start a Decision" on the
-    /// S00 landing surface AND iOS location permission is still
-    /// `notDetermined`. While true, the host renders the S00b
-    /// LocationPermissionScreen (pre-prime). On either CTA tap the
-    /// flag clears and `setupContext` populates so S01 Setup takes
-    /// over. Permission outcomes are observed via the shared
-    /// LocationCoordinator on `coordinators` — we don't gate the
-    /// transition on grant vs deny because the picker on Setup handles
-    /// both states.
+    /// tb-WF-5 — Pending plans backing the S00 Plan list surface.
+    /// Hydrated from PlansStore on appear and after a successful
+    /// Plan write. Empty by default → the list renders the empty
+    /// hero state.
+    @State private var planListPending: [PlansStore.Plan] = []
+    /// TB-03 (v1.1) → tb-WF-5 — set when the user invokes the Plan
+    /// list's `onCreatePlan` callback (hero pill OR temp `+` glyph)
+    /// AND iOS location permission is still `notDetermined`. While
+    /// true, the host renders the S00b LocationPermissionScreen
+    /// (pre-prime). On either CTA tap the flag clears and
+    /// `setupContext` populates so S01 Setup takes over. Permission
+    /// outcomes are observed via the shared LocationCoordinator on
+    /// `coordinators` — we don't gate the transition on grant vs deny
+    /// because the picker on Setup handles both states.
     @State private var showingLocationPermission = false
 
     public init() {}
@@ -142,13 +147,15 @@ public struct RootView: View {
                         onSignedIn: { }
                     )
                 } else if showingSettings {
-                    // TB-16 — Settings is the inner-most route in
-                    // the state precedence chain. While it's up, the
-                    // host suppresses every other surface; on Done or
-                    // after a successful delete, control returns to
-                    // S01 (which may itself defer to a deep-link or
+                    // TB-16 — Settings sits inside the post-auth
+                    // precedence chain. While it's up, the host
+                    // suppresses every other surface; on Done or after
+                    // a successful delete, control returns to the Plan
+                    // list (which may itself defer to a deep-link or
                     // read-only landing if those arrived in the
-                    // meantime).
+                    // meantime). tb-WF-5: the legacy LandingScreen
+                    // entry point is gone — see `@State showingSettings`
+                    // doc for the entry-point follow-up.
                     SettingsScreen(
                         auth: coordinators.auth,
                         onDone: { showingSettings = false }
@@ -166,12 +173,11 @@ public struct RootView: View {
                         role: quiz.isInitiator ? .initiator : .joiner,
                         isSolo: !quiz.invitedShared,
                         onClose: { activeQuiz = nil },
-                        // tb-WF-2 — Exit/Leave confirm. The host runs
-                        // the member-drop write (and, on a solo
-                        // initiator, the room-expire UPDATE) and routes
-                        // to the post-exit destination (currently S00
-                        // Landing — `QuizChromePostExitDestination.current`
-                        // until tb-WF-4 lands the visible Plan list).
+                        // tb-WF-2 → tb-WF-5 — Exit/Leave confirm. The
+                        // host runs the member-drop write (and, on a
+                        // solo initiator, the room-expire UPDATE) and
+                        // routes to the post-exit destination (now S00
+                        // Plan list — `QuizChromePostExitDestination.current`).
                         onExit: {
                             leaveQuizThenRoute(
                                 quiz: quiz,
@@ -179,10 +185,10 @@ public struct RootView: View {
                             )
                         },
                         // TB-19 — a successful Q5 submit no longer just
-                        // clears the quiz (which dead-ended on S00
-                        // Landing — bug-07). It hands the session to the
-                        // post-Q5 router, which resolves the verdict and
-                        // routes to S05.
+                        // clears the quiz (which dead-ended on the
+                        // post-sign-in idle surface — bug-07). It hands
+                        // the session to the post-Q5 router, which
+                        // resolves the verdict and routes to S05.
                         onSubmitted: {
                             enterPostQuiz(quiz: quiz, client: coordinators.client)
                         }
@@ -195,7 +201,7 @@ public struct RootView: View {
                     // Waiting surface (avatar row re-bootstrapped from
                     // a snapshot poll) and advances to S05 when the
                     // verdict fires. Ending the session returns to S00
-                    // Landing. `auth` + `promptStore` back the C-22
+                    // Plan list. `auth` + `promptStore` back the C-22
                     // Auth Upgrade Chip the S04 surface hosts.
                     PostQuizHostScreen(
                         host: host,
@@ -223,7 +229,7 @@ public struct RootView: View {
                         mode: .readOnly,
                         isInitiator: false,
                         onAdvance: {
-                            openCreateSetup()
+                            openSoloSetup()
                             readOnlyView = nil
                             deepLink = nil
                         }
@@ -242,13 +248,12 @@ public struct RootView: View {
                         }
                     )
                 } else if let userID = coordinators.auth.state.userID {
-                    // TB-01 (v1.1) — S00 Landing is the default
-                    // signed-in surface until tb-WF-5 lands the Plan
-                    // list. The host populates `setupContext` on the
-                    // Start a Decision tap (or on a late-joiner re-
-                    // invite advance) so the user lands directly on
-                    // S01 Setup instead of being asked "what's next?"
-                    // again.
+                    // tb-WF-5 — S00 Plan list is the default
+                    // signed-in surface. The host populates
+                    // `setupContext` when the Plan list invokes
+                    // `onCreatePlan` (hero pill OR temp `+` chrome
+                    // glyph) or `onTapPlan` (existing pending Plan,
+                    // re-opens in `.edit` mode).
                     //
                     // After TB-02 v1.1, the canonical iOS user is
                     // `.linkedApple` (post-S00a). Legacy v1 installs
@@ -260,9 +265,9 @@ public struct RootView: View {
                     // the C-22 upgrade prompt.
                     if showingLocationPermission {
                         // TB-03 (v1.1) — S00b pre-prime sits between
-                        // landing and S01 on first launch. Either CTA
-                        // clears the flag and flips into S01 Setup; the
-                        // primary CTA additionally fires
+                        // the Plan list and S01 on first launch.
+                        // Either CTA clears the flag and flips into S01
+                        // Setup; the primary CTA additionally fires
                         // `requestPermission()` so the iOS dialog
                         // appears on top of this surface and resolves
                         // before Setup mounts.
@@ -270,20 +275,20 @@ public struct RootView: View {
                             onShareLocation: {
                                 coordinators.locationCoordinator.requestPermission()
                                 showingLocationPermission = false
-                                openCreateSetup()
+                                openSoloSetup()
                             },
                             onManualEntry: {
                                 showingLocationPermission = false
-                                openCreateSetup()
+                                openSoloSetup()
                             }
                         )
                     } else if let context = setupContext {
                         // tb-WF-4 — S01 SetupScreen is the canonical
                         // Plan creation + edit surface. Mode is carried
-                        // by `SetupContext`; the create-from-landing
-                        // path lands in `.create + .group` until the
-                        // tb-WF-6 disambig sheet wires the explicit
-                        // solo route (Plan list FAB owns it).
+                        // by `SetupContext`. tb-WF-5 wires the
+                        // create-from-Plan-list path to `.create +
+                        // .solo`; tb-WF-6 will land the disambig sheet
+                        // so Group gets its own entry point.
                         SetupScreen(
                             mode: context.mode,
                             groupMode: context.groupMode,
@@ -311,35 +316,36 @@ public struct RootView: View {
                                 )
                             },
                             onSaved: { _ in
-                                // Secondary CTA / back-with-name. Until
-                                // tb-WF-5 lands the iOS Plan list, the
-                                // destination is S00 Landing per the
-                                // tb-WF-4 acceptance criteria.
+                                // tb-WF-5 — Save lands the user back
+                                // on the Plan list. Refresh the Pending
+                                // rows so the newly-minted Plan shows up
+                                // at the top of the section.
                                 self.setupContext = nil
+                                Task { await refreshPlanList(userID: userID) }
                             },
                             onDiscarded: {
                                 self.setupContext = nil
                             }
                         )
                     } else {
-                        LandingScreen(
-                            onStartDecision: {
-                                // TB-03 (v1.1) — only surface the S00b
-                                // pre-prime when the user hasn't yet
-                                // answered the iOS dialog. On subsequent
-                                // launches (granted or denied) we route
-                                // straight to Setup; the picker on
-                                // Setup handles both states.
+                        // tb-WF-5 — S00 Plan list. Hero pill (empty
+                        // state) + temp `+` (populated state) both
+                        // open Solo Setup; pending card tap re-opens
+                        // Setup in `.edit` mode for the tapped Plan.
+                        PlanListScreen(
+                            pending: planListPending,
+                            onCreatePlan: {
                                 if coordinators.locationCoordinator.authorization == .notDetermined {
                                     showingLocationPermission = true
                                 } else {
-                                    openCreateSetup()
+                                    openSoloSetup()
                                 }
                             },
-                            onAccountSettings: {
-                                showingSettings = true
+                            onTapPlan: { plan in
+                                openEditSetup(plan: plan)
                             }
                         )
+                        .task { await refreshPlanList(userID: userID) }
                     }
                 } else {
                     Text("Sign-in failed. Pull to retry.")
@@ -400,9 +406,9 @@ public struct RootView: View {
         // TB-03 (v1.1) — one LocationCoordinator per session. Built
         // here so S00b pre-prime and S01 chip both observe the same
         // CLLocationManager. The coordinator reads the live
-        // authorization status on init, so by the time the S00
-        // landing surface mounts we already know whether to short-
-        // circuit the pre-prime on subsequent launches.
+        // authorization status on init, so by the time the S00 Plan
+        // list mounts we already know whether to short-circuit the
+        // pre-prime on subsequent launches.
         let locationCoordinator = LocationCoordinator()
         // TB-02 v1.1 — restore cached session if any, otherwise leave
         // `.idle` so the S00a sign-in gate renders. Replaces the v1
@@ -419,12 +425,44 @@ public struct RootView: View {
         )
     }
 
-    /// tb-WF-4 — open Setup in `.create` mode for the temporary
-    /// "Start a Decision" entry point on S00 Landing. Until the
-    /// tb-WF-6 disambig sheet lands, group is the default (matches the
-    /// JSX first-paint and the locked CTA "Drop the invite link").
-    private func openCreateSetup() {
-        setupContext = SetupContext(mode: .create, groupMode: .group, editingPlan: nil)
+    /// tb-WF-5 — open Setup in `.create + .solo` mode for the Plan
+    /// list's hero pill (empty state) and temp `+` chrome glyph
+    /// (populated state). Both affordances route to Solo Setup
+    /// directly in this slice; the disambig sheet (tb-WF-6) will
+    /// add the Group route alongside.
+    private func openSoloSetup() {
+        setupContext = SetupContext(mode: .create, groupMode: .solo, editingPlan: nil)
+    }
+
+    /// tb-WF-5 — open Setup in `.edit` mode for an existing pending
+    /// Plan tapped on the Plan list. The carried `groupMode` is
+    /// derived from the Plan's `scope` (`.solo` → `.solo`, `.duo` /
+    /// `.group` → `.group`).
+    private func openEditSetup(plan: PlansStore.Plan) {
+        setupContext = SetupContext(
+            mode: .edit,
+            groupMode: SetupScreen.setupMode(for: plan.scope),
+            editingPlan: plan
+        )
+    }
+
+    /// tb-WF-5 — hydrate `planListPending` from PlansStore. Called on
+    /// Plan list mount + after a successful `onSaved` write. A
+    /// best-effort read: a transient fetch failure leaves the prior
+    /// `planListPending` in place rather than wiping the cached rows.
+    @MainActor
+    private func refreshPlanList(userID: UUID) async {
+        guard let coordinators else { return }
+        do {
+            let rows = try await coordinators.plansStore.plansForList(userID: userID)
+            self.planListPending = rows
+        } catch {
+            // Best-effort — a network blip on appear leaves the
+            // previous render in place. The user can pull to retry
+            // (the slot widens when refresh-affordance lands; for
+            // tb-WF-5 a successful Plan write retriggers the fetch
+            // through `onSaved`).
+        }
     }
 
     private func handle(url: URL) {
@@ -550,7 +588,7 @@ public struct RootView: View {
             // Flip into the quiz and tear down S01 Setup routing
             // state in the same scope so SwiftUI batches the updates
             // and the precedence chain never momentarily falls through
-            // to S00 Landing between SetupScreen and QuizScreen.
+            // to S00 Plan list between SetupScreen and QuizScreen.
             self.setupContext = nil
             self.activeQuiz = QuizContext(
                 coordinator: assembled.coordinator,
@@ -560,7 +598,7 @@ public struct RootView: View {
                 invitedShared: invitedShared
             )
             // Clear the deep link so closing the quiz returns to S00
-            // Landing rather than re-routing back into Join.
+            // Plan list rather than re-routing back into Join.
             self.deepLink = nil
         }
     }
@@ -601,23 +639,23 @@ public struct RootView: View {
         }
     }
 
-    /// tb-WF-2 — confirm-Exit handler. Drops the user's `members` row
-    /// from the active room (and, on a solo initiator, also expires
-    /// the room) via `MemberLeaveStore`, then clears the
-    /// `activeQuiz` route. The precedence chain hands an idle,
-    /// signed-in session back to S00 Landing — the post-exit
-    /// destination tb-WF-2 ships with (`QuizChromePostExitDestination.current`).
+    /// tb-WF-2 → tb-WF-5 — confirm-Exit handler. Drops the user's
+    /// `members` row from the active room (and, on a solo initiator,
+    /// also expires the room) via `MemberLeaveStore`, then clears
+    /// the `activeQuiz` route. The precedence chain hands an idle,
+    /// signed-in session back to the S00 Plan list — the post-exit
+    /// destination on `QuizChromePostExitDestination.current`.
     ///
     /// Why the route flip is synchronous: the user has tapped Exit
-    /// and explicitly confirmed; they expect to land on the Plan list
-    /// (or S00 Landing until tb-WF-4 lands it) immediately, not after
-    /// the round-trip resolves. The member-drop write is fire-and-
-    /// forget — a failed DELETE leaves a stuck membership row that
-    /// the verdict cron's no-signal sweeper expires anyway (and that
-    /// the user can re-trigger from their next session). Landing on
-    /// S00 even on a failed write is the boundary contract from the
-    /// acceptance criteria ("post-confirm exit always lands the user
-    /// on the same destination — no flaky path that dead-ends").
+    /// and explicitly confirmed; they expect to land on the Plan
+    /// list immediately, not after the round-trip resolves. The
+    /// member-drop write is fire-and-forget — a failed DELETE leaves
+    /// a stuck membership row that the verdict cron's no-signal
+    /// sweeper expires anyway (and that the user can re-trigger
+    /// from their next session). Landing on the Plan list even on a
+    /// failed write is the boundary contract from the acceptance
+    /// criteria ("post-confirm exit always lands the user on the
+    /// same destination — no flaky path that dead-ends").
     ///
     /// Failure shape: the Task swallows thrown errors and emits
     /// telemetry. The user is never stranded on the quiz waiting for
@@ -646,17 +684,23 @@ public struct RootView: View {
             }
         }
         // Route flip fires synchronously regardless of the write — see
-        // method doc-comment. tb-WF-5 will switch this from S00 Landing
+        // method doc-comment. tb-WF-5 flipped this from S00 Landing
         // to the Plan list surface; the destination is one-source-of-
         // truth on `QuizChromePostExitDestination.current`.
         switch QuizChromePostExitDestination.current {
-        case .landing:
+        case .planList:
             activeQuiz = nil
-            // Clear any sticky surface that would shadow S00 (a
-            // half-open SetupScreen, a deep-link / read-only landing).
+            // Clear any sticky surface that would shadow the Plan
+            // list (a half-open SetupScreen, a deep-link / read-only
+            // landing).
             setupContext = nil
             deepLink = nil
             readOnlyView = nil
+            // Refresh the Plan list rows so a Plan minted in the
+            // session shows up the moment the user lands back here.
+            if let userID = coordinators?.auth.state.userID {
+                Task { await refreshPlanList(userID: userID) }
+            }
         }
     }
 
@@ -665,12 +709,12 @@ public struct RootView: View {
     /// `PostQuizHost` whose verdict poll is backed by a live
     /// `VerdictStore`, then swaps the precedence chain from the quiz
     /// onto the host in a single scope so SwiftUI batches the update
-    /// and the chain never momentarily falls through to S00 Landing.
+    /// and the chain never momentarily falls through to S00 Plan list.
     ///
     /// Closes bug-07: the prior `onSubmitted` handler just cleared
     /// `activeQuiz`, and with nothing else set the precedence chain
-    /// dead-ended on S00 Landing. Now the host owns the session through
-    /// to the verdict.
+    /// dead-ended on the post-sign-in idle surface. Now the host owns
+    /// the session through to the verdict.
     ///
     /// bug-12 — idempotent per room. A successful Q5 submit delivers
     /// `onSubmitted` twice (the Q5 CTA path and the `.submitted` step's
@@ -799,11 +843,12 @@ public struct RootView: View {
         let locationCoordinator: LocationCoordinator
     }
 
-    /// tb-WF-4 — carries the lifecycle + group mode (and the editing
-    /// Plan, in edit mode) the SetupScreen needs to mount. The temp
-    /// entry point from S00 Landing wires this to `.create + .group`;
-    /// tb-WF-5 / tb-WF-6 will wire the Plan list FAB sheet + Plan-tap
-    /// entry points that pass `.solo` + `.edit`.
+    /// tb-WF-4 → tb-WF-5 — carries the lifecycle + group mode (and the
+    /// editing Plan, in edit mode) the SetupScreen needs to mount. The
+    /// Plan list's hero pill + temp `+` glyph both wire this to
+    /// `.create + .solo`; a Pending card tap wires it to `.edit +
+    /// <Plan.scope-derived mode>`. tb-WF-6 will wire the disambig
+    /// sheet's Group route.
     private struct SetupContext: Equatable {
         let mode: SetupScreen.Mode
         let groupMode: SetupScreen.GroupMode

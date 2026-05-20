@@ -41,7 +41,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | tb-WF-2 | [[issues/tb-wf-2-quiz-back-exit-wire\|Wire Quiz Back + Exit chrome on iOS]] | AFK | [#161](https://github.com/samfarls55/gettoit/issues/161) | done 2026-05-20 |
 | tb-WF-3 | [[issues/tb-wf-3-s04-timer-sweep-ios\|S04 timer sweep — iOS port (retire TimerCoordinator)]] | AFK | [#162](https://github.com/samfarls55/gettoit/issues/162) | done 2026-05-19 |
 | tb-WF-4 | [[issues/tb-wf-4-wire-plan-setup-surface\|Wire Plan setup surface — replaces S01 + S01b]] | AFK | [#163](https://github.com/samfarls55/gettoit/issues/163) | done 2026-05-20 |
-| tb-WF-5 | [[issues/tb-wf-5-plan-list-solo-cycle\|iOS Plan list — Solo creation cycle (foundation)]] | AFK | [#174](https://github.com/samfarls55/gettoit/issues/174) | sg-WF-4, tb-WF-4 |
+| tb-WF-5 | [[issues/tb-wf-5-plan-list-solo-cycle\|iOS Plan list — Solo creation cycle (foundation)]] | AFK | [#174](https://github.com/samfarls55/gettoit/issues/174) | done 2026-05-20 |
 | tb-WF-6 | [[issues/tb-wf-6-plan-list-group-disambig\|iOS Plan list — Group creation + FAB + disambig sheet]] | AFK | [#175](https://github.com/samfarls55/gettoit/issues/175) | tb-WF-5, tb-WF-4 |
 | tb-WF-7 | [[issues/tb-wf-7-plan-list-joiner-resume\|iOS Plan list — Joiner journey (JOINED chip + resume-from-state)]] | AFK | [#176](https://github.com/samfarls55/gettoit/issues/176) | tb-WF-5 |
 | tb-WF-8 | [[issues/tb-wf-8-plan-list-decided-history\|iOS Plan list — Decided + History sections + lifecycle transitions]] | AFK | [#177](https://github.com/samfarls55/gettoit/issues/177) | tb-WF-5, tb-WF-7 |
@@ -53,7 +53,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 - **tb-WF-2** consumes sg-WF-2 (Quiz Back+Exit chrome spec) — done.
 - **tb-WF-3** consumes sg-WF-3 (S04 timer sweep spec) — done.
 - **tb-WF-4** consumed sg-WF-1 (Setup spec) + tb-WF-1 (Plans table). Amended 2026-05-20 to fold in the Q7 lift-out (solo/group mode-conditional rendering, 5/6 controls); merged 2026-05-20. The retired `InitiatorScreen.swift` + `ParametersScreen.swift` (and their tests) are deleted; the design-system JSX for the superseded surfaces stays in the tree as spec history. `Save for later` lands on S00 Landing until tb-WF-5 wires the iOS Plan list.
-- **tb-WF-5** is the foundation iOS port for the Plan list. Blocked by sg-WF-4 (spec) + tb-WF-4 (amended Setup with `.solo` mode).
+- **tb-WF-5** is the foundation iOS port for the Plan list. Merged 2026-05-20 — landed `PlanListScreen.swift` (empty hero state + populated 1-line Pending cards + temp top-trailing `+` chrome), `PlansStore.plansForList(userID:)`, and retired `LandingScreen.swift`. Settings access from the Plan list is a known follow-up — the legacy `LandingScreen` was the only entry to `showingSettings`.
 - **tb-WF-6 / tb-WF-7 / tb-WF-8 / tb-WF-9** layer additional capabilities on the tb-WF-5 shell — each is a vertical user-journey slice. See per-issue blocked-by chains.
 
 The remaining HITL items (sg-WF-5 web-invitee flow, sg-WF-6 reroll-window deadline) need follow-up `/grill-with-docs` rounds before they can be promoted to `ready-for-agent`. The downstream tracer-bullets for those (web invitee wire, reroll-window iOS lifecycle) will be filed once those grills resolve.
