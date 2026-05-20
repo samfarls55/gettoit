@@ -2,7 +2,7 @@
 
 issue: sg-WF-1
 title: Plan setup surface — design-system spec + JSX
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 154
@@ -96,3 +96,7 @@ Carry S01b's voice forward — second-person, casual, never form-field register.
 ## Blocked by
 
 None — can start immediately. The eleven grilled decisions are all locked in [[../../../50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]].
+
+## Comments
+
+- **2026-05-19** — AFK agent closed on `afk/sg-wf-1` ([PR #166](https://github.com/samfarls55/gettoit/pull/166)). Landed `surfaces/01-setup.md` + `code/screens/ScreenSetup.jsx` with both Create and Edit modes driven by a `mode` prop. Six flat eyebrow-per-control rows match the locked workflow-overhaul Q7 inventory. The distance slider extends C-21 RangeSlider with optional `steps` array + `tickAt` props (snap-to-nearest on the 17-stop list, 2 × 10 px tick at 1.0 mi), and the new token `color.slider.tick` (`rgba(255,255,255,0.55)`) is registered + generated into `GTIColor.Slider.tick`. The surface deliberately overrides S01-initiator's "no name your night" defense — the override is documented in the new surface's own "What this surface defends against" section. `01-initiator.md` + `01b-parameters.md` carry `status: superseded` + `superseded-by: 01-setup` + a top-of-file banner; both files stay in the tree until tb-WF-4 retires the iOS code. Structural test at `design-system/scripts/test-plan-setup.mjs` (78 assertions, all green). `verify.mjs` green (drift + orphan-hex + surface↔jsx pairing).
