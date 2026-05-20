@@ -2,11 +2,13 @@
 
 issue: tb-WF-3
 title: S04 timer sweep — iOS port (retire TimerCoordinator)
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 162
 created: 2026-05-19
+closed: 2026-05-19
+pr: 171
 ---
 
 # tb-WF-3 — S04 timer sweep iOS port
@@ -57,3 +59,7 @@ End-to-end behavior delivered: the S04 Waiting surface on iOS no longer renders 
 ## Blocked by
 
 - [[sg-wf-3-s04-timer-sweep|sg-WF-3]] — the design-system spec must land first so this iOS port stays in sync with the canonical doc.
+
+## Comments
+
+- 2026-05-19 — Closed by [PR #171](https://github.com/samfarls55/gettoit/pull/171). `TimerCoordinator.swift` + its tests deleted; the manual-fire half was extracted to a new `FireVerdictCoordinator` so the Decide-now CTA can still call `fire_verdict(room_id)`. `WaitingScreen.swift` lost its 1Hz tick state, the `countdownLabel` view, the `accessibilityReduceMotion` env reader, and the timer-expiry no-quorum terminal. CTA is now always tappable for the initiator (min quorum = 1). `InitiatorScreen.swift` lost the timer chip group rendering; the `timerMinutes` State + downstream `createRoom` call stay at the default (10) so `rooms.timer_minutes` keeps its legacy value until the additive column drop. New migration `20260519010000000_drop_v1_timer_orphans.sql` drops the orphan `cron_auto_fire_or_expire()` worker + the 1-arg `dispatch_compute_verdict(uuid)` overload. New regression test `WaitingScreenTimerSweepRegressionTests.testHoldingTheSurfaceNeverFiresTheVerdictFromAClientTimer` locks the invariant. Schema columns `rooms.timer_minutes` and `rooms.deadline_at` left in place per spec; documented in the workflow-overhaul `_index.md` under "Schema cleanup follow-ups".
