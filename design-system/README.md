@@ -12,7 +12,7 @@ This is the handoff package for Claude Code → SwiftUI implementation. Tokens, 
 |---|---|
 | [`tokens.json`](./tokens.json) | **Canonical source of truth** for all tokens. `code/tokens.css` is generated from this. Future `GTITokens.swift` will be too. |
 | [`tokens.md`](./tokens.md) | Human-readable tokens reference: color, gradient, type, spacing, radii, shadow, motion. SwiftUI primitive map. |
-| [`components.md`](./components.md) | Every component (C-01…C-23) — states, sizes, tap targets, SwiftUI primitives. |
+| [`components.md`](./components.md) | Every component (C-01…C-26) — states, sizes, tap targets, SwiftUI primitives. |
 | [`motion.md`](./motion.md) | Per-component motion timings, verdict-reveal choreography, reduced-motion. |
 | [`accessibility.md`](./accessibility.md) | Contrast tables on every gradient, tap-target audit, focus order, VO, Dynamic Type. |
 | [`surfaces/`](./surfaces/) | 8 surface docs — purpose, defenses, copy register, edge cases. Each links to its JSX. |
@@ -29,7 +29,8 @@ Every surface has a corresponding JSX file. The markdown is the **why**, the JSX
 
 | # | Surface | Doc | JSX |
 |---|---|---|---|
-| 00 | Landing | [`surfaces/00-landing.md`](./surfaces/00-landing.md) | [`code/screens/ScreenLanding.jsx`](./code/screens/ScreenLanding.jsx) |
+| 00 | **Plan list** — canonical post-sign-in entry surface | [`surfaces/00-plan-list.md`](./surfaces/00-plan-list.md) | [`code/screens/ScreenPlanList.jsx`](./code/screens/ScreenPlanList.jsx) |
+| 00 | ~~Landing~~ — superseded 2026-05-20 by `00-plan-list`; remains in tree until tb-WF-5 retires the iOS code | [`surfaces/00-landing.md`](./surfaces/00-landing.md) | [`code/screens/ScreenLanding.jsx`](./code/screens/ScreenLanding.jsx) |
 | 00a | Forced sign-in gate (iOS, first launch) | [`surfaces/00a-signin.md`](./surfaces/00a-signin.md) | [`code/screens/ScreenSignIn.jsx`](./code/screens/ScreenSignIn.jsx) |
 | 00b | Location permission pre-prime | [`surfaces/00b-location-permission.md`](./surfaces/00b-location-permission.md) | [`code/screens/ScreenLocationPermission.jsx`](./code/screens/ScreenLocationPermission.jsx) |
 | 01 | **Plan setup (Create + Edit)** — canonical replacement for S01 + S01b | [`surfaces/01-setup.md`](./surfaces/01-setup.md) | [`code/screens/ScreenSetup.jsx`](./code/screens/ScreenSetup.jsx) |

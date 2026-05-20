@@ -1,12 +1,16 @@
 ---
 surface: 00-landing
-status: locked
+status: superseded
 locked-date: 2026-05-14
+superseded-date: 2026-05-20
+superseded-by: 00-plan-list
 jsx:
   - code/screens/ScreenLanding.jsx
 ---
 
 # S00 · Landing
+
+> **SUPERSEDED (2026-05-20) — replaced by [[00-plan-list|S00 Plan list]].** The workflow-overhaul phase retired the post-sign-in "What's next?" router; the Plan list is the new app entry surface ([[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-4-plan-list-surface|sg-WF-4]] / #157). This file and `code/screens/ScreenLanding.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-5** retires the consuming Swift code; do **not** build new features against this surface. See [[../../gti-vault/50_product/workflow-overhaul-plan-list|workflow-overhaul-plan-list]] for the locked decisions.
 
 > **Code:** [`../code/screens/ScreenLanding.jsx`](../code/screens/ScreenLanding.jsx)
 

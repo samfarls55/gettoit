@@ -1,12 +1,13 @@
 ---
 issue: sg-WF-4
 title: Plan list surface — design-system spec + JSX
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 157
 created: 2026-05-19
 grilled: 2026-05-20
+done: 2026-05-20
 ---
 
 # sg-WF-4 — Plan list surface
@@ -114,12 +115,12 @@ Per project working style and the [[../../../../memory/feedback_afk_full_autonom
 
 - [x] A grill session resolves the open items and produces a locked-decisions doc → [[../../../50_product/workflow-overhaul-plan-list|workflow-overhaul-plan-list]] (2026-05-20).
 - [x] This issue is re-triaged from `needs-triage` / `HITL` to `ready-for-agent` / `AFK` with the grill outcomes inlined.
-- [ ] A new design-system surface doc lands at `design-system/surfaces/00-plan-list.md` (or whichever number you pick — coordinate with the S00 retirement).
-- [ ] `design-system/code/screens/ScreenPlanList.jsx` renders the surface per the spec.
-- [ ] `design-system/components.md` gains entries for **C-25 Action Dot Menu** and **C-26 Floating Action Button**, with matching JSX primitives.
-- [ ] `design-system/surfaces/00-landing.md` is marked `status: superseded` with a `superseded-by:` pointer.
-- [ ] `CHANGELOG.md` carries a `BREAKING:` entry (app entry surface change).
-- [ ] `node design-system/scripts/verify.mjs` is green (drift gate + orphan-hex sweep + surface↔jsx pairing).
+- [x] A new design-system surface doc lands at `design-system/surfaces/00-plan-list.md` (or whichever number you pick — coordinate with the S00 retirement).
+- [x] `design-system/code/screens/ScreenPlanList.jsx` renders the surface per the spec.
+- [x] `design-system/components.md` gains entries for **C-25 Action Dot Menu** and **C-26 Floating Action Button**, with matching JSX primitives.
+- [x] `design-system/surfaces/00-landing.md` is marked `status: superseded` with a `superseded-by:` pointer.
+- [x] `CHANGELOG.md` carries a `BREAKING:` entry (app entry surface change).
+- [x] `node design-system/scripts/verify.mjs` is green (drift gate + orphan-hex sweep + surface↔jsx pairing).
 
 ## Blocks / blocked by
 
@@ -128,6 +129,10 @@ Per project working style and the [[../../../../memory/feedback_afk_full_autonom
 - **Blocked by:** none. All grill prereqs resolved.
 
 ## Comments
+
+### 2026-05-20 — AFK landed
+
+Closed by PR (auto-merge on green). New surface `design-system/surfaces/00-plan-list.md` + `design-system/code/screens/ScreenPlanList.jsx` land together; `00-landing.md` is now `status: superseded` with `superseded-by: 00-plan-list` and an in-body banner pointing here. Two new component primitives ship — **C-25 Action Dot Menu** (`ActionDotMenuTrigger` + `ActionDotMenu`, custom dark-glass popover so destructive items can render with the no-red rule intact) and **C-26 Floating Action Button** (56×56 glass body, sun glyph, anchored 18 / 18 off the trailing + bottom edges). Disambig + confirm sheets compose inline from the existing C-16 sheet primitive — single-surface, kept out of `components.jsx`. `CHANGELOG.md` carries the `BREAKING:` entry for the S00 retirement plus the C-25 / C-26 additions. `node design-system/scripts/verify.mjs` is green; the new structural test `design-system/scripts/test-plan-list.mjs` lands 89 assertions covering frontmatter, locked copy, JSX composition, no-red rules, and superseded bookkeeping. Unblocks tb-WF-5..9 (iOS port).
 
 ### 2026-05-20 — grill outcomes
 
