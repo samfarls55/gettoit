@@ -51,6 +51,15 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 
 The HITL items (sg-WF-4, sg-WF-5, sg-WF-6) need a follow-up `/grill-with-docs` round before they can be promoted to `ready-for-agent`. Anything that depends on them (the Plan list wire, the delete affordance, edit-mode wiring, web invitee wire, S01+S01b retirement, reroll-window iOS lifecycle) will be filed in a subsequent batch after those HITL grills resolve.
 
+## Schema cleanup follow-ups
+
+Items knowingly left in place by current slices — separate, low-risk cleanup tasks that can land any time without blocking forward work.
+
+| Column / artifact | Why it stays | Cleanup trigger |
+|---|---|---|
+| `rooms.timer_minutes` | Retired by v1.1 (sg-WF-3) — iOS no longer offers a timer chip, no client writes a non-default value. `tb-WF-3` left the column populated at the migration default (10) so existing rows stay valid. | Drop in an additive migration once any downstream readers (verify with a repo-wide grep for `timer_minutes`) are gone. |
+| `rooms.deadline_at` | Retired by v1.1 (sg-WF-3) — there is no client-side timer, no row receives a `deadline_at`, no cron consumes it. `tb-WF-3` dropped the orphan cron worker (`cron_auto_fire_or_expire`) and the 1-arg `dispatch_compute_verdict` overload in `20260519010000000_drop_v1_timer_orphans.sql` but left the column. | Drop in an additive migration once production rows are confirmed all-NULL. |
+
 ## Cross-references
 
 - [[../../50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] — the locked decisions doc (eleven Qs + rejected alternatives + follow-ups).

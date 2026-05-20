@@ -8,11 +8,19 @@
 //       — avatar row with answered / answering states (live via
 //         `WaitingStore` events)
 //       — display headline `"N of M / ARE IN"`
-//       — initiator-only `"Decide now"` ghost CTA with quorum gate
-//       — mono-tag countdown (`"AUTO-FIRES IN 7:42"`)
+//       — initiator-only `"Decide now"` ghost CTA
 //       — Nudge ghost CTA (rate-limited 1 per 2 min)
 //       — Auth Upgrade Chip preserved in the CTA dock
-//       — expired-no-quorum terminal mode
+//   * tb-WF-3 (sg-WF-3 iOS port) retires the session timer: the
+//     `"AUTO-FIRES IN 7:42"` mono-tag countdown, the 1Hz tick state,
+//     the reduced-motion countdown variant, the timer-expiry no-quorum
+//     terminal ("Couldn't reach quorum tonight"), and the dependency
+//     on `TimerCoordinator` are all gone. The two surviving verdict
+//     triggers are (a) all-Q5-complete (engine-side auto-fire) and
+//     (b) the initiator's `"Decide now"` tap, owned by
+//     `FireVerdictCoordinator`. The `"Decide now"` CTA is always
+//     tappable for the initiator — minimum quorum is one member, per
+//     surfaces/04-waiting.md §"`Decide now` CTA (initiator-only)".
 //
 // Tokens consumed: GTIColor / GTIGradient / GTIFont / GTISpacing /
 // GTIRadii / GTIMotion. Per repo CLAUDE.md no inline hex / px / easing.
@@ -45,16 +53,9 @@ public struct WaitingScreen: View {
     @State private var phase: ChipPhase = .loading
     @State private var linkError: String?
     @State private var fireError: String?
-    /// `Date()` snapshot pinned to the start of each second so the
-    /// countdown re-renders once per second without spinning a
-    /// `Timer` directly inside the view body. The `.task` modifier
-    /// below drives the update loop.
-    @State private var tick: Date = .now
     /// Local state for the Nudge CTA — surfaces "tap again later"
     /// after a rate-limited press.
     @State private var nudgeMessage: String?
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let auth: AuthCoordinator
     private let promptStore: AuthPromptStore
@@ -63,17 +64,24 @@ public struct WaitingScreen: View {
     /// New in TB-07. `nil` for the legacy TB-12 instantiation that
     /// only needed the chip surface.
     private let waitingStore: WaitingStore?
-    private let timerCoordinator: TimerCoordinator?
+    /// tb-WF-3 — owns the manual `"Decide now"` fire path. `nil` for
+    /// the legacy TB-12 instantiation; production wires it alongside
+    /// the `waitingStore` so the initiator's CTA can call
+    /// `fire_verdict(room_id)`.
+    private let fireCoordinator: FireVerdictCoordinator?
+    /// Closure invoked when the host (PostQuizHostScreen) leaves the
+    /// `onStartOver` slot unfilled; the view passes it through as a
+    /// no-op. Retained on the type so existing call sites compile.
     private let onAdvanceToVerdict: ((UUID) -> Void)?
     private let onStartOver: (() -> Void)?
 
     /// Designated initializer — used by TB-07 to drive the full
-    /// surface against a live `WaitingStore` + `TimerCoordinator`.
+    /// surface against a live `WaitingStore` + `FireVerdictCoordinator`.
     public init(
         auth: AuthCoordinator,
         promptStore: AuthPromptStore,
         waitingStore: WaitingStore? = nil,
-        timerCoordinator: TimerCoordinator? = nil,
+        fireCoordinator: FireVerdictCoordinator? = nil,
         appleProvider: AppleSignInProviding? = nil,
         now: @escaping () -> Date = { .now },
         onAdvanceToVerdict: ((UUID) -> Void)? = nil,
@@ -82,7 +90,7 @@ public struct WaitingScreen: View {
         self.auth = auth
         self.promptStore = promptStore
         self.waitingStore = waitingStore
-        self.timerCoordinator = timerCoordinator
+        self.fireCoordinator = fireCoordinator
         self.appleProvider = appleProvider ?? LiveAppleSignInProvider()
         self.now = now
         self.onAdvanceToVerdict = onAdvanceToVerdict
@@ -94,23 +102,10 @@ public struct WaitingScreen: View {
             GTIGradient.surface(.waiting)
                 .ignoresSafeArea()
 
-            if let store = waitingStore, store.status == .expired {
-                expiredTerminal(store: store)
-            } else {
-                mainBody
-            }
+            mainBody
         }
         .task {
             await refreshChipPhase()
-        }
-        .task {
-            // 1Hz countdown update. The loop runs for the lifetime
-            // of the view; flipping `tick` is what re-renders the
-            // mono-tag countdown label. Reduced-motion users still
-            // get updates; the *label* (`formatCountdownReducedMotion`)
-            // flattens to coarse minute granularity per `motion.md`
-            // §"Utility motion" entry for the waiting countdown tick.
-            await runCountdownLoop()
         }
         .onChange(of: waitingStore?.verdictReady ?? false) { _, ready in
             guard ready, let store = waitingStore else { return }
@@ -149,10 +144,6 @@ public struct WaitingScreen: View {
             }
 
             Spacer(minLength: 0)
-
-            countdownLabel
-                .padding(.horizontal, GTISpacing.step6)
-                .padding(.bottom, GTISpacing.step3 + GTISpacing.step1 / 2)
 
             ctaDock
                 .padding(.horizontal, GTISpacing.step6)
@@ -292,33 +283,6 @@ public struct WaitingScreen: View {
     }
 
     @ViewBuilder
-    private var countdownLabel: some View {
-        if let coord = timerCoordinator {
-            // Pure-function format so the label is stable and the
-            // re-render is cheap. Reduced-motion users get a coarse
-            // minute-granularity variant. The `_ = tick` line wires
-            // the view's re-render to the 1Hz tick state so the
-            // label refreshes every second without the coordinator
-            // needing to publish per-second updates.
-            let _ = tick
-            let secondsRemaining = coord.secondsRemaining
-            let label = reduceMotion
-                ? TimerCoordinator.formatCountdownReducedMotion(secondsRemaining: secondsRemaining)
-                : TimerCoordinator.formatCountdown(secondsRemaining: secondsRemaining)
-            Text(label)
-                .font(.system(size: GTIFont.Size.monoTag, weight: .medium, design: .monospaced))
-                .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
-                .textCase(.uppercase)
-                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("waiting.countdown")
-        } else {
-            EmptyView()
-        }
-    }
-
-    @ViewBuilder
     private var ctaDock: some View {
         VStack(spacing: GTISpacing.step3 + 2) {
             // Surface the fire-error and nudge messages first — they're
@@ -359,11 +323,13 @@ public struct WaitingScreen: View {
 
     @ViewBuilder
     private var decideNowCTA: some View {
-        if let coord = timerCoordinator, coord.isInitiator, let store = waitingStore {
-            let quorumMet = store.quorumMet
-            let label = quorumMet
-                ? "DECIDE NOW · \(store.answeredCount) OF \(store.memberCount) IN"
-                : "DECIDE NOW · NEED 2 IN"
+        if let coord = fireCoordinator, coord.isInitiator, let store = waitingStore {
+            // v1.1: minimum quorum is one member — the initiator
+            // alone always satisfies it. The CTA is always tappable
+            // (no `need 2 in` gate); the label surfaces the partial-
+            // quorum cost so the initiator can decide. Per
+            // surfaces/04-waiting.md §"`Decide now` CTA".
+            let label = "DECIDE NOW · \(store.answeredCount) OF \(store.memberCount) IN"
             Button {
                 Task { await onDecideNowTapped() }
             } label: {
@@ -379,22 +345,11 @@ public struct WaitingScreen: View {
                     )
             }
             .buttonStyle(.plain)
-            .disabled(!quorumMet || coord.isFiring)
-            .opacity(quorumMet ? (coord.isFiring ? 0.7 : 1.0) : 0.45)
-            .animation(
-                .timingCurve(
-                    GTIMotion.Easing.out.0,
-                    GTIMotion.Easing.out.1,
-                    GTIMotion.Easing.out.2,
-                    GTIMotion.Easing.out.3,
-                    duration: 0.320
-                ),
-                value: quorumMet
-            )
+            .disabled(coord.isFiring)
+            .opacity(coord.isFiring ? 0.7 : 1.0)
             .accessibilityIdentifier("waiting.decideNow")
-            .accessibilityLabel(Text(quorumMet ? "Decide now" : "Decide now, need at least two in"))
+            .accessibilityLabel(Text("Decide now"))
             .accessibilityHint(Text("Fires the verdict for whoever has answered"))
-            .accessibilityAddTraits(quorumMet ? [] : [.isStaticText])
         }
     }
 
@@ -421,59 +376,6 @@ public struct WaitingScreen: View {
         }
     }
 
-    // MARK: - expired terminal
-
-    private func expiredTerminal(store: WaitingStore) -> some View {
-        VStack(spacing: GTISpacing.step6) {
-            Spacer()
-
-            VStack(spacing: GTISpacing.step3) {
-                Text("COULDN'T REACH")
-                    .font(.system(size: GTIFont.Size.displayS, weight: .black))
-                    .tracking(GTIFont.TrackingEm.displayS * GTIFont.Size.displayS)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary)
-                Text("QUORUM TONIGHT")
-                    .font(.system(size: GTIFont.Size.displayS, weight: .black))
-                    .tracking(GTIFont.TrackingEm.displayS * GTIFont.Size.displayS)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary)
-            }
-            .multilineTextAlignment(.center)
-            .accessibilityIdentifier("waiting.expired.headline")
-
-            Text("Only one of you answered before the timer ran out. Start a new round?")
-                .font(.system(size: GTIFont.Size.body, weight: .semibold))
-                .foregroundStyle(GTIColor.TextOnGradient.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 280)
-                .accessibilityIdentifier("waiting.expired.body")
-
-            Spacer()
-
-            Button {
-                onStartOver?()
-            } label: {
-                Text("START OVER")
-                    .font(.system(size: GTIFont.Size.cta, weight: .black))
-                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
-                    .foregroundStyle(GTIColor.ink)
-                    .textCase(.uppercase)
-                    .frame(maxWidth: .infinity, minHeight: 60)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(GTIColor.paper)
-                    )
-                    .shadow(color: Color.black.opacity(0.18), radius: 16, x: 0, y: 12)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("waiting.expired.startOver")
-            .padding(.horizontal, GTISpacing.step6)
-            .padding(.bottom, GTISpacing.step5)
-        }
-        // Keep the root content centered when the terminal is the
-        // only thing on screen.
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
     /// Map the local phase to the AuthUpgradeChip's state enum.
     private var chipState: AuthUpgradeChip.State {
         switch phase {
@@ -488,19 +390,8 @@ public struct WaitingScreen: View {
 
     // MARK: - actions
 
-    private func runCountdownLoop() async {
-        // Update the tick state once per second so the countdown
-        // label re-renders. The loop exits when the task is cancelled
-        // (view dismissal). Reduced-motion users still tick — the
-        // label just renders a coarser minute granularity.
-        while !Task.isCancelled {
-            tick = .now
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-        }
-    }
-
     private func onDecideNowTapped() async {
-        guard let coord = timerCoordinator else { return }
+        guard let coord = fireCoordinator else { return }
         fireError = nil
         let outcome = await coord.tapDecideNow()
         switch outcome {

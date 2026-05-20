@@ -34,6 +34,11 @@
 
 import Foundation
 
+/// Source of "now" — injected so tests can advance time at will. The
+/// production path simply uses `{ Date.now }`. Used by `WaitingStore`
+/// to drive the nudge-rate-limit window.
+public typealias WaitingClock = @Sendable () -> Date
+
 /// Lifecycle of a room as the schema enumerates in
 /// `20260513223000000_rooms_deadline_at_and_firing_status.sql`.
 public enum RoomStatus: String, Equatable, Sendable, CaseIterable {
@@ -117,13 +122,13 @@ public final class WaitingStore {
     /// disabled until `answered.length >= 2`.
     public var quorumMet: Bool { answered.count >= 2 }
 
-    private let clock: TimerClock
+    private let clock: WaitingClock
 
     public init(
         roomID: UUID,
         currentUserID: UUID,
         isInitiator: Bool,
-        clock: @escaping TimerClock = { Date.now }
+        clock: @escaping WaitingClock = { Date.now }
     ) {
         self.roomID = roomID
         self.currentUserID = currentUserID

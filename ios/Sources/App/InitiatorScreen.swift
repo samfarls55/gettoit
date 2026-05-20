@@ -4,11 +4,22 @@
 // rendered as disabled future-plan rows; primary CTA creates a room
 // and triggers the iOS share sheet with the generated Universal Link.
 //
-// TB-03 adds the two initiator-set controls above the vertical picker:
+// TB-03 added two initiator-set controls above the vertical picker:
 //   * Timer chip group — `5 · 10 · 15 · 30` minutes (single-select,
-//     default 10), drives `rooms.timer_minutes`.
+//     default 10), drove `rooms.timer_minutes`.
 //   * Radius slider — `0.5 mi – 5.0 mi` (step 0.5, default 2.0 mi),
 //     drives `rooms.radius_meters` after a miles→meters conversion.
+//
+// tb-WF-3 (sg-WF-3 iOS port) retires the **timer chip group**
+// rendering: v1.1 has no session timer, so the chips on S01 had
+// nothing to drive. The `timerMinutes` State + downstream
+// `RoomStore.createRoom(timerMinutes:)` call are preserved at the
+// default (10) so the column stays populated for legacy compatibility
+// — column removal is a separate schema cleanup tracked in the
+// workflow-overhaul _index. The radius slider stays in place.
+//
+// (S01 itself is slated for full replacement by SetupScreen in
+// tb-WF-4; this issue removes only the timer-related rendering.)
 //
 // Both controls are documented as a spec exception against S01's
 // "no optional fields" defense in
@@ -179,8 +190,6 @@ public struct InitiatorScreen: View {
                         onOpen: { locationSheetOpen = true }
                     )
 
-                    timerChipRow
-
                     radiusSliderRow
 
                     verticalPicker
@@ -247,63 +256,6 @@ public struct InitiatorScreen: View {
                 .frame(maxWidth: 280, alignment: .leading)
                 .accessibilityIdentifier("initiator.subhead")
         }
-    }
-
-    /// Single-select chip group. C-04 variant per surface spec —
-    /// `5 · 10 · 15 · 30` minute chips, equal-flex row, default 10.
-    private var timerChipRow: some View {
-        VStack(alignment: .leading, spacing: GTISpacing.step2) {
-            Text("HOW LONG")
-                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
-                .accessibilityIdentifier("initiator.timer.eyebrow")
-
-            HStack(spacing: GTISpacing.step2) {
-                ForEach(Self.timerOptions, id: \.self) { minutes in
-                    timerChip(minutes: minutes)
-                }
-            }
-            .accessibilityIdentifier("initiator.timer.row")
-        }
-    }
-
-    @ViewBuilder
-    private func timerChip(minutes: Int) -> some View {
-        let selected = timerMinutes == minutes
-        Button {
-            timerMinutes = minutes
-        } label: {
-            Text("\(minutes) MIN")
-                .font(.system(size: GTIFont.Size.cta, weight: .heavy))
-                .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
-                .foregroundStyle(selected ? GTIColor.ink : GTIColor.TextOnGradient.primary)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 44)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(selected ? GTIColor.sun : GTIColor.Glass.fillSoft)
-                )
-                .overlay(
-                    Capsule(style: .continuous)
-                        .stroke(selected ? Color.clear : GTIColor.Glass.stroke, lineWidth: 1.5)
-                )
-                .scaleEffect(selected ? 1.02 : 1.0)
-                .animation(
-                    .timingCurve(
-                        GTIMotion.Easing.out.0,
-                        GTIMotion.Easing.out.1,
-                        GTIMotion.Easing.out.2,
-                        GTIMotion.Easing.out.3,
-                        duration: GTIMotion.Duration.chip
-                    ),
-                    value: selected
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("initiator.timer.chip.\(minutes)")
-        .accessibilityLabel("\(minutes) minute timer")
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     /// C-21 Range Slider row — `0.5 … 5.0 mi`, step `0.5`, default
