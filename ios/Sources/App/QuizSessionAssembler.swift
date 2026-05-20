@@ -81,6 +81,12 @@ public enum QuizSessionAssembler {
     /// `member_fetches` write (the live path binds it to a telemetry
     /// emission). Optional — when nil the failure stays observable via
     /// `QuizCoordinator.lastMemberFetchPersist`.
+    ///
+    /// tb-WF-7 — `progressWriter` persists the joiner's in-flight quiz
+    /// answers on each Q1..Q4 -> next-Q advance so a backgrounded
+    /// session can be resumed by tapping the Joined card on S00. The
+    /// live RootView path supplies `PlansStore.memberProgressWriter`;
+    /// boundary tests omit it and the persistence step is skipped.
     public static func assembleCoordinator(
         roomID: UUID,
         userID: UUID,
@@ -91,7 +97,8 @@ public enum QuizSessionAssembler {
         places: PlacesService,
         memberFetchWriter: MemberFetchWriter? = nil,
         memberFetchFailureSink: MemberFetchPersistFailureSink? = nil,
-        writer: @escaping QuizVoteWriter
+        writer: @escaping QuizVoteWriter,
+        progressWriter: MemberProgressWriter? = nil
     ) -> Assembled {
         let candidateFetch: QuizCandidateFetch
         let candidateSource: CandidateSource
@@ -127,7 +134,11 @@ public enum QuizSessionAssembler {
             // telemetry emission.
             memberFetchFailureSink: memberFetchFailureSink,
             sessionParameters: sessionParameters,
-            writer: writer
+            writer: writer,
+            // tb-WF-7 — persist the joiner's in-flight quiz answers on
+            // each Q1..Q4 -> next-Q advance so a backgrounded session
+            // can be resumed via the Joined card on S00.
+            progressWriter: progressWriter
         )
         return Assembled(coordinator: coordinator, candidateSource: candidateSource)
     }

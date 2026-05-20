@@ -1,11 +1,13 @@
 ---
 issue: tb-WF-7
 title: iOS Plan list — Joiner journey (JOINED chip + resume-from-state)
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 176
 created: 2026-05-20
+closed: 2026-05-20
+pr: 184
 ---
 
 # tb-WF-7 — iOS Plan list: Joiner journey
@@ -72,3 +74,19 @@ End-to-end vertical slice that enables an Account-member joiner to see Plans the
 ## Blocked by
 
 - [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] — foundation Plan list shell. Provides `PlanListScreen` to add the chip + router to.
+
+## Comments
+
+**2026-05-20 — merged (PR #184).** All six acceptance criteria green:
+
+1. JOINED chip renders in `GTIColor.sun` top-leading on every Joined card (Created cards still render no chip).
+2. `PlansStore.joinedPlansForList(userID:)` ships as a single-RPC batched read returning per-joiner `last_answered_question_index` + `has_voted` inline.
+3. `PlanListScreen.routeFor(joinedRow:)` pure helper dispatches all 5 §Q8 states via the new `JoinedTapDestination` enum; `RootView.handleJoinedTap` consumes it and mounts the right surface.
+4. Per-joiner quiz progress is preserved end-to-end: `QuizCoordinator(initialProgress:)` hydrates step + Q1..Q4 answers; `advance()` fires the optional `MemberProgressWriter` after every Q1..Q4 -> next-Q step. The wire shape (`{ last_index, answers: { q1, q2, q3, q4 } }`) lives on `members.quiz_progress`, persisted via the `members_progress_upsert` RPC.
+5. Exited joiners are excluded server-side: the `joined_plans_for_user` RPC joins through `members` whose `user_id = auth.uid()` — no membership row → no row in the result set.
+6. iOS CI lane green in 2m52s.
+
+Step indexing is 1-based — `last_index = N` means "the joiner is currently on QN" (not "answered up to QN, next is Q(N+1)"). That matches the surface §Q8 wording "resumes the quiz at Q3 (their last-answered question, NOT Q1)."
+
+Known limitations (documented in PR Decisions):
+- Resume into Q5 lands the user on Q5 but the Q5 candidate set is empty until the next Q4 -> Q5 advance — the resumed coordinator uses the legacy `candidates:` init without a `candidateFetch`. A follow-up could thread the assembler into the resume host.

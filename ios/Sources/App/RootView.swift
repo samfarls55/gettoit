@@ -864,7 +864,14 @@ public struct RootView: View {
                     roomID: roomID,
                     userID: userID
                 ),
-                writer: QuizSupabaseWriter.make(client: client)
+                writer: QuizSupabaseWriter.make(client: client),
+                // tb-WF-7 — persist the joiner's in-flight quiz answers
+                // on each Q1..Q4 -> next-Q advance so a backgrounded
+                // session can be resumed via the Joined card on S00.
+                // The initiator path benefits too — a re-tap on a
+                // self-created Plan keeps the user's draft answers if
+                // the join flow ever turns into a multi-device path.
+                progressWriter: coordinators.plansStore.memberProgressWriter(roomID: roomID)
             )
             // Flip into the quiz and tear down S01 Setup routing
             // state in the same scope so SwiftUI batches the updates
