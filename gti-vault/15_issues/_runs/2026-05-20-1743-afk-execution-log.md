@@ -1,6 +1,6 @@
 ---
 run: 2026-05-20-1743
-status: paused
+status: done
 ---
 
 # AFK Execution Run — 2026-05-20-1743
@@ -30,6 +30,8 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
 | tb-WF-5 | [#174](https://github.com/samfarls55/gettoit/issues/174) | merged | `afk/tb-wf-5` | [#181](https://github.com/samfarls55/gettoit/pull/181) | iOS `PlanListScreen` foundation; `LandingScreen.swift` deleted; Settings entry orphaned (flagged for follow-up) |
 | tb-WF-6 | [#175](https://github.com/samfarls55/gettoit/issues/175) | merged | `afk/tb-wf-6` | [#182](https://github.com/samfarls55/gettoit/pull/182) | C-26 `FloatingActionButton.swift` + `PlanDisambigSheet.swift` + `PlanListScreen` API: `onRequestDisambig` / `onPickGroupMode` |
 | tb-WF-7 | [#176](https://github.com/samfarls55/gettoit/issues/176) | merged | `afk/tb-wf-7` | [#184](https://github.com/samfarls55/gettoit/pull/184) + [#185](https://github.com/samfarls55/gettoit/pull/185) | JOINED chip + resume-from-state; new `members.quiz_progress jsonb` (ADR 0010 precedent); follow-up wired progressWriter into live-join path via `QuizSessionAssembler` |
+| tb-WF-8 | [#177](https://github.com/samfarls55/gettoit/issues/177) | merged | `afk/tb-wf-8` | [#186](https://github.com/samfarls55/gettoit/pull/186) + [#187](https://github.com/samfarls55/gettoit/pull/187) | Decided + History sections; new migration `20260522000000000_plans_decided_history_lifecycle.sql` (verdict_fired_at + expired_at + 2 RPCs + check_ins trigger); History collapse persisted per-user via UserDefaults |
+| tb-WF-9 | [#178](https://github.com/samfarls55/gettoit/issues/178) | merged | `afk/tb-wf-9` | [#188](https://github.com/samfarls55/gettoit/pull/188) + [#189](https://github.com/samfarls55/gettoit/pull/189) | `ActionDotMenu.swift` (custom popover, no native red) + `PlanDestructiveConfirmSheet.swift` + `PlanDeleteCoordinator.swift` (room expire → plan delete order); no new migration (existing RLS covered) |
 
 ## Event log
 - 17:43 — preflight green: tree clean, on `main`, even with `origin/main`
@@ -71,3 +73,51 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
   - tb-WF-8 (#177) — Decided + History sections + lifecycle transitions. Now unblocked (sole blocker tb-WF-7 done).
   - tb-WF-9 (#178) — Three-dot menu + destructive actions. Still blocked on tb-WF-8.
 - **Heads-up for resume:** tb-WF-7 added a new migration `supabase/migrations/20260521000000000_members_quiz_progress.sql`; tb-WF-8 will branch from a `main` that has it. Monitor the post-merge main CI on `9c791e9` before next spawn.
+
+## Resume
+
+- 21:18 — user resumed via `/execute-issues`
+- 21:18 — preflight green: tree clean, on `main`, even with `origin/main`; last two main CI runs both success on `12188b5` + `9c791e9` (auth rate-limit holding since dashboard bump)
+- 21:18 — `ready-issues.mjs` re-run: 1 ready (tb-WF-8), 1 waiting (tb-WF-9 on tb-WF-8)
+- 21:18 — wave 5: spawning tb-WF-8 alone
+- 21:50 — tb-WF-8 merged via PR #186 + docs closeout PR #187; GitHub #177 closed; local `main` ff'd to `fcab083`
+- 21:53 — `ready-issues.mjs` re-run: 1 ready (tb-WF-9), 0 waiting — final wave
+- 21:53 — wave 6: spawning tb-WF-9 alone (last AFK issue in the workflow-overhaul phase)
+- 22:21 — tb-WF-9 merged via PR #188 + docs closeout PR #189; GitHub #178 closed; local `main` ff'd to `c4df9dc`
+- 22:22 — `ready-issues.mjs` final run: 0 ready, 0 waiting — workflow-overhaul AFK backlog fully drained
+- 22:22 — run closed
+
+## Closeout
+
+- **Completed (7 / 7):**
+  - sg-WF-4 — Plan list surface spec ([PR #179](https://github.com/samfarls55/gettoit/pull/179))
+  - tb-WF-4 — Setup screen wire ([PR #180](https://github.com/samfarls55/gettoit/pull/180))
+  - tb-WF-5 — Plan list solo cycle foundation ([PR #181](https://github.com/samfarls55/gettoit/pull/181))
+  - tb-WF-6 — FAB + disambig sheet ([PR #182](https://github.com/samfarls55/gettoit/pull/182))
+  - tb-WF-7 — Joiner journey ([PR #184](https://github.com/samfarls55/gettoit/pull/184) + [PR #185](https://github.com/samfarls55/gettoit/pull/185))
+  - tb-WF-8 — Decided + History lifecycle ([PR #186](https://github.com/samfarls55/gettoit/pull/186))
+  - tb-WF-9 — Three-dot menu + destructive actions ([PR #188](https://github.com/samfarls55/gettoit/pull/188))
+- **Skipped:** —
+- **Escalated / failed:** —
+- **Stranded:** —
+
+### Incidents
+
+- **Supabase Auth rate limit (19:03–19:35).** Post-merge main CI #303 on `57e95b5` (tb-WF-5) failed 9 integration tests with `over_request_rate_limit`. NOT a code regression — burst of 6 auth-heavy CI runs in 75 min exhausted the default signups+signins/5min limit. Halted wave 4 mid-flight (killed tb-WF-6 + tb-WF-7 first attempts), user bumped the dashboard knob (`Auth → Rate Limits → Rate limit for sign-ups and sign-ins`), `gh run rerun 26183584025 --failed` recovered #303 GREEN, wave 4 was respawned and merged cleanly. Memory captured at `memory/project_supabase_auth_rate_limit_ci.md` so the next chained AFK run pre-checks the knob.
+
+### Schema deltas landed
+
+- `20260521000000000_members_quiz_progress.sql` (tb-WF-7) — `members.quiz_progress jsonb` for resume-from-state on Joined cards
+- `20260522000000000_plans_decided_history_lifecycle.sql` (tb-WF-8) — `plans.verdict_fired_at` + `plans.expired_at` + 2 RPCs (`plans_decided_for_user`, `plans_history_for_user`) + `check_ins` trigger to transition `decided-active → expired`
+
+### Design-system additions landed
+
+- New surface: `surfaces/00-plan-list.md` + `code/screens/ScreenPlanList.jsx` (replaces superseded `00-landing.md`)
+- New components: C-25 Action Dot Menu, C-26 Floating Action Button
+- README + CHANGELOG updated; iOS retired the now-superseded S01 + S01b JSX
+
+### Manual sweep flagged for follow-up (not in this run's scope)
+
+- tb-WF-5 retired `LandingScreen.swift` and left `RootView` Settings entry orphaned — needs a new entry point (separate issue)
+- Reroll-from-Plan-list wire is a no-op in tb-WF-8's Decided onReroll closure — live reroll-from-list is follow-on alongside whatever lands next on rerolls
+- Reroll window deadline computation remains sg-WF-6's territory (`23:59:59 next-calendar-day local-TZ` semantic still placeholder)
