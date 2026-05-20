@@ -430,6 +430,45 @@ public final class QuizCoordinator {
         }
     }
 
+    /// tb-WF-2 — step one question backward. Wired to the `Back`
+    /// affordance on the QuizChrome row (sg-WF-2 spec). Per-member;
+    /// no room mutation, no server call. The prior answer is already
+    /// held in the coordinator's @Observable state (`q1Cuisines`,
+    /// `q2Budget`, `q3Reputation`, `q4Vibe`, `q5Ratings`), so the
+    /// stepped-to surface re-renders pre-selected and re-editable
+    /// automatically — `back()` only flips `step`.
+    ///
+    /// Q1 has no prior question. Calling `back()` on Q1 is a safe
+    /// no-op rather than an underflow: the chrome guards the
+    /// affordance via `canBack: false`, but defending the coordinator
+    /// belt-and-braces means a stray invocation can never corrupt the
+    /// step machine.
+    ///
+    /// Stepping back from Q5 lands on Q4 with the already-resolved
+    /// Q5 candidate list preserved — we do NOT re-fire the per-member
+    /// Foursquare fetch on the next Q4 -> Q5 advance (the
+    /// `q5CandidatesState` guard in `startCandidateFetchIfNeeded`
+    /// drops re-entrant calls, so a forward step that follows a
+    /// Back step re-uses the existing candidates rather than
+    /// double-billing Foursquare and stacking duplicate
+    /// `member_fetches` rows).
+    ///
+    /// `submitting` / `submitted` / `failed` are post-submit terminal
+    /// states; Back is unreachable from them (no quiz chrome on the
+    /// submitting / submitted views) and the call is a no-op.
+    public func back() {
+        switch step {
+        case .q1:
+            break  // unreachable from UI (canBack: false); defensive no-op
+        case .q2: step = .q1
+        case .q3: step = .q2
+        case .q4: step = .q3
+        case .q5: step = .q4
+        case .submitting, .submitted, .failed:
+            break
+        }
+    }
+
     // MARK: - Q5 candidate fetch (TB-15)
 
     /// Fire the per-member Foursquare fetch, once, on the Q4 -> Q5
