@@ -1,6 +1,9 @@
 // Surface 04 — Waiting / coordination
 // Honest, calm. No spinners.
-// v1: initiator gets a "Decide now" CTA (disabled until quorum); all members see a live countdown.
+// v1.1: verdict fires on either all-Q5-submitted (auto, engine-side) or
+// the initiator's "Decide now" tap. There is no session timer — the v1
+// countdown mono-tag was retired by the v1.1 quiz redesign PRD
+// (sg-WF-3 / #156).
 // TB-12: anonymous users on iOS get an Auth Upgrade Chip (C-22) above the
 // other CTAs. Web fallback passes `platform="web"` and the chip stays hidden.
 // sg-03 (v1.1): web-fallback anonymous voters get a "Download the app" CTA
@@ -10,7 +13,6 @@
 function ScreenWaiting({
   onAdvance,
   isInitiator = true,
-  secondsRemaining = 462,
   // C-22 wiring — defaults model the canonical state: anonymous iOS user
   // who hasn't dismissed and hasn't linked yet, so the chip renders in
   // its `default` state.
@@ -32,15 +34,11 @@ function ScreenWaiting({
     { name: 'Sam',  color: '#9BC0FF', answered: false },
   ];
   const done = people.filter(p => p.answered).length;
-  const quorum = done >= 2;
 
-  const mm = Math.floor(secondsRemaining / 60);
-  const ss = String(secondsRemaining % 60).padStart(2, '0');
-  const countdownLabel = `Auto-fires in ${mm}:${ss}`;
-
-  const decideLabel = quorum
-    ? `Decide now · ${done} of ${people.length} in`
-    : `Decide now · need 2 in`;
+  // v1.1: minimum quorum is one member (the initiator alone). The
+  // "Decide now" CTA is always tappable for the initiator; the label
+  // surfaces the partial-quorum cost so they can make the call.
+  const decideLabel = `Decide now · ${done} of ${people.length} in`;
 
   return (
     <GradientSurface stop="waiting">
@@ -94,17 +92,6 @@ function ScreenWaiting({
             </div>
           </div>
 
-          {/* low-emphasis live countdown — every member sees it */}
-          <div style={{
-            padding: '0 22px',
-            textAlign: 'center',
-            fontFamily: 'var(--ff-mono)',
-            fontSize: 11, fontWeight: 500,
-            letterSpacing: '0.18em', textTransform: 'uppercase',
-            color: 'rgba(255,255,255,0.6)',
-            marginBottom: 14,
-          }}>{countdownLabel}</div>
-
           <CTADock>
             {/* C-22 Auth Upgrade Chip — iOS-only, anonymous-only. Web
                 fallback (TB-15) passes platform="web" so the chip is
@@ -146,7 +133,6 @@ function ScreenWaiting({
               <PillCTA
                 label={decideLabel}
                 fill="ghost"
-                disabled={!quorum}
                 onClick={onAdvance}
               />
             )}
