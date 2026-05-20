@@ -2,7 +2,7 @@
 // Cardinal scalar; canonical vocab is HUSHED → ROWDY (the "mood" register).
 // The display-sized word rises on every change.
 
-function ScreenQ4Vibe({ onAdvance }) {
+function ScreenQ4Vibe({ onAdvance, onBack, onExit, role = 'initiator', solo = false }) {
   const [val, setVal] = React.useState(3);
   const word = VIBE_LABELS[val];
 
@@ -10,6 +10,8 @@ function ScreenQ4Vibe({ onAdvance }) {
     <GradientSurface stop="q4">
       <div className="gti-canvas">
         <div className="content">
+          {/* sg-WF-2: Q4 chrome — Back + Exit. */}
+          <QuizChrome role={role} solo={solo} onBack={onBack} onExit={onExit} />
           <TopBar step={4} total={5} />
           <div style={{ height: 40 }} />
           <QuestionHeader

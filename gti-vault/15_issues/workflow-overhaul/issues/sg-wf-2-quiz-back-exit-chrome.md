@@ -2,7 +2,7 @@
 
 issue: sg-WF-2
 title: Quiz Back + Exit chrome — S03 surface additions
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 155
@@ -74,3 +74,7 @@ Solo session (no joiners, never shared the invite):
 ## Blocked by
 
 None — the verb definitions are locked in CONTEXT.md and the decisions doc.
+
+## Comments
+
+- **2026-05-19** — AFK agent closed on `afk/sg-wf-2`. Added `QuizChrome` to `code/components.jsx` (Back top-leading on Q2–Q5, Exit/Leave top-trailing on Q1–Q5, with confirmation alert + locked copy variants). Rendered on all five `code/screens/ScreenQ*.jsx` files; Q1 passes `canBack={false}`. C-02 TopBar's `×` made conditional and suppressed on quiz surfaces (chrome above owns Exit). Surface doc `surfaces/03-quiz.md` gained the §"Quiz chrome (Back + Exit)" section and the legacy "no back arrow / friction is the feature" cross-quiz invariant was retired in line with the workflow-overhaul plan §Q5. Accessibility doc updated (tap-target table + quiz focus order). CONTEXT.md "Plan exit" amended — the spec said "Q2 onward" which contradicted the parent decision doc + the Plan-back entry; harmonised to "Q1–Q5". Structural test landed at `design-system/scripts/test-quiz-chrome.mjs` (43 assertions, all green). `verify.mjs` green.

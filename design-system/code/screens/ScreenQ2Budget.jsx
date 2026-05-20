@@ -2,7 +2,7 @@
 // Single-select tier. 4 fixed tiers — never a slider (slider creates per-user
 // information asymmetry that doesn't survive the aggregate rule chip).
 
-function ScreenQ2Budget({ onAdvance }) {
+function ScreenQ2Budget({ onAdvance, onBack, onExit, role = 'initiator', solo = false }) {
   const [tier, setTier] = React.useState(1);
   const tiers = [
     { label: '$',    sub: 'Under $15' },
@@ -15,6 +15,8 @@ function ScreenQ2Budget({ onAdvance }) {
     <GradientSurface stop="q2">
       <div className="gti-canvas">
         <div className="content">
+          {/* sg-WF-2: Q2 chrome — Back + Exit. */}
+          <QuizChrome role={role} solo={solo} onBack={onBack} onExit={onExit} />
           <TopBar step={2} total={5} />
           <div style={{ height: 40 }} />
           <QuestionHeader

@@ -73,8 +73,12 @@ iOS HIG minimum: **44×44pt**. We hit this almost everywhere — exceptions are 
 
 | Component | Size | Status |
 |---|---|---|
-| Top bar `×` close | 32×32 button, 44×44 effective with surrounding padding | ✅ via hit-slop |
+| Top bar `×` close | 32×32 button, 44×44 effective with surrounding padding | ✅ via hit-slop (suppressed on quiz surfaces — chrome below owns Exit) |
 | Top bar segments | 4px height — non-tappable by design | n/a |
+| Quiz chrome `Back` (sg-WF-2) | min-height 44, min-width 44; eyebrow-treatment text label | ✅ |
+| Quiz chrome `Exit` / `Leave` (sg-WF-2) | min-height 44, min-width 44; eyebrow-treatment text label | ✅ |
+| Quiz chrome confirmation Confirm button | min-height 48, pill-shaped white-fill | ✅ |
+| Quiz chrome confirmation Cancel button | min-height 44, transparent ghost | ✅ |
 | Veto chip (C-04) | min-height 48 | ✅ |
 | Pill CTA (C-05) | height 60 | ✅ |
 | Receipt chip (C-06) | ~30 height — **non-tappable** (informational) | n/a |
@@ -107,11 +111,12 @@ iOS HIG minimum: **44×44pt**. We hit this almost everywhere — exceptions are 
 Per surface, the focus order ladders from top → bottom, with the primary CTA always last:
 
 ### Quiz surfaces (Q1–Q5)
-1. Top-bar close (`×`)
-2. (Skip progress bar — decorative)
-3. Eyebrow / Title / Sub (read together as the screen header)
-4. Each chip / picker / control in source order
-5. Primary CTA
+1. `Back` chrome link (top-leading) — Q2–Q5 only; Q1 starts at item 2
+2. `Exit` / `Leave` chrome link (top-trailing) — every Q
+3. (Skip progress bar — decorative)
+4. Eyebrow / Title / Sub (read together as the screen header)
+5. Each chip / picker / control in source order
+6. Primary CTA
 
 ### Verdict (default / cuts / committed)
 1. Top-bar close (none — verdict is post-quiz; close exits to home)

@@ -8,7 +8,7 @@
 //   headline + body block tells the user this step is skipped and the
 //   verdict still lands. Mirrors the Verdict surface's `no-survivor` mode.
 
-function ScreenQ5Regret({ mode = 'default', onAdvance }) {
+function ScreenQ5Regret({ mode = 'default', onAdvance, onBack, onExit, role = 'initiator', solo = false }) {
   const isNoResults = mode === 'no-results';
 
   const [ratings, setRatings] = React.useState({ pico: 5, ren: 2, pastoral: 4 });
@@ -22,6 +22,8 @@ function ScreenQ5Regret({ mode = 'default', onAdvance }) {
     <GradientSurface stop="q5">
       <div className="gti-canvas">
         <div className="content">
+          {/* sg-WF-2: Q5 chrome — Back + Exit. */}
+          <QuizChrome role={role} solo={solo} onBack={onBack} onExit={onExit} />
           <TopBar step={5} total={5} />
           <div style={{ height: 40 }} />
 

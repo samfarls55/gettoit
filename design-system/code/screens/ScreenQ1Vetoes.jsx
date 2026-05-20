@@ -1,7 +1,7 @@
 // Surface 03 — Q1 · Vetoes
 // EBA veto, multi-select chips.  "Nothing tonight" is mutually exclusive with all others.
 
-function ScreenQ1Vetoes({ onAdvance, onBack }) {
+function ScreenQ1Vetoes({ onAdvance, onExit, role = 'initiator', solo = false }) {
   const [selected, setSelected] = React.useState(new Set(['shellfish']));
   const opts = ['Gluten','Dairy','Shellfish','Needs vegan options','Halal-only','Nothing tonight'];
 
@@ -19,6 +19,8 @@ function ScreenQ1Vetoes({ onAdvance, onBack }) {
     <GradientSurface stop="q1">
       <div className="gti-canvas">
         <div className="content">
+          {/* sg-WF-2: Q1 chrome — Exit only, no Back (no prior question). */}
+          <QuizChrome canBack={false} role={role} solo={solo} onExit={onExit} />
           <TopBar step={1} total={5} />
           <div style={{ height: 40 }} />
           <QuestionHeader
