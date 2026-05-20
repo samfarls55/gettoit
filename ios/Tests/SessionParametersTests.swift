@@ -141,29 +141,27 @@ final class SessionParametersTests: XCTestCase {
         XCTAssertEqual(d.transportMode, .walk)
     }
 
-    // MARK: - transport mode → radius default
+    // MARK: - transport mode → radius default (legacy)
 
-    /// The transport mode supplies the default S01 radius. Walking
-    /// pins the canonical 2.0 mi; driving widens to 5.0 mi. Both stay
-    /// inside the S01 slider's legal `0.5…5.0 mi` range.
-    func testTransportModeSuppliesRadiusDefaultInsideSliderRange() {
+    /// The transport mode used to supply the default S01 radius
+    /// (walking → 2.0 mi, driving → 5.0 mi). tb-WF-4 retires the
+    /// transport-mode chip group along with S01b: the Setup distance
+    /// slider replaces it with a single non-uniform value space. The
+    /// SessionParameters enum keeps the field for the joiner-side
+    /// tolerant-decode contract (a pre-tb-WF-4 room's
+    /// `session_params.transport_mode` still hydrates a valid value).
+    ///
+    /// The defaults still need to stay inside the Setup distance
+    /// slider's snap-list so a legacy room's transport-derived radius
+    /// doesn't fail an S04 widen action — but the gate is the SetupScreen
+    /// range now (`0.25…10.0 mi`), not the retired S01 InitiatorScreen.
+    func testTransportModeDefaultsStayInsideSetupSliderRange() {
         XCTAssertEqual(SessionParameters.TransportMode.walk.defaultRadiusMiles, 2.0, accuracy: 0.001)
         XCTAssertEqual(SessionParameters.TransportMode.drive.defaultRadiusMiles, 5.0, accuracy: 0.001)
         for mode in SessionParameters.TransportMode.allCases {
-            XCTAssertGreaterThanOrEqual(mode.defaultRadiusMiles, InitiatorScreen.radiusMinMiles)
-            XCTAssertLessThanOrEqual(mode.defaultRadiusMiles, InitiatorScreen.radiusMaxMiles)
+            XCTAssertGreaterThanOrEqual(mode.defaultRadiusMiles, SetupScreen.minDistanceMiles)
+            XCTAssertLessThanOrEqual(mode.defaultRadiusMiles, SetupScreen.maxDistanceMiles)
         }
-    }
-
-    /// The walking default lines up with the canonical S01 radius
-    /// default, so the zero-tap parameters → zero-tap radius story is
-    /// consistent end to end.
-    func testWalkRadiusDefaultMatchesCanonicalS01Default() {
-        XCTAssertEqual(
-            SessionParameters.TransportMode.walk.defaultRadiusMiles,
-            InitiatorScreen.defaultRadiusMiles,
-            accuracy: 0.001
-        )
     }
 
     // MARK: - service shape grouping

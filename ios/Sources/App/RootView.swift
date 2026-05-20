@@ -1,7 +1,7 @@
 // GetToIt — Root view.
 //
-// Boots the AuthCoordinator + RoomStore + LateJoinerStore, then
-// routes between five surfaces:
+// Boots the AuthCoordinator + RoomStore + PlansStore + LateJoinerStore,
+// then routes between the surfaces below:
 //   * S00a SignInScreen — TB-02 (v1.1) forced first-launch sign-in
 //     gate. Rendered when `AuthCoordinator.state` is `.idle` (fresh
 //     install, no cached session) OR `.anonymous` (pre-v1.1 install
@@ -13,11 +13,17 @@
 //     of ADR 0007's anonymous-default for v1.1.
 //   * S00 LandingScreen — post-sign-in entry surface (v1.1, TB-01).
 //     Every cold launch with an active auth session lands here first;
-//     the user picks Start a Decision (→ S01) or Account Settings
-//     (→ S09). Idle until tap. See surfaces/00-landing.md.
-//   * S01 InitiatorScreen — the "Pick a Vertical" / timer + radius
-//     surface. Reached via the landing "Start a Decision" CTA, or
-//     directly for the late-joiner re-invite tap.
+//     the user picks Start a Decision (→ S01 Setup) or Account
+//     Settings (→ S09). Idle until tap. See surfaces/00-landing.md.
+//     tb-WF-5 lands the Plan list as the canonical post-sign-in
+//     surface (per `surfaces/00-plan-list.md`) — until then S00 Landing
+//     stays the default with the Setup screen as the "Start a Decision"
+//     destination.
+//   * S01 SetupScreen — tb-WF-4 (workflow-overhaul). The canonical
+//     Plan creation + Plan edit surface — collapses the retired S01
+//     Initiator + S01b Parameters screens into one. Two lifecycle
+//     modes (`.create` / `.edit`); two group modes (`.solo` / `.group`)
+//     drive 5- vs 6-control rendering per the 2026-05-20 amendment.
 //   * JoinScreen — surfaced when a Universal Link delivers a deep
 //     link payload (TB-02). Internally routes via
 //     `LateJoinerStore.resolveRoute` to decide whether to insert
@@ -30,8 +36,8 @@
 //     tapped an invite link AFTER the verdict was sealed (TB-11).
 //
 // State precedence (inner-most wins): `activeQuiz` → `postQuizHost`
-// → `readOnlyView` → `deepLink` → settings → S01 (when
-// `showingInitiator` is true) → S00 Landing (the default for a
+// → `readOnlyView` → `deepLink` → settings → S01 Setup (when
+// `setupContext` is non-nil) → S00 Landing (the default for a
 // signed-in idle session). The S00a gate sits outside this chain — it
 // is the launch destination iff no session exists. Once the user
 // signs in, the gate dismisses and the standard precedence chain
@@ -63,40 +69,34 @@ public struct RootView: View {
     /// destination).
     @State private var postQuizHost: PostQuizHost?
     @State private var readOnlyView: ReadOnlyContext?
-    /// TB-05 (v1.1) — set when the initiator finishes S01 (room
-    /// created, link dropped or solo) and the pre-quiz S01b parameters
-    /// surface should render before the quiz starts. Cleared when the
-    /// initiator persists the parameters and `startQuiz` fires. A
-    /// JOINER never gets a `ParametersContext` — joiners read the
-    /// initiator's parameters off the room and skip straight to the
-    /// quiz.
-    @State private var pendingParameters: ParametersContext?
-    /// TB-11 — re-invite prefill carried through from a read-only
-    /// landing. When the late-joiner taps "Start a new decision",
-    /// the InitiatorScreen opens with these values pre-populated
-    /// (saves a tap; the late-joiner is likely planning a similar
-    /// outing).
-    @State private var reInvitePrefill: ReInvitePrefill?
     /// TB-16 — set when the user taps "Settings" on S01 or the S00
     /// landing surface's "Account Settings" CTA. Renders the S09
     /// Settings surface; the route clears on Done or after a successful
     /// delete + re-bootstrap.
     @State private var showingSettings = false
-    /// TB-01 (v1.1) — set when the user taps "Start a Decision" on the
-    /// S00 landing surface. While true, the host renders the S01
-    /// InitiatorScreen; the late-joiner re-invite path also flips this
-    /// on so the prefilled InitiatorScreen surfaces without a detour
-    /// through the landing screen. Defaults to false so a cold,
-    /// signed-in launch lands on S00 per surfaces/00-landing.md.
-    @State private var showingInitiator = false
+    /// tb-WF-4 — set when the user taps "Start a Decision" on the S00
+    /// landing surface. While non-nil, the host renders the S01
+    /// SetupScreen in the carried lifecycle + group mode. Defaults to
+    /// nil so a cold, signed-in launch lands on S00 per surfaces/00-
+    /// landing.md.
+    ///
+    /// Mode-picking entry point note: the disambig sheet (tb-WF-6) that
+    /// lifts solo vs group out of Setup is not yet wired. Until the
+    /// disambig sheet + Plan list (tb-WF-5 / tb-WF-6) land, the
+    /// temporary "Start a Decision" entry point opens Setup in
+    /// `.create + .group` — the canonical first-paint of the JSX, with
+    /// the primary CTA reading `Drop the invite link`. A user who
+    /// wants to solo today must wait for tb-WF-6 to wire the explicit
+    /// solo route; per the issue body this is a known interim state.
+    @State private var setupContext: SetupContext?
     /// TB-03 (v1.1) — set when the user taps "Start a Decision" on the
     /// S00 landing surface AND iOS location permission is still
     /// `notDetermined`. While true, the host renders the S00b
     /// LocationPermissionScreen (pre-prime). On either CTA tap the
-    /// flag clears and `showingInitiator` flips to true so S01 takes
+    /// flag clears and `setupContext` populates so S01 Setup takes
     /// over. Permission outcomes are observed via the shared
     /// LocationCoordinator on `coordinators` — we don't gate the
-    /// transition on grant vs deny because the picker on S01 handles
+    /// transition on grant vs deny because the picker on Setup handles
     /// both states.
     @State private var showingLocationPermission = false
 
@@ -209,48 +209,23 @@ public struct RootView: View {
                 } else if let readOnly = readOnlyView {
                     // TB-11 — read-only late-joiner branch. The
                     // VerdictScreen renders the sealed verdict; the
-                    // re-invite CTA hands the prior room's defaults
-                    // up to RootView, which routes back to the
-                    // initiator surface as a fresh round.
+                    // re-invite CTA opens a fresh Setup surface so
+                    // the user can start a brand-new Plan. The
+                    // legacy timer + radius prefill (TB-11) is dropped
+                    // by tb-WF-4 — Setup uses the distance slider, not
+                    // the retired timer chip group, and lifts the
+                    // radius onto a per-Plan column. Reading those
+                    // values back into the Setup defaults would re-
+                    // introduce the contract the workflow-overhaul
+                    // phase deliberately retired.
                     VerdictScreen(
                         verdict: readOnly.payload.verdict,
                         mode: .readOnly,
                         isInitiator: false,
                         onAdvance: {
-                            reInvitePrefill = ReInvitePrefill(
-                                timerMinutes: readOnly.payload.timerMinutes,
-                                radiusMiles: LateJoinerStore.radiusMilesForMeters(readOnly.payload.radiusMeters)
-                            )
+                            openCreateSetup()
                             readOnlyView = nil
                             deepLink = nil
-                        }
-                    )
-                } else if let parameters = pendingParameters {
-                    // TB-05 (v1.1) — S01b pre-quiz parameters surface.
-                    // The initiator just finished S01 (room created);
-                    // S01b captures the session-wide parameters bucket
-                    // and persists it onto the room before the quiz
-                    // starts. On Continue the parameters are written
-                    // and `startQuiz` fires.
-                    ParametersScreen(
-                        roomID: parameters.roomID,
-                        roomStore: coordinators.roomStore,
-                        locationName: coordinators.locationCoordinator.place?.name,
-                        initialParameters: SessionParameters.default,
-                        onContinue: {
-                            self.pendingParameters = nil
-                            startQuiz(
-                                roomID: parameters.roomID,
-                                userID: parameters.userID,
-                                client: coordinators.client,
-                                invitedShared: parameters.invitedShared,
-                                // The S01b parameters surface is only
-                                // reached by the initiator (joiners read
-                                // the initiator's parameters off the
-                                // room and skip S01b — see the
-                                // `ParametersContext` doc comment).
-                                isInitiator: true
-                            )
                         }
                     )
                 } else if let payload = deepLink {
@@ -268,12 +243,12 @@ public struct RootView: View {
                     )
                 } else if let userID = coordinators.auth.state.userID {
                     // TB-01 (v1.1) — S00 Landing is the default
-                    // signed-in surface. The host flips
-                    // `showingInitiator` to true on the Start a
-                    // Decision tap (or when a late-joiner re-invite
-                    // prefill is carried in, so the user lands on
-                    // S01 with prefill instead of being asked
-                    // "what's next?" again).
+                    // signed-in surface until tb-WF-5 lands the Plan
+                    // list. The host populates `setupContext` on the
+                    // Start a Decision tap (or on a late-joiner re-
+                    // invite advance) so the user lands directly on
+                    // S01 Setup instead of being asked "what's next?"
+                    // again.
                     //
                     // After TB-02 v1.1, the canonical iOS user is
                     // `.linkedApple` (post-S00a). Legacy v1 installs
@@ -286,54 +261,64 @@ public struct RootView: View {
                     if showingLocationPermission {
                         // TB-03 (v1.1) — S00b pre-prime sits between
                         // landing and S01 on first launch. Either CTA
-                        // clears the flag and flips into S01; the
+                        // clears the flag and flips into S01 Setup; the
                         // primary CTA additionally fires
                         // `requestPermission()` so the iOS dialog
                         // appears on top of this surface and resolves
-                        // before S01 mounts.
+                        // before Setup mounts.
                         LocationPermissionScreen(
                             onShareLocation: {
                                 coordinators.locationCoordinator.requestPermission()
                                 showingLocationPermission = false
-                                showingInitiator = true
+                                openCreateSetup()
                             },
                             onManualEntry: {
                                 showingLocationPermission = false
-                                showingInitiator = true
+                                openCreateSetup()
                             }
                         )
-                    } else if showingInitiator || reInvitePrefill != nil {
-                        InitiatorScreen(
+                    } else if let context = setupContext {
+                        // tb-WF-4 — S01 SetupScreen is the canonical
+                        // Plan creation + edit surface. Mode is carried
+                        // by `SetupContext`; the create-from-landing
+                        // path lands in `.create + .group` until the
+                        // tb-WF-6 disambig sheet wires the explicit
+                        // solo route (Plan list FAB owns it).
+                        SetupScreen(
+                            mode: context.mode,
+                            groupMode: context.groupMode,
+                            plansStore: coordinators.plansStore,
                             roomStore: coordinators.roomStore,
                             userID: userID,
                             locationCoordinator: coordinators.locationCoordinator,
-                            prefilledTimerMinutes: reInvitePrefill?.timerMinutes,
-                            prefilledRadiusMiles: reInvitePrefill?.radiusMiles,
-                            onSharedRoom: { roomID in
-                                // TB-05 (v1.1) — the initiator's S01
-                                // CTA now routes into the S01b
-                                // pre-quiz parameters surface rather
-                                // than straight to the quiz. S01b
-                                // persists the parameters bucket and
-                                // its Continue handler fires
-                                // `startQuiz`. `showingInitiator` /
-                                // `reInvitePrefill` are torn down in
-                                // `startQuiz` so the swap stays atomic.
-                                self.pendingParameters = ParametersContext(
+                            editingPlan: context.editingPlan,
+                            onLaunched: { roomID, _ in
+                                // Primary CTA — the Plan was minted +
+                                // the Room was minted linked to it.
+                                // Hand the session off to the existing
+                                // invite / quiz path. `invitedShared`
+                                // mirrors the live group context — solo
+                                // skips Waiting, group runs the share-
+                                // sheet flow via `pendingSetupShare`.
+                                self.setupContext = nil
+                                let invitedShared = context.groupMode == .group
+                                startQuiz(
                                     roomID: roomID,
                                     userID: userID,
-                                    invitedShared: true
+                                    client: coordinators.client,
+                                    invitedShared: invitedShared,
+                                    isInitiator: true
                                 )
                             },
-                            onSoloRoom: { roomID in
-                                self.pendingParameters = ParametersContext(
-                                    roomID: roomID,
-                                    userID: userID,
-                                    invitedShared: false
-                                )
+                            onSaved: { _ in
+                                // Secondary CTA / back-with-name. Until
+                                // tb-WF-5 lands the iOS Plan list, the
+                                // destination is S00 Landing per the
+                                // tb-WF-4 acceptance criteria.
+                                self.setupContext = nil
                             },
-                            onSettings: {
-                                showingSettings = true
+                            onDiscarded: {
+                                self.setupContext = nil
                             }
                         )
                     } else {
@@ -343,12 +328,12 @@ public struct RootView: View {
                                 // pre-prime when the user hasn't yet
                                 // answered the iOS dialog. On subsequent
                                 // launches (granted or denied) we route
-                                // straight to S01; the picker on S01
-                                // handles both states.
+                                // straight to Setup; the picker on
+                                // Setup handles both states.
                                 if coordinators.locationCoordinator.authorization == .notDetermined {
                                     showingLocationPermission = true
                                 } else {
-                                    showingInitiator = true
+                                    openCreateSetup()
                                 }
                             },
                             onAccountSettings: {
@@ -410,6 +395,7 @@ public struct RootView: View {
         let client = SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
         let auth = AuthCoordinator(client: client)
         let roomStore = RoomStore(client: client)
+        let plansStore = PlansStore(client: client)
         let lateJoinerStore = LateJoinerStore(client: client)
         // TB-03 (v1.1) — one LocationCoordinator per session. Built
         // here so S00b pre-prime and S01 chip both observe the same
@@ -426,10 +412,19 @@ public struct RootView: View {
         self.coordinators = Coordinators(
             auth: auth,
             roomStore: roomStore,
+            plansStore: plansStore,
             lateJoinerStore: lateJoinerStore,
             client: client,
             locationCoordinator: locationCoordinator
         )
+    }
+
+    /// tb-WF-4 — open Setup in `.create` mode for the temporary
+    /// "Start a Decision" entry point on S00 Landing. Until the
+    /// tb-WF-6 disambig sheet lands, group is the default (matches the
+    /// JSX first-paint and the locked CTA "Drop the invite link").
+    private func openCreateSetup() {
+        setupContext = SetupContext(mode: .create, groupMode: .group, editingPlan: nil)
     }
 
     private func handle(url: URL) {
@@ -552,12 +547,11 @@ public struct RootView: View {
                 ),
                 writer: QuizSupabaseWriter.make(client: client)
             )
-            // Flip into the quiz and tear down S01 routing state in
-            // the same scope so SwiftUI batches the updates and the
-            // precedence chain never momentarily falls through to S00
-            // Landing between InitiatorScreen and QuizScreen.
-            self.reInvitePrefill = nil
-            self.showingInitiator = false
+            // Flip into the quiz and tear down S01 Setup routing
+            // state in the same scope so SwiftUI batches the updates
+            // and the precedence chain never momentarily falls through
+            // to S00 Landing between SetupScreen and QuizScreen.
+            self.setupContext = nil
             self.activeQuiz = QuizContext(
                 coordinator: assembled.coordinator,
                 roomID: roomID,
@@ -652,15 +646,15 @@ public struct RootView: View {
             }
         }
         // Route flip fires synchronously regardless of the write — see
-        // method doc-comment. tb-WF-4 will switch this from S00 Landing
+        // method doc-comment. tb-WF-5 will switch this from S00 Landing
         // to the Plan list surface; the destination is one-source-of-
         // truth on `QuizChromePostExitDestination.current`.
         switch QuizChromePostExitDestination.current {
         case .landing:
             activeQuiz = nil
-            // Clear any sticky surface that would shadow S00 (the
-            // S01 InitiatorScreen, a deep-link / read-only landing).
-            showingInitiator = false
+            // Clear any sticky surface that would shadow S00 (a
+            // half-open SetupScreen, a deep-link / read-only landing).
+            setupContext = nil
             deepLink = nil
             readOnlyView = nil
         }
@@ -790,24 +784,30 @@ public struct RootView: View {
     private struct Coordinators {
         let auth: AuthCoordinator
         let roomStore: RoomStore
+        /// tb-WF-4 — durable Plan store. Backs the SetupScreen Plan
+        /// create + edit writes. PlansStore is `@Observable` so future
+        /// list-surface consumers (tb-WF-5) can share the same instance.
+        let plansStore: PlansStore
         let lateJoinerStore: LateJoinerStore
         let client: SupabaseClient
         /// TB-03 (v1.1) — shared LocationCoordinator instance. The
         /// S00b pre-prime CTA fires `requestPermission()` on this
-        /// instance; the S01 LocationPickerChip + LocationPickerSheet
+        /// instance; the SetupScreen LocationPickerChip + LocationPickerSheet
         /// observe the same instance so the permission state and the
-        /// resolved place flow from the pre-prime into the initiator
+        /// resolved place flow from the pre-prime into the setup
         /// surface without re-instantiating CLLocationManager.
         let locationCoordinator: LocationCoordinator
     }
 
-    /// TB-05 (v1.1) — carries the room + user from the S01 CTA into
-    /// the S01b parameters surface, plus the `invitedShared` flag the
-    /// post-Q5 router needs once the quiz starts.
-    private struct ParametersContext {
-        let roomID: UUID
-        let userID: UUID
-        let invitedShared: Bool
+    /// tb-WF-4 — carries the lifecycle + group mode (and the editing
+    /// Plan, in edit mode) the SetupScreen needs to mount. The temp
+    /// entry point from S00 Landing wires this to `.create + .group`;
+    /// tb-WF-5 / tb-WF-6 will wire the Plan list FAB sheet + Plan-tap
+    /// entry points that pass `.solo` + `.edit`.
+    private struct SetupContext: Equatable {
+        let mode: SetupScreen.Mode
+        let groupMode: SetupScreen.GroupMode
+        let editingPlan: PlansStore.Plan?
     }
 
     private struct QuizContext {
@@ -835,12 +835,5 @@ public struct RootView: View {
     private struct ReadOnlyContext {
         let roomID: UUID
         let payload: LateJoinerStore.ReadOnlyPayload
-    }
-
-    /// TB-11 — one-shot prefill carried from the read-only S05
-    /// re-invite CTA into the next cold InitiatorScreen entry.
-    private struct ReInvitePrefill {
-        let timerMinutes: Int
-        let radiusMiles: Double
     }
 }

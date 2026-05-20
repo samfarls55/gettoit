@@ -2,12 +2,13 @@
 
 issue: tb-WF-4
 title: Wire Plan setup surface — replaces S01 + S01b
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 163
 created: 2026-05-19
 amended: 2026-05-20
+closed: 2026-05-20
 ---
 
 # tb-WF-4 — Wire Plan setup surface
@@ -96,3 +97,16 @@ Status promoted to `ready-for-agent` on 2026-05-20. The `Save for later` destina
 ### 2026-05-20 — amended in place after sg-WF-4 grill
 
 Promoted from `needs-info` → `ready-for-agent`. Scope amended to include the Q7-amendment (mode-conditional 5/6 control rendering); see "Amendment" subsection in What to build.
+
+### 2026-05-20 — merged
+
+AFK execution shipped on `afk/tb-wf-4`. Highlights of the autonomous calls:
+
+- **Pure deletion of `InitiatorScreen.swift` + `ParametersScreen.swift`** (plus their tests). The issue body offered either pure deletion or a feature-flag transition window; deletion is simpler and avoids a half-state window. The retired surface docs (`design-system/surfaces/01-initiator.md`, `01b-parameters.md`) stay in the tree as spec history; the README is updated to note iOS retirement.
+- **Temporary "Start a Decision" entry point** on S00 Landing opens Setup in `.create + .group` mode. The disambig sheet that lifts solo vs group out of Setup (tb-WF-6) is not yet wired; the canonical first-paint of the JSX has group selected, so this matches. A user who wants the solo path must wait for tb-WF-6.
+- **Late-joiner re-invite path** now opens Setup in `.create + .group` rather than the legacy `InitiatorScreen` with timer + radius prefill. The legacy `timer_minutes` + `radius_meters` prefill no longer maps cleanly — Setup uses the new distance slider and lifts the radius onto a per-Plan column. The prefill semantics are dropped (the late-joiner picks Setup defaults; one extra tap if they want a custom distance).
+- **`Save for later` destination** lands on S00 Landing until tb-WF-5 wires the iOS Plan list. The issue body explicitly permits this stub.
+- **`RoomStore.createRoom` gains an optional `planID` parameter** that writes through to `rooms.plan_id` (omitted when nil so legacy NULL semantics survive). The server-side `set_plan_decided_active` was already wired by tb-WF-1 — this just gives the iOS create path a way to populate the column.
+- **Snap-list tie-break** for the distance slider snaps to the lower-index (smaller) stop on a tie. The JSX `reduce` uses a strict `<` so equally-distant stops resolve to the first-seen — matching this in Swift keeps the two implementations byte-equivalent.
+
+PR: see GitHub for the merged diff (`Closes #163`).
