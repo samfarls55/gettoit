@@ -494,6 +494,33 @@ public struct RootView: View {
                                     userID: userID,
                                     coordinators: coordinators
                                 )
+                            },
+                            // tb-WF-9 — Created card `Delete plan`
+                            // confirmation. The host runs the delete
+                            // journey via `PlanDeleteCoordinator` (look
+                            // up linked room, flip it to expired so
+                            // joiners see session-ended, delete the
+                            // Plan) and refreshes the list.
+                            onDeletePlan: { plan, status in
+                                handleDeletePlan(
+                                    plan: plan,
+                                    status: status,
+                                    userID: userID,
+                                    coordinators: coordinators
+                                )
+                            },
+                            // tb-WF-9 — Joined card `Leave plan`
+                            // confirmation. The host reuses the
+                            // existing `MemberLeaveStore.leave(...)`
+                            // path from tb-WF-2 (drop the membership;
+                            // keep the room alive for the remaining
+                            // members) and refreshes the list.
+                            onLeavePlan: { row in
+                                handleLeavePlan(
+                                    row: row,
+                                    userID: userID,
+                                    coordinators: coordinators
+                                )
                             }
                         )
                         .task { await refreshPlanList(userID: userID) }
@@ -817,6 +844,81 @@ public struct RootView: View {
         } catch {
             // Best-effort — leave the user on the Plan list. They
             // can re-tap once the network recovers.
+        }
+    }
+
+    /// tb-WF-9 — handle a Created card `Delete plan` confirmation.
+    /// Runs the delete journey via `PlanDeleteCoordinator` (look up the
+    /// linked room, flip it to expired so any joiner mid-quiz observes
+    /// the session-ended broadcast via the existing realtime channel,
+    /// delete the Plan row) and refreshes the Plan list to drop the
+    /// row from the surface.
+    ///
+    /// Authorization is server-enforced via the `plans_delete_creator`
+    /// + `rooms_update_creator` RLS policies. A `403` here would
+    /// surface as a thrown error from the coordinator; the catch
+    /// branch refreshes the list anyway so the surface reconciles.
+    @MainActor
+    private func handleDeletePlan(
+        plan: PlansStore.Plan,
+        status: PlansStore.LifecycleState,
+        userID: UUID,
+        coordinators: Coordinators
+    ) {
+        let coordinator = PlanDeleteCoordinator.live(
+            plansStore: coordinators.plansStore,
+            client: coordinators.client
+        )
+        Task {
+            do {
+                try await coordinator.deletePlan(planID: plan.id, status: status)
+            } catch {
+                // Best-effort — the Plan list refresh below will
+                // reconcile. A persistent failure (RLS deny) leaves
+                // the Plan visible; the user can retry.
+            }
+            await refreshPlanList(userID: userID)
+        }
+    }
+
+    /// tb-WF-9 — handle a Joined card `Leave plan` confirmation.
+    /// Reuses the existing `MemberLeaveStore.leave(...)` semantic from
+    /// tb-WF-2 — the same path the Quiz chrome's `Leave` uses to drop
+    /// the joiner's `members` row. Per `Plan exit` in CONTEXT.md the
+    /// room stays alive for the remaining members; the cron sweeper
+    /// expires it if the rest of the group never finishes the quiz.
+    @MainActor
+    private func handleLeavePlan(
+        row: PlansStore.JoinedPlanRow,
+        userID: UUID,
+        coordinators: Coordinators
+    ) {
+        Task {
+            guard let roomID = await coordinators.plansStore.roomIDForJoinedPlan(
+                planID: row.plan.id,
+                userID: userID
+            ) else {
+                // No room linked — the joiner cannot leave a room that
+                // does not exist. Refresh anyway to reconcile.
+                await refreshPlanList(userID: userID)
+                return
+            }
+            let store = MemberLeaveStore.live(client: coordinators.client)
+            do {
+                // Joiner — never the room creator, never solo. The
+                // store hard-suppresses the rooms write on the joiner
+                // branch regardless of `isSolo`, so passing the
+                // canonical values here is a no-op safety belt.
+                try await store.leave(
+                    roomID: roomID,
+                    userID: userID,
+                    role: .joiner,
+                    isSolo: false
+                )
+            } catch {
+                // Best-effort — the list refresh below will reconcile.
+            }
+            await refreshPlanList(userID: userID)
         }
     }
 
