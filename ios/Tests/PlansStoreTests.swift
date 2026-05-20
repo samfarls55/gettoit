@@ -22,6 +22,7 @@
 // `ios` CI lane runs and the secrets stay out of AFK worktrees.
 
 import XCTest
+import Supabase
 @testable import GetToIt
 
 @MainActor
