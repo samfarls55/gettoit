@@ -213,7 +213,7 @@ final class PlanListScreenRenderTests: XCTestCase {
     /// menu composition, 2-line card body.
     func testCreatedDecidedCardWithMenuRenders() {
         let row = makeDecidedRow(name: "Friday dinner", status: .decidedActive)
-        render(makeScreen(decided: [row]))
+        render(makeScreen(pending: [], decided: [row]))
     }
 
     /// Joined card materialises with the C-25 trigger. The menu items
@@ -225,6 +225,6 @@ final class PlanListScreenRenderTests: XCTestCase {
             lastAnsweredQuestionIndex: 0,
             hasVoted: false
         )
-        render(makeScreen(joined: [row]))
+        render(makeScreen(pending: [], joined: [row]))
     }
 }
