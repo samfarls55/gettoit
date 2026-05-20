@@ -116,6 +116,8 @@ Layout is **flat** — one eyebrow per control, no higher-level section headers.
 
 Headline (Create mode): `Start a new plan`. Headline (Edit mode): `Edit your plan`. Body line: `One screen. Set it once. Share when you're ready.`
 
+> **Amendment 2026-05-20** (from [[workflow-overhaul-plan-list|workflow-overhaul-plan-list]] §Q5): the `Who's coming` row has been lifted out of the Setup screen into a pre-Setup disambig sheet attached to the create-Plan affordance (FAB / empty-state pill). Solo path renders 5 controls on Setup (this row omitted); Group path renders 6 controls with the `Just me` option removed (chips become `Two of us / A group`). Primary CTA copy in Q4 is unchanged.
+
 ### Q8 — Distance slider
 **Locked:** 0.25–10.0 mi range, non-uniform step, walk-anchored tick at 1.0 mi.
 
@@ -153,6 +155,8 @@ Full def in `[[../../CONTEXT|CONTEXT.md]] → Plan reroll window`.
 - Top-bar `Back`/`Cancel` from Setup with name empty → discards, returns to list (nothing to save).
 - Top-bar `Back` from Edit mode with changes → auto-saves changes (name already validated by definition).
 - Tap `decided-active` / `decided-expired` Plan → goes to verdict screen (S05 territory), not Setup. Decided Plans are not editable.
+
+> **Clarification 2026-05-20** (from [[workflow-overhaul-plan-list|workflow-overhaul-plan-list]] §Q8): the tap-pending → Setup-Edit rule applies to **Created Plans only**. Tapping a **Joined** Plan card invokes resume-from-state: route to S03 Quiz at the joiner's last-answered question, S04 Waiting if quiz complete, or S05 Verdict if decided. Mirrors the locked Web invitee re-clicking-the-link behavior.
 
 ## Cross-references
 

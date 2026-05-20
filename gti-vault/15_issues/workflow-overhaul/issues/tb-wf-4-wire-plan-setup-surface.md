@@ -2,11 +2,12 @@
 
 issue: tb-WF-4
 title: Wire Plan setup surface — replaces S01 + S01b
-status: needs-info
+status: ready-for-agent
 type: AFK
 feature: workflow-overhaul
 github_issue: 163
 created: 2026-05-19
+amended: 2026-05-20
 ---
 
 # tb-WF-4 — Wire Plan setup surface
@@ -37,14 +38,22 @@ End-to-end behavior delivered:
 
 ### Plan list landing requirement
 
-`Save for later` requires a destination — the Plan list surface. Until [[sg-wf-4-plan-list-surface|sg-WF-4]] is grilled and the Plan list wire lands, this issue cannot ship cleanly. **This is why the status is `needs-info`** — the spec is locked but the entry point and post-save destination are not.
+`Save for later` requires a destination — the Plan list surface. As of the 2026-05-20 sg-WF-4 grill, the Plan list spec is locked and the iOS wire is being delivered by [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] (foundation slice). **This issue is no longer `needs-info`.** Ship Setup per the amendment below; tb-WF-5 lands the list as the `Save for later` destination.
 
-Two paths for unblocking:
+### Amendment 2026-05-20: Q7 lifted-out chip
 
-- **(a) Wait for sg-WF-4** to be grilled + the Plan list wire to land, then re-triage this to `ready-for-agent`.
-- **(b) Ship Setup in Create mode only**, with `Save for later` initially disabled and the post-launch destination remaining S00 Landing. Add `Save for later` + the Edit mode later when the list lands. This is a tactical de-scope; the spec doesn't explicitly support a single-CTA Create mode, so the agent must coordinate with the founder on the spec deviation.
+The Plan list grill ([[../../../50_product/workflow-overhaul-plan-list|workflow-overhaul-plan-list]] §Q5) lifted the `Who's coming` choice out of Setup into a pre-Setup disambig sheet attached to the create-Plan affordance. Setup screen now renders **conditionally on a `mode: .solo | .group` parameter** passed in at construction:
 
-Recommend (a). The agent should not ship a degraded version of the spec; wait for the list grill.
+- **Solo path** (`mode == .solo`) — render **5 controls**. The `Who's coming` row is **omitted entirely**.
+- **Group path** (`mode == .group`) — render **6 controls**. The `Who's coming` chips become **`Two of us / A group`** only (the `Just me` option is removed because the user already disambig'd upstream).
+
+Headlines + body + dock CTA copy from the original spec (parent doc Q4 + Q7) are unchanged. Primary CTA: `Start the quiz` (solo) / `Drop the invite link` (group), same as locked.
+
+**Edit mode entry path:** the existing Plan's persisted `scope` value (`solo / duo / group` per CONTEXT.md → `Plan`) determines the rendered mode on re-open. A `solo` Plan re-opens in Solo Setup (5 controls); a `duo` or `group` Plan re-opens in Group Setup (6 controls). The chip pre-selection on Edit is whatever the user picked originally — `Two of us` for duo, `A group` for group.
+
+**Why amended in place rather than as a separate slice:** the amendment can't ship in a half-done state. If this issue lands first with the original 6-chip-flat layout and a later slice amends it, there's an intermediate window where Setup is wrong. Folding into this issue's scope avoids that window.
+
+The disambig sheet itself + FAB wire + hero pill routing are NOT in this issue's scope — they are delivered by [[tb-wf-6-plan-list-group-disambig|tb-WF-6]]. This issue ships Setup with the amended mode-conditional rendering; tb-WF-5 / tb-WF-6 wire the entry paths that pass the mode in.
 
 ### Tests
 
@@ -63,7 +72,7 @@ Recommend (a). The agent should not ship a degraded version of the spec; wait fo
 
 ## Acceptance criteria
 
-- [ ] `SetupScreen` exists with both Create and Edit modes, rendering all six controls per sg-WF-1.
+- [ ] `SetupScreen` exists with both Create and Edit modes, taking a `mode: .solo | .group` parameter; solo renders 5 controls (no `Who's coming` row); group renders 6 controls with the `Just me` chip option removed.
 - [ ] Distance slider behavior matches the spec exactly (range 0.25–10.0 mi, non-uniform step, default 1.0, tick at 1.0).
 - [ ] Name validation: both dock CTAs disabled while name is empty; enabled when non-empty.
 - [ ] `Drop the invite link` mints a Plan in `pending` AND a Room linked to it; fires the existing invite/quiz path.
@@ -76,8 +85,14 @@ Recommend (a). The agent should not ship a degraded version of the spec; wait fo
 
 ## Blocked by
 
-- [[sg-wf-1-plan-setup-surface|sg-WF-1]] — the design-system spec.
-- [[tb-wf-1-plans-table-schema|tb-WF-1]] — the `plans` table + PlansStore.
-- [[sg-wf-4-plan-list-surface|sg-WF-4]] — the Plan list surface, because `Save for later` needs the list as a destination.
+- [[sg-wf-1-plan-setup-surface|sg-WF-1]] — the design-system spec (done).
+- [[tb-wf-1-plans-table-schema|tb-WF-1]] — the `plans` table + PlansStore (done).
+- [[sg-wf-4-plan-list-surface|sg-WF-4]] — the Plan list surface spec (done — grilled 2026-05-20).
 
-Status is `needs-info` until sg-WF-4 grills.
+Status promoted to `ready-for-agent` on 2026-05-20. The `Save for later` destination (Plan list) is concurrently delivered by [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]]; both can ship in parallel since tb-WF-5 stubs Setup-Edit reachability and this issue stubs the entry point from the list.
+
+## Comments
+
+### 2026-05-20 — amended in place after sg-WF-4 grill
+
+Promoted from `needs-info` → `ready-for-agent`. Scope amended to include the Q7-amendment (mode-conditional 5/6 control rendering); see "Amendment" subsection in What to build.
