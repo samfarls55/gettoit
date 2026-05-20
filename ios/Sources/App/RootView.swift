@@ -103,6 +103,25 @@ public struct RootView: View {
     /// round-trip per card. Empty by default — a fresh signed-in
     /// session that has not joined anyone's Plan stays empty.
     @State private var planListJoined: [PlansStore.JoinedPlanRow] = []
+    /// tb-WF-8 — Decided-active rows backing the S00 Plan list's
+    /// Decided section. Hydrated by `refreshPlanList` from the
+    /// `plans_decided_for_user` RPC. Pre-sorted server-side
+    /// (`verdict_fired_at DESC`); the iOS surface re-sorts defensively
+    /// via the pure `sortedDecided` helper.
+    @State private var planListDecided: [PlansStore.DecidedPlanRow] = []
+    /// tb-WF-8 — Decided-expired rows backing the S00 Plan list's
+    /// History section.
+    @State private var planListHistory: [PlansStore.DecidedPlanRow] = []
+    /// tb-WF-8 — when set, the host mounts the full VerdictScreen (with
+    /// reroll affordance per surface §"Tap behavior") for a Created
+    /// Decided-active Plan tapped from the list. Cleared when the user
+    /// dismisses back to the Plan list.
+    @State private var createdDecidedVerdict: ReadOnlyContext?
+    /// tb-WF-8 — when set, the host mounts the read-only VerdictScreen
+    /// for a Created History (decided-expired) tap. Same payload shape
+    /// as `joinedReadOnly`; separate slot so the tap-target precedence
+    /// is unambiguous.
+    @State private var createdHistoryVerdict: ReadOnlyContext?
     /// tb-WF-7 — when set, the host owns a resume context for the
     /// joiner who tapped a Joined Pending card. The context carries
     /// the room id, the saved progress payload, and the destination
@@ -390,6 +409,35 @@ public struct RootView: View {
                                 joinedReadOnly = nil
                             }
                         )
+                    } else if let context = createdDecidedVerdict {
+                        // tb-WF-8 — Created Decided-active tap from the
+                        // S00 Plan list lands here. Full VerdictScreen
+                        // with the reroll affordance visible (the
+                        // `.default` mode + `isInitiator=true` render
+                        // the tertiary "Reroll" button per S05).
+                        // `onAdvance` returns the user to the Plan list
+                        // — the Setup re-invite path is the late-joiner
+                        // deep-link branch only.
+                        VerdictScreen(
+                            verdict: context.payload.verdict,
+                            mode: .default,
+                            isInitiator: true,
+                            onAdvance: {
+                                createdDecidedVerdict = nil
+                            }
+                        )
+                    } else if let context = createdHistoryVerdict {
+                        // tb-WF-8 — Created History (decided-expired)
+                        // tap. Read-only Verdict — the Plan is sealed;
+                        // reroll is suppressed by `.readOnly` mode.
+                        VerdictScreen(
+                            verdict: context.payload.verdict,
+                            mode: .readOnly,
+                            isInitiator: false,
+                            onAdvance: {
+                                createdHistoryVerdict = nil
+                            }
+                        )
                     } else {
                         // tb-WF-5 → tb-WF-6 → tb-WF-7 — S00 Plan list.
                         // Hero pill (empty state) + C-26 FAB (populated
@@ -418,6 +466,9 @@ public struct RootView: View {
                         PlanListScreen(
                             pending: planListPending,
                             joined: planListJoined,
+                            decided: PlanListScreen.sortedDecided(planListDecided),
+                            history: PlanListScreen.sortedHistory(planListHistory),
+                            signedInUserID: userID,
                             onRequestDisambig: {},
                             onPickGroupMode: { mode in
                                 if coordinators.locationCoordinator.authorization == .notDetermined {
@@ -432,6 +483,13 @@ public struct RootView: View {
                             },
                             onTapJoined: { row in
                                 handleJoinedTap(
+                                    row: row,
+                                    userID: userID,
+                                    coordinators: coordinators
+                                )
+                            },
+                            onTapDecidedOrHistory: { row in
+                                handleDecidedOrHistoryTap(
                                     row: row,
                                     userID: userID,
                                     coordinators: coordinators
@@ -549,21 +607,104 @@ public struct RootView: View {
         )
     }
 
-    /// tb-WF-5 / tb-WF-7 — hydrate `planListPending` + `planListJoined`
-    /// from PlansStore. Called on Plan list mount + after a successful
-    /// `onSaved` write. A best-effort read: a transient fetch failure
-    /// leaves the prior cached rows in place rather than wiping the
-    /// list to empty.
+    /// tb-WF-5 / tb-WF-7 / tb-WF-8 — hydrate `planListPending` +
+    /// `planListJoined` + `planListDecided` + `planListHistory` from
+    /// PlansStore. Called on Plan list mount + after a successful
+    /// `onSaved` write. A best-effort read per bucket: a transient
+    /// fetch failure leaves the prior cached rows in place rather
+    /// than wiping the list to empty.
     @MainActor
     private func refreshPlanList(userID: UUID) async {
         guard let coordinators else { return }
-        async let pendingTask = coordinators.plansStore.plansForList(userID: userID)
-        async let joinedTask = coordinators.plansStore.joinedPlansForList(userID: userID)
+        async let pendingTask  = coordinators.plansStore.plansForList(userID: userID)
+        async let joinedTask   = coordinators.plansStore.joinedPlansForList(userID: userID)
+        async let decidedTask  = coordinators.plansStore.plansDecidedForList(userID: userID)
+        async let historyTask  = coordinators.plansStore.plansHistoryForList(userID: userID)
         if let rows = try? await pendingTask {
             self.planListPending = rows
         }
         if let rows = try? await joinedTask {
             self.planListJoined = rows
+        }
+        if let rows = try? await decidedTask {
+            self.planListDecided = rows
+        }
+        if let rows = try? await historyTask {
+            self.planListHistory = rows
+        }
+    }
+
+    /// tb-WF-8 — dispatch a Decided / History card tap via the pure
+    /// `PlanListScreen.tapRoute(for:)` helper. Each destination flips
+    /// a different `@State` slot so the precedence chain renders the
+    /// right surface on the next SwiftUI tick.
+    ///
+    /// Created (`role=owner`) cards route to either the full or
+    /// read-only VerdictScreen depending on Decided-active vs
+    /// Decided-expired. Joined (`role=joined`) cards route to the
+    /// existing `joinedReadOnly` slot (read-only Verdict, no reroll).
+    /// In both cases the verdict payload is fetched via the existing
+    /// `LateJoinerStore.fetchReadOnlyPayload(roomID:)` — the API is
+    /// shape-compatible (returns the same `Verdict` value the
+    /// VerdictScreen consumes).
+    @MainActor
+    private func handleDecidedOrHistoryTap(
+        row: PlansStore.DecidedPlanRow,
+        userID: UUID,
+        coordinators: Coordinators
+    ) {
+        let destination = PlanListScreen.tapRoute(for: row)
+        Task {
+            await openDecidedOrHistoryVerdict(
+                plan: row.plan,
+                destination: destination,
+                userID: userID,
+                coordinators: coordinators
+            )
+        }
+    }
+
+    /// tb-WF-8 — look up the room id linked to a Decided / History
+    /// Plan, fetch the read-only verdict payload, and flip the right
+    /// `@State` slot for the precedence chain to mount the right
+    /// surface. Best-effort — a transient failure leaves the user on
+    /// the Plan list.
+    private func openDecidedOrHistoryVerdict(
+        plan: PlansStore.Plan,
+        destination: DecidedHistoryTapDestination,
+        userID: UUID,
+        coordinators: Coordinators
+    ) async {
+        // Both Decided and History plans have a non-null `plan_id`
+        // backing room — the verdict landed against that room. One
+        // round-trip resolves the room id via the role-agnostic
+        // `roomIDForPlan` helper (the tb-WF-7 `roomIDForJoinedPlan`
+        // joins through `members.role <> 'owner'`, which excludes
+        // Created plans where the caller IS the owner).
+        guard let roomID = await coordinators.plansStore.roomIDForPlan(
+            planID: plan.id
+        ) else {
+            return
+        }
+        do {
+            let payload = try await coordinators.lateJoinerStore
+                .fetchReadOnlyPayload(roomID: roomID)
+            let context = ReadOnlyContext(roomID: roomID, payload: payload)
+            switch destination {
+            case .createdVerdictFull:
+                self.createdDecidedVerdict = context
+            case .createdVerdictReadOnly:
+                self.createdHistoryVerdict = context
+            case .joinedVerdictReadOnlyActive,
+                 .joinedVerdictReadOnlyHistory:
+                // Joined cards route through the existing
+                // `joinedReadOnly` slot — same view shape as the
+                // tb-WF-7 Joined-card decided routing.
+                self.joinedReadOnly = context
+            }
+        } catch {
+            // Best-effort — leave the user on the Plan list. They can
+            // re-tap once the network recovers.
         }
     }
 

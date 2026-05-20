@@ -130,6 +130,17 @@ public final class PlansStore {
         public let distanceMeters: Int
         public let status: LifecycleState
         public let rerollWindowClosesAt: String?
+        /// tb-WF-8 — when the Plan transitioned pending → decided-active.
+        /// Stamped by `set_plan_decided_active`. Sort key for the
+        /// Decided section of the S00 Plan list. `String?` to match the
+        /// existing timestamp shape — PostgREST emits ISO-8601 with
+        /// microsecond precision and the iOS UI never renders the raw
+        /// timestamp directly.
+        public let verdictFiredAt: String?
+        /// tb-WF-8 — when the Plan transitioned decided-active →
+        /// decided-expired. Stamped by `set_plan_decided_expired`. Sort
+        /// key for the History section. `String?` for the same reason.
+        public let expiredAt: String?
         public let createdAt: String?
         public let updatedAt: String?
 
@@ -144,6 +155,8 @@ public final class PlansStore {
             distanceMeters: Int,
             status: LifecycleState,
             rerollWindowClosesAt: String? = nil,
+            verdictFiredAt: String? = nil,
+            expiredAt: String? = nil,
             createdAt: String? = nil,
             updatedAt: String? = nil
         ) {
@@ -157,6 +170,8 @@ public final class PlansStore {
             self.distanceMeters = distanceMeters
             self.status = status
             self.rerollWindowClosesAt = rerollWindowClosesAt
+            self.verdictFiredAt = verdictFiredAt
+            self.expiredAt = expiredAt
             self.createdAt = createdAt
             self.updatedAt = updatedAt
         }
@@ -172,8 +187,49 @@ public final class PlansStore {
             case distanceMeters = "distance_meters"
             case status
             case rerollWindowClosesAt = "reroll_window_closes_at"
+            case verdictFiredAt = "verdict_fired_at"
+            case expiredAt = "expired_at"
             case createdAt = "created_at"
             case updatedAt = "updated_at"
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.id = try c.decode(UUID.self, forKey: .id)
+            self.creatorID = try c.decode(UUID.self, forKey: .creatorID)
+            self.name = try c.decode(String.self, forKey: .name)
+            self.category = try c.decode(String.self, forKey: .category)
+            self.scope = try c.decode(Scope.self, forKey: .scope)
+            self.location = try c.decodeIfPresent(Location.self, forKey: .location)
+            self.sessionParameters = try c.decodeIfPresent(SessionParameters.self, forKey: .sessionParameters)
+            self.distanceMeters = try c.decode(Int.self, forKey: .distanceMeters)
+            self.status = try c.decode(LifecycleState.self, forKey: .status)
+            self.rerollWindowClosesAt = try c.decodeIfPresent(String.self, forKey: .rerollWindowClosesAt)
+            // Lifecycle timestamps land in tb-WF-8 — old wire shapes
+            // (a row that landed before the migration) may omit them.
+            // Tolerant decode so a stale cached row still hydrates.
+            self.verdictFiredAt = try c.decodeIfPresent(String.self, forKey: .verdictFiredAt)
+            self.expiredAt = try c.decodeIfPresent(String.self, forKey: .expiredAt)
+            self.createdAt = try c.decodeIfPresent(String.self, forKey: .createdAt)
+            self.updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(id, forKey: .id)
+            try c.encode(creatorID, forKey: .creatorID)
+            try c.encode(name, forKey: .name)
+            try c.encode(category, forKey: .category)
+            try c.encode(scope, forKey: .scope)
+            try c.encodeIfPresent(location, forKey: .location)
+            try c.encodeIfPresent(sessionParameters, forKey: .sessionParameters)
+            try c.encode(distanceMeters, forKey: .distanceMeters)
+            try c.encode(status, forKey: .status)
+            try c.encodeIfPresent(rerollWindowClosesAt, forKey: .rerollWindowClosesAt)
+            try c.encodeIfPresent(verdictFiredAt, forKey: .verdictFiredAt)
+            try c.encodeIfPresent(expiredAt, forKey: .expiredAt)
+            try c.encodeIfPresent(createdAt, forKey: .createdAt)
+            try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
         }
     }
 
@@ -235,6 +291,70 @@ public final class PlansStore {
             try c.encode(lastAnsweredQuestionIndex,
                          forKey: .lastAnsweredQuestionIndex)
             try c.encode(hasVoted, forKey: .hasVoted)
+        }
+    }
+
+    /// tb-WF-8 — wire shape for the Decided + History list queries
+    /// (`plansDecidedForList` / `plansHistoryForList`). The RPCs return
+    /// a flat row per Plan: every `plans.*` column plus a `role` text
+    /// column ('owner' vs 'joined') and a `verdict_place_name` text
+    /// column extracted from the linked verdict option's
+    /// `payload->>'name'`. The iOS Decodable splits the row into the
+    /// `Plan` body + the two surface-specific projections so call sites
+    /// reason about each signal explicitly.
+    ///
+    /// `verdictPlaceName` is nullable — a no-survivor verdict (no
+    /// winning option) decodes with nil here; the surface still
+    /// renders the Plan name, with an empty secondary line.
+    ///
+    /// `role` differentiates Created (the caller owns the Plan AND is
+    /// the room's owner-member) from Joined (the caller is a non-owner
+    /// member). The iOS surface uses this to render the JOINED chip on
+    /// Joined cards and to gate the reroll affordance on tap (Created
+    /// Decided → full Verdict with reroll, Joined Decided → read-only).
+    public struct DecidedPlanRow: Codable, Equatable, Sendable, Identifiable {
+        public enum Role: String, Codable, Equatable, Sendable {
+            /// The caller created this Plan (`members.role = 'owner'`).
+            /// Renders with no JOINED chip; tap on a Decided card opens
+            /// the full VerdictScreen with the reroll affordance.
+            case owner
+            /// The caller joined this Plan (`members.role <> 'owner'`).
+            /// Renders with the JOINED chip; tap opens read-only
+            /// Verdict (reroll is initiator-only per parent Q9).
+            case joined
+        }
+
+        public let plan: Plan
+        public let role: Role
+        public let verdictPlaceName: String?
+
+        public var id: UUID { plan.id }
+
+        public init(plan: Plan, role: Role, verdictPlaceName: String?) {
+            self.plan = plan
+            self.role = role
+            self.verdictPlaceName = verdictPlaceName
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case role
+            case verdictPlaceName = "verdict_place_name"
+        }
+
+        public init(from decoder: Decoder) throws {
+            // Same flat-row strategy as JoinedPlanRow — the Plan
+            // columns are siblings of `role` + `verdict_place_name`.
+            self.plan = try Plan(from: decoder)
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.role = try c.decode(Role.self, forKey: .role)
+            self.verdictPlaceName = try c.decodeIfPresent(String.self, forKey: .verdictPlaceName)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            try plan.encode(to: encoder)
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(role, forKey: .role)
+            try c.encodeIfPresent(verdictPlaceName, forKey: .verdictPlaceName)
         }
     }
 
@@ -450,6 +570,38 @@ public final class PlansStore {
         return rows
     }
 
+    /// tb-WF-8 — backs the S00 Plan list Decided section. Returns the
+    /// caller's Plans in `status=decided-active`, both Created
+    /// (`role=owner`) and Joined (`role=joined`), with the verdict's
+    /// place name inlined from `options.payload->>'name'`. Ordered
+    /// `verdict_fired_at DESC`, tiebreaker `created_at DESC`. Pinned
+    /// to `auth.uid()` server-side.
+    ///
+    /// One round-trip — the SECURITY DEFINER RPC handles the
+    /// `plans → rooms → members → verdicts → options` join + filter +
+    /// sort. The iOS surface consumes the flat rows directly.
+    public func plansDecidedForList(userID: UUID) async throws -> [DecidedPlanRow] {
+        struct Params: Encodable { let p_user_id: UUID }
+        let rows: [DecidedPlanRow] = try await client
+            .rpc("plans_decided_for_user", params: Params(p_user_id: userID))
+            .execute()
+            .value
+        return rows
+    }
+
+    /// tb-WF-8 — backs the S00 Plan list History section. Same shape as
+    /// `plansDecidedForList(userID:)` but gates on
+    /// `status=decided-expired` and orders by `expired_at DESC`,
+    /// tiebreaker `created_at DESC`.
+    public func plansHistoryForList(userID: UUID) async throws -> [DecidedPlanRow] {
+        struct Params: Encodable { let p_user_id: UUID }
+        let rows: [DecidedPlanRow] = try await client
+            .rpc("plans_history_for_user", params: Params(p_user_id: userID))
+            .execute()
+            .value
+        return rows
+    }
+
     /// tb-WF-7 — write the in-flight quiz progress payload to the
     /// caller's `members.quiz_progress` jsonb column. Backs the
     /// `MemberProgressWriter` seam on the `QuizCoordinator` so a
@@ -568,6 +720,36 @@ public final class PlansStore {
         let pinned = userID ?? UUID()
         let payload = await fetchJoinedResumePayload(planID: planID, userID: pinned)
         return payload?.roomID
+    }
+
+    /// tb-WF-8 — look up the room id linked to a Plan regardless of
+    /// the caller's role on it. The tb-WF-7 `roomIDForJoinedPlan`
+    /// joins through `members` with `role <> 'owner'` and returns
+    /// nothing for Created plans (the caller IS the owner). This
+    /// lookup goes through PostgREST directly against `rooms` — the
+    /// `rooms_select_members` RLS policy admits the read iff the
+    /// caller is a member of the room (which includes both the
+    /// owner-member and any joined non-owner-member).
+    ///
+    /// Returns nil when no room is linked to the Plan (a pre-tb-WF-1
+    /// row where `plan_id` is null, or a Plan whose room was deleted)
+    /// or when a transport / RLS failure suppresses the read.
+    public func roomIDForPlan(planID: UUID) async -> UUID? {
+        struct Row: Decodable {
+            let id: UUID
+        }
+        do {
+            let rows: [Row] = try await client
+                .from("rooms")
+                .select("id")
+                .eq("plan_id", value: planID.uuidString.lowercased())
+                .limit(1)
+                .execute()
+                .value
+            return rows.first?.id
+        } catch {
+            return nil
+        }
     }
 
     /// Apply a partial update to a Plan and return the refreshed row.

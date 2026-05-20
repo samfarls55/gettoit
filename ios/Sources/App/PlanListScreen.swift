@@ -1,4 +1,4 @@
-// GetToIt — S00 · Plan list (tb-WF-5 → tb-WF-6 → tb-WF-7, workflow-overhaul).
+// GetToIt — S00 · Plan list (tb-WF-5 → tb-WF-6 → tb-WF-7 → tb-WF-8, workflow-overhaul).
 //
 // The new app entry surface. Replaces the retired S00 Landing as the
 // post-sign-in landing on iOS. A sectioned list of the user's Plans,
@@ -20,33 +20,58 @@
 //     resume-from-state helper per §Q8, `onTapJoined` callback so
 //     the host can dispatch to QuizScreen / WaitingScreen /
 //     read-only Verdict.
+//   * tb-WF-8: Decided + History sections light up end-to-end.
+//     2-line cards (Plan name + verdict place name), History
+//     collapsible with per-user UserDefaults persistence,
+//     `DecidedHistoryTapDestination` router, `onTapDecidedOrHistory`
+//     callback so the host mounts the right VerdictScreen variant
+//     (full vs read-only).
 //
 // In the current state:
-//   * Only the Pending section ever has rows — Decided + History
-//     are wired through the API shape but always empty until tb-WF-8.
-//     Pending cards may be either Created (no chip, tap → Setup
-//     `.edit`) or Joined (JOINED eyebrow chip in `var(--sun)`, tap
-//     routed through the §Q8 resume-from-state table).
-//   * 1-line Pending cards, glass row treatment per C-19 lineage.
-//     No three-dot menu (tb-WF-9).
+//   * Three sections render: Pending, Decided, History. Each section
+//     hides when empty (surface §"Surface structure (locked Q1)").
+//   * Pending — 1-line cards. Created tap → Setup `.edit`; Joined tap
+//     → §Q8 router → QuizScreen / Waiting / read-only Verdict.
+//   * Decided — 2-line cards (Plan name + verdict place name).
+//     Created tap → full VerdictScreen; Joined tap → read-only Verdict.
+//   * History — same 2-line cards; collapsible (iOS-native disclosure
+//     pattern, default expanded on first viewing, persisted per user
+//     across launches within a session via UserDefaults).
+//   * No three-dot menu yet (tb-WF-9).
 //   * Empty state: centered hero pill `Create your first plan` — the
-//     only create affordance when the user has zero Plans (joined
-//     OR created). The pill opens the disambig sheet (unified entry,
-//     per Q6) — same path as the FAB.
+//     only create affordance when ALL four buckets are empty
+//     (Pending Created + Pending Joined + Decided + History). The
+//     pill opens the disambig sheet (unified entry, per Q6) — same
+//     path as the FAB.
 //   * Populated state: C-26 FloatingActionButton on the bottom-right
 //     edge. Both the FAB and the empty-state hero pill open the same
 //     disambig sheet (`PlanDisambigSheet`); the sheet's pick callback
 //     routes to `SetupScreen(mode: .solo)` or `SetupScreen(mode: .group)`.
-//   * Pending Created card tap → `SetupScreen` in `.edit` mode for
-//     the tapped Plan.
-//   * Pending Joined card tap → host dispatches via `JoinedTapDestination`
-//     to QuizScreen (resumed at the saved step) / WaitingScreen /
-//     read-only Verdict.
 //
 // All color / type / spacing / radii come from `GTITokens.swift` per
 // repo CLAUDE.md — no inline hex / px / easing.
 
 import SwiftUI
+
+/// tb-WF-8 — the destination a Decided / History card tap dispatches
+/// into. Created cards land on full or read-only Verdict; Joined
+/// cards always land on read-only Verdict (reroll is initiator-only
+/// per parent Q9 of the surface decisions doc).
+///
+/// The router is a pure value the host consumes — `PlanListScreen`
+/// stays Supabase-free; the host (RootView) mounts the right view.
+public enum DecidedHistoryTapDestination: Equatable, Sendable {
+    /// Created Decided-active Plan → full VerdictScreen with the
+    /// reroll affordance.
+    case createdVerdictFull
+    /// Created Decided-expired Plan (History) → read-only Verdict.
+    case createdVerdictReadOnly
+    /// Joined Decided-active Plan → read-only VerdictScreen
+    /// (reroll suppressed — initiator-only per parent Q9).
+    case joinedVerdictReadOnlyActive
+    /// Joined Decided-expired Plan (History) → read-only Verdict.
+    case joinedVerdictReadOnlyHistory
+}
 
 /// tb-WF-7 — the §Q8 resume-from-state destinations a Joined-card
 /// tap dispatches into. The host (RootView) listens for these via
@@ -105,6 +130,28 @@ public struct PlanListScreen: View {
     /// token. NEVER `"In progress"`.
     public static let pendingSectionLabel: String = "Pending"
 
+    /// tb-WF-8 — Decided section header label. Title-case, single word,
+    /// eyebrow token. NEVER `"Resolved"`, never `"Done"`.
+    public static let decidedSectionLabel: String = "Decided"
+
+    /// tb-WF-8 — History section header label. NEVER `"Past"`, never
+    /// `"Archive"`.
+    public static let historySectionLabel: String = "History"
+
+    /// tb-WF-8 — namespace prefix for the per-user History-open
+    /// `@AppStorage` key. The full key appends the lowercase UUID of
+    /// the signed-in user so two users sharing a device do not see
+    /// each other's collapsed state.
+    public static let historyOpenStorageKeyPrefix: String = "planList.historyOpen."
+
+    /// tb-WF-8 — compute the `@AppStorage` key carrying the History
+    /// section's expand / collapse state for a given signed-in user.
+    /// Keyed on the user's UUID so a sign-out + sign-in-as-someone-
+    /// else resets the state cleanly.
+    public static func historyOpenStorageKey(for userID: UUID) -> String {
+        return historyOpenStorageKeyPrefix + userID.uuidString.lowercased()
+    }
+
     // (tb-WF-6) The `tempCreateGlyph` constant from tb-WF-5 has been
     // retired. The populated-state create affordance is now the C-26
     // FloatingActionButton; see `FloatingActionButton.swift`.
@@ -119,16 +166,33 @@ public struct PlanListScreen: View {
 
     // MARK: - pure helpers
 
-    /// Empty-state detection. In this slice only `pending` and
-    /// `joined` ever have rows (Decided + History always-empty until
-    /// tb-WF-8). A Plan list is empty iff BOTH arrays are empty —
-    /// a user with only Joined Plans still has plans on their list,
-    /// and the empty hero must not flash in their face.
+    /// Empty-state detection (pre-tb-WF-8 shape). Retained for the
+    /// existing call sites + tests that only know about Pending and
+    /// Joined-Pending rows. tb-WF-8 widens the contract to include
+    /// Decided + History rows — the live host calls the four-bucket
+    /// overload below.
     public static func isEmpty(
         pending: [PlansStore.Plan],
         joined: [PlansStore.JoinedPlanRow]
     ) -> Bool {
-        pending.isEmpty && joined.isEmpty
+        isEmpty(pending: pending, joined: joined, decided: [], history: [])
+    }
+
+    /// tb-WF-8 — widened empty-state detection. The Plan list is empty
+    /// iff ALL four buckets are empty. A user with only Decided rows
+    /// (mid-lifecycle) or only History rows (post-lifecycle) still has
+    /// Plans on their list and must see the populated state — the
+    /// empty hero is for first-launch / all-Plans-deleted only.
+    public static func isEmpty(
+        pending: [PlansStore.Plan],
+        joined: [PlansStore.JoinedPlanRow],
+        decided: [PlansStore.DecidedPlanRow],
+        history: [PlansStore.DecidedPlanRow]
+    ) -> Bool {
+        pending.isEmpty
+            && joined.isEmpty
+            && decided.isEmpty
+            && history.isEmpty
     }
 
     /// tb-WF-7 — pure helper that derives the §Q8 destination from a
@@ -179,14 +243,114 @@ public struct PlanListScreen: View {
         }
     }
 
+    /// tb-WF-8 — Decided section sort per surface §"Ordering within
+    /// sections" (Q7): `verdict_fired_at DESC`, tiebreaker
+    /// `created_at DESC`. A defensive nil-handling pass keeps a stale
+    /// row (no `verdict_fired_at`) sorted last so the visible Decided
+    /// section never leads with a row that has no verdict timestamp
+    /// to telegraph "this just happened."
+    public static func sortedDecided(
+        _ rows: [PlansStore.DecidedPlanRow]
+    ) -> [PlansStore.DecidedPlanRow] {
+        rows.sorted { lhs, rhs in
+            // Primary: verdict_fired_at DESC.
+            switch (lhs.plan.verdictFiredAt, rhs.plan.verdictFiredAt) {
+            case let (l?, r?):
+                if l != r { return l > r }
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                break // fall through to tiebreaker
+            }
+            // Tiebreaker: created_at DESC.
+            switch (lhs.plan.createdAt, rhs.plan.createdAt) {
+            case let (l?, r?):     return l > r
+            case (_?, nil):        return true
+            case (nil, _?):        return false
+            case (nil, nil):       return false
+            }
+        }
+    }
+
+    /// tb-WF-8 — History section sort per surface §"Ordering within
+    /// sections" (Q7): `expired_at DESC`, tiebreaker `created_at DESC`.
+    public static func sortedHistory(
+        _ rows: [PlansStore.DecidedPlanRow]
+    ) -> [PlansStore.DecidedPlanRow] {
+        rows.sorted { lhs, rhs in
+            switch (lhs.plan.expiredAt, rhs.plan.expiredAt) {
+            case let (l?, r?):
+                if l != r { return l > r }
+            case (_?, nil):
+                return true
+            case (nil, _?):
+                return false
+            case (nil, nil):
+                break
+            }
+            switch (lhs.plan.createdAt, rhs.plan.createdAt) {
+            case let (l?, r?):     return l > r
+            case (_?, nil):        return true
+            case (nil, _?):        return false
+            case (nil, nil):       return false
+            }
+        }
+    }
+
+    /// tb-WF-8 — derive the §"Tap behavior" destination for a
+    /// Decided / History card tap. Pure value — the host (RootView)
+    /// pattern-matches and mounts the right view.
+    ///
+    /// Created Decided-active → full VerdictScreen with reroll
+    /// affordance. Created Decided-expired → read-only Verdict.
+    /// Joined cards (any status) → read-only Verdict; the
+    /// `*Active` vs `*History` variant is preserved for the host
+    /// so any future behavioral differentiation (e.g. expired-only
+    /// affordances) has a place to land.
+    public static func tapRoute(
+        for row: PlansStore.DecidedPlanRow
+    ) -> DecidedHistoryTapDestination {
+        switch (row.role, row.plan.status) {
+        case (.owner, .decidedActive):       return .createdVerdictFull
+        case (.owner, .decidedExpired):      return .createdVerdictReadOnly
+        case (.joined, .decidedActive):      return .joinedVerdictReadOnlyActive
+        case (.joined, .decidedExpired):     return .joinedVerdictReadOnlyHistory
+        case (_, .pending):
+            // A Decided-section row whose status is .pending would be
+            // a server-side bug — the RPC gates on
+            // status='decided-active'. Defensive fall-through to the
+            // read-only branch keeps the surface from crashing.
+            return .createdVerdictReadOnly
+        }
+    }
+
     // MARK: - dependencies (host-supplied)
 
     private let pending: [PlansStore.Plan]
     private let joined: [PlansStore.JoinedPlanRow]
+    /// tb-WF-8 — Decided section rows (`status=decided-active`),
+    /// pre-sorted by the host via the `sortedDecided` helper. The view
+    /// does NOT re-sort — that keeps the test contract explicit (the
+    /// pure helper is what tests pin).
+    private let decided: [PlansStore.DecidedPlanRow]
+    /// tb-WF-8 — History section rows (`status=decided-expired`),
+    /// pre-sorted via the `sortedHistory` helper.
+    private let history: [PlansStore.DecidedPlanRow]
+    /// tb-WF-8 — signed-in user id, used to key the History-collapse
+    /// state in `@AppStorage`. Optional so test render harnesses that
+    /// don't have a real user id can still mount the view (they fall
+    /// back to a stable test key).
+    private let signedInUserID: UUID?
     private let onRequestDisambig: () -> Void
     private let onPickGroupMode: (SetupScreen.GroupMode) -> Void
     private let onTapPlan: (PlansStore.Plan) -> Void
     private let onTapJoined: (PlansStore.JoinedPlanRow) -> Void
+    /// tb-WF-8 — Decided / History card tap dispatcher. The host
+    /// pattern-matches the supplied `tapRoute(for:)` value and mounts
+    /// the right screen (full or read-only VerdictScreen).
+    private let onTapDecidedOrHistory: (PlansStore.DecidedPlanRow) -> Void
 
     // MARK: - state
 
@@ -195,6 +359,19 @@ public struct PlanListScreen: View {
     /// `PlanDisambigSheet` via SwiftUI's `.sheet` modifier. Surface-
     /// local UI state — the host doesn't need to own this.
     @State private var disambigOpen: Bool = false
+
+    /// tb-WF-8 — History section expand / collapse state. Persists per
+    /// user across launches within a session via `@AppStorage` (a
+    /// thin wrapper over `UserDefaults`). The key is computed from
+    /// `signedInUserID`; when no user id is supplied (tests, preview),
+    /// a stable test key is used so the storage still round-trips.
+    ///
+    /// Default `true` per surface §"Surface structure (locked Q1)":
+    /// `expanded on first viewing, sticky-collapsed thereafter per
+    /// session`. `@AppStorage` carries the default through to the
+    /// `UserDefaults`-backed read, and the wrapper's `set` writes the
+    /// new value on every toggle.
+    @State private var historyOpen: Bool = true
 
     // MARK: - init
 
@@ -220,17 +397,50 @@ public struct PlanListScreen: View {
     public init(
         pending: [PlansStore.Plan],
         joined: [PlansStore.JoinedPlanRow] = [],
+        decided: [PlansStore.DecidedPlanRow] = [],
+        history: [PlansStore.DecidedPlanRow] = [],
+        signedInUserID: UUID? = nil,
         onRequestDisambig: @escaping () -> Void,
         onPickGroupMode: @escaping (SetupScreen.GroupMode) -> Void,
         onTapPlan: @escaping (PlansStore.Plan) -> Void,
-        onTapJoined: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in }
+        onTapJoined: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in },
+        onTapDecidedOrHistory: @escaping (PlansStore.DecidedPlanRow) -> Void = { _ in }
     ) {
         self.pending = pending
         self.joined = joined
+        self.decided = decided
+        self.history = history
+        self.signedInUserID = signedInUserID
         self.onRequestDisambig = onRequestDisambig
         self.onPickGroupMode = onPickGroupMode
         self.onTapPlan = onTapPlan
         self.onTapJoined = onTapJoined
+        self.onTapDecidedOrHistory = onTapDecidedOrHistory
+
+        // Hydrate the initial `historyOpen` value from UserDefaults
+        // using the per-user key. `@AppStorage`'s declarative form
+        // wants a compile-time-known key string, but the iOS port keys
+        // on the runtime userID. We bridge that by reading
+        // UserDefaults directly here and seeding `@State`; the
+        // toggle handler writes back through the same key.
+        let key = Self.storageKey(for: signedInUserID)
+        if UserDefaults.standard.object(forKey: key) != nil {
+            self._historyOpen = State(initialValue: UserDefaults.standard.bool(forKey: key))
+        }
+        // No stored value → leave the @State default (true) — matches
+        // surface §"Surface structure (locked Q1)": expanded on first
+        // viewing.
+    }
+
+    /// tb-WF-8 — internal storage-key resolver. Maps a (possibly nil)
+    /// signed-in user id to the `UserDefaults` key used by the
+    /// History collapse state. Nil-user falls back to a stable test
+    /// key so the surface still works in render harnesses + previews.
+    private static func storageKey(for userID: UUID?) -> String {
+        if let userID {
+            return historyOpenStorageKey(for: userID)
+        }
+        return historyOpenStorageKeyPrefix + "anonymous"
     }
 
     // MARK: - body
@@ -240,7 +450,7 @@ public struct PlanListScreen: View {
             GTIGradient.surface(.initiator)
                 .ignoresSafeArea()
 
-            if Self.isEmpty(pending: pending, joined: joined) {
+            if Self.isEmpty(pending: pending, joined: joined, decided: decided, history: history) {
                 emptyState
             } else {
                 populatedState
@@ -351,8 +561,22 @@ public struct PlanListScreen: View {
                         .padding(.top, GTISpacing.step3)
                         .accessibilityIdentifier("planList.populated.eyebrow")
 
-                    pendingSection
-                        .padding(.top, GTISpacing.step5)
+                    // Pending — surface §"Surface structure (locked Q1)"
+                    // hides the section header entirely when empty.
+                    if !pending.isEmpty || !joinedPendingRows.isEmpty {
+                        pendingSection
+                            .padding(.top, GTISpacing.step5)
+                    }
+
+                    // tb-WF-8 — Decided + History land below Pending.
+                    if !decided.isEmpty {
+                        decidedSection
+                            .padding(.top, GTISpacing.step5)
+                    }
+                    if !history.isEmpty {
+                        historySection
+                            .padding(.top, GTISpacing.step5)
+                    }
 
                     // Bottom padding — clears the C-26 FAB's 56pt body
                     // + 18pt bottom inset + breathing room so the last
@@ -419,18 +643,210 @@ public struct PlanListScreen: View {
                 .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
                 .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
                 .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
-                .accessibilityIdentifier("planList.section.pending.label")
+                .accessibilityIdentifier("planList.section.\(label.lowercased()).label")
 
             Text("(\(count))")
                 .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
                 .foregroundStyle(GTIColor.TextOnGradient.tertiary)
-                .accessibilityIdentifier("planList.section.pending.count")
+                .accessibilityIdentifier("planList.section.\(label.lowercased()).count")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, GTISpacing.step6)
         .padding(.top, GTISpacing.step3)
         .padding(.bottom, GTISpacing.step2)
         .frame(minHeight: 44, alignment: .leading)
+    }
+
+    /// tb-WF-8 — collapsible section header for History. The tap target
+    /// covers the full row (matches HIG 44pt minimum); the trailing
+    /// chevron rotates 0° → 180° on expand using the surface's
+    /// `var(--ease-out)` 200ms timing. Per surface §"Section header
+    /// treatment": Inter 900 / 14, white 0.55.
+    private func collapsibleSectionHeader(
+        label: String,
+        count: Int,
+        isOpen: Bool,
+        onToggle: @escaping () -> Void
+    ) -> some View {
+        Button(action: onToggle) {
+            HStack(spacing: GTISpacing.step2 - 2) { // 6pt gap to match JSX
+                Text(label.uppercased())
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                    .accessibilityIdentifier("planList.section.\(label.lowercased()).label")
+
+                Text("(\(count))")
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                    .accessibilityIdentifier("planList.section.\(label.lowercased()).count")
+
+                Spacer(minLength: 0)
+
+                // Chevron — Inter 900 / 14 / white 0.55. Rotation
+                // 0° → 180° on expand, 200ms ease-out per the surface
+                // doc. Using SF Symbols' chevron.right keeps the iOS-
+                // native disclosure feel the surface spec calls for.
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .black))
+                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                    .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    .animation(.easeOut(duration: 0.2), value: isOpen)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, GTISpacing.step6)
+            .padding(.top, GTISpacing.step3)
+            .padding(.bottom, GTISpacing.step2)
+            .frame(minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("planList.section.\(label.lowercased()).toggle")
+        .accessibilityLabel("\(label) section")
+        .accessibilityHint(isOpen ? "Collapse \(label) section." : "Expand \(label) section.")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    /// tb-WF-8 — Decided section. 2-line cards (Plan name + verdict
+    /// place name), both Created and Joined rows inline. Sort key is
+    /// `verdict_fired_at DESC` (host pre-sorts via the
+    /// `sortedDecided` helper). Always expanded — no collapse on
+    /// Decided per surface §"Surface structure (locked Q1)".
+    private var decidedSection: some View {
+        VStack(alignment: .leading, spacing: GTISpacing.step3) {
+            sectionHeader(label: Self.decidedSectionLabel, count: decided.count)
+
+            VStack(spacing: GTISpacing.step3 - GTISpacing.step1) { // 8pt
+                ForEach(decided) { row in
+                    decidedHistoryButton(row: row)
+                }
+            }
+            .padding(.horizontal, GTISpacing.step6)
+        }
+    }
+
+    /// tb-WF-8 — History section. Same 2-line card shape as Decided.
+    /// Collapsible — default expanded on first viewing, persisted
+    /// per-user via `@AppStorage` (see `historyOpen` doc).
+    private var historySection: some View {
+        VStack(alignment: .leading, spacing: GTISpacing.step3) {
+            collapsibleSectionHeader(
+                label: Self.historySectionLabel,
+                count: history.count,
+                isOpen: historyOpen,
+                onToggle: { toggleHistoryOpen() }
+            )
+
+            if historyOpen {
+                VStack(spacing: GTISpacing.step3 - GTISpacing.step1) { // 8pt
+                    ForEach(history) { row in
+                        decidedHistoryButton(row: row)
+                    }
+                }
+                .padding(.horizontal, GTISpacing.step6)
+            }
+        }
+    }
+
+    /// tb-WF-8 — tappable card for a Decided or History row. The host's
+    /// `onTapDecidedOrHistory` callback fires with the full row so the
+    /// host can pattern-match on `tapRoute(for:)` and mount the right
+    /// VerdictScreen variant.
+    private func decidedHistoryButton(row: PlansStore.DecidedPlanRow) -> some View {
+        Button(action: { onTapDecidedOrHistory(row) }) {
+            decidedHistoryCard(row: row)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("planList.decidedCard.\(row.plan.id.uuidString)")
+        .accessibilityLabel(accessibilityLabelFor(row: row))
+        .accessibilityHint(accessibilityHintFor(row: row))
+    }
+
+    /// tb-WF-8 — 2-line card for Decided / History. Renders:
+    ///   1. JOINED eyebrow chip (Joined rows only),
+    ///   2. Plan name — Inter 700 / 17, white, 1 line, ellipsis on
+    ///      overflow,
+    ///   3. Verdict place name — Inter 500 / 13, white 0.7, 1 line,
+    ///      ellipsis on overflow (per surface §"Card content").
+    ///
+    /// The verdict place name truncates with the default tail-ellipsis
+    /// on long Foursquare names per the surface spec.
+    private func decidedHistoryCard(row: PlansStore.DecidedPlanRow) -> some View {
+        VStack(alignment: .leading, spacing: GTISpacing.step2 - 2) { // 6pt
+            if row.role == .joined {
+                Text(Self.joinedChipLabel)
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.sun)
+                    .accessibilityIdentifier("planList.decidedCard.chip.\(row.plan.id.uuidString)")
+                    .accessibilityLabel("Joined")
+            }
+
+            Text(row.plan.name)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Verdict place name — secondary line. Present only when
+            // the row carries a non-nil `verdictPlaceName` (a
+            // no-survivor verdict decodes with nil; the card still
+            // renders the Plan name and skips the secondary line).
+            if let place = row.verdictPlaceName, !place.isEmpty {
+                Text(place)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 2) // matches JSX `marginTop: 4`-ish (after 6pt gap above name)
+                    .accessibilityIdentifier("planList.decidedCard.verdictPlace.\(row.plan.id.uuidString)")
+            }
+        }
+        .padding(.horizontal, GTISpacing.step5 - 2) // 18pt — matches JSX `14px 18px`
+        .padding(.vertical, GTISpacing.step3 + 2)   // 14pt — matches JSX `14px 18px`
+        .frame(minHeight: 76) // 2-line card per spec
+        .background(
+            RoundedRectangle(cornerRadius: GTIRadii.card, style: .continuous)
+                .fill(GTIColor.Glass.fillSoft)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: GTIRadii.card, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    /// Accessibility label for a Decided / History card. Reads the
+    /// Plan name + verdict place name aloud when present, so the
+    /// VoiceOver user gets the full 2-line context.
+    private func accessibilityLabelFor(row: PlansStore.DecidedPlanRow) -> String {
+        if let place = row.verdictPlaceName, !place.isEmpty {
+            return "\(row.plan.name), \(place)"
+        }
+        return row.plan.name
+    }
+
+    /// Accessibility hint for a Decided / History card — telegraphs
+    /// the destination per surface §"Tap behavior".
+    private func accessibilityHintFor(row: PlansStore.DecidedPlanRow) -> String {
+        switch Self.tapRoute(for: row) {
+        case .createdVerdictFull:
+            return "Open the verdict. Reroll is available."
+        case .createdVerdictReadOnly,
+             .joinedVerdictReadOnlyActive,
+             .joinedVerdictReadOnlyHistory:
+            return "Open the verdict."
+        }
+    }
+
+    /// tb-WF-8 — toggle the History section open / collapsed and
+    /// persist the new value to `UserDefaults` under the per-user key.
+    private func toggleHistoryOpen() {
+        historyOpen.toggle()
+        let key = Self.storageKey(for: signedInUserID)
+        UserDefaults.standard.set(historyOpen, forKey: key)
     }
 
     /// 1-line Pending card. Name only, ellipsis on overflow, glass row
@@ -549,5 +965,21 @@ extension PlanListScreen {
     @MainActor
     func simulateDisambigPick(_ mode: SetupScreen.GroupMode) {
         onPickGroupMode(mode)
+    }
+
+    /// Test-only hook (tb-WF-8) — read the current History-collapse
+    /// state. Lets tests assert the default state without walking the
+    /// view tree.
+    @MainActor
+    func currentHistoryOpenForTest() -> Bool {
+        historyOpen
+    }
+
+    /// Test-only hook (tb-WF-8) — drive the History-collapse toggle.
+    /// Wires through the same persistence path the visible chevron
+    /// uses, so a test can assert the `UserDefaults` write lands.
+    @MainActor
+    func simulateHistoryToggle() {
+        toggleHistoryOpen()
     }
 }
