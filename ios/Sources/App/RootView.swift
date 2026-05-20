@@ -218,7 +218,6 @@ public struct RootView: View {
                     // values back into the Setup defaults would re-
                     // introduce the contract the workflow-overhaul
                     // phase deliberately retired.
-                    _ = readOnly.payload
                     VerdictScreen(
                         verdict: readOnly.payload.verdict,
                         mode: .readOnly,
