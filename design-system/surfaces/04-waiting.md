@@ -1,21 +1,12 @@
 ---
 surface: 04-waiting
 status: locked
-locked-date: 2026-05-12
-partially-superseded-by:
-  - gti-vault/10_prds/v1.1-quiz-redesign-prd.md
-stale-sections:
-  - "Countdown timer (all members)"
-  - "Verdict fire trigger (timer-elapse branch)"
-  - "Timer expiry no-quorum edge case"
-  - 'Copy: "Auto-fires in 7:42"'
+locked-date: 2026-05-19
 jsx:
   - code/screens/ScreenWaiting.jsx
 ---
 
 # S04 · Waiting / Coordination
-
-> **PARTIALLY SUPERSEDED — v1.1 quiz redesign PRD (2026-05-15).** The countdown timer, the `"Auto-fires in 7:42"` mono-tag, the timer-elapse fire branch, and the `rooms.deadline_at` / cron-auto-fire mechanism described below are RETIRED. The v1.1 PRD removed the session timer entirely (US34, US35, §line 115). The verdict trigger is now exactly two paths: **(a) all participants have submitted Q5**, or **(b) initiator manually closes voting** (the existing "Decide now" CTA survives, but may be relabelled). Do **not** implement timer-elapse mechanics from this doc. The canonical trigger is in `CONTEXT.md → Verdict trigger`.
 
 > **Code:** [`../code/screens/ScreenWaiting.jsx`](../code/screens/ScreenWaiting.jsx)
 
@@ -29,7 +20,7 @@ The user has finished the quiz; not everyone has. Honest, calm, no anxiety.
 
 ## Components used
 
-`GradientSurface` (waiting) · `GTIMark` · `Eyebrow` · display headline (`N of M` / `ARE IN`) · `AvatarDot` × N · `PillCTA` ghost (Nudge) · `PillCTA` ghost (Decide now, initiator-only) · `PillCTA` white (`"Download the app"`, web-anonymous-only) · mono-tag countdown · `AuthUpgradeChip` (C-22, iOS-only).
+`GradientSurface` (waiting) · `GTIMark` · `Eyebrow` · display headline (`N of M` / `ARE IN`) · `AvatarDot` × N · `PillCTA` ghost (Nudge) · `PillCTA` ghost (Decide now, initiator-only) · `PillCTA` white (`"Download the app"`, web-anonymous-only) · `AuthUpgradeChip` (C-22, iOS-only).
 
 ## Copy register
 
@@ -37,18 +28,18 @@ The user has finished the quiz; not everyone has. Honest, calm, no anxiety.
 - **`"Sam is still answering"`** — present continuous. Not "Sam hasn't answered" (accusatory).
 - **`"no spinners, promise."`** — a meta-commitment. End-of-workday users are fatigued; this surface promises not to perform urgency.
 - **`"Decide now · 3 of 4 in"`** — label exposes the partial-quorum cost. Not `"Skip waiting"` (dismissive) or `"Force verdict"` (algorithm framing).
-- **`"Auto-fires in 7:42"`** — the timer is what counts down, not the group's patience.
 - **`"Download the app"`** (web-only, anonymous-only — see §"Download the app" CTA below) — voluntary verb, plain noun. The web fallback's primary post-quiz CTA, surfacing the only path the user has to a persistent identity. NEVER `"Get the app"` (sales register), NEVER `"Install GetToIt"` (transactional), NEVER `"Continue in app"` (implies a continuation that doesn't exist — installing creates a fresh anonymous identity per ADR 0007 unless they later complete S00a).
 
 ## Verdict fire trigger
 
 The verdict computes the moment **either** condition holds:
 
-1. Every member of the room has submitted answers — the canonical "everyone's in" path, OR
-2. The room's timer elapses (initiator-set, see [[01-initiator|S01]]). Minimum 2 answers required (initiator + 1). Below that, the room flips to an expired state instead of firing, OR
-3. The **initiator** taps the `"Decide now"` CTA on this surface. Disabled until ≥2 members have answered. Fires the verdict for whoever has answered so far.
+1. **All participants have submitted Q5** — the canonical "everyone's in" path (auto-fire on quorum-completion). The room auto-fires the moment the last outstanding member's Q5 ratings land, OR
+2. The **initiator** taps the `"Decide now"` CTA on this surface. Fires the verdict for whoever has answered so far.
 
-Conditions 2 and 3 are the new v1 escape hatches that keep a slow answerer from holding the room indefinitely. Both are owned by the initiator.
+These are the two — and only two — verdict triggers v1.1 ships. There is **no session timer** and no shot-clock countdown; the v1 PRD's `timer_minutes` / `deadline_at` / cron-auto-fire mechanism was retired by the v1.1 quiz redesign PRD (US34, US35, §line 115). The canonical definition lives in [[../../CONTEXT|CONTEXT.md]] → `Verdict trigger`.
+
+**Minimum quorum is one member** — the initiator alone, in the edge case where nobody else responds. There is no minimum-answers gate on the "Decide now" CTA; the initiator can fire a single-member verdict if they choose.
 
 ### `"Decide now"` CTA (initiator-only)
 
@@ -56,32 +47,19 @@ Conditions 2 and 3 are the new v1 escape hatches that keep a slow answerer from 
 |---|---|
 | Component | `C-05` Pill CTA, `ghost` variant |
 | Visibility | Initiator only (current user === room's initiator). Invitees never see this control. |
-| Disabled until | `answered.length >= 2` (initiator + 1 invitee) |
-| Disabled style | opacity 0.45, not-allowed cursor; label remains visible so the initiator sees the threshold |
-| Label (disabled) | `"Decide now · need 2 in"` |
-| Label (enabled) | `"Decide now · {N} of {M} in"` |
+| Disabled until | never — minimum quorum is one member, which the initiator always satisfies. The CTA is always tappable for the initiator. |
+| Label | `"Decide now · {N} of {M} in"` |
 | Confirmation | none — the cost is on the initiator's own tap; a confirm step would undermine the speed promise |
 | Position | below the avatar row, above the Nudge CTA in the dock |
 
-### Countdown timer (all members)
-
-| Property | Value |
-|---|---|
-| Type | mono-tag (`tokens.md §2 → mono-tag`) — IBM Plex Mono 11 / tracking 0.18em / UPPERCASE |
-| Color | `rgba(255,255,255,0.6)` (tertiary on-gradient) — low-emphasis on purpose |
-| Position | bottom of content, above the CTA dock |
-| Format | `"AUTO-FIRES IN 7:42"` — single digit minutes OK (`"AUTO-FIRES IN 0:42"`) |
-| Tick cadence | every second. Initiator is watching this to decide when to tap; coarse minutes would lose the read. |
-| Reduced motion | replace the live tick with a coarse `"under {N} min"` update once per minute. |
-| Visibility | all members see it; identical render. |
+The CTA's label may be renamed in a future copy pass (the v1.1 PRD allows for it); the underlying initiator-closes-voting action is the canonical mechanism regardless of label.
 
 ## Behavior
 
 - Live updates: when `answered` flips, animate `all 320ms ease-out` (color, ring, check appears).
 - Nudge → push to Sam's device: `"Maya, Alex + 2 are waiting on you."` Cap: 1 per 2min.
 - The `"Decide now"` CTA writes `rooms.fire_trigger = 'manual'` and immediately advances the room to verdict computation for the subset that has answered.
-- Timer expiry with ≥2 answers writes `rooms.fire_trigger = 'timer'` and advances the same way.
-- Timer expiry with <2 answers writes `rooms.status = 'expired'` and flips the surface to the no-quorum terminal (see edge cases).
+- When the last outstanding member submits Q5, the room auto-advances with `rooms.fire_trigger = 'quorum'` — no initiator action required.
 
 ### Auth-upgrade chip (all members, iOS-only)
 
@@ -129,10 +107,11 @@ Exactly one of the two affordances ever renders in a given context; the dock nev
 
 - Tap writes a telemetry event (`waiting_download_cta_tapped` per [[../../gti-vault/60_engineering/adr/0005-telemetry-supabase-event-store|ADR 0005]] event-store conventions) before opening the store URL — gives us conversion measurement.
 - On a subsequent iOS install the user hits [[00a-signin|S00a]] like any other first launch. Their web-fallback room state does NOT auto-rehydrate into the new install — per ADR 0007 §"Negative / accepted tradeoffs", web-to-iOS identity merge is a future feature, not v1.1 scope. The CTA copy ("Then your votes save with you") promises only forward-going behavior, not retroactive merge.
-- No countdown coupling. The pill does not change label or state as the timer ticks down. If the room expires while the user is mid-install, they re-open the link to find the verdict (the deep link routes them to the verdict surface as a late-joiner per [[05-verdict|S05 §read-only]]).
+- The pill does not change label or state — there is no countdown to couple to. If the room fires while the user is mid-install, they re-open the link to find the verdict (the deep link routes them to the verdict surface as a late-joiner per [[05-verdict|S05 §read-only]]).
 
 ## Edge cases
 
-- **Quorum met (≥2 answered, <100%).** Verdict computes for the subset that answered. Non-answerers appear in `pending` style on the verdict screen as a non-shaming "didn't answer" tag.
-- **Timer expires with only the initiator answered (no quorum).** Room enters `expired` status. Surface flips to a terminal mode with copy `"Couldn't reach quorum tonight"` + body `"Only you answered before the timer ran out. Start a new round?"` + primary CTA `"Start over"` (white pill). The initiator returns to S01 with the prior timer + radius pre-populated.
+- **Single-member quorum (initiator alone).** If nobody else responds and the initiator taps `"Decide now"`, the verdict computes for the initiator's answers only. The verdict surface renders normally; non-answerers do not appear (there were none).
+- **Partial quorum (initiator + some, not all).** Verdict computes for the subset that answered. Non-answerers appear in `pending` style on the verdict screen as a non-shaming "didn't answer" tag.
+- **Empty candidate pool.** When the union of every member's Foursquare / MapKit fetch yields no usable candidates, the engine exits `method = 'no_survivor'` and the verdict surface renders its `no-survivor` terminal — see [[05-verdict|S05 §no-survivor]]. This is the only path to a no-survivor outcome in v1.1; the prior timer-expiry no-quorum terminal is retired (v1.1 has no timer to expire). Handled engine-side in [[../../gti-vault/15_issues/v1.1/issues/bug-13-empty-pool-no-survivor|bug-13]] / paired tracer-bullet.
 - **Late answerer submits during verdict computation.** Their answer is honored if it lands before the engine commits the verdict (race-free via DB transaction). After commit, they fall into the late-joiner read-only path (see [[05-verdict|S05]] §read-only).

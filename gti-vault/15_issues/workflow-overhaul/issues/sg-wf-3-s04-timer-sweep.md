@@ -2,11 +2,12 @@
 
 issue: sg-WF-3
 title: S04 timer sweep — finalize removal beyond the stale marker
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 156
 created: 2026-05-19
+closed: 2026-05-19
 ---
 
 # sg-WF-3 — S04 timer sweep
@@ -66,3 +67,7 @@ A design-system edit pass on `design-system/surfaces/04-waiting.md` and `design-
 ## Blocked by
 
 None — the v1.1 PRD ruling has been canonical since 2026-05-15; this issue is overdue cleanup.
+
+## Comments
+
+- **2026-05-19 — done (afk/sg-wf-3, PR #TBD).** Surface doc `surfaces/04-waiting.md` had the `Countdown timer (all members)` section, the timer-elapse branch of `Verdict fire trigger`, the `Timer expiry no-quorum edge case`, the `partially-superseded-by` + `stale-sections` frontmatter and the top-of-file banner all removed. `Verdict fire trigger` rewritten to the v1.1 canonical model (all-Q5 OR initiator-closes-voting); minimum quorum documented as one member; the `Decide now` CTA is now always tappable for the initiator (no `need 2 in` gate). `locked-date` refreshed to `2026-05-19`. `ScreenWaiting.jsx` lost the `secondsRemaining` prop, the `countdownLabel` binding, the mono-tag render, and the `quorum >= 2` gate on the Decide-now PillCTA. `motion.md` lost the `Waiting countdown tick` row and the `Decide-now CTA quorum unlock` row (the always-tappable CTA has no quorum unlock to animate) — flagged as an adjacency in the PR. `CHANGELOG.md` carries a BREAKING entry. `node design-system/scripts/verify.mjs` is green. iOS port remains tb-WF-3 (#162); `rooms.timer_minutes` / `rooms.deadline_at` schema cleanup remains out of scope.
