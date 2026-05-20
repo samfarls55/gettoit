@@ -1,11 +1,13 @@
 ---
 issue: tb-WF-9
 title: iOS Plan list — Three-dot menu + delete + leave (destructive actions)
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 178
 created: 2026-05-20
+merged: 2026-05-20
+pr: 188
 ---
 
 # tb-WF-9 — iOS Plan list: Three-dot menu + destructive actions
@@ -90,3 +92,15 @@ End-to-end vertical slice that adds the destructive action affordances to every 
 
 - [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] — foundation Plan list shell with cards to add `⋯` to.
 - [[tb-wf-8-plan-list-decided-history|tb-WF-8]] — Decided + History cards must exist to support the menu items targeting them.
+
+## Comments
+
+### 2026-05-20 — Closed (PR #188 merged)
+
+Landed end-to-end. Visual layer is a custom C-25 popover primitive (`ActionDotMenu.Trigger` + `ActionDotMenu.Popover`) rather than SwiftUI's native `Menu`, because the native one paints `.destructive` rows red and Sunset Pop forbids red (`tokens.md §1.3`). The destructive flag on items is informational only; `ActionDotMenu.itemForegroundColor(destructive:)` returns the same `.white` for both branches, and a unit test pins that contract so a future regression that paints a red destructive row fails CI.
+
+The four confirm-sheet variants live in `PlanDestructiveConfirmSheet`. The copy table from §"Confirm sheet copy (LOCKED)" is encoded as a pure `copyFor(_:)` helper, with a parallel `variantFor(role:status:verb:)` resolver tests pin verbatim. Primary pill is `PillCTA fill="white"` for every variant.
+
+Backend journey: `PlanDeleteCoordinator` looks up the linked room first, flips it to `status='expired'` (the existing session-ended signal joiners observe via `WaitingStore.RoomStatus.expired` from TB-07), then deletes the Plan. Order matters — if the Plan were deleted first, the `rooms.plan_id` FK would go NULL via `on delete set null` and a joiner who hadn't yet received the realtime status flip would see a live room. Joiner leave reuses `MemberLeaveStore.leave(...)` from tb-WF-2 — same `Plan exit` semantic (drop the membership, room continues for everyone else). No new migration was needed; existing RLS (`plans_delete_creator` from tb-WF-1, `rooms_update_creator` from TB-05, `members_delete_self` from tb-WF-2) covers authorization.
+
+iOS test lane green (3m53s); design-system verify green; supabase-db + functions lanes green. With this merge the workflow-overhaul phase tracer-bullet sequence (tb-WF-1..9) is fully landed.
