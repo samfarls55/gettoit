@@ -26,7 +26,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| sg-WF-1 | [[issues/sg-wf-1-plan-setup-surface\|Plan setup surface — design-system spec + JSX]] | AFK | [#154](https://github.com/samfarls55/gettoit/issues/154) | — |
+| sg-WF-1 | [[issues/sg-wf-1-plan-setup-surface\|Plan setup surface — design-system spec + JSX]] | AFK | [#154](https://github.com/samfarls55/gettoit/issues/154) | done 2026-05-19 |
 | sg-WF-2 | [[issues/sg-wf-2-quiz-back-exit-chrome\|Quiz Back + Exit chrome — S03 surface additions]] | AFK | [#155](https://github.com/samfarls55/gettoit/issues/155) | done 2026-05-19 |
 | sg-WF-3 | [[issues/sg-wf-3-s04-timer-sweep\|S04 timer sweep — finalize removal beyond the stale marker]] | AFK | [#156](https://github.com/samfarls55/gettoit/issues/156) | done 2026-05-19 |
 | sg-WF-4 | [[issues/sg-wf-4-plan-list-surface\|Plan list surface — design needed]] | HITL | [#157](https://github.com/samfarls55/gettoit/issues/157) | — |
