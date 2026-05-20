@@ -33,7 +33,6 @@
 
 import SwiftUI
 
-@MainActor
 public enum ActionDotMenu {
 
     // MARK: - locked visual constants

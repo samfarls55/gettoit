@@ -31,7 +31,6 @@
 
 import SwiftUI
 
-@MainActor
 public struct PlanDestructiveConfirmSheet: View {
 
     // MARK: - variants
