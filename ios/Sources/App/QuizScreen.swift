@@ -1,4 +1,4 @@
-// GetToIt — QuizScreen (TB-04).
+// GetToIt — QuizScreen (TB-04, chrome added by tb-WF-2).
 //
 // Hosts the five quiz questions. Owns:
 //   * The 4-stop gradient surface and its 1100ms ease-in-out tween
@@ -6,7 +6,15 @@
 //     §"Gradient surface tween" — duration locked at
 //     `GTIMotion.Duration.gradTween`, easing locked at
 //     `GTIMotion.Easing.inOut`).
-//   * The top bar (× + 5-segment progress).
+//   * The Quiz chrome row (Back top-leading on Q2-Q5, Exit/Leave
+//     top-trailing on Q1-Q5) — sg-WF-2 / tb-WF-2. The chrome sits
+//     above the C-02 TopBar; the TopBar's `×` is suppressed in the
+//     quiz context (the chrome owns the exit verb now). Back wires to
+//     `QuizCoordinator.back()`; Exit/Leave hands `onExit` up to the
+//     host, which performs the `members` DELETE-self + (solo
+//     initiator) `rooms.status = 'expired'` round-trip and routes
+//     to the post-exit destination.
+//   * The 5-segment progress strip on the top bar.
 //   * Routing between QuizQ1Cuisine / QuizQ2Budget / QuizQ3Reputation /
 //     QuizQ4Vibe / QuizQ5Regret based on `coordinator.step`. The
 //     content swap cross-fades in lockstep with the gradient tween
@@ -20,9 +28,6 @@
 // re-assigning them inside `withAnimation(...)` whenever the active
 // step changes. SwiftUI interpolates each `Color` natively — same
 // shape as the SwiftUI snippet in `tokens.md` §1.4.
-//
-// `×` exits the session by calling `onClose`. No back arrow per S03
-// cross-quiz invariants.
 
 import SwiftUI
 
@@ -32,12 +37,60 @@ public struct QuizScreen: View {
     @State private var stops: [Color]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Called when the user taps the × to leave the quiz, or after
-    /// Q5 has been written successfully (so the parent can route to
-    /// the Waiting surface).
-    private let onClose: () -> Void
+    /// tb-WF-2 — the QuizChrome role (`Exit` vs `Leave` label).
+    /// Resolved by the caller from `room.creator_user_id == auth.uid()`.
+    private let role: QuizChromeRole
+
+    /// tb-WF-2 — whether this is a solo session (the chrome's
+    /// confirmation copy uses the solo variant; the leave write also
+    /// expires the room on a solo initiator). Derived by the caller
+    /// from the existing `SoloPath.shouldSkipWaiting(memberCount:
+    /// invitedShared:)` signal, which in practice equals
+    /// `!invitedShared` for the on-device quiz (a single-member room
+    /// where the share sheet was never opened).
+    private let isSolo: Bool
+
+    /// Called after Q5 has been written successfully — the host
+    /// routes to the post-Q5 router (PostQuizHost).
     private let onSubmitted: () -> Void
 
+    /// Called when the user confirms `Exit` / `Leave` on the chrome's
+    /// alert. The host performs the member-drop write and routes to
+    /// the post-exit destination (`QuizChromePostExitDestination`).
+    private let onExit: () -> Void
+
+    /// Legacy `onClose` — preserved for the pre-chrome callers (test
+    /// targets, snapshot harness). Live callers should use `onExit`
+    /// instead; the chrome's `Exit` button always routes through
+    /// `onExit`, never `onClose`. Kept as a no-op default so the new
+    /// chrome-aware init is the canonical surface.
+    private let onClose: () -> Void
+
+    /// tb-WF-2 init. The chrome consumes `role` + `isSolo`; the host
+    /// owns `onExit` (member-drop + route) and `onSubmitted` (Q5
+    /// success → post-Q5 router).
+    public init(
+        coordinator: QuizCoordinator,
+        role: QuizChromeRole,
+        isSolo: Bool,
+        onClose: @escaping () -> Void = {},
+        onExit: @escaping () -> Void,
+        onSubmitted: @escaping () -> Void = {}
+    ) {
+        self._coordinator = State(initialValue: coordinator)
+        self._stops = State(initialValue: GTIGradient.colorStops(.q1))
+        self.role = role
+        self.isSolo = isSolo
+        self.onClose = onClose
+        self.onExit = onExit
+        self.onSubmitted = onSubmitted
+    }
+
+    /// Pre-chrome init — preserved for the snapshot harness and the
+    /// existing unit tests that constructed a QuizScreen without the
+    /// chrome wiring. Defaults `role` to `.initiator` and `isSolo` to
+    /// `false` (the most-common live state); `onExit` forwards to
+    /// `onClose` so the existing close-on-exit semantics survive.
     public init(
         coordinator: QuizCoordinator,
         onClose: @escaping () -> Void,
@@ -45,7 +98,10 @@ public struct QuizScreen: View {
     ) {
         self._coordinator = State(initialValue: coordinator)
         self._stops = State(initialValue: GTIGradient.colorStops(.q1))
+        self.role = .initiator
+        self.isSolo = false
         self.onClose = onClose
+        self.onExit = onClose
         self.onSubmitted = onSubmitted
     }
 
@@ -65,8 +121,23 @@ public struct QuizScreen: View {
             .accessibilityIdentifier("quiz.gradient")
 
             VStack(spacing: 0) {
+                // tb-WF-2 — QuizChrome row above the C-02 TopBar. The
+                // chrome owns the Exit/Leave affordance, so the TopBar's
+                // `×` is suppressed (the close button below is
+                // intentionally hidden by zero-opacity + zero-frame to
+                // preserve the progress strip's horizontal alignment
+                // without changing the layout).
+                QuizChromeView(
+                    canBack: canBackForStep(coordinator.step),
+                    role: role,
+                    isSolo: isSolo,
+                    onBack: { coordinator.back() },
+                    onExit: onExit
+                )
+                .padding(.top, GTISpacing.step4)
+
                 topBar
-                    .padding(.top, GTISpacing.step6)
+                    .padding(.top, GTISpacing.step3)
 
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -91,20 +162,16 @@ public struct QuizScreen: View {
     // MARK: - top bar
 
     private var topBar: some View {
+        // tb-WF-2 — the C-02 TopBar's `×` is suppressed in the quiz
+        // context. The QuizChrome row above owns the Exit/Leave verb
+        // now; the spec's "no icons" rule applies (`surfaces/03-quiz.md`
+        // §"Quiz skeleton"). The leading slot collapses to a 32pt-wide
+        // spacer so the 5-segment progress strip stays at the same
+        // horizontal position it sat at when the `×` rendered.
         HStack(alignment: .center, spacing: GTISpacing.step4) {
-            Button(action: onClose) {
-                Text("×")
-                    // `heading` (28pt) is the tokenised size that
-                    // closest matches the JSX hand-tuned 22pt × glyph;
-                    // bumped up by one scale step so the × is hit-target
-                    // friendly without breaking the design-system gate.
-                    .font(.system(size: GTIFont.Size.heading, weight: .black))
-                    .foregroundStyle(GTIColor.TextOnGradient.primary)
-                    .opacity(0.85)
-                    .frame(width: 32, height: 32)
-            }
-            .accessibilityIdentifier("quiz.close")
-            .accessibilityLabel("Close session")
+            Color.clear
+                .frame(width: 32, height: 32)
+                .accessibilityHidden(true)
 
             HStack(spacing: 5) {
                 ForEach(0..<5, id: \.self) { i in
@@ -296,6 +363,18 @@ public struct QuizScreen: View {
         case .q4: return 4
         case .q5: return 5
         case .submitting, .submitted, .failed: return 5
+        }
+    }
+
+    /// tb-WF-2 — whether the QuizChrome row renders a Back affordance
+    /// for the given step. Per spec, Q1 omits Back (no prior question);
+    /// Q2-Q5 carry it. The submitting / submitted / failed states are
+    /// post-Q5 terminal — the chrome is not interactive there, so the
+    /// answer doesn't matter (defensively returns `false`).
+    private func canBackForStep(_ step: QuizCoordinator.Step) -> Bool {
+        switch step {
+        case .q1, .submitting, .submitted, .failed: return false
+        case .q2, .q3, .q4, .q5: return true
         }
     }
 }

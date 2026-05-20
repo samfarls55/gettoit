@@ -156,7 +156,28 @@ public struct RootView: View {
                 } else if let quiz = activeQuiz {
                     QuizScreen(
                         coordinator: quiz.coordinator,
+                        // tb-WF-2 — role + isSolo drive the Quiz chrome's
+                        // Exit/Leave verb + alert copy. isInitiator
+                        // comes from QuizContext (S01 sets it true for
+                        // the creator path, false on the join-flow
+                        // invitee path); isSolo follows the same
+                        // SoloPath signal the post-Q5 router consults
+                        // (`!invitedShared` for a single-member room).
+                        role: quiz.isInitiator ? .initiator : .joiner,
+                        isSolo: !quiz.invitedShared,
                         onClose: { activeQuiz = nil },
+                        // tb-WF-2 — Exit/Leave confirm. The host runs
+                        // the member-drop write (and, on a solo
+                        // initiator, the room-expire UPDATE) and routes
+                        // to the post-exit destination (currently S00
+                        // Landing — `QuizChromePostExitDestination.current`
+                        // until tb-WF-4 lands the visible Plan list).
+                        onExit: {
+                            leaveQuizThenRoute(
+                                quiz: quiz,
+                                client: coordinators.client
+                            )
+                        },
                         // TB-19 — a successful Q5 submit no longer just
                         // clears the quiz (which dead-ended on S00
                         // Landing — bug-07). It hands the session to the
@@ -583,6 +604,65 @@ public struct RootView: View {
                 properties: ["error": .string(String(describing: error))]
             )
             Task { try? await sink.write(row) }
+        }
+    }
+
+    /// tb-WF-2 — confirm-Exit handler. Drops the user's `members` row
+    /// from the active room (and, on a solo initiator, also expires
+    /// the room) via `MemberLeaveStore`, then clears the
+    /// `activeQuiz` route. The precedence chain hands an idle,
+    /// signed-in session back to S00 Landing — the post-exit
+    /// destination tb-WF-2 ships with (`QuizChromePostExitDestination.current`).
+    ///
+    /// Why the route flip is synchronous: the user has tapped Exit
+    /// and explicitly confirmed; they expect to land on the Plan list
+    /// (or S00 Landing until tb-WF-4 lands it) immediately, not after
+    /// the round-trip resolves. The member-drop write is fire-and-
+    /// forget — a failed DELETE leaves a stuck membership row that
+    /// the verdict cron's no-signal sweeper expires anyway (and that
+    /// the user can re-trigger from their next session). Landing on
+    /// S00 even on a failed write is the boundary contract from the
+    /// acceptance criteria ("post-confirm exit always lands the user
+    /// on the same destination — no flaky path that dead-ends").
+    ///
+    /// Failure shape: the Task swallows thrown errors and emits
+    /// telemetry. The user is never stranded on the quiz waiting for
+    /// a network round-trip to resolve.
+    private func leaveQuizThenRoute(
+        quiz: QuizContext,
+        client: SupabaseClient
+    ) {
+        let store = MemberLeaveStore.live(client: client)
+        let role: MemberLeaveRole = quiz.isInitiator ? .initiator : .joiner
+        let isSolo = !quiz.invitedShared
+        Task {
+            do {
+                try await store.leave(
+                    roomID: quiz.roomID,
+                    userID: quiz.userID,
+                    role: role,
+                    isSolo: isSolo
+                )
+            } catch {
+                // Best-effort: a failed member-drop leaves a stuck
+                // membership row the verdict cron's no-signal sweeper
+                // expires anyway. The post-exit route still fires
+                // (`activeQuiz = nil` already ran below) so the
+                // user is never stranded on the quiz.
+            }
+        }
+        // Route flip fires synchronously regardless of the write — see
+        // method doc-comment. tb-WF-4 will switch this from S00 Landing
+        // to the Plan list surface; the destination is one-source-of-
+        // truth on `QuizChromePostExitDestination.current`.
+        switch QuizChromePostExitDestination.current {
+        case .landing:
+            activeQuiz = nil
+            // Clear any sticky surface that would shadow S00 (the
+            // S01 InitiatorScreen, a deep-link / read-only landing).
+            showingInitiator = false
+            deepLink = nil
+            readOnlyView = nil
         }
     }
 
