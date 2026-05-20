@@ -338,6 +338,32 @@ public final class PlansStore {
         return rows
     }
 
+    /// Read-side list query backing the S00 Plan list surface
+    /// (tb-WF-5). Filters to `status = 'pending'` and orders
+    /// `created_at DESC` per `surfaces/00-plan-list.md` §"Ordering
+    /// within sections" (Q7).
+    ///
+    /// The `userID` argument is carried for explicit auditability at
+    /// the call site — the actual scoping is enforced server-side by
+    /// the `plans_select_creator` RLS policy (`creator_id =
+    /// auth.uid()`). Passing it here means a future call site can't
+    /// silently read someone else's Plans even if the RLS regresses.
+    ///
+    /// tb-WF-5 only ships the Pending section. Decided + History
+    /// queries land in tb-WF-8 (different status filters + different
+    /// sort keys — `verdict_fired_at DESC` / `expired_at DESC`).
+    public func plansForList(userID: UUID) async throws -> [Plan] {
+        let rows: [Plan] = try await client
+            .from("plans")
+            .select()
+            .eq("creator_id", value: userID.uuidString.lowercased())
+            .eq("status", value: LifecycleState.pending.rawValue)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+        return rows
+    }
+
     /// Apply a partial update to a Plan and return the refreshed row.
     public func update(
         planID: UUID,

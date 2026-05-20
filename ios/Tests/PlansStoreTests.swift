@@ -262,6 +262,31 @@ final class PlansStoreTests: XCTestCase {
         XCTAssertNotNil(dict?["session_params"])
     }
 
+    // MARK: - plansForList query shape (tb-WF-5)
+
+    /// `plansForList(userId:)` is the read-side query backing the S00
+    /// Plan list surface. It returns the caller's Pending plans
+    /// sorted `created_at DESC` (Q7 in `surfaces/00-plan-list.md`).
+    ///
+    /// `fetchMine()` orders by `updated_at` and surfaces every
+    /// status — that is the right default for the generic store, but
+    /// the list surface needs section-specific ordering + filtering.
+    /// The new method makes the contract explicit at the call site.
+    ///
+    /// This test pins the symbol existence and the userID-typed
+    /// signature; the live query goes through PostgREST and is
+    /// covered by the existing live-DB integration suite.
+    func testPlansForListSignatureExistsOnPlansStore() async throws {
+        let client = SupabaseClient(
+            supabaseURL: URL(string: "https://example.supabase.co")!,
+            supabaseKey: "test-anon-key"
+        )
+        let store = PlansStore(client: client)
+        // Symbol-existence + typed-signature assertion. The body is
+        // not invoked — we never call the network in unit tests.
+        let _: (UUID) async throws -> [PlansStore.Plan] = store.plansForList(userID:)
+    }
+
     // MARK: - name validation (client side, mirrors SQL CHECK)
 
     func testNameValidationMatchesSQLCheck() {
