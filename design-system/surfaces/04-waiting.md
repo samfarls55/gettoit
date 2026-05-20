@@ -2,11 +2,20 @@
 surface: 04-waiting
 status: locked
 locked-date: 2026-05-12
+partially-superseded-by:
+  - gti-vault/10_prds/v1.1-quiz-redesign-prd.md
+stale-sections:
+  - "Countdown timer (all members)"
+  - "Verdict fire trigger (timer-elapse branch)"
+  - "Timer expiry no-quorum edge case"
+  - 'Copy: "Auto-fires in 7:42"'
 jsx:
   - code/screens/ScreenWaiting.jsx
 ---
 
 # S04 · Waiting / Coordination
+
+> **PARTIALLY SUPERSEDED — v1.1 quiz redesign PRD (2026-05-15).** The countdown timer, the `"Auto-fires in 7:42"` mono-tag, the timer-elapse fire branch, and the `rooms.deadline_at` / cron-auto-fire mechanism described below are RETIRED. The v1.1 PRD removed the session timer entirely (US34, US35, §line 115). The verdict trigger is now exactly two paths: **(a) all participants have submitted Q5**, or **(b) initiator manually closes voting** (the existing "Decide now" CTA survives, but may be relabelled). Do **not** implement timer-elapse mechanics from this doc. The canonical trigger is in `CONTEXT.md → Verdict trigger`.
 
 > **Code:** [`../code/screens/ScreenWaiting.jsx`](../code/screens/ScreenWaiting.jsx)
 

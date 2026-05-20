@@ -2,11 +2,19 @@
 surface: 01-initiator
 status: locked
 locked-date: 2026-05-12
+partially-superseded-by:
+  - gti-vault/10_prds/v1.1-quiz-redesign-prd.md
+stale-sections:
+  - "Timer + radius controls (timer half)"
+  - "Timer chip group — How long"
+  - "Behavior (timer_minutes write)"
 jsx:
   - code/screens/ScreenInitiator.jsx
 ---
 
 # S01 · Initiator Landing
+
+> **PARTIALLY SUPERSEDED — v1.1 quiz redesign PRD (2026-05-15).** The Timer chip group, the "How long" eyebrow, the `timer_minutes` column write, and any "Auto-fires" behavior described below are RETIRED. The v1.1 PRD removed the session timer entirely (US34 "no shot clock", US35 "verdict fires when all participants finish", §line 115 "no timer, no shot clock"). Do **not** implement timer mechanics from this doc. The canonical verdict trigger is defined in `CONTEXT.md → Verdict trigger`. Radius slider sections remain valid but are themselves slated for replacement by a distance slider in the workflow-overhaul setup screen — see `CONTEXT.md → Plan vocabulary`.
 
 > **Code:** [`../code/screens/ScreenInitiator.jsx`](../code/screens/ScreenInitiator.jsx)
 
