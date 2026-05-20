@@ -259,18 +259,39 @@ public final class QuizCoordinator {
     /// but a wasted round-trip we can avoid cheaply.
     private var inflight: Task<QuizSubmitOutcome, Error>?
 
+    /// tb-WF-7 — the seam that persists in-flight quiz progress to
+    /// `members.quiz_progress` on every Q1..Q4 -> next-Q advance. Nil
+    /// on every init path that does not opt in (legacy unit tests,
+    /// snapshot harness, the create-flow initiator who is never going
+    /// to resume on their own list — the resume contract is joiner-
+    /// side per §Q8). When non-nil, `advance()` fires it from a
+    /// detached Task with the post-advance progress payload.
+    /// Best-effort: a thrown error is caught and dropped so a
+    /// transient network failure never strands the quiz on a step
+    /// transition. See `QuizProgress.swift` for the wire shape.
+    private let progressWriter: MemberProgressWriter?
+
     /// Legacy init — Q5 candidates are supplied up front. Used by the
     /// unit tests and the snapshot harness; the per-member fetch never
     /// fires on this path (`candidateFetch` is nil). `candidates`
     /// defaults to empty — tests that exercise Q5 rating pass an
     /// explicit test fixture (`QuizCandidateFixtures.all`). Production
     /// always uses the `candidateFetch` init below.
+    ///
+    /// tb-WF-7 — `initialProgress` hydrates the coordinator from a
+    /// saved snapshot of Q1..Q4 answers + a `lastIndex` that decides
+    /// the starting step (e.g. lastIndex=3 -> Q4 with Q1/Q2/Q3 pre-
+    /// loaded). `progressWriter` persists the progress payload on
+    /// every subsequent advance. Both are nil-default so existing
+    /// call sites compile unchanged.
     public init(
         roomID: UUID,
         userID: UUID,
         candidates: [QuizCandidate] = [],
         sessionParameters: SessionParameters = .default,
-        writer: @escaping QuizVoteWriter
+        writer: @escaping QuizVoteWriter,
+        initialProgress: QuizProgress? = nil,
+        progressWriter: MemberProgressWriter? = nil
     ) {
         self.roomID = roomID
         self.userID = userID
@@ -280,10 +301,14 @@ public final class QuizCoordinator {
         self.memberFetchWriter = nil
         self.memberFetchFailureSink = nil
         self.writer = writer
+        self.progressWriter = progressWriter
         // Seed Q5 ratings at the spec'd default (3 — middle of the
         // 1–5 scale) so the surface renders with a chosen state per
         // card and the user can submit without touching every card.
         self.q5Ratings = QuizCoordinator.seededRatings(for: candidates)
+        // Hydrate from saved progress AFTER the @State defaults land —
+        // `applyInitialProgress` rewrites step + answers in place.
+        if let initialProgress { applyInitialProgress(initialProgress) }
     }
 
     /// TB-15 (v1.1) — the live-quiz init. Q5 candidates are NOT supplied
@@ -304,6 +329,12 @@ public final class QuizCoordinator {
     /// `member_fetches` write (the live quiz path binds it to a
     /// telemetry emission). Optional: unit / boundary tests omit it and
     /// the failure stays observable via `lastMemberFetchPersist`.
+    ///
+    /// tb-WF-7 — `initialProgress` + `progressWriter` work identically
+    /// to the legacy init. The live joiner path uses this init with
+    /// both args populated so a backgrounded mid-quiz resumes correctly
+    /// AND the in-flight answers continue to persist as the joiner
+    /// advances.
     public init(
         roomID: UUID,
         userID: UUID,
@@ -311,7 +342,9 @@ public final class QuizCoordinator {
         memberFetchWriter: MemberFetchWriter? = nil,
         memberFetchFailureSink: MemberFetchPersistFailureSink? = nil,
         sessionParameters: SessionParameters = .default,
-        writer: @escaping QuizVoteWriter
+        writer: @escaping QuizVoteWriter,
+        initialProgress: QuizProgress? = nil,
+        progressWriter: MemberProgressWriter? = nil
     ) {
         self.roomID = roomID
         self.userID = userID
@@ -321,7 +354,85 @@ public final class QuizCoordinator {
         self.memberFetchWriter = memberFetchWriter
         self.memberFetchFailureSink = memberFetchFailureSink
         self.writer = writer
+        self.progressWriter = progressWriter
         self.q5Ratings = [:]
+        if let initialProgress { applyInitialProgress(initialProgress) }
+    }
+
+    /// tb-WF-7 — hydrate the coordinator's step + per-question state
+    /// from a saved `QuizProgress`. Called from both init paths after
+    /// the `self.*` defaults land, so the rewrite is unconditional.
+    ///
+    /// Step mapping (1-based — `lastIndex` is the question the joiner
+    /// is currently on, NOT the next-unanswered question per
+    /// surfaces/00-plan-list.md §Q8 "resumes the quiz at Q3 (their
+    /// last-answered question, NOT Q1)"):
+    ///   * `0` → Q1 (joiner never started; the surface lands on Q1
+    ///     anyway, this is the "not touched" sentinel).
+    ///   * `1` → Q1, `2` → Q2, `3` → Q3, `4` → Q4, `5` → Q5.
+    ///   * `>=5` clamps to Q5 — the `votes` row is the canonical
+    ///     "past Q5" signal, not the progress index. A stale
+    ///     progress payload must never land the user on `.submitted`
+    ///     and skip the explicit submit.
+    private func applyInitialProgress(_ progress: QuizProgress) {
+        if let q1 = progress.q1 {
+            self.q1Cuisines = Set(q1.cuisines)
+            self.q1NoPreference = q1.noPreference
+        }
+        if let q2 = progress.q2 {
+            self.q2Budget = q2.tier
+        }
+        if let q3 = progress.q3 {
+            self.q3Reputation = q3.reputation
+        }
+        if let q4 = progress.q4 {
+            self.q4Vibe = q4.level
+        }
+        switch progress.lastIndex {
+        case ..<1: self.step = .q1
+        case 1:    self.step = .q1
+        case 2:    self.step = .q2
+        case 3:    self.step = .q3
+        case 4:    self.step = .q4
+        default:   self.step = .q5  // lastIndex >= 5 lands on Q5
+        }
+    }
+
+    /// tb-WF-7 — pack the live coordinator state into a `QuizProgress`
+    /// snapshot. Used internally to fire the progress writer after
+    /// each advance and exposed publicly so tests can inspect the
+    /// shape without poking @Observable fields.
+    ///
+    /// `lastIndex` is the 1-based current-step number — Q1 stamps 1,
+    /// Q2 stamps 2, … Q5 stamps 5. The "user backgrounded at Q3"
+    /// resume contract reads this directly: a row carrying
+    /// `last_index = 3` re-lands the joiner on Q3.
+    public var quizProgressSnapshot: QuizProgress {
+        QuizProgress(
+            lastIndex: currentStepIndex,
+            q1: QuizProgress.Q1Answer(
+                cuisines: q1Cuisines.sorted(),
+                noPreference: q1NoPreference
+            ),
+            q2: QuizProgress.Q2Answer(tier: q2Budget),
+            q3: QuizProgress.Q3Answer(reputation: q3Reputation),
+            q4: QuizProgress.Q4Answer(level: q4Vibe)
+        )
+    }
+
+    /// The `last_index` value to stamp in the post-advance progress
+    /// payload — the 1-based current-step number. `submitting` /
+    /// `submitted` / `failed` are post-Q5 terminal states; they
+    /// stamp 5 (the `votes` row is the ground truth past that).
+    private var currentStepIndex: Int {
+        switch step {
+        case .q1: return 1
+        case .q2: return 2
+        case .q3: return 3
+        case .q4: return 4
+        case .q5: return 5
+        case .submitting, .submitted, .failed: return 5
+        }
     }
 
     /// Seed Q5 ratings at the spec'd default (3 — middle of the 1…5
@@ -412,13 +523,26 @@ public final class QuizCoordinator {
     /// No answer is required to advance — `advance()` always moves
     /// forward, so the flow never stalls on a Q1-Q4 step (PRD user
     /// story 21).
+    ///
+    /// tb-WF-7 — every Q1..Q4 -> next-Q advance fires the optional
+    /// `progressWriter` with the post-advance snapshot so a joiner
+    /// who backgrounds the app mid-quiz can resume from the saved
+    /// state on next launch (see §Q8 in surfaces/00-plan-list.md).
+    /// Best-effort: a thrown error inside the writer is caught and
+    /// dropped so a transient network failure never strands the
+    /// quiz on a step transition. The Q5 -> submit transition is
+    /// owned by `submit()`, not `advance()`, so the writer never
+    /// fires for the final hop — the `votes` row is the canonical
+    /// "past Q5" signal.
     public func advance() {
+        let advanced: Bool
         switch step {
-        case .q1: step = .q2
-        case .q2: step = .q3
-        case .q3: step = .q4
+        case .q1: step = .q2; advanced = true
+        case .q2: step = .q3; advanced = true
+        case .q3: step = .q4; advanced = true
         case .q4:
             step = .q5
+            advanced = true
             // TB-15 (v1.1) — completing Q4 is the trigger for the
             // per-member Foursquare fetch. The member has now answered
             // Q1 (cuisines) and Q2 (spend cap); fire the answer-tailored
@@ -426,7 +550,22 @@ public final class QuizCoordinator {
             // this point.
             startCandidateFetchIfNeeded()
         case .q5, .submitting, .submitted, .failed:
-            break  // submit is a separate explicit call
+            advanced = false  // submit is a separate explicit call
+        }
+        if advanced { fireProgressWriterIfNeeded() }
+    }
+
+    /// tb-WF-7 — fire the optional progress writer with the current
+    /// snapshot. Best-effort: the call runs in a detached Task so a
+    /// slow network round-trip never blocks the step transition, and
+    /// a thrown error is caught and dropped (the column is a resume-
+    /// from-state convenience, not a verdict-engine input).
+    private func fireProgressWriterIfNeeded() {
+        guard let progressWriter else { return }
+        let snapshot = quizProgressSnapshot
+        Task {
+            do { try await progressWriter(snapshot) }
+            catch { /* best-effort — degrade silently */ }
         }
     }
 

@@ -28,17 +28,30 @@ final class PlanListScreenTests: XCTestCase {
     // MARK: - empty-state detection
 
     /// All three sections empty (pending/decided/history) → empty
-    /// state. In this slice only `pending` ever has rows; the
-    /// `Decided` / `History` arrays are wired through but always
-    /// empty (tb-WF-8 lights them up).
+    /// state. In this slice only `pending` and `joined` ever have
+    /// rows; the `Decided` / `History` arrays are wired through but
+    /// always empty (tb-WF-8 lights them up).
     func testIsEmptyWhenAllSectionsEmpty() {
-        XCTAssertTrue(PlanListScreen.isEmpty(pending: []))
+        XCTAssertTrue(PlanListScreen.isEmpty(pending: [], joined: []))
     }
 
     /// Even one Pending row flips to the populated state.
     func testIsNotEmptyWithAtLeastOnePending() {
         let plan = Self.makePlan(name: "Friday dinner")
-        XCTAssertFalse(PlanListScreen.isEmpty(pending: [plan]))
+        XCTAssertFalse(PlanListScreen.isEmpty(pending: [plan], joined: []))
+    }
+
+    /// tb-WF-7 — even one Joined row flips to the populated state.
+    /// Empty Pending + one Joined Plan must NOT render the empty hero;
+    /// the user has plans on their list, just not ones they created.
+    func testIsNotEmptyWithAtLeastOneJoined() {
+        let plan = Self.makePlan(name: "Alex's birthday")
+        let row = PlansStore.JoinedPlanRow(
+            plan: plan,
+            lastAnsweredQuestionIndex: 0,
+            hasVoted: false
+        )
+        XCTAssertFalse(PlanListScreen.isEmpty(pending: [], joined: [row]))
     }
 
     // MARK: - empty-state hero copy (locked)
