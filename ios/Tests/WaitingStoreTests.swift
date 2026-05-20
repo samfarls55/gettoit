@@ -13,7 +13,7 @@ final class WaitingStoreTests: XCTestCase {
     private func makeStore(
         userID: UUID = UUID(),
         isInitiator: Bool = true,
-        clock: @escaping TimerClock = { Date() }
+        clock: @escaping WaitingClock = { Date() }
     ) -> WaitingStore {
         WaitingStore(
             roomID: UUID(),

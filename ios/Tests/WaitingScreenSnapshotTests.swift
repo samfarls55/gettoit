@@ -3,8 +3,14 @@
 // Pixel-snapshot tooling is not on the iOS dependency graph (same
 // reason as the quiz screen snapshot tests). Acceptance is satisfied
 // by smoke tests that materialise the view body for each mode the
-// surface can be in: initiator-with-quorum, invitee-pre-quorum, and
-// the expired-no-quorum terminal.
+// surface can be in: initiator-with-partial-quorum, invitee-all-in,
+// and everyone-answered.
+//
+// tb-WF-3: v1.1 retired the session timer, so the expired-no-quorum
+// terminal that used to be one of the rendered modes is also gone.
+// The room can no longer reach `.expired` from a client-side timer;
+// the only no-result terminal in v1.1 is the engine-side
+// `no_survivor` path which lives on S05, not S04.
 //
 // Stubs the AppleSignInProviding seam so the chip path doesn't try
 // to spin up an authorization controller in a unit-test process.
@@ -45,7 +51,7 @@ final class WaitingScreenSnapshotTests: XCTestCase {
         answeredCount: Int = 1,
         status: RoomStatus = .open,
         isInitiator: Bool = true
-    ) -> (WaitingStore, TimerCoordinator) {
+    ) -> (WaitingStore, FireVerdictCoordinator) {
         let me = UUID()
         let store = WaitingStore(
             roomID: UUID(),
@@ -64,11 +70,9 @@ final class WaitingScreenSnapshotTests: XCTestCase {
         }
         store.bootstrap(members: members, answered: answered, status: status)
 
-        let coord = TimerCoordinator(
+        let coord = FireVerdictCoordinator(
             roomID: store.roomID,
-            deadlineAt: Date().addingTimeInterval(462),
             isInitiator: isInitiator,
-            clock: { Date() },
             invoker: { _ in .firing }
         )
         return (store, coord)
@@ -94,7 +98,7 @@ final class WaitingScreenSnapshotTests: XCTestCase {
             auth: makeAuthCoordinator(),
             promptStore: makePromptStore(),
             waitingStore: store,
-            timerCoordinator: coord,
+            fireCoordinator: coord,
             appleProvider: StubAppleProvider()
         )
         render(view)
@@ -106,7 +110,7 @@ final class WaitingScreenSnapshotTests: XCTestCase {
             auth: makeAuthCoordinator(),
             promptStore: makePromptStore(),
             waitingStore: store,
-            timerCoordinator: coord,
+            fireCoordinator: coord,
             appleProvider: StubAppleProvider()
         )
         render(view)
@@ -118,19 +122,26 @@ final class WaitingScreenSnapshotTests: XCTestCase {
             auth: makeAuthCoordinator(),
             promptStore: makePromptStore(),
             waitingStore: store,
-            timerCoordinator: coord,
+            fireCoordinator: coord,
             appleProvider: StubAppleProvider()
         )
         render(view)
     }
 
-    func testExpiredTerminalRendersWithoutCrashing() {
+    /// Regression for tb-WF-3: the surface no longer renders a special
+    /// "Couldn't reach quorum tonight" terminal when the room reaches
+    /// `.expired`. v1.1 has no session timer, so the only path to
+    /// `.expired` is a legacy room created before the timer was retired;
+    /// the surface holds the regular main body in that case. The no-
+    /// survivor terminal lives on S05 (engine-side `no_survivor`), not
+    /// here.
+    func testExpiredStatusRendersMainBodyNotATimerTerminal() {
         let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, status: .expired, isInitiator: true)
         let view = WaitingScreen(
             auth: makeAuthCoordinator(),
             promptStore: makePromptStore(),
             waitingStore: store,
-            timerCoordinator: coord,
+            fireCoordinator: coord,
             appleProvider: StubAppleProvider()
         )
         render(view)
@@ -142,7 +153,7 @@ final class WaitingScreenSnapshotTests: XCTestCase {
             auth: makeAuthCoordinator(),
             promptStore: makePromptStore(),
             waitingStore: store,
-            timerCoordinator: coord,
+            fireCoordinator: coord,
             appleProvider: StubAppleProvider()
         )
         render(view)
