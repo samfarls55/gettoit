@@ -99,6 +99,20 @@ public enum JoinedTapDestination: Equatable, Sendable {
     case verdictReadOnlyHistory
 }
 
+/// tb-WF-8 — small `@Observable` holder for the History section's
+/// expand / collapse state. Lives in a class so the unit-test path can
+/// mutate it on a struct PlanListScreen value without needing a
+/// `UIHostingController` mount; SwiftUI tracks the class reference and
+/// re-renders the View on every change.
+@MainActor
+@Observable
+final class HistoryCollapseState {
+    /// True when the History section is expanded. Defaults to `true`
+    /// per surface §"Surface structure (locked Q1)" — `expanded on
+    /// first viewing`.
+    var isOpen: Bool = true
+}
+
 @MainActor
 public struct PlanListScreen: View {
 
@@ -360,18 +374,19 @@ public struct PlanListScreen: View {
     /// local UI state — the host doesn't need to own this.
     @State private var disambigOpen: Bool = false
 
-    /// tb-WF-8 — History section expand / collapse state. Persists per
-    /// user across launches within a session via `@AppStorage` (a
-    /// thin wrapper over `UserDefaults`). The key is computed from
-    /// `signedInUserID`; when no user id is supplied (tests, preview),
-    /// a stable test key is used so the storage still round-trips.
+    /// tb-WF-8 — History section expand / collapse state, held in a
+    /// small `@Observable` class so SwiftUI re-renders on toggle AND
+    /// the unit-test path can mutate the value without installing the
+    /// View in a hosting controller. (A bare `@State Bool` would
+    /// re-render fine, but its underlying storage box only updates
+    /// through SwiftUI's tracking — making it awkward to test the
+    /// persistence path in a struct value not in any view tree.)
     ///
     /// Default `true` per surface §"Surface structure (locked Q1)":
     /// `expanded on first viewing, sticky-collapsed thereafter per
-    /// session`. `@AppStorage` carries the default through to the
-    /// `UserDefaults`-backed read, and the wrapper's `set` writes the
-    /// new value on every toggle.
-    @State private var historyOpen: Bool = true
+    /// session`. The init hydrates from `UserDefaults` under the
+    /// per-user key; the toggle path writes back through the same key.
+    @State private var historyState: HistoryCollapseState = HistoryCollapseState()
 
     // MARK: - init
 
@@ -417,19 +432,21 @@ public struct PlanListScreen: View {
         self.onTapJoined = onTapJoined
         self.onTapDecidedOrHistory = onTapDecidedOrHistory
 
-        // Hydrate the initial `historyOpen` value from UserDefaults
-        // using the per-user key. `@AppStorage`'s declarative form
-        // wants a compile-time-known key string, but the iOS port keys
-        // on the runtime userID. We bridge that by reading
-        // UserDefaults directly here and seeding `@State`; the
-        // toggle handler writes back through the same key.
+        // Hydrate the History collapse state from UserDefaults using
+        // the per-user key. `@AppStorage`'s declarative form wants a
+        // compile-time-known key string, but the iOS port keys on
+        // the runtime userID. We bridge that by reading UserDefaults
+        // directly here, seeding a small `@Observable` class
+        // (`HistoryCollapseState`), and writing back through the same
+        // key on every toggle.
         let key = Self.storageKey(for: signedInUserID)
+        let initial = HistoryCollapseState()
         if UserDefaults.standard.object(forKey: key) != nil {
-            self._historyOpen = State(initialValue: UserDefaults.standard.bool(forKey: key))
+            initial.isOpen = UserDefaults.standard.bool(forKey: key)
         }
-        // No stored value → leave the @State default (true) — matches
-        // surface §"Surface structure (locked Q1)": expanded on first
-        // viewing.
+        // No stored value → leave the default (true) — matches surface
+        // §"Surface structure (locked Q1)": expanded on first viewing.
+        self._historyState = State(initialValue: initial)
     }
 
     /// tb-WF-8 — internal storage-key resolver. Maps a (possibly nil)
@@ -728,17 +745,17 @@ public struct PlanListScreen: View {
 
     /// tb-WF-8 — History section. Same 2-line card shape as Decided.
     /// Collapsible — default expanded on first viewing, persisted
-    /// per-user via `@AppStorage` (see `historyOpen` doc).
+    /// per-user via `UserDefaults` (see `historyState` doc).
     private var historySection: some View {
         VStack(alignment: .leading, spacing: GTISpacing.step3) {
             collapsibleSectionHeader(
                 label: Self.historySectionLabel,
                 count: history.count,
-                isOpen: historyOpen,
+                isOpen: historyState.isOpen,
                 onToggle: { toggleHistoryOpen() }
             )
 
-            if historyOpen {
+            if historyState.isOpen {
                 VStack(spacing: GTISpacing.step3 - GTISpacing.step1) { // 8pt
                     ForEach(history) { row in
                         decidedHistoryButton(row: row)
@@ -844,9 +861,9 @@ public struct PlanListScreen: View {
     /// tb-WF-8 — toggle the History section open / collapsed and
     /// persist the new value to `UserDefaults` under the per-user key.
     private func toggleHistoryOpen() {
-        historyOpen.toggle()
+        historyState.isOpen.toggle()
         let key = Self.storageKey(for: signedInUserID)
-        UserDefaults.standard.set(historyOpen, forKey: key)
+        UserDefaults.standard.set(historyState.isOpen, forKey: key)
     }
 
     /// 1-line Pending card. Name only, ellipsis on overflow, glass row
@@ -972,7 +989,7 @@ extension PlanListScreen {
     /// view tree.
     @MainActor
     func currentHistoryOpenForTest() -> Bool {
-        historyOpen
+        historyState.isOpen
     }
 
     /// Test-only hook (tb-WF-8) — drive the History-collapse toggle.
