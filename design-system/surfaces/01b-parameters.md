@@ -1,12 +1,16 @@
 ---
 surface: 01b-parameters
-status: locked
+status: superseded
 locked-date: 2026-05-15
+superseded-date: 2026-05-19
+superseded-by: 01-setup
 jsx:
   - code/screens/ScreenParameters.jsx
 ---
 
 # S01b · Pre-quiz parameters setup
+
+> **SUPERSEDED (2026-05-19) — replaced by [[01-setup|S01 Plan setup]].** The workflow-overhaul phase collapsed [[01-initiator|S01 Initiator Landing]] + this surface into a single Plan setup screen ([[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] / #154). The new surface carries this surface's flat eyebrow-per-control rhythm, the four chip groups, and the read-only LocationPicker echo pattern forward — with the transport-mode chip group dropped (collapsed into a distance slider per workflow-overhaul Q8). This file and `code/screens/ScreenParameters.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-4** retires the consuming Swift code; do **not** build new features against this surface. See [[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] for the locked decisions.
 
 > **Code:** [`../code/screens/ScreenParameters.jsx`](../code/screens/ScreenParameters.jsx)
 

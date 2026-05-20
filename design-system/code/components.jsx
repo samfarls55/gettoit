@@ -265,9 +265,49 @@ function Glass({ children, style = {}, soft = false }) {
 // Range Slider (C-21) — continuous numeric input on gradient surface.
 // Used on S01 for radius. Sun-yellow filled track + white thumb.
 // Visual track is 6px; tap target is the full row (44 tall) via hit-slop.
+//
+// Two operating modes:
+//   - Uniform step:  pass `min` + `max` + `step` (canonical S01 / S05 use).
+//   - Non-uniform `steps` array: pass `steps={[0.25, 0.5, 0.75, 1, 1.5, ...]}`
+//     (S01 Setup distance slider — granularity tracks the walk/drive cognitive
+//     shift, so the step schedule shrinks below 1 mi and grows above 5 mi).
+//     When `steps` is present, the input snaps to the nearest entry on change;
+//     `min` / `max` are derived from the first / last entries.
+//
+// Optional `tickAt={value}` renders a subtle anchor mark on the track at
+// the given value (S01 Setup walk/drive boundary at 1.0 mi). The tick is
+// purely visual — no words, no label — and does not interact with snap.
 // ────────────────────────────────────────────────────────────
-function RangeSlider({ value, min, max, step, onChange, valueLabel, ariaLabel }) {
-  const pct = ((value - min) / (max - min)) * 100;
+function RangeSlider({
+  value, min, max, step, steps, onChange, valueLabel, ariaLabel, tickAt,
+}) {
+  // When `steps` is given, derive the bounds from it and snap on change.
+  const useDiscrete = Array.isArray(steps) && steps.length > 0;
+  const lo = useDiscrete ? steps[0] : min;
+  const hi = useDiscrete ? steps[steps.length - 1] : max;
+  // Native step still drives the slider thumb resolution. With a discrete
+  // list, pick the smallest gap so the user can land on any of them.
+  const nativeStep = useDiscrete
+    ? steps.slice(1).reduce((g, v, i) => Math.min(g, v - steps[i]), Infinity)
+    : step;
+
+  const pct = ((value - lo) / (hi - lo)) * 100;
+  const tickPct = (tickAt != null)
+    ? ((tickAt - lo) / (hi - lo)) * 100
+    : null;
+
+  const handleChange = (raw) => {
+    if (!useDiscrete) { onChange(raw); return; }
+    // Snap to the nearest allowed step value.
+    let best = steps[0];
+    let bestDelta = Math.abs(raw - best);
+    for (const s of steps) {
+      const d = Math.abs(raw - s);
+      if (d < bestDelta) { best = s; bestDelta = d; }
+    }
+    onChange(best);
+  };
+
   return (
     <div style={{
       position: 'relative', width: '100%',
@@ -288,6 +328,20 @@ function RangeSlider({ value, min, max, step, onChange, valueLabel, ariaLabel })
             background: 'var(--sun)',
             boxShadow: '0 0 12px rgba(255,210,63,0.45)',
           }} />
+          {tickPct != null && (
+            // Subtle anchor tick — registered token slider.tick (white 0.55).
+            // 2px wide × 10px tall, centered on the 6px track.
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute', top: '50%', left: `calc(${tickPct}% )`,
+                width: 2, height: 10, borderRadius: 1,
+                background: 'rgba(255,255,255,0.55)',
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
           <div style={{
             position: 'absolute', top: '50%', left: `calc(${pct}% )`,
             width: 22, height: 22, borderRadius: '50%',
@@ -298,8 +352,8 @@ function RangeSlider({ value, min, max, step, onChange, valueLabel, ariaLabel })
         </div>
       </div>
       <input
-        type="range" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(Number(e.target.value))}
+        type="range" min={lo} max={hi} step={nativeStep} value={value}
+        onChange={e => handleChange(Number(e.target.value))}
         aria-label={ariaLabel}
         aria-valuetext={valueLabel}
         style={{

@@ -1,20 +1,18 @@
 ---
 surface: 01-initiator
-status: locked
+status: superseded
 locked-date: 2026-05-12
-partially-superseded-by:
-  - gti-vault/10_prds/v1.1-quiz-redesign-prd.md
-stale-sections:
-  - "Timer + radius controls (timer half)"
-  - "Timer chip group — How long"
-  - "Behavior (timer_minutes write)"
+superseded-date: 2026-05-19
+superseded-by: 01-setup
 jsx:
   - code/screens/ScreenInitiator.jsx
 ---
 
 # S01 · Initiator Landing
 
-> **PARTIALLY SUPERSEDED — v1.1 quiz redesign PRD (2026-05-15).** The Timer chip group, the "How long" eyebrow, the `timer_minutes` column write, and any "Auto-fires" behavior described below are RETIRED. The v1.1 PRD removed the session timer entirely (US34 "no shot clock", US35 "verdict fires when all participants finish", §line 115 "no timer, no shot clock"). Do **not** implement timer mechanics from this doc. The canonical verdict trigger is defined in `CONTEXT.md → Verdict trigger`. Radius slider sections remain valid but are themselves slated for replacement by a distance slider in the workflow-overhaul setup screen — see `CONTEXT.md → Plan vocabulary`.
+> **SUPERSEDED (2026-05-19) — replaced by [[01-setup|S01 Plan setup]].** The workflow-overhaul phase collapsed this surface + [[01b-parameters|S01b Pre-quiz parameters]] into a single Plan setup screen ([[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] / #154). This file and `code/screens/ScreenInitiator.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-4** retires the consuming Swift code; do **not** build new features against this surface. The Plan-list-as-landing decision also retires the standalone "initiator landing" pattern — there is no longer an entry surface that asks the user to "Pick a vertical". See [[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] for the locked decisions.
+
+> **Earlier note (2026-05-15) — partially superseded by v1.1 quiz redesign PRD.** The Timer chip group, the "How long" eyebrow, the `timer_minutes` column write, and any "Auto-fires" behavior described below were already RETIRED by US34 / US35 / §line 115 of the v1.1 PRD. The 2026-05-19 supersession above carries that retirement forward and additionally drops the radius slider, the vertical picker rows, and the SETTINGS footer link (subsumed by the new Setup surface + Plan list landing).
 
 > **Code:** [`../code/screens/ScreenInitiator.jsx`](../code/screens/ScreenInitiator.jsx)
 
