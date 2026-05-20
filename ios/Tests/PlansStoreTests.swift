@@ -106,7 +106,9 @@ final class PlansStoreTests: XCTestCase {
         XCTAssertNil(plan.rerollWindowClosesAt,
                      "reroll_window_closes_at is null while pending")
         XCTAssertEqual(plan.location?.name, "Greenpoint")
-        XCTAssertEqual(plan.location?.lat, 40.7, accuracy: 0.0001)
+        // XCTAssertEqual's accuracy overload is non-optional; unwrap
+        // explicitly so the type matches.
+        XCTAssertEqual(plan.location?.lat ?? .nan, 40.7, accuracy: 0.0001)
         XCTAssertNotNil(plan.sessionParameters,
                         "session_params should decode into a SessionParameters value")
     }
