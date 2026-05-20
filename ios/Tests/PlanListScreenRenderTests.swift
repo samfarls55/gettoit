@@ -31,7 +31,8 @@ final class PlanListScreenRenderTests: XCTestCase {
     private func makeScreen(pending: [PlansStore.Plan]) -> PlanListScreen {
         PlanListScreen(
             pending: pending,
-            onCreatePlan: {},
+            onRequestDisambig: {},
+            onPickGroupMode: { _ in },
             onTapPlan: { _ in }
         )
     }
@@ -64,8 +65,8 @@ final class PlanListScreenRenderTests: XCTestCase {
         render(makeScreen(pending: []))
     }
 
-    /// One-Pending state — one card + top-trailing temp `+` glyph,
-    /// no hero pill.
+    /// One-Pending state — one card + the C-26 FAB on the bottom-
+    /// trailing edge, no hero pill, no temp chrome `+` glyph (tb-WF-6).
     func testOnePendingRenders() {
         render(makeScreen(pending: [makePlan(name: "Friday dinner")]))
     }
