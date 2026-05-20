@@ -1,4 +1,4 @@
-// GetToIt — S00 · Plan list (tb-WF-5 → tb-WF-6, workflow-overhaul).
+// GetToIt — S00 · Plan list (tb-WF-5 → tb-WF-6 → tb-WF-7, workflow-overhaul).
 //
 // The new app entry surface. Replaces the retired S00 Landing as the
 // post-sign-in landing on iOS. A sectioned list of the user's Plans,
@@ -9,27 +9,70 @@
 // JSX reference: `design-system/code/screens/ScreenPlanList.jsx`.
 // Parent decisions doc: [[gti-vault/50_product/workflow-overhaul-plan-list]].
 //
-// In this slice (tb-WF-6 — Group creation path + FAB + disambig sheet):
-//   * Only the Pending section ever has rows — Decided + History are
-//     wired through the API shape but always empty until tb-WF-8.
-//   * 1-line Pending cards: name only, glass row treatment per C-19
-//     lineage. No three-dot menu (tb-WF-9), no JOINED chip (tb-WF-7).
+// Slice history:
+//   * tb-WF-5: foundation Plan list shell + 1-line Pending cards +
+//     temp top-trailing `+` chrome glyph.
+//   * tb-WF-6: C-26 FAB replaces the temp `+`; Group creation path
+//     via the `PlanDisambigSheet` (both the FAB and the empty-state
+//     hero pill open the same sheet).
+//   * tb-WF-7: Joiner journey end-to-end — JOINED eyebrow chip on
+//     Joined cards (in `GTIColor.sun`), `routeFor(joinedRow:)`
+//     resume-from-state helper per §Q8, `onTapJoined` callback so
+//     the host can dispatch to QuizScreen / WaitingScreen /
+//     read-only Verdict.
+//
+// In the current state:
+//   * Only the Pending section ever has rows — Decided + History
+//     are wired through the API shape but always empty until tb-WF-8.
+//     Pending cards may be either Created (no chip, tap → Setup
+//     `.edit`) or Joined (JOINED eyebrow chip in `var(--sun)`, tap
+//     routed through the §Q8 resume-from-state table).
+//   * 1-line Pending cards, glass row treatment per C-19 lineage.
+//     No three-dot menu (tb-WF-9).
 //   * Empty state: centered hero pill `Create your first plan` — the
-//     only create affordance when the user has zero Plans. The pill
-//     now opens the disambig sheet (unified entry, per Q6) instead of
-//     routing straight to Solo Setup.
+//     only create affordance when the user has zero Plans (joined
+//     OR created). The pill opens the disambig sheet (unified entry,
+//     per Q6) — same path as the FAB.
 //   * Populated state: C-26 FloatingActionButton on the bottom-right
-//     edge (replaces the temp top-trailing `+` chrome from tb-WF-5).
-//     Both the FAB and the empty-state hero pill open the same
+//     edge. Both the FAB and the empty-state hero pill open the same
 //     disambig sheet (`PlanDisambigSheet`); the sheet's pick callback
 //     routes to `SetupScreen(mode: .solo)` or `SetupScreen(mode: .group)`.
-//   * Pending card tap → `SetupScreen` in `.edit` mode for the
-//     tapped Plan.
+//   * Pending Created card tap → `SetupScreen` in `.edit` mode for
+//     the tapped Plan.
+//   * Pending Joined card tap → host dispatches via `JoinedTapDestination`
+//     to QuizScreen (resumed at the saved step) / WaitingScreen /
+//     read-only Verdict.
 //
 // All color / type / spacing / radii come from `GTITokens.swift` per
 // repo CLAUDE.md — no inline hex / px / easing.
 
 import SwiftUI
+
+/// tb-WF-7 — the §Q8 resume-from-state destinations a Joined-card
+/// tap dispatches into. The host (RootView) listens for these via
+/// the `onTapJoined` closure and mounts the corresponding screen.
+///
+/// The router does NOT navigate itself — it is a pure value the
+/// host consumes. That keeps `PlanListScreen` view-free of
+/// Supabase calls (the resume hydration of `QuizCoordinator`
+/// lives in `RootView`).
+public enum JoinedTapDestination: Equatable, Sendable {
+    /// Pending Plan + joiner hasn't started the quiz → QuizScreen
+    /// from Q1.
+    case quizAtStart
+    /// Pending Plan + joiner is mid-quiz → QuizScreen at the
+    /// last-answered question. `index` is the 1-based 1..5 index;
+    /// the host maps it onto `QuizCoordinator.Step.qN`.
+    case quizAtQuestion(index: Int)
+    /// Pending Plan + joiner already wrote the votes row →
+    /// WaitingScreen.
+    case waiting
+    /// Decided-active Plan → read-only VerdictScreen (no reroll —
+    /// initiator-only per parent Q9).
+    case verdictReadOnlyActive
+    /// Decided-expired Plan → read-only VerdictScreen history.
+    case verdictReadOnlyHistory
+}
 
 @MainActor
 public struct PlanListScreen: View {
@@ -66,15 +109,54 @@ public struct PlanListScreen: View {
     // retired. The populated-state create affordance is now the C-26
     // FloatingActionButton; see `FloatingActionButton.swift`.
 
+    /// tb-WF-7 — the JOINED eyebrow chip label. UPPERCASE in source so
+    /// the iOS render does NOT need to `.uppercased()` it — the chip
+    /// is the label, not a heading; the eyebrow token's
+    /// `letterSpacing` carries the visual lift. NEVER `"Invited"`,
+    /// `"From <name>"`, or `"You joined"` (surface §"Copy register",
+    /// parent Q3).
+    public static let joinedChipLabel: String = "JOINED"
+
     // MARK: - pure helpers
 
-    /// Empty-state detection. In this slice only `pending` ever has
-    /// rows (Decided + History always-empty until tb-WF-8); the
-    /// public API takes only `pending` so the host can't accidentally
-    /// stash rows in the unused sections. When tb-WF-8 lands, the
-    /// signature widens to take all three arrays.
-    public static func isEmpty(pending: [PlansStore.Plan]) -> Bool {
-        pending.isEmpty
+    /// Empty-state detection. In this slice only `pending` and
+    /// `joined` ever have rows (Decided + History always-empty until
+    /// tb-WF-8). A Plan list is empty iff BOTH arrays are empty —
+    /// a user with only Joined Plans still has plans on their list,
+    /// and the empty hero must not flash in their face.
+    public static func isEmpty(
+        pending: [PlansStore.Plan],
+        joined: [PlansStore.JoinedPlanRow]
+    ) -> Bool {
+        pending.isEmpty && joined.isEmpty
+    }
+
+    /// tb-WF-7 — pure helper that derives the §Q8 destination from a
+    /// `JoinedPlanRow`. Exposed as a static so the host can reuse the
+    /// router decision without re-rendering the view; the
+    /// `onTapJoined` callback hands the destination through.
+    ///
+    /// Precedence:
+    ///   * Decided-active → `verdictReadOnlyActive` (regardless of
+    ///     whether the joiner voted — see issue body "Decided-active
+    ///     Plan where joiner never voted" edge case).
+    ///   * Decided-expired → `verdictReadOnlyHistory`.
+    ///   * Pending + `hasVoted` → `waiting` (votes row is the ground
+    ///     truth for "past the quiz" — beats a stale progress index).
+    ///   * Pending + `lastAnsweredQuestionIndex <= 0` → `quizAtStart`.
+    ///   * Pending + otherwise → `quizAtQuestion(index: clamped)`.
+    public static func routeFor(joinedRow: PlansStore.JoinedPlanRow) -> JoinedTapDestination {
+        switch joinedRow.plan.status {
+        case .decidedActive:
+            return .verdictReadOnlyActive
+        case .decidedExpired:
+            return .verdictReadOnlyHistory
+        case .pending:
+            if joinedRow.hasVoted { return .waiting }
+            let clamped = max(0, min(5, joinedRow.lastAnsweredQuestionIndex))
+            if clamped <= 0 { return .quizAtStart }
+            return .quizAtQuestion(index: clamped)
+        }
     }
 
     /// Pending section sort — `created_at DESC` per surface §"Ordering
@@ -100,9 +182,11 @@ public struct PlanListScreen: View {
     // MARK: - dependencies (host-supplied)
 
     private let pending: [PlansStore.Plan]
+    private let joined: [PlansStore.JoinedPlanRow]
     private let onRequestDisambig: () -> Void
     private let onPickGroupMode: (SetupScreen.GroupMode) -> Void
     private let onTapPlan: (PlansStore.Plan) -> Void
+    private let onTapJoined: (PlansStore.JoinedPlanRow) -> Void
 
     // MARK: - state
 
@@ -114,30 +198,39 @@ public struct PlanListScreen: View {
 
     // MARK: - init
 
-    /// In this slice the host supplies the Pending rows directly. When
-    /// tb-WF-8 lights up Decided + History, the API widens to take
-    /// three arrays. Keeping the entry tight here means the
-    /// downstream tracer-bullets get a single, narrow surface to add
-    /// to — no speculative parameters to retire.
+    /// In this slice the host supplies the Pending + Joined rows
+    /// directly. When tb-WF-8 lights up Decided + History, the API
+    /// widens to take all three arrays. Keeping the entry tight here
+    /// means the downstream tracer-bullets get a single, narrow
+    /// surface to add to — no speculative parameters to retire.
     ///
     /// `onRequestDisambig` fires when the user invokes the create
-    /// affordance (FAB or empty-state hero pill). The host can use this
-    /// to log telemetry or run side effects (e.g. iOS location pre-
-    /// prime) before / instead of letting the sheet open. The screen's
-    /// own `.sheet` still mounts to drive the disambig UI; the
-    /// `onPickGroupMode` callback is the load-bearing route — it
+    /// affordance (FAB or empty-state hero pill). The host can use
+    /// this to log telemetry or run side effects (e.g. iOS location
+    /// pre-prime) before / instead of letting the sheet open. The
+    /// screen's own `.sheet` still mounts to drive the disambig UI;
+    /// the `onPickGroupMode` callback is the load-bearing route — it
     /// carries the user's Solo/Group choice up to the host so Setup
     /// can be presented in the correct mode.
+    ///
+    /// tb-WF-7 — `joined` defaults to `[]` and `onTapJoined` defaults
+    /// to a no-op so the existing tb-WF-6 call sites compile
+    /// unchanged; the live host always supplies a non-trivial
+    /// dispatcher.
     public init(
         pending: [PlansStore.Plan],
+        joined: [PlansStore.JoinedPlanRow] = [],
         onRequestDisambig: @escaping () -> Void,
         onPickGroupMode: @escaping (SetupScreen.GroupMode) -> Void,
-        onTapPlan: @escaping (PlansStore.Plan) -> Void
+        onTapPlan: @escaping (PlansStore.Plan) -> Void,
+        onTapJoined: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in }
     ) {
         self.pending = pending
+        self.joined = joined
         self.onRequestDisambig = onRequestDisambig
         self.onPickGroupMode = onPickGroupMode
         self.onTapPlan = onTapPlan
+        self.onTapJoined = onTapJoined
     }
 
     // MARK: - body
@@ -147,7 +240,7 @@ public struct PlanListScreen: View {
             GTIGradient.surface(.initiator)
                 .ignoresSafeArea()
 
-            if Self.isEmpty(pending: pending) {
+            if Self.isEmpty(pending: pending, joined: joined) {
                 emptyState
             } else {
                 populatedState
@@ -171,6 +264,29 @@ public struct PlanListScreen: View {
                 onDismiss: { disambigOpen = false }
             )
         }
+    }
+
+    /// tb-WF-7 — Joined Pending plans rendered inline alongside the
+    /// Created Pending plans. The surface §"Card content (locked Q2)"
+    /// table sections by status, not by ownership; Joined cards live
+    /// in the Pending section and the JOINED chip carries the
+    /// "joined, not created" distinction. Decided / History Joined
+    /// cards land when tb-WF-8 lights up those sections; until then
+    /// only Pending Joined cards may render.
+    ///
+    /// Sort: same `created_at DESC` Created Pending cards use, so the
+    /// row order is mechanically driven by recency — newest Plan
+    /// (created OR joined) on top.
+    private var joinedPendingRows: [PlansStore.JoinedPlanRow] {
+        joined.filter { $0.plan.status == .pending }
+              .sorted { lhs, rhs in
+                  switch (lhs.plan.createdAt, rhs.plan.createdAt) {
+                  case let (l?, r?):     return l > r
+                  case (_?, nil):        return true
+                  case (nil, _?):        return false
+                  case (nil, nil):       return false
+                  }
+              }
     }
 
     // MARK: - empty state
@@ -263,10 +379,17 @@ public struct PlanListScreen: View {
     }
 
     private var pendingSection: some View {
-        VStack(alignment: .leading, spacing: GTISpacing.step3) {
-            sectionHeader(label: Self.pendingSectionLabel, count: pending.count)
+        let joinedPending = joinedPendingRows
+        let totalCount = pending.count + joinedPending.count
+        return VStack(alignment: .leading, spacing: GTISpacing.step3) {
+            sectionHeader(label: Self.pendingSectionLabel, count: totalCount)
 
             VStack(spacing: GTISpacing.step3 - GTISpacing.step1) { // 8pt between rows (close to JSX gap 10)
+                // Created Pending cards first — preserves the
+                // tb-WF-5 baseline render. Joined Pending cards
+                // follow below; the surface spec puts both in the
+                // same Pending section with the JOINED chip carrying
+                // the distinction.
                 ForEach(Self.sortedPending(pending)) { plan in
                     Button(action: { onTapPlan(plan) }) {
                         planCard(plan)
@@ -275,6 +398,15 @@ public struct PlanListScreen: View {
                     .accessibilityIdentifier("planList.card.\(plan.id.uuidString)")
                     .accessibilityLabel(plan.name)
                     .accessibilityHint("Edit this plan.")
+                }
+                ForEach(joinedPending) { row in
+                    Button(action: { onTapJoined(row) }) {
+                        joinedPlanCard(row)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("planList.joinedCard.\(row.plan.id.uuidString)")
+                    .accessibilityLabel(row.plan.name)
+                    .accessibilityHint("Joined plan. Resume where you left off.")
                 }
             }
             .padding(.horizontal, GTISpacing.step6)
@@ -316,6 +448,45 @@ public struct PlanListScreen: View {
         .padding(.horizontal, GTISpacing.step5 - 2) // 18pt — matches JSX `14px 18px`
         .padding(.vertical, GTISpacing.step3 + 2)   // 14pt — matches JSX `14px 18px`
         .frame(minHeight: 64) // 1-line card per spec
+        .background(
+            RoundedRectangle(cornerRadius: GTIRadii.card, style: .continuous)
+                .fill(GTIColor.Glass.fillSoft)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: GTIRadii.card, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
+    }
+
+    /// tb-WF-7 — Joined Pending card. JOINED eyebrow chip
+    /// top-leading in `GTIColor.sun` per the surface §"Joined card
+    /// (any status)" spec; the chip uses the eyebrow token (Inter
+    /// 700 / 11pt / `letterSpacing = 0.18em` UPPERCASE) so the chip
+    /// is the label, not a headline. Plan name below — same Inter
+    /// 700 / 17 line as the Created Pending card.
+    ///
+    /// No three-dot menu in this slice (tb-WF-9). Tap routing flows
+    /// through the host-supplied `onTapJoined` closure (see
+    /// `pendingSection`); this view is render-only.
+    private func joinedPlanCard(_ row: PlansStore.JoinedPlanRow) -> some View {
+        VStack(alignment: .leading, spacing: GTISpacing.step2 - 2) { // 6pt gap below chip (matches JSX `marginBottom: 6`)
+            Text(Self.joinedChipLabel)
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.sun)
+                .accessibilityIdentifier("planList.joinedCard.chip.\(row.plan.id.uuidString)")
+                .accessibilityLabel("Joined")
+
+            Text(row.plan.name)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, GTISpacing.step5 - 2) // 18pt — matches JSX `14px 18px`
+        .padding(.vertical, GTISpacing.step3 + 2)   // 14pt — matches JSX `14px 18px`
+        .frame(minHeight: 64)
         .background(
             RoundedRectangle(cornerRadius: GTIRadii.card, style: .continuous)
                 .fill(GTIColor.Glass.fillSoft)

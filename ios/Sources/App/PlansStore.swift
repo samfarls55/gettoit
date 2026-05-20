@@ -177,6 +177,67 @@ public final class PlansStore {
         }
     }
 
+    /// tb-WF-7 — wire shape for the Joined-section read query
+    /// (`joinedPlansForList(userID:)`). The RPC returns a flat row per
+    /// Plan: the `plans.*` columns plus two per-joiner projections
+    /// (`last_answered_question_index`, `has_voted`). The iOS
+    /// Decodable splits the row into a `Plan` body and the two
+    /// resume signals so call sites (`PlanListScreen.routeFor`)
+    /// reason about the signal explicitly.
+    ///
+    /// `lastAnsweredQuestionIndex` is 0..5 — 0 means the joiner
+    /// hasn't started; 1..4 means they advanced past Q1..Q4; 5 means
+    /// they reached Q5. `hasVoted` is the canonical "finished" signal
+    /// — the §Q8 router prefers it over `lastAnsweredQuestionIndex`
+    /// because the votes row is the ground truth (an index alone can
+    /// be stale if a progress write was in flight when the user
+    /// backgrounded).
+    public struct JoinedPlanRow: Codable, Equatable, Sendable, Identifiable {
+        public let plan: Plan
+        public let lastAnsweredQuestionIndex: Int
+        public let hasVoted: Bool
+
+        public var id: UUID { plan.id }
+
+        public init(
+            plan: Plan,
+            lastAnsweredQuestionIndex: Int,
+            hasVoted: Bool
+        ) {
+            self.plan = plan
+            self.lastAnsweredQuestionIndex = lastAnsweredQuestionIndex
+            self.hasVoted = hasVoted
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case lastAnsweredQuestionIndex = "last_answered_question_index"
+            case hasVoted = "has_voted"
+        }
+
+        public init(from decoder: Decoder) throws {
+            // The RPC returns a single flat row per Plan — the
+            // `plans.*` columns are siblings of the two per-joiner
+            // projections. Decode each Plan field via the Plan
+            // Decodable + decode the two projections at this level.
+            self.plan = try Plan(from: decoder)
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.lastAnsweredQuestionIndex =
+                try c.decodeIfPresent(Int.self, forKey: .lastAnsweredQuestionIndex) ?? 0
+            self.hasVoted = try c.decodeIfPresent(Bool.self, forKey: .hasVoted) ?? false
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            // Round-trip via the Plan encoder + two sibling fields.
+            // Mostly here to satisfy `Codable`; the wire direction is
+            // server -> client.
+            try plan.encode(to: encoder)
+            var c = encoder.container(keyedBy: CodingKeys.self)
+            try c.encode(lastAnsweredQuestionIndex,
+                         forKey: .lastAnsweredQuestionIndex)
+            try c.encode(hasVoted, forKey: .hasVoted)
+        }
+    }
+
     // MARK: - encoded payloads
 
     /// Encoded payload for the `plans` INSERT. Skips server-owned
@@ -362,6 +423,151 @@ public final class PlansStore {
             .execute()
             .value
         return rows
+    }
+
+    /// tb-WF-7 — read-side query backing the S00 Plan list's Joined
+    /// section. Returns every Plan the caller is a non-owner member
+    /// of (`members.role <> 'owner'`), with per-joiner resume signals
+    /// (`lastAnsweredQuestionIndex`, `hasVoted`) projected inline so
+    /// the surface can dispatch the §Q8 tap router without an N+1
+    /// lookup per card.
+    ///
+    /// Server-side filtering — the `joined_plans_for_user` RPC pins
+    /// the query to `auth.uid()`, joins `members -> rooms -> plans`,
+    /// and excludes exited joiners (no `members` row) and the
+    /// caller's own Created Plans (`role = 'owner'`).
+    ///
+    /// `userID` is explicit at the call site for auditability; the
+    /// RPC body checks it matches `auth.uid()` and returns zero rows
+    /// otherwise — a future call site can't silently request someone
+    /// else's Joined list even if RLS regresses.
+    public func joinedPlansForList(userID: UUID) async throws -> [JoinedPlanRow] {
+        struct Params: Encodable { let p_user_id: UUID }
+        let rows: [JoinedPlanRow] = try await client
+            .rpc("joined_plans_for_user", params: Params(p_user_id: userID))
+            .execute()
+            .value
+        return rows
+    }
+
+    /// tb-WF-7 — write the in-flight quiz progress payload to the
+    /// caller's `members.quiz_progress` jsonb column. Backs the
+    /// `MemberProgressWriter` seam on the `QuizCoordinator` so a
+    /// joiner who backgrounds the app mid-quiz can resume from the
+    /// saved state on next launch.
+    ///
+    /// Best-effort from the caller's perspective: the underlying
+    /// RPC has a `security definer` body that pins to
+    /// `auth.uid()`, so a thrown error here is either a transport
+    /// failure (network blip) or a malformed payload (a coordinator
+    /// bug). Either way the QuizCoordinator catches and drops the
+    /// error — the column is a resume-from-state convenience, not a
+    /// verdict-engine input.
+    public func writeQuizProgress(
+        roomID: UUID,
+        progress: QuizProgress
+    ) async throws {
+        // Encode the progress payload to AnyJSON via a JSONEncoder
+        // round-trip so the supabase-swift RPC call wraps it as the
+        // server-side `p_progress jsonb` argument without us having
+        // to hand-build the `AnyJSON` tree. The encoder honors the
+        // CodingKey mapping in `QuizProgress` (snake-case wire shape).
+        struct Params: Encodable {
+            let p_room_id: UUID
+            let p_progress: QuizProgress
+        }
+        try await client
+            .rpc(
+                "members_progress_upsert",
+                params: Params(p_room_id: roomID, p_progress: progress)
+            )
+            .execute()
+    }
+
+    /// tb-WF-7 — build the `MemberProgressWriter` closure the
+    /// `QuizCoordinator` consumes. The live joiner-side
+    /// `QuizSessionAssembler` (and the RootView resume path) binds
+    /// this to a `PlansStore` instance so progress writes flow
+    /// through the same Supabase client as every other call.
+    public func memberProgressWriter(roomID: UUID) -> MemberProgressWriter {
+        return { [weak self] progress in
+            guard let self else { return }
+            try await self.writeQuizProgress(roomID: roomID, progress: progress)
+        }
+    }
+
+    /// tb-WF-7 — wire shape for the resume-payload lookup. Carries
+    /// the room id (the Joined-list query returns it elsewhere) +
+    /// the in-flight `QuizProgress` payload as written into
+    /// `members.quiz_progress`.
+    public struct JoinedResumePayload: Sendable {
+        public let roomID: UUID
+        public let progress: QuizProgress
+    }
+
+    /// tb-WF-7 — fetch the room id linked to a Joined Plan plus the
+    /// caller's saved `members.quiz_progress`. Best-effort: returns
+    /// nil on a transport failure or RLS deny so the caller can fall
+    /// back to leaving the user on the Plan list.
+    ///
+    /// One round-trip: the call selects from `members` (which the
+    /// caller can read for any room they belong to) and joins to
+    /// `rooms` to project the linked `plan_id`. RLS on `members`
+    /// already restricts the rows to rooms the caller is in.
+    public func fetchJoinedResumePayload(
+        planID: UUID,
+        userID: UUID
+    ) async -> JoinedResumePayload? {
+        // Two-step: look up the (room_id, quiz_progress) for the
+        // caller's membership on a room whose `plan_id` equals
+        // `planID`. The natural shape is a single PostgREST
+        // embedded select, but `members` doesn't have a foreign-key
+        // alias on rooms that PostgREST infers cleanly here; the
+        // direct shape is to filter `rooms` by `plan_id` first then
+        // join `members` on the resulting room id. We fold both
+        // into a single SECURITY DEFINER RPC.
+        struct Params: Encodable {
+            let p_plan_id: UUID
+            let p_user_id: UUID
+        }
+        struct Row: Decodable {
+            let room_id: UUID
+            let quiz_progress: QuizProgress?
+        }
+        do {
+            let rows: [Row] = try await client
+                .rpc(
+                    "joined_plan_resume_payload",
+                    params: Params(p_plan_id: planID, p_user_id: userID)
+                )
+                .execute()
+                .value
+            guard let row = rows.first else { return nil }
+            return JoinedResumePayload(
+                roomID: row.room_id,
+                progress: row.quiz_progress ?? QuizProgress()
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    /// tb-WF-7 — look up only the room id linked to a Joined Plan,
+    /// without hydrating the progress payload. Used by the read-only
+    /// Verdict branch (a Decided Plan tap), which does not need
+    /// quiz progress but does need the room id to call
+    /// `LateJoinerStore.fetchReadOnlyPayload`. The userID is the
+    /// caller's signed-in id and is checked against `auth.uid()`
+    /// server-side; passing it explicitly keeps the call-site
+    /// auditable.
+    public func roomIDForJoinedPlan(planID: UUID, userID: UUID? = nil) async -> UUID? {
+        // The server-side RPC pins to `auth.uid()` regardless of the
+        // `p_user_id` we pass, but matching the two means the call
+        // site can never mis-route a lookup. `userID` is optional
+        // for ergonomic call sites that don't already have it.
+        let pinned = userID ?? UUID()
+        let payload = await fetchJoinedResumePayload(planID: planID, userID: pinned)
+        return payload?.roomID
     }
 
     /// Apply a partial update to a Plan and return the refreshed row.

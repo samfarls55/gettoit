@@ -1,4 +1,4 @@
-// GetToIt — PlanListScreen render smoke tests (tb-WF-5).
+// GetToIt — PlanListScreen render smoke tests (tb-WF-5, tb-WF-6, tb-WF-7).
 //
 // Pixel-snapshot tooling is not yet on the iOS dependency graph (see
 // the header on `QuizScreenSnapshotTests` for the why). Until then,
@@ -28,12 +28,17 @@ final class PlanListScreenRenderTests: XCTestCase {
         return host.view
     }
 
-    private func makeScreen(pending: [PlansStore.Plan]) -> PlanListScreen {
+    private func makeScreen(
+        pending: [PlansStore.Plan],
+        joined: [PlansStore.JoinedPlanRow] = []
+    ) -> PlanListScreen {
         PlanListScreen(
             pending: pending,
+            joined: joined,
             onRequestDisambig: {},
             onPickGroupMode: { _ in },
-            onTapPlan: { _ in }
+            onTapPlan: { _ in },
+            onTapJoined: { _ in }
         )
     }
 
@@ -79,5 +84,33 @@ final class PlanListScreenRenderTests: XCTestCase {
             makePlan(name: "Date night",     createdAt: "2026-05-18T12:00:00Z"),
         ]
         render(makeScreen(pending: plans))
+    }
+
+    // MARK: - tb-WF-7 Joined-card render coverage
+
+    /// A single Joined card renders alongside zero Pending Created
+    /// cards. The JOINED eyebrow chip is present; the chrome stays
+    /// the populated state (FAB, eyebrow welcome).
+    func testJoinedOnlyRenders() {
+        let joinedPlan = makePlan(name: "Alex's birthday")
+        let row = PlansStore.JoinedPlanRow(
+            plan: joinedPlan,
+            lastAnsweredQuestionIndex: 0,
+            hasVoted: false
+        )
+        render(makeScreen(pending: [], joined: [row]))
+    }
+
+    /// Mixed state — one Created Pending card + one Joined card. Both
+    /// render; only the Joined card carries the JOINED chip.
+    func testMixedCreatedAndJoinedRenders() {
+        let created = makePlan(name: "Friday dinner")
+        let joined = makePlan(name: "Alex's birthday")
+        let row = PlansStore.JoinedPlanRow(
+            plan: joined,
+            lastAnsweredQuestionIndex: 2,
+            hasVoted: false
+        )
+        render(makeScreen(pending: [created], joined: [row]))
     }
 }

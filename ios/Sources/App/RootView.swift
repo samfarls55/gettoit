@@ -95,6 +95,26 @@ public struct RootView: View {
     /// Plan write. Empty by default → the list renders the empty
     /// hero state.
     @State private var planListPending: [PlansStore.Plan] = []
+    /// tb-WF-7 — Joined plans backing the S00 Plan list surface.
+    /// Hydrated from `PlansStore.joinedPlansForList` on appear; the
+    /// rows carry per-joiner resume signals (`lastAnsweredQuestionIndex`,
+    /// `hasVoted`) so the Joined-card tap router can dispatch
+    /// directly to QuizScreen/Waiting/Verdict without an extra
+    /// round-trip per card. Empty by default — a fresh signed-in
+    /// session that has not joined anyone's Plan stays empty.
+    @State private var planListJoined: [PlansStore.JoinedPlanRow] = []
+    /// tb-WF-7 — when set, the host owns a resume context for the
+    /// joiner who tapped a Joined Pending card. The context carries
+    /// the room id, the saved progress payload, and the destination
+    /// step (Q1..Q5 or Waiting). The body branches into the live
+    /// QuizScreen / WaitingScreen mounted against this context.
+    @State private var joinedResume: JoinedResumeContext?
+    /// tb-WF-7 — when set, the host renders the read-only Verdict
+    /// for a Joined card whose Plan is decided. Different from
+    /// `readOnlyView` (which is the late-joiner deep-link branch);
+    /// the resume path is a tap on the Plan list, not a fresh
+    /// invite-link landing.
+    @State private var joinedReadOnly: ReadOnlyContext?
     /// TB-03 (v1.1) → tb-WF-5 → tb-WF-6 — set when the user picks a
     /// Solo/Group from the Plan list's disambig sheet AND iOS location
     /// permission is still `notDetermined`. While true, the host
@@ -344,14 +364,45 @@ public struct RootView: View {
                                 self.setupContext = nil
                             }
                         )
+                    } else if let resume = joinedResume {
+                        // tb-WF-7 — Joined-card resume routing. The
+                        // joiner tapped a Pending Plan they had not
+                        // yet finished the quiz on; the host owns a
+                        // `JoinedResumeContext` that mounts either
+                        // QuizScreen (resumed at the saved step with
+                        // prior answers hydrated) or WaitingScreen
+                        // (joiner already wrote the votes row).
+                        joinedResumeView(resume: resume, userID: userID, client: coordinators.client, auth: coordinators.auth, plansStore: coordinators.plansStore)
+                    } else if let readOnly = joinedReadOnly {
+                        // tb-WF-7 — Joined-card decided routing. Tap on
+                        // a Decided-active / Decided-expired Joined
+                        // card lands here. Read-only Verdict, no
+                        // reroll (initiator-only per parent Q9). The
+                        // "Done" callback returns the user to the Plan
+                        // list rather than starting a fresh Plan (the
+                        // re-invite CTA path is the late-joiner
+                        // deep-link branch, owned by `readOnlyView`).
+                        VerdictScreen(
+                            verdict: readOnly.payload.verdict,
+                            mode: .readOnly,
+                            isInitiator: false,
+                            onAdvance: {
+                                joinedReadOnly = nil
+                            }
+                        )
                     } else {
-                        // tb-WF-5 → tb-WF-6 — S00 Plan list. Hero pill
-                        // (empty state) + C-26 FAB (populated state)
-                        // both open the disambig sheet (unified entry
-                        // per Q6); the sheet's pick callback routes to
-                        // Setup in the chosen `.solo` / `.group` mode.
-                        // Pending card tap re-opens Setup in `.edit`
-                        // mode for the tapped Plan.
+                        // tb-WF-5 → tb-WF-6 → tb-WF-7 — S00 Plan list.
+                        // Hero pill (empty state) + C-26 FAB (populated
+                        // state) both open the disambig sheet (unified
+                        // entry per Q6); the sheet's pick callback
+                        // routes to Setup in the chosen `.solo` /
+                        // `.group` mode. Pending Created card tap
+                        // re-opens Setup in `.edit` mode for the tapped
+                        // Plan. tb-WF-7 — Joined card tap dispatches
+                        // via `PlanListScreen.routeFor(joinedRow:)`,
+                        // resuming the joiner into QuizScreen,
+                        // WaitingScreen, or read-only Verdict per the
+                        // §Q8 table.
                         //
                         // Disambig is presented inside `PlanListScreen`
                         // via SwiftUI's `.sheet` modifier. When the user
@@ -366,6 +417,7 @@ public struct RootView: View {
                         // back through the sheet.
                         PlanListScreen(
                             pending: planListPending,
+                            joined: planListJoined,
                             onRequestDisambig: {},
                             onPickGroupMode: { mode in
                                 if coordinators.locationCoordinator.authorization == .notDetermined {
@@ -377,6 +429,13 @@ public struct RootView: View {
                             },
                             onTapPlan: { plan in
                                 openEditSetup(plan: plan)
+                            },
+                            onTapJoined: { row in
+                                handleJoinedTap(
+                                    row: row,
+                                    userID: userID,
+                                    coordinators: coordinators
+                                )
                             }
                         )
                         .task { await refreshPlanList(userID: userID) }
@@ -490,22 +549,200 @@ public struct RootView: View {
         )
     }
 
-    /// tb-WF-5 — hydrate `planListPending` from PlansStore. Called on
-    /// Plan list mount + after a successful `onSaved` write. A
-    /// best-effort read: a transient fetch failure leaves the prior
-    /// `planListPending` in place rather than wiping the cached rows.
+    /// tb-WF-5 / tb-WF-7 — hydrate `planListPending` + `planListJoined`
+    /// from PlansStore. Called on Plan list mount + after a successful
+    /// `onSaved` write. A best-effort read: a transient fetch failure
+    /// leaves the prior cached rows in place rather than wiping the
+    /// list to empty.
     @MainActor
     private func refreshPlanList(userID: UUID) async {
         guard let coordinators else { return }
-        do {
-            let rows = try await coordinators.plansStore.plansForList(userID: userID)
+        async let pendingTask = coordinators.plansStore.plansForList(userID: userID)
+        async let joinedTask = coordinators.plansStore.joinedPlansForList(userID: userID)
+        if let rows = try? await pendingTask {
             self.planListPending = rows
+        }
+        if let rows = try? await joinedTask {
+            self.planListJoined = rows
+        }
+    }
+
+    /// tb-WF-7 — dispatch a Joined-card tap via the pure `routeFor`
+    /// helper. Each destination flips a different `@State` slot so
+    /// the precedence chain renders the right surface on the next
+    /// SwiftUI tick.
+    ///
+    /// `quizAtStart` + `quizAtQuestion` build a `JoinedResumeContext`
+    /// carrying the saved progress payload + the destination step.
+    /// `waiting` builds the same context with a `.waiting` step (the
+    /// joiner already wrote the votes row; we mount Waiting directly).
+    /// `verdictReadOnly*` builds a `ReadOnlyContext` from a fresh
+    /// `fetchReadOnlyPayload` round-trip — the Plan is decided so the
+    /// payload is sealed and the late-joiner store's payload shape is
+    /// exactly what the read-only Verdict consumes.
+    @MainActor
+    private func handleJoinedTap(
+        row: PlansStore.JoinedPlanRow,
+        userID: UUID,
+        coordinators: Coordinators
+    ) {
+        let destination = PlanListScreen.routeFor(joinedRow: row)
+        switch destination {
+        case .quizAtStart, .quizAtQuestion, .waiting:
+            // Look up the room id linked to this Plan, hydrate the
+            // saved progress payload, and mount the resume context.
+            // The lookup is best-effort: a transient failure leaves
+            // the user on the Plan list rather than dropping them
+            // into a stale resume.
+            Task {
+                await openJoinedResume(
+                    row: row,
+                    userID: userID,
+                    destination: destination,
+                    coordinators: coordinators
+                )
+            }
+        case .verdictReadOnlyActive, .verdictReadOnlyHistory:
+            Task {
+                await openJoinedReadOnly(
+                    plan: row.plan,
+                    userID: userID,
+                    coordinators: coordinators
+                )
+            }
+        }
+    }
+
+    /// tb-WF-7 — look up the room linked to a Joined Plan, then read
+    /// the joiner's saved `members.quiz_progress` so the resumed
+    /// QuizCoordinator can hydrate its step + answers. Mounts the
+    /// `JoinedResumeContext` once both reads return.
+    private func openJoinedResume(
+        row: PlansStore.JoinedPlanRow,
+        userID: UUID,
+        destination: JoinedTapDestination,
+        coordinators: Coordinators
+    ) async {
+        guard let resume = await coordinators.plansStore.fetchJoinedResumePayload(
+            planID: row.plan.id,
+            userID: userID
+        ) else {
+            return  // best-effort — leave the user on the Plan list
+        }
+        let step: JoinedResumeContext.Step
+        switch destination {
+        case .waiting:
+            step = .waiting
+        case .quizAtStart:
+            step = .quizAtQuestion(index: 0)
+        case .quizAtQuestion(let index):
+            step = .quizAtQuestion(index: index)
+        case .verdictReadOnlyActive, .verdictReadOnlyHistory:
+            return  // unreachable — guarded above
+        }
+        self.joinedResume = JoinedResumeContext(
+            plan: row.plan,
+            roomID: resume.roomID,
+            progress: resume.progress,
+            step: step
+        )
+    }
+
+    /// tb-WF-7 — fetch the read-only Verdict payload for a Joined
+    /// Plan that is decided (active or expired). Reuses the
+    /// `LateJoinerStore.fetchReadOnlyPayload` shape so the
+    /// VerdictScreen `.readOnly` mode renders the same body the
+    /// deep-link path uses.
+    private func openJoinedReadOnly(
+        plan: PlansStore.Plan,
+        userID: UUID,
+        coordinators: Coordinators
+    ) async {
+        // The Joined-Plan read-only flow needs the room id behind
+        // the Plan; the `joined_plans_for_user` RPC doesn't carry
+        // it inline, so we resolve it here. For Decided plans the
+        // room is by definition non-null on `plan_id`, so the
+        // lookup is one round-trip.
+        guard let roomID = await coordinators.plansStore.roomIDForJoinedPlan(
+            planID: plan.id,
+            userID: userID
+        ) else {
+            return
+        }
+        do {
+            let payload = try await coordinators.lateJoinerStore
+                .fetchReadOnlyPayload(roomID: roomID)
+            self.joinedReadOnly = ReadOnlyContext(roomID: roomID, payload: payload)
         } catch {
-            // Best-effort — a network blip on appear leaves the
-            // previous render in place. The user can pull to retry
-            // (the slot widens when refresh-affordance lands; for
-            // tb-WF-5 a successful Plan write retriggers the fetch
-            // through `onSaved`).
+            // Best-effort — leave the user on the Plan list. They
+            // can re-tap once the network recovers.
+        }
+    }
+
+    /// tb-WF-7 — render the joined-resume context. Mounts QuizScreen
+    /// (resumed at the saved step with hydrated answers) for the
+    /// quiz cases, or WaitingScreen for the finished-quiz case.
+    @ViewBuilder
+    private func joinedResumeView(
+        resume: JoinedResumeContext,
+        userID: UUID,
+        client: SupabaseClient,
+        auth: AuthCoordinator,
+        plansStore: PlansStore
+    ) -> some View {
+        switch resume.step {
+        case .quizAtQuestion:
+            JoinedResumeQuizHost(
+                resume: resume,
+                userID: userID,
+                client: client,
+                plansStore: plansStore,
+                onClose: { joinedResume = nil },
+                onSubmitted: {
+                    // Q5 submit on the resume path hands off to the
+                    // standard post-Q5 router so the verdict
+                    // surfaces the same way as the live-join path.
+                    let quiz = QuizContext(
+                        coordinator: $0,
+                        roomID: resume.roomID,
+                        userID: userID,
+                        isInitiator: false,
+                        invitedShared: true
+                    )
+                    enterPostQuiz(quiz: quiz, client: client)
+                    self.joinedResume = nil
+                }
+            )
+        case .waiting:
+            // The joiner's votes row is already in. Mount
+            // PostQuizHostScreen directly so it polls the verdict
+            // and renders S04 Waiting until the verdict lands.
+            let context = PostQuizSessionContext(
+                roomID: resume.roomID,
+                userID: userID,
+                isInitiator: false,
+                invitedShared: true
+            )
+            let verdictStore = VerdictStore(client: client)
+            let snapshotStore = SessionSnapshotStore(client: client)
+            let host = PostQuizHost(
+                context: context,
+                fetchVerdict: { rid in
+                    try await verdictStore.fetchVerdict(roomID: rid)
+                },
+                fetchSnapshot: { rid in
+                    try await snapshotStore.fetchSnapshot(roomID: rid)
+                }
+            )
+            PostQuizHostScreen(
+                host: host,
+                auth: auth,
+                promptStore: AuthPromptStore(client: client),
+                onEndSession: {
+                    host.teardown()
+                    joinedResume = nil
+                }
+            )
         }
     }
 
@@ -924,5 +1161,104 @@ public struct RootView: View {
     private struct ReadOnlyContext {
         let roomID: UUID
         let payload: LateJoinerStore.ReadOnlyPayload
+    }
+
+    /// tb-WF-7 — context for a Joined-card resume tap. Carries the
+    /// Plan + the linked room id + the saved progress payload + the
+    /// destination step (which question to land on, or `.waiting` for
+    /// a joiner who already voted). The body mounts QuizScreen or
+    /// WaitingScreen against this context.
+    fileprivate struct JoinedResumeContext: Equatable {
+        let plan: PlansStore.Plan
+        let roomID: UUID
+        let progress: QuizProgress
+        let step: Step
+
+        enum Step: Equatable {
+            /// Resume into QuizScreen at the given 0..5 question
+            /// index. 0 means Q1 (joiner never started); 1..4 means
+            /// the next-unanswered question; 5 means Q5 (the joiner
+            /// reached Q5 but did not submit).
+            case quizAtQuestion(index: Int)
+            /// Resume into WaitingScreen — the joiner already wrote
+            /// a votes row and is waiting for the verdict to fire.
+            case waiting
+        }
+    }
+}
+
+// MARK: - tb-WF-7 JoinedResumeQuizHost
+
+/// tb-WF-7 — the host SwiftUI view that owns the QuizCoordinator
+/// for a Joined-card resume tap. Mounts a fresh coordinator hydrated
+/// from the saved `members.quiz_progress` payload and pinned to the
+/// resumed step. The coordinator does NOT carry a `candidateFetch`
+/// — the Q5 candidate set comes from the live `QuizSessionAssembler`
+/// path; rebuilding the assembler stack inside a resume is out of
+/// scope for this slice (the assembler reads location + session
+/// params from the room, which we hand it once the resume mount
+/// completes). For now the resume into Q5 lands the user on Q5
+/// with prior answers preserved; the per-member Foursquare fetch
+/// fires anew on the next Q5 render.
+///
+/// Why a dedicated host rather than reusing the existing QuizScreen
+/// path: the live path's `startQuiz` runs through `QuizSessionAssembler`,
+/// which assumes a fresh session and emits a coordinator pinned to
+/// Q1. Reusing it would require a parallel "resume" code path in the
+/// assembler — that's a bigger refactor than this slice can absorb.
+/// The resume host wraps QuizScreen with the resumed coordinator;
+/// production behavior on Q5 submit is identical (the same Q5 vote
+/// row + the same verdict-fire path).
+@MainActor
+private struct JoinedResumeQuizHost: View {
+    let resume: RootView.JoinedResumeContext
+    let userID: UUID
+    let client: SupabaseClient
+    let plansStore: PlansStore
+    let onClose: () -> Void
+    let onSubmitted: (QuizCoordinator) -> Void
+
+    @State private var coordinator: QuizCoordinator?
+
+    var body: some View {
+        Group {
+            if let coordinator {
+                QuizScreen(
+                    coordinator: coordinator,
+                    role: .joiner,
+                    isSolo: false,
+                    onClose: onClose,
+                    onExit: onClose,
+                    onSubmitted: { onSubmitted(coordinator) }
+                )
+            } else {
+                // Mount one-shot: build the QuizCoordinator from the
+                // resume payload. `applyInitialProgress` consumes
+                // the progress in its init and lands the step.
+                ProgressView()
+                    .tint(GTIColor.TextOnGradient.primary)
+                    .onAppear { mount() }
+            }
+        }
+    }
+
+    private func mount() {
+        // Build a fresh coordinator on the legacy `candidates:` init —
+        // the live Foursquare fetch path is owned by the assembler
+        // and a resume re-runs the fetch on the next Q5 advance. The
+        // progress payload hydrates Q1..Q4 answers AND lands the step
+        // at the right question (§Q8 row-mapping per `QuizCoordinator.
+        // applyInitialProgress`).
+        let writer = QuizSupabaseWriter.make(client: client)
+        let progressWriter = plansStore.memberProgressWriter(roomID: resume.roomID)
+        self.coordinator = QuizCoordinator(
+            roomID: resume.roomID,
+            userID: userID,
+            candidates: [],
+            sessionParameters: resume.plan.sessionParameters ?? .default,
+            writer: writer,
+            initialProgress: resume.progress,
+            progressWriter: progressWriter
+        )
     }
 }
