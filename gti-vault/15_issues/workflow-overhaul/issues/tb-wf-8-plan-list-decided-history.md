@@ -1,11 +1,12 @@
 ---
 issue: tb-WF-8
 title: iOS Plan list — Decided + History sections + lifecycle transitions
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 177
 created: 2026-05-20
+closed: 2026-05-20
 ---
 
 # tb-WF-8 — iOS Plan list: Decided + History lifecycle
@@ -78,3 +79,18 @@ End-to-end vertical slice that makes the **full lifecycle of a Plan visible on t
 
 - [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] — foundation Plan list shell with stub Decided/History queries.
 - [[tb-wf-7-plan-list-joiner-resume|tb-WF-7]] — Joined-card tap router. Required because Decided/History rows can be Joined cards too.
+
+## Comments
+
+### 2026-05-20 — AFK execution closed (PR [#186](https://github.com/samfarls55/gettoit/pull/186))
+
+Merged on `afk/tb-wf-8` and squashed onto `main`. All eight acceptance criteria pass.
+
+**What landed:**
+- Migration `20260522000000000_plans_decided_history_lifecycle.sql` — `plans.verdict_fired_at` + `plans.expired_at` columns, amended `set_plan_decided_active` to stamp `verdict_fired_at`, new `set_plan_decided_expired` SECURITY DEFINER function, per-minute `cron_expire_reroll_windows` worker, AFTER INSERT triggers on `rerolls` (3rd burn) and `check_ins` (any outcome), and two new RPCs (`plans_decided_for_user` + `plans_history_for_user`) that inline the verdict's place name and project a `role` text column.
+- iOS — `PlansStore.Plan` widened (tolerant decode on new timestamps); new `PlansStore.DecidedPlanRow` value type + two new queries; new `roomIDForPlan` role-agnostic lookup; `PlanListScreen` renders 2-line Decided + History cards; History collapsible (state held in a small `@Observable` class so unit tests can mutate without a hosting controller mount) with per-user `UserDefaults` persistence; new `DecidedHistoryTapDestination` router + pure `tapRoute(for:)` helper; `RootView` wires four-bucket refresh + dispatches Decided/History taps to full or read-only `VerdictScreen`.
+- Tests — 19 Deno migration-shape tests, 9 PlansStore decoder + signature tests, 12 PlanListScreen pure-helper + persistence tests (including the cross-user isolation case), and 5 new render-smoke tests.
+
+**Known follow-ups (out of scope here):**
+- The reroll window's exact "23:59:59 next-calendar-day local-TZ" computation remains sg-WF-6's territory; the cron worker honours whatever `reroll_window_closes_at` carries, which today is the tb-WF-1 placeholder `now() + interval '2 days'`.
+- The Created-Decided tap mounts the full `VerdictScreen` with `mode=.default, isInitiator=true` (the reroll button is visible per surface §"Tap behavior"), but the `onReroll` closure is a no-op for this slice — matching the existing post-quiz screen pattern. A live reroll-from-Plan-list flow is a separate piece of work alongside tb-WF-9 (three-dot menu + delete + leave).
