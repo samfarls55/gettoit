@@ -11,3 +11,4 @@ Live + archived progress logs from `/execute-issues` runs. One file per run, nam
 | 2026-05-18-1924 | done | [[2026-05-18-1924-afk-execution-log]] — 2/2 merged (bug-09, tb-23), 0 escalated — verdict pipeline now wired end to end |
 | 2026-05-18-1306 | done | [[2026-05-18-1306-afk-execution-log]] — 1/1 merged (tb-24, iOS Q5 factorial-ratings wire), 0 escalated |
 | 2026-05-19-1932 | done | [[2026-05-19-1932-afk-execution-log]] — verdict-spinner batch (bug-12/13/14 + ops-01), 4/4 merged, 0 escalated |
+| 2026-05-19-1839 | running | [[2026-05-19-1839-afk-execution-log]] — workflow-overhaul wave-1: 4 AFK issues (sg-WF-1/2/3, tb-WF-1) + 2 waiting (tb-WF-2/3) |
