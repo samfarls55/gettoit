@@ -57,6 +57,12 @@ public enum GTIColor {
         public static let secondary   = Color(gtiHex: 0x0E1011, opacity: 0.7)
         public static let tertiary    = Color(gtiHex: 0x0E1011, opacity: 0.5)
     }
+
+    /// Range Slider (C-21) accent colors. `tick` is the subtle anchor mark used by the
+    /// S01 Setup distance slider variant (at the 1.0 mi walk/drive boundary).
+    public enum Slider {
+        public static let tick        = Color.white.opacity(0.55)
+    }
 }
 
 /// Per-surface 4-stop linear gradients. Stop positions are shared across all surfaces.

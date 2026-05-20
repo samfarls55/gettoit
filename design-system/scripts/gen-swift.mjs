@@ -98,6 +98,12 @@ function renderSwift(t) {
   lines.push(`        public static let secondary   = Color(gtiHex: ${hex(t.color['ink'])}, opacity: ${rgbaAlpha(t.color.text['on-surface'].secondary)})`);
   lines.push(`        public static let tertiary    = Color(gtiHex: ${hex(t.color['ink'])}, opacity: ${rgbaAlpha(t.color.text['on-surface'].tertiary)})`);
   lines.push('    }');
+  lines.push('');
+  lines.push('    /// Range Slider (C-21) accent colors. `tick` is the subtle anchor mark used by the');
+  lines.push('    /// S01 Setup distance slider variant (at the 1.0 mi walk/drive boundary).');
+  lines.push('    public enum Slider {');
+  lines.push(`        public static let tick        = Color.white.opacity(${rgbaAlpha(t.color.slider.tick)})`);
+  lines.push('    }');
   lines.push('}');
   lines.push('');
 

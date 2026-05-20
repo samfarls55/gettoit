@@ -344,7 +344,7 @@ Treat as **not final** — real wordmark is owned by `40_marketing_branding/`.
 
 ## C-21 · Range Slider
 
-Continuous numeric input on a gradient surface. Used by S01 for radius. Single primitive — no min/max chips, no end labels, no histogram. The current value renders as a readable label in the row above the slider (e.g. `"2.0 mi"`).
+Continuous numeric input on a gradient surface. Used by S01-setup (distance) and S05 verdict's "Widen radius" branch. Single primitive — no min/max chips, no end labels, no histogram. The current value renders as a readable label in the row above the slider (e.g. `"2.0 mi"`).
 
 | Element | Spec |
 |---|---|
@@ -361,13 +361,27 @@ The C-08 vibe slider already uses sun-fill for its selected stop. Continuity wit
 **Tap target:** The visual bar is 6px; the input overlay is 44pt tall. Both the bar and the row above (label) are inside the same hit row.
 
 **Accessibility:**
-- `aria-label` describes what's being adjusted (e.g. `"Walk radius"`).
+- `aria-label` describes what's being adjusted (e.g. `"Walk radius"`, `"Plan distance"`).
 - `aria-valuetext` mirrors the visible label so VO reads `"2.0 miles"` rather than `"2"`.
 - VO order: row label → live value → slider hint (`"Adjustable. Swipe up or down to change."`).
 
-**SwiftUI primitive:** `Slider(value: $radius, in: 0.5...5.0, step: 0.5)` with `.tint(GTIColor.sun)` and a custom `.frame(height: 44)`. Render the value label separately above the slider so it can use `mono-tag` or similar treatment.
+### Variants
 
-**When NOT to use:** ordinal/cardinal-scalar inputs (vibe Q4) — use C-08 Vibe Slider; users should land on discrete labeled stops, not in-between values.
+**Uniform step (canonical):** Pass `min` + `max` + `step`. The native `<input type="range">` slides linearly across that range. Used by S05 verdict "Widen radius" (`1.0 / 0.5 / 10.0`).
+
+**Non-uniform `steps` array + anchor tick** *(added 2026-05-19 for sg-WF-1):* Pass `steps={[…]}` instead of `min`/`max`/`step`. The slider derives `min` / `max` from the first / last entries; the native overlay uses the smallest gap between adjacent entries as its step resolution; on `onChange`, the JSX snaps the raw value to the nearest entry in the list. The optional `tickAt={value}` prop renders a subtle 2 × 10 px anchor mark on the track at the given value (color: `color.slider.tick` → white 0.55). The tick is purely visual — no words, no label — and does not interact with snap behavior.
+
+Used by S01-setup distance slider:
+- `steps={[0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]}` — granularity tracks the walk/drive cognitive shift (0.25 below 1 mi, 0.5 between 1 and 5, 1.0 above 5).
+- `tickAt={1.0}` — anchors the implicit walk/drive boundary without resurrecting the rejected transport-mode question (workflow-overhaul Q8).
+
+The token `color.slider.tick` (`rgba(255,255,255,0.55)`) was added with this variant; the same opacity already serves the chip outline and the S01 settings link, so the value lifts an existing visual into a registered semantic role. Generated into `GTIColor.Slider.tick` (`ios/Sources/GTITokens.swift`) by `gen-swift.mjs`.
+
+**SwiftUI primitive (uniform step):** `Slider(value: $radius, in: 0.5...5.0, step: 0.5)` with `.tint(GTIColor.sun)` and a custom `.frame(height: 44)`. Render the value label separately above the slider so it can use `mono-tag` or similar treatment.
+
+**SwiftUI primitive (non-uniform steps + tick):** The native `Slider` API only supports uniform steps. The iOS port lays a custom track + thumb on top of a `Slider(value: $rawValue, in: 0.25...10.0)` (no step), binds `onChange` to snap to the nearest entry of the `steps` array, and overlays a 2×10 `Rectangle().fill(GTIColor.Slider.tick)` at the `tickAt` percentage. See tb-WF-4 for the specific Swift wiring.
+
+**When NOT to use:** ordinal/cardinal-scalar inputs (vibe Q4) — use C-08 Vibe Energy Scale; users should land on discrete labeled stops, not in-between values.
 
 ---
 
