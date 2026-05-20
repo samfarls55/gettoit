@@ -30,15 +30,20 @@ final class PlanListScreenRenderTests: XCTestCase {
 
     private func makeScreen(
         pending: [PlansStore.Plan],
-        joined: [PlansStore.JoinedPlanRow] = []
+        joined: [PlansStore.JoinedPlanRow] = [],
+        decided: [PlansStore.DecidedPlanRow] = [],
+        history: [PlansStore.DecidedPlanRow] = []
     ) -> PlanListScreen {
         PlanListScreen(
             pending: pending,
             joined: joined,
+            decided: decided,
+            history: history,
             onRequestDisambig: {},
             onPickGroupMode: { _ in },
             onTapPlan: { _ in },
-            onTapJoined: { _ in }
+            onTapJoined: { _ in },
+            onTapDecidedOrHistory: { _ in }
         )
     }
 
@@ -112,5 +117,84 @@ final class PlanListScreenRenderTests: XCTestCase {
             hasVoted: false
         )
         render(makeScreen(pending: [created], joined: [row]))
+    }
+
+    // MARK: - tb-WF-8 Decided + History render coverage
+
+    private func makeDecidedRow(
+        name: String,
+        status: PlansStore.LifecycleState,
+        role: PlansStore.DecidedPlanRow.Role = .owner,
+        verdictPlaceName: String? = "Pico's Taqueria"
+    ) -> PlansStore.DecidedPlanRow {
+        let plan = PlansStore.Plan(
+            id: UUID(),
+            creatorID: UUID(),
+            name: name,
+            category: "food",
+            scope: .group,
+            location: nil,
+            sessionParameters: SessionParameters.default,
+            distanceMeters: 1609,
+            status: status,
+            rerollWindowClosesAt: nil,
+            verdictFiredAt: "2026-05-20T18:00:00Z",
+            expiredAt: status == .decidedExpired ? "2026-05-20T23:59:59Z" : nil,
+            createdAt: "2026-05-20T12:00:00Z",
+            updatedAt: "2026-05-20T18:00:00Z"
+        )
+        return PlansStore.DecidedPlanRow(
+            plan: plan,
+            role: role,
+            verdictPlaceName: verdictPlaceName
+        )
+    }
+
+    /// One Decided-active row renders the Decided section with the
+    /// 2-line card (Plan name + verdict place).
+    func testOneDecidedRenders() {
+        let row = makeDecidedRow(name: "Friday dinner", status: .decidedActive)
+        render(makeScreen(pending: [], decided: [row]))
+    }
+
+    /// One History row renders the History section, expanded by default.
+    func testOneHistoryRenders() {
+        let row = makeDecidedRow(name: "Friday dinner", status: .decidedExpired)
+        render(makeScreen(pending: [], history: [row]))
+    }
+
+    /// Full lifecycle — one Plan in each section (Pending / Decided /
+    /// History). Per the issue's snapshot-test requirement: the full
+    /// lifecycle visualization in a single render.
+    func testFullLifecycleRenders() {
+        let pendingPlan = makePlan(name: "Sunday brunch")
+        let decidedRow = makeDecidedRow(name: "Friday dinner", status: .decidedActive)
+        let historyRow = makeDecidedRow(name: "Last Tuesday", status: .decidedExpired)
+        render(makeScreen(
+            pending: [pendingPlan],
+            decided: [decidedRow],
+            history: [historyRow]
+        ))
+    }
+
+    /// A Joined Decided card renders the JOINED chip + 2-line body.
+    func testJoinedDecidedRenders() {
+        let row = makeDecidedRow(
+            name: "Alex's birthday",
+            status: .decidedActive,
+            role: .joined
+        )
+        render(makeScreen(pending: [], decided: [row]))
+    }
+
+    /// A Decided row whose verdict_place_name is nil (no-survivor
+    /// verdict) still renders — name only, no secondary line.
+    func testDecidedWithMissingVerdictPlaceRenders() {
+        let row = makeDecidedRow(
+            name: "Friday dinner",
+            status: .decidedActive,
+            verdictPlaceName: nil
+        )
+        render(makeScreen(pending: [], decided: [row]))
     }
 }
