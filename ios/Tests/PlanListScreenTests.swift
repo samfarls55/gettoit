@@ -75,12 +75,10 @@ final class PlanListScreenTests: XCTestCase {
         XCTAssertEqual(PlanListScreen.pendingSectionLabel, "Pending")
     }
 
-    /// Temp `+` chrome glyph label. The chrome `+` is the populated-
-    /// state create affordance until tb-WF-6 lands the C-26 FAB. The
-    /// glyph itself is a literal `+` per the issue body.
-    func testTempPlusChromeGlyph() {
-        XCTAssertEqual(PlanListScreen.tempCreateGlyph, "+")
-    }
+    // (tb-WF-6) The `tempCreateGlyph` constant from tb-WF-5 has been
+    // retired — the populated-state create affordance is now the C-26
+    // FAB, not a top-trailing chrome `+`. See
+    // `PlanListScreenDisambigTests` for the FAB-routing coverage.
 
     // MARK: - sort order
 

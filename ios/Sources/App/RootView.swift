@@ -84,26 +84,38 @@ public struct RootView: View {
     /// cold, signed-in launch lands on the Plan list per
     /// surfaces/00-plan-list.md.
     ///
-    /// Mode-picking entry point: tb-WF-5 wires the Plan list's hero
-    /// pill + temp `+` glyph to `.create + .solo`. tb-WF-6 will land
-    /// the disambig sheet (FAB → Solo / Group) so the Group route
-    /// gets its own entry point alongside Solo.
+    /// Mode-picking entry point: tb-WF-6 wires the Plan list's
+    /// disambig sheet (FAB or empty-state hero pill → Solo / Group)
+    /// to `.create` with the user's picked group mode. The TB-11
+    /// read-only verdict re-invite still lands on `.create + .solo`
+    /// via the legacy `openSoloSetup()` thin wrapper.
     @State private var setupContext: SetupContext?
     /// tb-WF-5 — Pending plans backing the S00 Plan list surface.
     /// Hydrated from PlansStore on appear and after a successful
     /// Plan write. Empty by default → the list renders the empty
     /// hero state.
     @State private var planListPending: [PlansStore.Plan] = []
-    /// TB-03 (v1.1) → tb-WF-5 — set when the user invokes the Plan
-    /// list's `onCreatePlan` callback (hero pill OR temp `+` glyph)
-    /// AND iOS location permission is still `notDetermined`. While
-    /// true, the host renders the S00b LocationPermissionScreen
-    /// (pre-prime). On either CTA tap the flag clears and
-    /// `setupContext` populates so S01 Setup takes over. Permission
-    /// outcomes are observed via the shared LocationCoordinator on
-    /// `coordinators` — we don't gate the transition on grant vs deny
-    /// because the picker on Setup handles both states.
+    /// TB-03 (v1.1) → tb-WF-5 → tb-WF-6 — set when the user picks a
+    /// Solo/Group from the Plan list's disambig sheet AND iOS location
+    /// permission is still `notDetermined`. While true, the host
+    /// renders the S00b LocationPermissionScreen (pre-prime). On
+    /// either CTA tap the flag clears and `setupContext` populates so
+    /// S01 Setup takes over in the previously-disambig'd group mode.
+    /// Permission outcomes are observed via the shared
+    /// LocationCoordinator on `coordinators` — we don't gate the
+    /// transition on grant vs deny because the picker on Setup handles
+    /// both states.
     @State private var showingLocationPermission = false
+
+    /// tb-WF-6 — carries the disambig'd group mode while the location
+    /// pre-prime is on screen. The disambig sheet sets this when the
+    /// user picks Solo or Group, then the pre-prime resumes Setup in
+    /// the carried mode after either CTA tap. Nil when no pre-prime is
+    /// pending, or in flows that skip the pre-prime (permission
+    /// already determined). The disambig itself does not mount the
+    /// pre-prime — the Plan list closes its sheet first and the
+    /// pending group mode bridges the two.
+    @State private var pendingDisambigGroupMode: SetupScreen.GroupMode?
 
     public init() {}
 
@@ -248,12 +260,13 @@ public struct RootView: View {
                         }
                     )
                 } else if let userID = coordinators.auth.state.userID {
-                    // tb-WF-5 — S00 Plan list is the default
+                    // tb-WF-5 → tb-WF-6 — S00 Plan list is the default
                     // signed-in surface. The host populates
                     // `setupContext` when the Plan list invokes
-                    // `onCreatePlan` (hero pill OR temp `+` chrome
-                    // glyph) or `onTapPlan` (existing pending Plan,
-                    // re-opens in `.edit` mode).
+                    // `onPickGroupMode` (after the user picks Solo or
+                    // Group on the disambig sheet) or `onTapPlan`
+                    // (existing pending Plan, re-opens in `.edit`
+                    // mode).
                     //
                     // After TB-02 v1.1, the canonical iOS user is
                     // `.linkedApple` (post-S00a). Legacy v1 installs
@@ -274,12 +287,16 @@ public struct RootView: View {
                         LocationPermissionScreen(
                             onShareLocation: {
                                 coordinators.locationCoordinator.requestPermission()
+                                let mode = pendingDisambigGroupMode ?? .solo
+                                pendingDisambigGroupMode = nil
                                 showingLocationPermission = false
-                                openSoloSetup()
+                                openSetup(groupMode: mode)
                             },
                             onManualEntry: {
+                                let mode = pendingDisambigGroupMode ?? .solo
+                                pendingDisambigGroupMode = nil
                                 showingLocationPermission = false
-                                openSoloSetup()
+                                openSetup(groupMode: mode)
                             }
                         )
                     } else if let context = setupContext {
@@ -328,17 +345,34 @@ public struct RootView: View {
                             }
                         )
                     } else {
-                        // tb-WF-5 — S00 Plan list. Hero pill (empty
-                        // state) + temp `+` (populated state) both
-                        // open Solo Setup; pending card tap re-opens
-                        // Setup in `.edit` mode for the tapped Plan.
+                        // tb-WF-5 → tb-WF-6 — S00 Plan list. Hero pill
+                        // (empty state) + C-26 FAB (populated state)
+                        // both open the disambig sheet (unified entry
+                        // per Q6); the sheet's pick callback routes to
+                        // Setup in the chosen `.solo` / `.group` mode.
+                        // Pending card tap re-opens Setup in `.edit`
+                        // mode for the tapped Plan.
+                        //
+                        // Disambig is presented inside `PlanListScreen`
+                        // via SwiftUI's `.sheet` modifier. When the user
+                        // picks Solo or Group, `onPickGroupMode` fires —
+                        // and at that point we branch on iOS location
+                        // permission: undetermined → carry the chosen
+                        // mode in `pendingDisambigGroupMode` and route
+                        // through S00b pre-prime; determined → open
+                        // Setup in the chosen mode directly. The
+                        // pre-prime resume preserves the user's
+                        // disambig choice rather than forcing them
+                        // back through the sheet.
                         PlanListScreen(
                             pending: planListPending,
-                            onCreatePlan: {
+                            onRequestDisambig: {},
+                            onPickGroupMode: { mode in
                                 if coordinators.locationCoordinator.authorization == .notDetermined {
+                                    pendingDisambigGroupMode = mode
                                     showingLocationPermission = true
                                 } else {
-                                    openSoloSetup()
+                                    openSetup(groupMode: mode)
                                 }
                             },
                             onTapPlan: { plan in
@@ -425,13 +459,23 @@ public struct RootView: View {
         )
     }
 
-    /// tb-WF-5 — open Setup in `.create + .solo` mode for the Plan
-    /// list's hero pill (empty state) and temp `+` chrome glyph
-    /// (populated state). Both affordances route to Solo Setup
-    /// directly in this slice; the disambig sheet (tb-WF-6) will
-    /// add the Group route alongside.
+    /// tb-WF-5 → tb-WF-6 — open Setup in `.create` mode with the
+    /// supplied group mode. Wraps the legacy `openSoloSetup()` call
+    /// site (TB-11 read-only verdict re-invite, which always lands in
+    /// Solo) and the new disambig pick site (which carries either
+    /// Solo or Group). The disambig sheet (tb-WF-6) routes here with
+    /// the user's chosen mode; the read-only re-invite path retains
+    /// the previous Solo default.
+    private func openSetup(groupMode: SetupScreen.GroupMode) {
+        setupContext = SetupContext(mode: .create, groupMode: groupMode, editingPlan: nil)
+    }
+
+    /// Legacy thin wrapper — preserves the call site shape from
+    /// tb-WF-5 (TB-11 read-only verdict `onAdvance` re-invite always
+    /// lands on Solo Setup). The disambig sheet bypasses this by
+    /// calling `openSetup(groupMode:)` directly with the user's pick.
     private func openSoloSetup() {
-        setupContext = SetupContext(mode: .create, groupMode: .solo, editingPlan: nil)
+        openSetup(groupMode: .solo)
     }
 
     /// tb-WF-5 — open Setup in `.edit` mode for an existing pending
