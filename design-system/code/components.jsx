@@ -37,7 +37,13 @@ function GradientSurface({ stop, children }) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Top bar — close × + segmented progress
+// Top bar — close × (optional) + segmented progress
+//
+// The × is rendered when an `onClose` callback is provided. The quiz
+// screens (sg-WF-2) suppress it: the QuizChrome row above the TopBar
+// owns the Exit/Leave affordance, so the × becomes redundant. Passing
+// `onClose={undefined}` collapses the close slot and lets the segments
+// span the full row.
 // ────────────────────────────────────────────────────────────
 function TopBar({ step = 0, total = 5, onClose }) {
   return (
@@ -46,12 +52,14 @@ function TopBar({ step = 0, total = 5, onClose }) {
       display: 'flex', alignItems: 'center', gap: 14,
       padding: '0 22px',
     }}>
-      <button onClick={onClose} aria-label="Close session" style={{
-        appearance: 'none', border: 0, background: 'transparent',
-        color: '#fff', padding: 4, cursor: 'pointer',
-        fontFamily: 'var(--ff-body)', fontWeight: 800, fontSize: 22,
-        lineHeight: 1, opacity: 0.85,
-      }}>×</button>
+      {onClose && (
+        <button onClick={onClose} aria-label="Close session" style={{
+          appearance: 'none', border: 0, background: 'transparent',
+          color: '#fff', padding: 4, cursor: 'pointer',
+          fontFamily: 'var(--ff-body)', fontWeight: 800, fontSize: 22,
+          lineHeight: 1, opacity: 0.85,
+        }}>×</button>
+      )}
       <div style={{ flex: 1, display: 'flex', gap: 5, alignItems: 'center' }}>
         {Array.from({length: total}).map((_, i) => (
           <div key={i} style={{
@@ -814,6 +822,200 @@ function LocationPickerSheet({
   );
 }
 
+// ────────────────────────────────────────────────────────────
+// Quiz chrome (sg-WF-2) — Back + Exit affordances on every Qn screen.
+//
+// Two text labels sitting above the C-02 TopBar:
+//   • Back  — top-leading, omitted on Q1 (canBack={false}). Per-member;
+//             stepping one question backward preserves the prior answer.
+//             Spec semantic only — the actual step-back nav is owned by
+//             the host surface via the onBack callback.
+//   • Exit / Leave  — top-trailing, rendered on every Qn. Label depends
+//             on role: initiator sees "Exit", joiner sees "Leave". Tap
+//             opens a confirmation alert; on confirm, onExit fires.
+//
+// `solo` flag swaps the body copy to the solo-session variant — the
+// member is the only one in the room, so "others can still finish" is
+// false. Plan-state side-effect ("your plan will stay saved") goes here.
+//
+// Treatment matches the existing S01 "SETTINGS" footer convention —
+// eyebrow type token (Inter 700 / 11 / tracking 0.18em / UPPERCASE),
+// pure text label, no icons, 44pt minimum hit row. The intent is low
+// visual weight so neither affordance competes with the primary input.
+//
+// CONTEXT.md → "Plan back" / "Plan exit" carry the canonical semantics.
+// The room-mutation side of Exit is an iOS-wiring concern (tb-WF-2).
+// ────────────────────────────────────────────────────────────
+function QuizChrome({
+  canBack = true,
+  role = 'initiator',                 // 'initiator' | 'joiner'
+  solo = false,
+  onBack = () => {},
+  onExit = () => {},
+}) {
+  const [confirming, setConfirming] = React.useState(false);
+
+  const isJoiner = role === 'joiner';
+  const exitLabel = isJoiner ? 'Leave' : 'Exit';
+
+  // Confirmation copy — locked verbatim, see surfaces/03-quiz.md §"Quiz chrome (Back + Exit)".
+  const copy = (() => {
+    if (solo) {
+      return {
+        title: 'Exit this plan?',
+        body: 'Your answers will be discarded. Your plan will stay saved so you can start over.',
+        confirm: 'Exit',
+        cancel: 'Keep going',
+      };
+    }
+    if (isJoiner) {
+      return {
+        title: 'Leave this plan?',
+        body: 'Your answers will be discarded. The host and others can still finish.',
+        confirm: 'Leave',
+        cancel: 'Keep going',
+      };
+    }
+    return {
+      title: 'Exit this plan?',
+      body: 'Your answers will be discarded. Others can still finish without you.',
+      confirm: 'Exit',
+      cancel: 'Keep going',
+    };
+  })();
+
+  const linkStyle = {
+    appearance: 'none', background: 'transparent', border: 0, cursor: 'pointer',
+    minHeight: 44, minWidth: 44,
+    padding: '12px 4px',
+    fontFamily: 'var(--ff-body)',
+    fontSize: 'var(--fz-eyebrow)', fontWeight: 700,
+    letterSpacing: 'var(--tr-eyebrow)', textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.78)',
+    lineHeight: 1,
+    transition: 'opacity 140ms var(--ease-out)',
+  };
+
+  return (
+    <>
+      <div style={{
+        position: 'relative', zIndex: 3,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 22px',
+        minHeight: 44,
+      }}>
+        {/* Back — top-leading, suppressed on Q1 (canBack=false). The slot
+            collapses to an empty 44pt-wide spacer so the Exit/Leave label
+            stays anchored to the trailing edge. */}
+        {canBack ? (
+          <button
+            onClick={onBack}
+            style={{ ...linkStyle, textAlign: 'left' }}
+            aria-label="Back to previous question"
+          >Back</button>
+        ) : (
+          <div style={{ minWidth: 44, minHeight: 44 }} aria-hidden="true" />
+        )}
+
+        {/* Exit / Leave — top-trailing, every screen. */}
+        <button
+          onClick={() => setConfirming(true)}
+          style={{ ...linkStyle, textAlign: 'right' }}
+          aria-label={`${exitLabel} the quiz`}
+        >{exitLabel}</button>
+      </div>
+
+      {confirming && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="quiz-chrome-exit-title"
+          aria-describedby="quiz-chrome-exit-body"
+          style={{
+            position: 'absolute', inset: 0, zIndex: 20,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 22px',
+          }}
+        >
+          {/* Backdrop — tap to cancel */}
+          <button
+            onClick={() => setConfirming(false)}
+            aria-label="Cancel"
+            style={{
+              position: 'absolute', inset: 0,
+              background: 'rgba(0,0,0,0.42)',
+              border: 0, padding: 0, cursor: 'pointer',
+              animation: 'gti-fade-up 200ms var(--ease-out) both',
+            }}
+          />
+
+          {/* Alert card */}
+          <div style={{
+            position: 'relative',
+            width: '100%', maxWidth: 320,
+            padding: '22px 22px 16px',
+            borderRadius: 'var(--r-card)',
+            background: 'rgba(20,20,30,0.94)',
+            backdropFilter: 'blur(24px) saturate(160%)',
+            WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+            border: '1px solid rgba(255,255,255,0.10)',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
+            color: '#fff',
+            animation: 'gti-sheet-rise 280ms var(--ease-out-soft) both',
+            textAlign: 'center',
+          }}>
+            <h2
+              id="quiz-chrome-exit-title"
+              className="gti-display"
+              style={{
+                margin: '0 0 8px',
+                fontSize: 22,
+                lineHeight: 1.15,
+                textWrap: 'balance',
+              }}
+            >{copy.title}</h2>
+            <p
+              id="quiz-chrome-exit-body"
+              style={{
+                margin: '0 0 18px',
+                fontSize: 14, fontWeight: 500, lineHeight: 1.4,
+                color: 'rgba(255,255,255,0.78)',
+                textWrap: 'balance',
+              }}
+            >{copy.body}</p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                onClick={() => { setConfirming(false); onExit(); }}
+                style={{
+                  appearance: 'none', border: 0, cursor: 'pointer',
+                  width: '100%', minHeight: 48, borderRadius: 999,
+                  background: '#fff', color: 'var(--ink)',
+                  fontFamily: 'var(--ff-body)',
+                  fontWeight: 900, fontSize: 14,
+                  letterSpacing: '0.14em', textTransform: 'uppercase',
+                }}
+              >{copy.confirm}</button>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{
+                  appearance: 'none', border: 0, background: 'transparent',
+                  width: '100%', minHeight: 44,
+                  fontFamily: 'var(--ff-body)',
+                  fontSize: 13, fontWeight: 700,
+                  letterSpacing: '0.12em', textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.78)',
+                  cursor: 'pointer',
+                }}
+              >{copy.cancel}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 Object.assign(window, {
   GTI_GRADIENTS, VIBE_LABELS,
   GradientSurface, TopBar, QuestionHeader,
@@ -821,4 +1023,5 @@ Object.assign(window, {
   CTADock, Eyebrow, Glass, GTIMark,
   RangeSlider, AuthUpgradeChip,
   LocationPickerChip, LocationPickerSheet,
+  QuizChrome,
 });

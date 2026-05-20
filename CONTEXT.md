@@ -61,7 +61,7 @@ The list of past `decided-expired` Plans visible to the user from the Plan list 
 _Avoid_: past decisions (uses the deprecated noun), verdict log (engineering register).
 
 **Plan exit** (verb):
-A *participant-scoped* withdrawal from an in-progress quiz, taken on a quiz screen (Q2 onward via an `Exit` affordance in the chrome). The exiter's quiz answers are discarded and their membership is dropped from the active room. The room remains alive for the remaining participants. The Plan itself does **not** change state — for the initiator's list, an exited Plan stays `pending` if the remaining members no longer hold quorum (room times out without a verdict), or transitions to `decided-active` if the rest reach verdict without the exiter's votes counted.
+A *participant-scoped* withdrawal from an in-progress quiz, taken on any quiz screen (Q1–Q5 via an `Exit` affordance in the chrome — joiners see the same affordance labelled `Leave`). The exiter's quiz answers are discarded and their membership is dropped from the active room. The room remains alive for the remaining participants. The Plan itself does **not** change state — for the initiator's list, an exited Plan stays `pending` if the remaining members no longer hold quorum (room times out without a verdict), or transitions to `decided-active` if the rest reach verdict without the exiter's votes counted.
 _Avoid_: cancel (overloaded — see Plan delete), leave (acceptable colloquially in UI copy but ambiguous about whose state changes), abandon (engineering register).
 
 **Plan delete** (verb):

@@ -1,7 +1,7 @@
 // Surface 05 — Q3 · Distance (walk time)
 // EBA veto threshold.  Number is shown at display scale to rehearse the constraint.
 
-function ScreenQ3Distance({ onAdvance }) {
+function ScreenQ3Distance({ onAdvance, onBack, onExit, role = 'initiator', solo = false }) {
   const [val, setVal] = React.useState(15);
   const ticks = [5, 10, 15, 20, 30];
 
@@ -9,6 +9,8 @@ function ScreenQ3Distance({ onAdvance }) {
     <GradientSurface stop="q3">
       <div className="gti-canvas">
         <div className="content">
+          {/* sg-WF-2: Q3 chrome — Back + Exit. */}
+          <QuizChrome role={role} solo={solo} onBack={onBack} onExit={onExit} />
           <TopBar step={3} total={5} />
           <div style={{ height: 40 }} />
           <QuestionHeader

@@ -26,7 +26,9 @@ jsx:
 Every Qn screen has the same skeleton:
 
 ```
-TopBar  (× + 5-segment progress)
+QuizChrome  (Back? + Exit/Leave text labels)
+   ↓ 0
+TopBar  (5-segment progress; × suppressed in quiz context)
    ↓ 40
 QuestionHeader  (eyebrow + display title + sub)
    ↓ 24
@@ -35,7 +37,10 @@ QuestionHeader  (eyebrow + display title + sub)
 CTADock  (primary pill)
 ```
 
-Reusable across all five — see `components.jsx`.
+Reusable across all five — see `components.jsx`. The `QuizChrome` row
+owns the Exit/Leave affordance, so the C-02 TopBar's `×` is suppressed
+on the quiz surfaces (`onClose` left undefined). See §"Quiz chrome
+(Back + Exit)" below for the locked rules.
 
 ---
 
@@ -168,8 +173,114 @@ action-shaped sun-fill CTA, no fictitious filler.
 
 ---
 
+## Quiz chrome (Back + Exit)
+
+Every Qn surface carries two text-label affordances above the C-02
+TopBar: a `Back` link top-leading and an `Exit` / `Leave` link
+top-trailing. Locked by the workflow-overhaul plan §Q5 (`[[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]]`)
+and the canonical verb semantics in `[[../../CONTEXT|CONTEXT.md]]` →
+*Plan back* / *Plan exit*. The `Delete` verb lives on the Plan list
+surface (sg-WF-4) and never appears here.
+
+### Per-question render rules
+
+| Question | Back | Exit / Leave |
+|---|---|---|
+| Q1 — Cuisine craving | **Omitted** — no prior question to return to | Rendered |
+| Q2 — Spend cap | Rendered | Rendered |
+| Q3 — Reputation / discovery | Rendered | Rendered |
+| Q4 — Vibe energy | Rendered | Rendered |
+| Q5 — Preference probe | Rendered | Rendered |
+
+`Back` is wired via `QuizChrome canBack={false}` on Q1; that collapses
+the leading slot to a 44pt-wide spacer so the Exit/Leave label stays
+anchored to the trailing edge. The Q1 chrome therefore carries only
+`Exit` / `Leave`.
+
+### Role-conditional labels
+
+| Role | Top-trailing label |
+|---|---|
+| Initiator (Plan creator, Account member) | `Exit` |
+| Joiner (Account or Web invitee) | `Leave` |
+
+Same mechanic, different verb: `Leave` honours that the joiner is
+withdrawing from someone else's Plan, not killing it. The label is
+selected by the `role` prop on `QuizChrome` (`'initiator'` |
+`'joiner'`).
+
+### Placement + treatment
+
+| Element | Spec |
+|---|---|
+| Position | Top of the surface, above the C-02 TopBar |
+| `Back` | Top-leading |
+| `Exit` / `Leave` | Top-trailing |
+| Type | Existing `eyebrow` token treatment — Inter 700 / 11 / tracking 0.18em / UPPERCASE |
+| Color | white 0.78 |
+| Icons | **None** — pure text labels. Matches the existing S01 `SETTINGS` footer link convention |
+| Tap target | 44pt minimum (per HIG); the hit row is taller than the visible glyph via padding |
+| Visual weight | Low — neither label may compete with the primary chip / scale / rater area below |
+
+### Behavior
+
+- **`Back`.** Tap steps the active quiz screen one question backward
+  (e.g., Q3 → Q2) **with the prior answer preserved and re-editable**.
+  Strictly per-member; never affects room state. Wired via the
+  `onBack` callback supplied by the host surface — the JSX guarantees
+  the affordance renders; the actual nav + answer-preservation lives
+  in the iOS state layer (tb-WF-2).
+- **`Exit` / `Leave`.** Tap opens the confirmation alert (below). On
+  confirm, `onExit` fires — the host drops the exiter from the room
+  (answers discarded), then routes to the Plan list surface. Room
+  mutation is an iOS-wiring concern (tb-WF-2). On cancel ("Keep
+  going"), the alert dismisses and no state changes.
+
+### Confirmation copy (verbatim — do not paraphrase)
+
+**`Exit` (initiator, multi-member room):**
+
+- Title: `Exit this plan?`
+- Body: `Your answers will be discarded. Others can still finish without you.`
+- Confirm button: `Exit`
+- Cancel button: `Keep going`
+
+**`Leave` (joiner):**
+
+- Title: `Leave this plan?`
+- Body: `Your answers will be discarded. The host and others can still finish.`
+- Confirm button: `Leave`
+- Cancel button: `Keep going`
+
+**Solo session** (only one member; the invite link was never shared) —
+`QuizChrome solo={true}`:
+
+- Title: `Exit this plan?`
+- Body: `Your answers will be discarded. Your plan will stay saved so you can start over.`
+- Confirm button: `Exit`
+- Cancel button: `Keep going`
+
+The solo variant communicates the Plan-state side-effect — the Plan
+returns to `pending` on the user's list — because a solo exit is the
+only case where the Plan can't quietly continue without the user.
+
+### Cancel-via-backdrop
+
+Tapping outside the alert card dismisses it the same as `Keep going`.
+No state changes. Backdrop is `rgba(0,0,0,0.42)`; the alert card uses
+the existing dark glass treatment (matches C-23 LocationPickerSheet
+and the Settings delete alert).
+
+---
+
 ## Cross-quiz invariants
 
-- **No back arrow.** The `×` exits the session entirely. Going back after answering pollutes the preference signal. If a user mis-taps, they exit and restart. Friction is the feature.
+- **In-quiz back is allowed Q2–Q5.** `Back` steps one question backward
+  with the prior answer preserved; see §"Quiz chrome (Back + Exit)"
+  above. Q1 has no Back affordance (no prior question). The v1 "no
+  back arrow / friction is the feature" stance was retired by the
+  workflow-overhaul plan §Q5 — preserving the prior answer prevents
+  the preference-signal pollution that the friction model was
+  guarding against.
 - **Top bar progress fills first (300ms ease-out)** so users know they're on the next question before the 1.1s gradient settles.
 - **Primary CTA is white-filled by default.** Q5 breaks the pattern (sun-filled) deliberately — it telegraphs commitment.
