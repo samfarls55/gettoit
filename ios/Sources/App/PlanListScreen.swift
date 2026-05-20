@@ -313,6 +313,53 @@ public struct PlanListScreen: View {
         }
     }
 
+    /// tb-WF-9 — labels for the C-25 Action Dot Menu items, derived
+    /// from a card's (role, status). Pure helper so the iOS port can
+    /// pin the role × status × menu items contract from
+    /// `surfaces/00-plan-list.md §"Three-dot menu (locked Q4)"`:
+    ///
+    /// | Card               | Menu items (in order) |
+    /// |--------------------|------------------------|
+    /// | Created Pending    | Edit plan, Delete plan |
+    /// | Created Decided    | Delete plan            |
+    /// | Created History    | Delete plan            |
+    /// | Joined (any)       | Leave plan             |
+    ///
+    /// HARD RULE — Joined cards NEVER show `Delete plan`. Only the
+    /// Plan creator can delete (CONTEXT.md → `Plan delete`); joiners
+    /// can only `Leave plan`.
+    public static func menuItemLabels(
+        role: PlansStore.DecidedPlanRow.Role,
+        status: PlansStore.LifecycleState
+    ) -> [String] {
+        switch role {
+        case .joined:
+            // Joiner — Leave only, every status.
+            return [Self.menuLabelLeavePlan]
+        case .owner:
+            switch status {
+            case .pending:
+                return [Self.menuLabelEditPlan, Self.menuLabelDeletePlan]
+            case .decidedActive, .decidedExpired:
+                return [Self.menuLabelDeletePlan]
+            }
+        }
+    }
+
+    /// tb-WF-9 — `Edit plan` menu item label. Sentence-case in source;
+    /// the C-25 menu renders rows in Inter 700 / 14 (no `.uppercased()`
+    /// transform). NEVER `"Edit"` or `"Modify plan"`.
+    public static let menuLabelEditPlan: String = "Edit plan"
+
+    /// tb-WF-9 — `Delete plan` menu item label. NEVER `"Cancel plan"`,
+    /// `"Remove"`, or `"Delete"` — per CONTEXT.md the verb is
+    /// "delete" and the noun is `plan`.
+    public static let menuLabelDeletePlan: String = "Delete plan"
+
+    /// tb-WF-9 — `Leave plan` menu item label. NEVER `"Exit"` or
+    /// `"Abandon"`; the warm-friend register uses "leave."
+    public static let menuLabelLeavePlan: String = "Leave plan"
+
     /// tb-WF-8 — derive the §"Tap behavior" destination for a
     /// Decided / History card tap. Pure value — the host (RootView)
     /// pattern-matches and mounts the right view.
@@ -365,6 +412,21 @@ public struct PlanListScreen: View {
     /// pattern-matches the supplied `tapRoute(for:)` value and mounts
     /// the right screen (full or read-only VerdictScreen).
     private let onTapDecidedOrHistory: (PlansStore.DecidedPlanRow) -> Void
+    /// tb-WF-9 — fires when the user confirms `Delete plan` on a
+    /// Created card. The host runs the delete journey (look up linked
+    /// room, expire it to broadcast session-ended, delete the Plan
+    /// row) and refreshes the list. `status` is the card's current
+    /// lifecycle state so the host can branch on Pending vs Decided.
+    private let onDeletePlan: (PlansStore.Plan, PlansStore.LifecycleState) -> Void
+    /// tb-WF-9 — fires when the user confirms `Leave plan` on a
+    /// Joined card. The host runs the existing
+    /// `MemberLeaveStore.leave(...)` path (matches `Plan exit` from
+    /// tb-WF-2) and refreshes the list. `roomID` comes from the host
+    /// (the iOS port stores it on the JoinedPlanRow), but the JSX
+    /// only carries the Plan id — the host resolves the room via
+    /// `PlansStore.roomIDForJoinedPlan` before invoking
+    /// `MemberLeaveStore`.
+    private let onLeavePlan: (PlansStore.JoinedPlanRow) -> Void
 
     // MARK: - state
 
@@ -387,6 +449,57 @@ public struct PlanListScreen: View {
     /// session`. The init hydrates from `UserDefaults` under the
     /// per-user key; the toggle path writes back through the same key.
     @State private var historyState: HistoryCollapseState = HistoryCollapseState()
+
+    /// tb-WF-9 — which card has its C-25 popover open. Only one menu
+    /// is ever open at a time; tapping another trigger replaces the
+    /// open id. Nil means no menu is open. The popover is rendered as
+    /// an overlay anchored to the card row that matches this id.
+    @State private var openMenuPlanID: UUID? = nil
+
+    /// tb-WF-9 — which destructive confirm sheet is up. Set when the
+    /// user taps a `Delete plan` / `Leave plan` row in the C-25 menu.
+    /// Drives the `.sheet` modifier; tapping the primary pill fires
+    /// the host callback and clears this; tapping the dismiss eyebrow
+    /// (`KEEP` / `STAY`) clears it without firing.
+    @State private var confirmContext: ConfirmContext? = nil
+
+    /// tb-WF-9 — minimal context payload for the destructive confirm
+    /// sheet. Carries the resolved `Variant` (from the locked copy
+    /// table) and either a Created Plan + status (for Delete) or a
+    /// JoinedPlanRow (for Leave). Equatable so SwiftUI's `.sheet(item:)`
+    /// re-presents on identity change.
+    struct ConfirmContext: Identifiable, Equatable {
+        let id: UUID
+        let variant: PlanDestructiveConfirmSheet.Variant
+        let createdPlan: PlansStore.Plan?
+        let createdStatus: PlansStore.LifecycleState?
+        let joinedRow: PlansStore.JoinedPlanRow?
+
+        static func delete(plan: PlansStore.Plan) -> ConfirmContext {
+            let variant = PlanDestructiveConfirmSheet.variantFor(
+                role: .owner,
+                status: plan.status,
+                verb: .delete
+            )
+            return ConfirmContext(
+                id: plan.id,
+                variant: variant,
+                createdPlan: plan,
+                createdStatus: plan.status,
+                joinedRow: nil
+            )
+        }
+
+        static func leave(row: PlansStore.JoinedPlanRow) -> ConfirmContext {
+            return ConfirmContext(
+                id: row.plan.id,
+                variant: .joinedLeave,
+                createdPlan: nil,
+                createdStatus: nil,
+                joinedRow: row
+            )
+        }
+    }
 
     // MARK: - init
 
@@ -419,7 +532,9 @@ public struct PlanListScreen: View {
         onPickGroupMode: @escaping (SetupScreen.GroupMode) -> Void,
         onTapPlan: @escaping (PlansStore.Plan) -> Void,
         onTapJoined: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in },
-        onTapDecidedOrHistory: @escaping (PlansStore.DecidedPlanRow) -> Void = { _ in }
+        onTapDecidedOrHistory: @escaping (PlansStore.DecidedPlanRow) -> Void = { _ in },
+        onDeletePlan: @escaping (PlansStore.Plan, PlansStore.LifecycleState) -> Void = { _, _ in },
+        onLeavePlan: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in }
     ) {
         self.pending = pending
         self.joined = joined
@@ -431,6 +546,8 @@ public struct PlanListScreen: View {
         self.onTapPlan = onTapPlan
         self.onTapJoined = onTapJoined
         self.onTapDecidedOrHistory = onTapDecidedOrHistory
+        self.onDeletePlan = onDeletePlan
+        self.onLeavePlan = onLeavePlan
 
         // Hydrate the History collapse state from UserDefaults using
         // the per-user key. `@AppStorage`'s declarative form wants a
@@ -489,6 +606,20 @@ public struct PlanListScreen: View {
                     onPickGroupMode(PlanDisambigSheet.setupMode(for: choice))
                 },
                 onDismiss: { disambigOpen = false }
+            )
+        }
+        // tb-WF-9 — destructive confirm sheet. C-16 register, sun-
+        // yellow `KEEP` / `STAY` dismiss eyebrow, no red. Mounts on
+        // top of the Plan list via SwiftUI's `.sheet(item:)`.
+        .sheet(item: $confirmContext) { ctx in
+            PlanDestructiveConfirmSheet(
+                variant: ctx.variant,
+                onConfirm: {
+                    let context = ctx
+                    confirmContext = nil
+                    fireConfirmedAction(for: context)
+                },
+                onDismiss: { confirmContext = nil }
             )
         }
     }
@@ -632,22 +763,10 @@ public struct PlanListScreen: View {
                 // same Pending section with the JOINED chip carrying
                 // the distinction.
                 ForEach(Self.sortedPending(pending)) { plan in
-                    Button(action: { onTapPlan(plan) }) {
-                        planCard(plan)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("planList.card.\(plan.id.uuidString)")
-                    .accessibilityLabel(plan.name)
-                    .accessibilityHint("Edit this plan.")
+                    cardRowForCreated(plan)
                 }
                 ForEach(joinedPending) { row in
-                    Button(action: { onTapJoined(row) }) {
-                        joinedPlanCard(row)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("planList.joinedCard.\(row.plan.id.uuidString)")
-                    .accessibilityLabel(row.plan.name)
-                    .accessibilityHint("Joined plan. Resume where you left off.")
+                    cardRowForJoined(row)
                 }
             }
             .padding(.horizontal, GTISpacing.step6)
@@ -766,18 +885,46 @@ public struct PlanListScreen: View {
         }
     }
 
-    /// tb-WF-8 — tappable card for a Decided or History row. The host's
-    /// `onTapDecidedOrHistory` callback fires with the full row so the
-    /// host can pattern-match on `tapRoute(for:)` and mount the right
-    /// VerdictScreen variant.
+    /// tb-WF-8 → tb-WF-9 — tappable Decided / History row with the C-25
+    /// menu overlaid on the trailing edge. The trigger sits inside a
+    /// ZStack on top of the card body so the C-25 tap area is excluded
+    /// from the card's tap target. The host's `onTapDecidedOrHistory`
+    /// callback still fires when the user taps the body itself.
+    @ViewBuilder
     private func decidedHistoryButton(row: PlansStore.DecidedPlanRow) -> some View {
-        Button(action: { onTapDecidedOrHistory(row) }) {
-            decidedHistoryCard(row: row)
+        ZStack(alignment: .topTrailing) {
+            Button(action: { onTapDecidedOrHistory(row) }) {
+                decidedHistoryCard(row: row)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("planList.decidedCard.\(row.plan.id.uuidString)")
+            .accessibilityLabel(accessibilityLabelFor(row: row))
+            .accessibilityHint(accessibilityHintFor(row: row))
+
+            actionDotMenuOverlay(
+                planID: row.plan.id,
+                planName: row.plan.name,
+                buildItems: {
+                    if row.role == .joined {
+                        return [
+                            ActionDotMenu.Item(label: Self.menuLabelLeavePlan, destructive: true) {
+                                openMenuPlanID = nil
+                                // Joined Decided / History — wrap into a JoinedPlanRow stub.
+                                // The host (RootView) resolves the room via PlansStore.
+                                let stub = PlansStore.JoinedPlanRow(
+                                    plan: row.plan,
+                                    lastAnsweredQuestionIndex: 0,
+                                    hasVoted: false
+                                )
+                                confirmContext = ConfirmContext.leave(row: stub)
+                            }
+                        ]
+                    } else {
+                        return menuItems(for: row.plan)
+                    }
+                }
+            )
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier("planList.decidedCard.\(row.plan.id.uuidString)")
-        .accessibilityLabel(accessibilityLabelFor(row: row))
-        .accessibilityHint(accessibilityHintFor(row: row))
     }
 
     /// tb-WF-8 — 2-line card for Decided / History. Renders:
@@ -823,6 +970,9 @@ public struct PlanListScreen: View {
             }
         }
         .padding(.horizontal, GTISpacing.step5 - 2) // 18pt — matches JSX `14px 18px`
+        // tb-WF-9 — extra trailing inset so the verdict place name does
+        // not run under the C-25 trigger overlaid on the trailing edge.
+        .padding(.trailing, ActionDotMenu.triggerDiameter)
         .padding(.vertical, GTISpacing.step3 + 2)   // 14pt — matches JSX `14px 18px`
         .frame(minHeight: 76) // 2-line card per spec
         .background(
@@ -866,9 +1016,103 @@ public struct PlanListScreen: View {
         UserDefaults.standard.set(historyState.isOpen, forKey: key)
     }
 
+    /// tb-WF-9 — Created Pending card row. ZStack composing the
+    /// tappable card body and the trailing C-25 trigger / popover. The
+    /// trigger sits in a 36-wide trailing slot reserved by the card's
+    /// internal padding so the body tap area never overlaps the menu.
+    @ViewBuilder
+    private func cardRowForCreated(_ plan: PlansStore.Plan) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: { onTapPlan(plan) }) {
+                planCard(plan)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("planList.card.\(plan.id.uuidString)")
+            .accessibilityLabel(plan.name)
+            .accessibilityHint("Edit this plan.")
+
+            actionDotMenuOverlay(
+                planID: plan.id,
+                planName: plan.name,
+                buildItems: { menuItems(for: plan) }
+            )
+        }
+    }
+
+    /// tb-WF-9 — Joined Pending card row. Same ZStack pattern as the
+    /// Created variant; the menu builds the `Leave plan` item against
+    /// the JoinedPlanRow.
+    @ViewBuilder
+    private func cardRowForJoined(_ row: PlansStore.JoinedPlanRow) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: { onTapJoined(row) }) {
+                joinedPlanCard(row)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("planList.joinedCard.\(row.plan.id.uuidString)")
+            .accessibilityLabel(row.plan.name)
+            .accessibilityHint("Joined plan. Resume where you left off.")
+
+            actionDotMenuOverlay(
+                planID: row.plan.id,
+                planName: row.plan.name,
+                buildItems: { menuItems(for: row) }
+            )
+        }
+    }
+
+    /// tb-WF-9 — C-25 Action Dot Menu overlay anchored to the trailing
+    /// edge of a Plan card. Renders the trigger inset 14pt from the
+    /// trailing edge (matches the card's 18pt horizontal padding —
+    /// 4pt of trigger overlap sits cleanly inside the row); the
+    /// popover anchors to the same slot with a small top-offset
+    /// (`top: calc(100% + 6px)` from the JSX → 6pt top padding).
+    @ViewBuilder
+    private func actionDotMenuOverlay(
+        planID: UUID,
+        planName: String,
+        buildItems: @escaping () -> [ActionDotMenu.Item]
+    ) -> some View {
+        let isOpen = openMenuPlanID == planID
+        VStack(alignment: .trailing, spacing: GTISpacing.step2 - 2) { // 6pt
+            ActionDotMenu.Trigger(
+                isOpen: isOpen,
+                onToggle: { toggleMenu(for: planID) },
+                accessibilityLabel: "More actions for \(planName)"
+            )
+
+            if isOpen {
+                ActionDotMenu.Popover(
+                    items: buildItems(),
+                    onDismiss: { openMenuPlanID = nil }
+                )
+                .transition(.opacity)
+            }
+        }
+        .padding(.top, GTISpacing.step2)        // 8pt — pulls the trigger glyph
+                                                 // down so it visually centers
+                                                 // on the 1-line card body.
+        .padding(.trailing, GTISpacing.step2)   // 8pt — visual nudge inside the
+                                                 // card's 18pt horizontal padding.
+        .accessibilityElement(children: .contain)
+    }
+
+    /// tb-WF-9 — toggle the C-25 popover for a given Plan id. If the
+    /// menu is already open on this card, close it; otherwise close
+    /// any other open menu and open this one. Only one menu is ever
+    /// open at a time.
+    private func toggleMenu(for planID: UUID) {
+        if openMenuPlanID == planID {
+            openMenuPlanID = nil
+        } else {
+            openMenuPlanID = planID
+        }
+    }
+
     /// 1-line Pending card. Name only, ellipsis on overflow, glass row
     /// treatment per surface §"Card content — Created Pending card
-    /// (1-line)". No trailing `⋯` menu in this slice (tb-WF-9).
+    /// (1-line)". The trailing slot is reserved for the C-25 trigger
+    /// via the card's right-padding budget.
     private func planCard(_ plan: PlansStore.Plan) -> some View {
         HStack(spacing: GTISpacing.step3) {
             Text(plan.name)
@@ -877,6 +1121,13 @@ public struct PlanListScreen: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            // tb-WF-9 — reserve a 36pt trailing slot for the C-25
+            // Action Dot trigger. The trigger renders as an overlay
+            // sibling on the row; this spacer keeps the Plan name
+            // from running under it when the title is long enough
+            // to ellipsis.
+            Spacer(minLength: ActionDotMenu.triggerDiameter)
+                .frame(width: ActionDotMenu.triggerDiameter)
         }
         .padding(.horizontal, GTISpacing.step5 - 2) // 18pt — matches JSX `14px 18px`
         .padding(.vertical, GTISpacing.step3 + 2)   // 14pt — matches JSX `14px 18px`
@@ -918,6 +1169,9 @@ public struct PlanListScreen: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, GTISpacing.step5 - 2) // 18pt — matches JSX `14px 18px`
+        // tb-WF-9 — extra trailing inset so the Plan name does not
+        // run under the C-25 trigger overlaid on the trailing edge.
+        .padding(.trailing, ActionDotMenu.triggerDiameter)
         .padding(.vertical, GTISpacing.step3 + 2)   // 14pt — matches JSX `14px 18px`
         .frame(minHeight: 64)
         .background(
@@ -956,6 +1210,69 @@ public struct PlanListScreen: View {
     private func openDisambig() {
         onRequestDisambig()
         disambigOpen = true
+    }
+
+    /// tb-WF-9 — fire the host callback for a confirmed destructive
+    /// action. Delete dispatches `onDeletePlan(plan, status)`; Leave
+    /// dispatches `onLeavePlan(row)`. The C-25 menu is closed and the
+    /// confirm sheet is dismissed by the caller; this helper only
+    /// runs the side effect.
+    private func fireConfirmedAction(for context: ConfirmContext) {
+        // Close any open menu on the same card so the popover doesn't
+        // re-render against a removed row.
+        openMenuPlanID = nil
+        if let plan = context.createdPlan, let status = context.createdStatus {
+            onDeletePlan(plan, status)
+            return
+        }
+        if let row = context.joinedRow {
+            onLeavePlan(row)
+            return
+        }
+    }
+
+    /// tb-WF-9 — build the C-25 menu items for an owned Plan card.
+    /// The closure wires each item to the right side effect:
+    /// `Edit plan` → `onTapPlan(plan)` (same destination as the
+    /// tap-card shortcut, per the issue's `Edit plan functionally
+    /// equivalent to tap-pending-card` acceptance criterion);
+    /// `Delete plan` → opens the confirm sheet via `confirmContext`.
+    private func menuItems(for plan: PlansStore.Plan) -> [ActionDotMenu.Item] {
+        let labels = Self.menuItemLabels(role: .owner, status: plan.status)
+        return labels.map { label in
+            switch label {
+            case Self.menuLabelEditPlan:
+                return ActionDotMenu.Item(label: label) {
+                    openMenuPlanID = nil
+                    onTapPlan(plan)
+                }
+            case Self.menuLabelDeletePlan:
+                return ActionDotMenu.Item(label: label, destructive: true) {
+                    openMenuPlanID = nil
+                    confirmContext = ConfirmContext.delete(plan: plan)
+                }
+            default:
+                // Unreachable — the helper only returns the three
+                // canonical labels — but a defensive fallback keeps
+                // the surface from crashing if a future status adds a
+                // new label without wiring.
+                return ActionDotMenu.Item(label: label) { openMenuPlanID = nil }
+            }
+        }
+    }
+
+    /// tb-WF-9 — build the C-25 menu items for a Joined Plan card.
+    /// Joined cards only ever carry `Leave plan` — see the menu
+    /// items table in `surfaces/00-plan-list.md §"Three-dot menu
+    /// (locked Q4)"`. The label opens the confirm sheet seeded with
+    /// the `.joinedLeave` variant.
+    private func menuItems(for row: PlansStore.JoinedPlanRow) -> [ActionDotMenu.Item] {
+        return [
+            ActionDotMenu.Item(label: Self.menuLabelLeavePlan, destructive: true) {
+                openMenuPlanID = nil
+                confirmContext = ConfirmContext.leave(row: row)
+            }
+        ]
     }
 }
 
@@ -998,5 +1315,24 @@ extension PlanListScreen {
     @MainActor
     func simulateHistoryToggle() {
         toggleHistoryOpen()
+    }
+
+    /// Test-only hook (tb-WF-9) — drive a `Delete plan` confirmation
+    /// for a Created Plan card. Invokes the same host-callback path
+    /// the visible primary pill uses, without driving the @State sheet
+    /// presentation. Production code goes through the SwiftUI .sheet
+    /// presenter.
+    @MainActor
+    func simulateDeletePlanConfirm(_ plan: PlansStore.Plan) {
+        let ctx = ConfirmContext.delete(plan: plan)
+        fireConfirmedAction(for: ctx)
+    }
+
+    /// Test-only hook (tb-WF-9) — drive a `Leave plan` confirmation
+    /// for a Joined Plan card.
+    @MainActor
+    func simulateLeavePlanConfirm(_ row: PlansStore.JoinedPlanRow) {
+        let ctx = ConfirmContext.leave(row: row)
+        fireConfirmedAction(for: ctx)
     }
 }

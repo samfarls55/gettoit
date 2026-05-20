@@ -197,4 +197,34 @@ final class PlanListScreenRenderTests: XCTestCase {
         )
         render(makeScreen(pending: [], decided: [row]))
     }
+
+    // MARK: - tb-WF-9 C-25 menu render coverage
+
+    /// Created Pending card materialises with the C-25 trigger on the
+    /// trailing edge. Render-smoke — the trigger itself is covered by
+    /// `ActionDotMenuTests`; this asserts the host composition
+    /// type-checks.
+    func testCreatedPendingCardWithMenuRenders() {
+        let plan = makePlan(name: "Friday dinner")
+        render(makeScreen(pending: [plan]))
+    }
+
+    /// Created Decided card materialises with the C-25 trigger. Same
+    /// menu composition, 2-line card body.
+    func testCreatedDecidedCardWithMenuRenders() {
+        let row = makeDecidedRow(name: "Friday dinner", status: .decidedActive)
+        render(makeScreen(pending: [], decided: [row]))
+    }
+
+    /// Joined card materialises with the C-25 trigger. The menu items
+    /// differ (Leave plan only) but the visual register is identical.
+    func testJoinedCardWithMenuRenders() {
+        let plan = makePlan(name: "Alex's birthday")
+        let row = PlansStore.JoinedPlanRow(
+            plan: plan,
+            lastAnsweredQuestionIndex: 0,
+            hasVoted: false
+        )
+        render(makeScreen(pending: [], joined: [row]))
+    }
 }
