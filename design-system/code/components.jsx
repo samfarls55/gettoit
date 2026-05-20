@@ -1070,6 +1070,149 @@ function QuizChrome({
   );
 }
 
+// ────────────────────────────────────────────────────────────
+// Action Dot Menu (C-25) — trailing `⋯` glyph + popover menu.
+//
+// Used on owned Plan cards (S00 Plan list) and intended for reuse on
+// future surfaces (Verdict overflow, plan-detail row actions). The
+// primitive is composed of two pieces:
+//
+//   - ActionDotMenuTrigger — the always-visible `⋯` button on the host row.
+//   - ActionDotMenu        — the popover surface; renders the items as rows.
+//
+// The host owns the open/close state so the trigger and menu can be
+// anchored together visually (the menu opens anchored to the trigger).
+// Items are a list of `{ label, onSelect, destructive? }` — destructive
+// items render in the same visual register as the rest (no red); the
+// confirm sheet hosted by the consumer is where the destructive weight
+// lives.
+// ────────────────────────────────────────────────────────────
+function ActionDotMenuTrigger({ open, onToggle, ariaLabel = 'More actions' }) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      aria-haspopup="menu"
+      aria-expanded={open ? 'true' : 'false'}
+      onClick={onToggle}
+      style={{
+        appearance: 'none', border: 0, background: 'transparent',
+        width: 36, height: 36, borderRadius: 999,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        color: 'rgba(255,255,255,0.6)',
+        fontFamily: 'var(--ff-body)', fontWeight: 900, fontSize: 18,
+        lineHeight: 1, cursor: 'pointer',
+        transition: 'background 140ms var(--ease-out), color 140ms var(--ease-out)',
+        background: open ? 'rgba(255,255,255,0.10)' : 'transparent',
+        ...(open && { color: '#fff' }),
+      }}
+    >⋯</button>
+  );
+}
+
+function ActionDotMenu({ items, onDismiss }) {
+  return (
+    <>
+      {/* Tap-scrim — closes the menu on any outside tap. Transparent
+          so the host card stays visually intact behind the popover. */}
+      <div
+        onClick={onDismiss}
+        aria-hidden="true"
+        style={{
+          position: 'fixed', inset: 0, zIndex: 10,
+          background: 'transparent',
+        }}
+      />
+      <div
+        role="menu"
+        style={{
+          position: 'absolute', zIndex: 11,
+          top: 'calc(100% + 6px)', right: 0,
+          minWidth: 200,
+          padding: 6,
+          borderRadius: 14,
+          background: 'rgba(20,20,30,0.92)',
+          backdropFilter: 'blur(24px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+          border: '1px solid rgba(255,255,255,0.10)',
+          boxShadow: '0 12px 32px rgba(0,0,0,0.32)',
+          display: 'flex', flexDirection: 'column', gap: 2,
+          animation: 'gti-fade-up 180ms var(--ease-out) both',
+        }}
+      >
+        {items.map((item, i) => (
+          <button
+            key={i}
+            role="menuitem"
+            type="button"
+            onClick={() => { item.onSelect?.(); onDismiss?.(); }}
+            style={{
+              appearance: 'none', border: 0, background: 'transparent',
+              width: '100%', minHeight: 44,
+              padding: '10px 14px',
+              textAlign: 'left',
+              color: '#fff',
+              fontFamily: 'var(--ff-body)', fontWeight: 700, fontSize: 14,
+              letterSpacing: 0.1,
+              borderRadius: 10,
+              cursor: 'pointer',
+              transition: 'background 140ms var(--ease-out)',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >{item.label}</button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Floating Action Button (C-26) — bottom-right circular create button.
+//
+// Sunset Pop primitive — glass body, sun-yellow `+` glyph, ~56pt
+// diameter, light shadow. Sits fixed at 18 off the bottom + trailing
+// edges of the surface. Single tap target; no labels, no states beyond
+// `pressed`. The host owns navigation — the FAB just emits `onClick`.
+// ────────────────────────────────────────────────────────────
+function FloatingActionButton({
+  onClick = () => {},
+  glyph = '+',
+  ariaLabel = 'Create a plan',
+  bottom = 18,
+  right = 18,
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      style={{
+        position: 'absolute',
+        bottom, right,
+        width: 56, height: 56,
+        borderRadius: 999,
+        background: 'rgba(255,255,255,0.18)',
+        backdropFilter: 'blur(14px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(14px) saturate(160%)',
+        border: '0.75px solid rgba(255,255,255,0.32)',
+        boxShadow:
+          'inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.18)',
+        color: 'var(--sun)',
+        fontFamily: 'var(--ff-body)', fontWeight: 900, fontSize: 28,
+        lineHeight: 1,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer',
+        transition: 'transform 140ms var(--ease-out)',
+        zIndex: 5,
+      }}
+      onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.96)'; }}
+      onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+    >{glyph}</button>
+  );
+}
+
 Object.assign(window, {
   GTI_GRADIENTS, VIBE_LABELS,
   GradientSurface, TopBar, QuestionHeader,
@@ -1078,4 +1221,6 @@ Object.assign(window, {
   RangeSlider, AuthUpgradeChip,
   LocationPickerChip, LocationPickerSheet,
   QuizChrome,
+  ActionDotMenuTrigger, ActionDotMenu,
+  FloatingActionButton,
 });

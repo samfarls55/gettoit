@@ -644,3 +644,170 @@ The data layer is supplied by `tb-03` — `MKLocalSearchCompleter` for typeahead
 - Picker still hosted only on S01 after pre-public-launch milestone → reconsider whether `C-23` should be folded back into a single-surface composition.
 - Multi-geo handling lands and the picker needs to render per-room rather than per-user → may force a `C-23` re-spec.
 - Map thumbnail proves needed by a future consumer → un-defer the composite, add a `composite` variant.
+
+---
+
+## C-25 · Action Dot Menu
+
+The trailing `⋯` glyph + popover menu used on every owned Plan card in S00 Plan list, intended for reuse on future overflow surfaces (Verdict overflow, plan-detail row actions, etc.). The primitive is a pair — a trigger button that lives in the host row, and a popover anchored to the trigger.
+
+Added 2026-05-20 for sg-WF-4 (#157).
+
+### Why a custom primitive instead of the native iOS `UIMenu` / `Menu`
+
+- **Visual register lock-in.** The native iOS context menu and SwiftUI `Menu` apply system-controlled chrome (blur, corner radius, separator weight, item typography) that we can't fully restyle. Sunset Pop's dark-glass register has to compose with the existing C-16 sheet language; the native menu reads as a foreign surface against that.
+- **Destructive-item color.** The native `Menu` paints `.destructive` role items red — which we cannot supply because Sunset Pop forbids red as a state color (`tokens.md §1.3`). A custom primitive lets the destructive items render in the same visual register as the rest, with the destructive weight carried by the C-25 → confirm sheet flow rather than by color.
+- **Reusable composition.** The same trigger + popover pair can host overflow on the Verdict surface later (`View on Maps`, `Share`, `Reroll`) without re-inventing the affordance.
+
+### Sub-components
+
+`C-25` ships as two JSX exports that compose into a single conceptual primitive:
+
+- **`ActionDotMenuTrigger`** — the always-visible `⋯` button on the host row. Owns its own visual state (default / open) and emits `onToggle` to the host. The host manages the open/close state so it can render the `ActionDotMenu` only when needed.
+- **`ActionDotMenu`** — the popover surface; renders the items as accessible menu rows. Owns the tap-scrim that dismisses on outside tap.
+
+### Visual spec — `ActionDotMenuTrigger`
+
+| Element | Spec |
+|---|---|
+| Container | inline 36×36 button, radius 999, transparent bg by default |
+| Glyph | `⋯` Inter 900 / 18 / white 0.6, vertically centered |
+| Open state | bg → `rgba(255,255,255,0.10)`, glyph → white 1.0; 140ms `var(--ease-out)` |
+| Tap target | 36×36 visible; the host card row reserves a 36-wide trailing slot so the visible button clears HIG 44pt via the surrounding row padding |
+| `aria-haspopup` | `"menu"` |
+| `aria-expanded` | mirrors the host's open state |
+
+### Visual spec — `ActionDotMenu`
+
+| Element | Spec |
+|---|---|
+| Anchor | absolutely positioned `top: calc(100% + 6px)`, `right: 0` relative to a trigger-positioned wrapper. The host card supplies the `position: relative` wrapper around the trigger. |
+| Container | min-width 200, padding 6, radius 14, `rgba(20,20,30,0.92)` + `blur(24px) saturate(160%)` + `1px white 0.10` border, shadow `0 12px 32px rgba(0,0,0,0.32)` |
+| Open motion | `gti-fade-up` 180ms `var(--ease-out)` |
+| Item row | full-width, min-height 44, padding `10px 14px`, radius 10, transparent bg by default, white text, Inter 700 / 14 / tracking 0.1 |
+| Hover state | bg → `rgba(255,255,255,0.06)`, 140ms `var(--ease-out)` |
+| Tap-scrim | fixed inset 0, transparent, z-index 10 — closes the menu on any outside tap |
+| `role="menu"` | container |
+| `role="menuitem"` | each item row |
+
+### Item shape (JSX prop)
+
+Items are a list of `{ label, onSelect, destructive? }`. The `destructive` flag is **informational only** — it has no visual effect (no red). Hosts use it to route the item through a confirm sheet rather than firing the action directly. In practice the host (S00 Plan list) doesn't bother passing `destructive` because the menu items themselves directly invoke a confirm-sheet setter.
+
+### Destructive items — confirm-sheet pattern
+
+Destructive items (`Delete plan`, `Leave plan`) do NOT fire the action on tap. They open a host-owned C-16-pattern bottom sheet with a one-sentence consequence body and a primary `PillCTA fill="white"` (never sun, never any red). The destructive weight is in the copy and the sheet's visual register, not in a colored button.
+
+The S00 Plan list's confirm-sheet copy is locked inline in `surfaces/00-plan-list.md` §"Three-dot menu (locked Q4)" and varies by card status + verb (`delete` / `leave`). Future consumers of C-25 (e.g. Verdict overflow) follow the same pattern but supply their own copy.
+
+### Accessibility
+
+- Trigger tap target: 36×36 visible button inside a 44pt-tall host row.
+- `aria-haspopup="menu"` + `aria-expanded` on the trigger; `role="menu"` on the popover; `role="menuitem"` on each row.
+- VO order on open: first item → … → last item. The tap-scrim is `aria-hidden`.
+- Reduced motion: the `gti-fade-up` is opacity-only by construction (no translateY in the keyframe — it's a fade-up with a small offset that animation tooling can flatten); honors the global `prefers-reduced-motion` motion gates.
+
+### SwiftUI primitive
+
+```swift
+// Trigger — composes inside the PlanCard row, anchored to the trailing edge.
+struct ActionDotMenuTrigger: View {
+  @Binding var open: Bool
+  var body: some View {
+    Button { open.toggle() } label: {
+      Text("⋯")
+        .font(.system(size: 18, weight: .black))
+        .foregroundColor(open ? .white : .white.opacity(0.6))
+        .frame(width: 36, height: 36)
+        .background(open ? Color.white.opacity(0.10) : Color.clear)
+        .clipShape(Circle())
+    }
+    .accessibilityLabel("More actions")
+  }
+}
+
+// Popover — custom, not `Menu`. Use a `ZStack` overlay anchored to the
+// PlanCard so the popover can paint the dark-glass register.
+// The destructive items open a `.sheet` carrying the confirm body.
+```
+
+**Why not the native `Menu`:** see §"Why a custom primitive instead of the native iOS `UIMenu` / `Menu`" above. The iOS port owns its own dark-glass popover surface; the C-16 sheet primitive (already used by the reroll sheet + the LocationPicker sheet) is the visual reference.
+
+### When NOT to use
+
+- **Single-action rows.** If a card has only one destructive verb and no other menu items, a long-press confirmation or an inline dismiss control is lighter — the menu adds a tap without earning it.
+- **Inside a sheet that already owns its own dismiss + actions.** Nested popovers inside a presented sheet are an iOS HIG anti-pattern.
+
+---
+
+## C-26 · Floating Action Button
+
+The bottom-right circular create button on S00 Plan list, and the canonical Sunset Pop FAB primitive for any future surface needing a single persistent create affordance. Glass body, sun-yellow glyph, ~56pt diameter, light shadow. Sits anchored 18 off the trailing + bottom edges of the host surface.
+
+Added 2026-05-20 for sg-WF-4 (#157).
+
+### Why a custom FAB vs. a chrome `+` glyph or a bottom dock pill
+
+- **Founder preference for the FAB-unfold aesthetic** locked in the sg-WF-4 grill (2026-05-20, Q5). The list surface owns its vertical real estate end-to-end; a chrome `+` competes with the surface header for attention, and a bottom dock pill eats a 60pt-tall row the section list itself should own.
+- **Glass + sun glyph composes with the gradient.** The FAB sits on the `initiator` gradient stop (Plan list's gradient); a sun-yellow disc would over-saturate against the warm wash. Glass body with a sun glyph lets the gradient breathe through the button while the glyph carries the brand color.
+
+### Visual spec
+
+| Element | Spec |
+|---|---|
+| Container | 56×56, `position: absolute`, `bottom: 18`, `right: 18`, `z-index: 5` |
+| Background | `rgba(255,255,255,0.18)` + `backdrop-filter: blur(14px) saturate(160%)` |
+| Border | `0.75px solid rgba(255,255,255,0.32)` |
+| Shadow | `inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.18)` |
+| Radius | 999 (full circle) |
+| Glyph | `+` Inter 900 / 28, `var(--sun)`, vertically centered |
+| Pressed | `transform: scale(0.96)`, 140ms `var(--ease-out)` |
+| Tap target | 56×56 visible — clears HIG 44 with breathing room |
+
+### Behavior
+
+Single tap target. The FAB emits `onClick`; the host owns navigation. On S00 Plan list, the tap opens the disambig sheet (Solo / Group) that routes to S01 Setup with the chosen `groupContext`.
+
+The FAB suppresses itself in the empty-state hero — the hero pill (`PillCTA fill="white"`, label `"Create your first plan"`) is the only create affordance in zero-Plan state, by design. The empty-state path teaches the disambig pattern early; the populated state uses the persistent FAB.
+
+### Customization (props)
+
+The component accepts `glyph` (default `+`), `ariaLabel` (default `"Create a plan"`), and `bottom` / `right` offsets (default 18 / 18) for hosts that need to coexist with an inset bottom bar. The visual register (glass body, sun glyph, 56×56, shadow) is locked.
+
+### Accessibility
+
+- Tap target ≥ 44 (56 visible).
+- `aria-label` describes the action ("Start a new plan"), not the shape ("plus button"). The default copy is "Create a plan"; hosts override per surface.
+- The glyph itself is `aria-hidden` by virtue of being inside the button's text content — VO reads the `aria-label`, not the `+`.
+- Reduced motion: the press-scale transform is the only motion; it is short enough to honor reduced-motion guidelines without explicit gating.
+
+### SwiftUI primitive
+
+```swift
+struct FloatingActionButton: View {
+  var onTap: () -> Void
+  var glyph: String = "+"
+  var bottomInset: CGFloat = 18
+  var trailingInset: CGFloat = 18
+  // ...
+  var body: some View {
+    Button(action: onTap) {
+      Text(glyph)
+        .font(.system(size: 28, weight: .black))
+        .foregroundColor(GTIColor.sun)
+        .frame(width: 56, height: 56)
+        .background(.ultraThinMaterial, in: Circle())
+        .overlay(Circle().stroke(.white.opacity(0.32), lineWidth: 0.75))
+        .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 8)
+    }
+    .accessibilityLabel("Start a new plan")
+    // anchor to the host surface's safeAreaInset(.bottom) + .trailing
+  }
+}
+```
+
+### When NOT to use
+
+- **Surfaces with a CTADock-anchored primary action.** S01 Setup, the quiz screens, the verdict — these surfaces already own a bottom-anchored CTA via `CTADock`. A FAB on top of that competes for attention.
+- **Sheets / presented modal surfaces.** A FAB on a sheet reads as a system control; modal actions belong in the sheet's own action row.
+- **Multi-action create flows.** The FAB is a single tap target — use it when one action covers ≥80% of intent. For multi-action surfaces (e.g. a "compose" button that fans into 4 verbs), reach for a different primitive.
