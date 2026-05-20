@@ -78,8 +78,17 @@ export interface ComputeVerdictEnv {
  *  binds these to supabase-js queries; tests bind them to in-memory
  *  fixtures. */
 export interface ComputeVerdictDataAdapter {
-  /** Verify the room exists. Returns null when RLS / lookup denies. */
-  fetchRoom(room_id: string): Promise<{ id: string } | null>;
+  /** Verify the room exists. Returns null when RLS / lookup denies.
+   *
+   *  tb-WF-1 (workflow-overhaul) — the optional `plan_id` ties the
+   *  in-flight Room to a durable Plan. When non-null, the handler
+   *  invokes `setPlanDecidedActive(plan_id)` after the verdict insert
+   *  so the Plan transitions `pending → decided-active`. Legacy
+   *  rooms (created before the workflow-overhaul phase) carry NULL
+   *  here and the Plan transition is skipped entirely. The supabase
+   *  adapter selects `id, plan_id` so the field is always populated
+   *  one-way-or-the-other. */
+  fetchRoom(room_id: string): Promise<{ id: string; plan_id?: string | null } | null>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
@@ -153,6 +162,16 @@ export interface ComputeVerdictDataAdapter {
    *  Optional — tests that don't exercise profile vetoes omit it; the
    *  handler treats absence as "every member has an empty profile." */
   fetchProfileVetoes?(user_ids: string[]): Promise<Record<string, HardVeto[]>>;
+  /** tb-WF-1 (workflow-overhaul) — transition the parent Plan from
+   *  `pending` to `decided-active`. Called after a successful verdict
+   *  insert when the Room carries a non-null `plan_id`. Wraps the
+   *  `set_plan_decided_active(p_plan_id uuid)` Postgres function,
+   *  which is SECURITY DEFINER and idempotent (a non-pending plan is
+   *  a no-op). Best-effort — a failure is logged but does NOT fail
+   *  the verdict response, same pattern as `markRoomVerdictReady`
+   *  and `emitVerdictReadyBroadcast`. Optional — tests omit it; the
+   *  handler treats absence as "no Plan to transition." */
+  setPlanDecidedActive?(plan_id: string): Promise<void>;
 }
 
 /** Aggregate of the reroll-state slice the engine reads from `rooms`
@@ -697,6 +716,20 @@ export async function handleRequest(
       await data.emitVerdictReadyBroadcast(roomId, verdict.id);
     } catch (e) {
       console.warn("compute-verdict emitVerdictReadyBroadcast failed:", e);
+    }
+  }
+  // tb-WF-1 (workflow-overhaul) — transition the parent Plan to
+  // `decided-active` if the Room is linked to one. Legacy rooms
+  // (pre-workflow-overhaul S01 path) carry `plan_id = null` and
+  // skip this entirely. Best-effort: a failure is logged and does
+  // not fail the verdict response — the Plan list surface will
+  // reconcile on its next read.
+  const planId = (room as { plan_id?: string | null }).plan_id ?? null;
+  if (planId && data.setPlanDecidedActive) {
+    try {
+      await data.setPlanDecidedActive(planId);
+    } catch (e) {
+      console.warn("compute-verdict setPlanDecidedActive failed:", e);
     }
   }
 
