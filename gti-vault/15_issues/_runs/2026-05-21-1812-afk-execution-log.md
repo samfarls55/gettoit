@@ -31,8 +31,8 @@ Concurrency cap: 2 (default).
 | sg-WF-8  | #194 | merged | afk/sg-WF-8  | [#200](https://github.com/samfarls55/gettoit/pull/200) | wave 1; S00a + web mint affordance; unblocks tb-WF-13, tb-WF-14 |
 | tb-WF-10 | #190 | merged | afk/tb-WF-10 | [#202](https://github.com/samfarls55/gettoit/pull/202) | wave 1; web quiz v1.1 port + votes-wire leaf module |
 | tb-WF-11 | #192 | merged | afk/tb-WF-11 | [#203](https://github.com/samfarls55/gettoit/pull/203) | wave 2; invitee shell foundation + members.display_name |
-| tb-WF-12 | #193 | building | afk/tb-WF-12 | — | wave 3; unblocked by tb-WF-11 |
-| tb-WF-13 | #195 | waiting | afk/tb-WF-13 | — | blocked by tb-WF-12 (sg-WF-8 cleared) |
+| tb-WF-12 | #193 | merged | afk/tb-WF-12 | [#204](https://github.com/samfarls55/gettoit/pull/204) | wave 3; invitee shell re-click behaviors; ADR 0017 |
+| tb-WF-13 | #195 | building | afk/tb-WF-13 | — | wave 4; unblocked by tb-WF-12 |
 | tb-WF-14 | #196 | waiting | afk/tb-WF-14 | — | blocked by tb-WF-13 (sg-WF-8 cleared) |
 
 ## Event log
@@ -53,3 +53,5 @@ Concurrency cap: 2 (default).
 - 19:22 — Free slot cannot be filled: only remaining work is the sequential chain tb-WF-12→13→14, all blocked behind tb-WF-11 (still building). Holding at 1 in flight.
 - 19:48 — tb-WF-11 MERGED via PR #203 (squash 3807085). 6/9 done. Subagent noted a pre-existing `tsc --noEmit` type error in `web/lib/quiz.test.ts:128-129` left by tb-WF-10 — not CI-gated (web lane runs test+build only). Surfaced to user at close-out.
 - 19:48 — Re-scan: tb-WF-12 ready. Dispatching tb-WF-12 (#193). tb-WF-13/14 still chained behind it — 1 in flight by necessity.
+- 20:18 — tb-WF-12 MERGED via PR #204 (squash fb0161d). 7/9 done. ADR 0017 added (web-invitee re-click RLS routing). Adjacency flagged by subagent: `web/components/InviteWebCard.tsx` is genuinely dead code (referenced only by its own test) — candidate cleanup issue. (Note: tb-WF-11's earlier claim that `/s/[sessionId]` is dead was wrong — that route still hosts SessionRoom.)
+- 20:18 — Re-scan: tb-WF-13 ready. Dispatching tb-WF-13 (#195). tb-WF-14 chained behind it.
