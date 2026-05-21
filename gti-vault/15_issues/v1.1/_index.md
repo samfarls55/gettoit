@@ -30,7 +30,7 @@ These items are follow-ups to v1, not part of the original v1 PRD ([[../../10_pr
 | bug-08 | [[issues/bug-08-verdict-pipeline-integration-unwired\|Verdict never computes — candidate-pool + preference-scoring integration (modules A/E/G) never wired]] ✅ closed — fork decided (Option 2, server-side); decomposed into tb-21/tb-22/tb-23; fix tracked there | HITL | [#116](https://github.com/samfarls55/gettoit/issues/116) | — |
 | bug-09 | [[issues/bug-09-verdict-fire-dispatch-guc-noop\|Verdict engine never auto-invoked — dispatch no-ops on unset app.* DB GUCs]] ✅ done — `app_config` table replaces the `app.*` GUCs; both `dispatch_compute_verdict` overloads rewritten, applied live + CI-seeded | AFK | [#117](https://github.com/samfarls55/gettoit/issues/117) | — |
 | bug-10 | [[issues/bug-10-verdict-poll-no-timeout\|Post-Q5 "Lining Up the Verdict" spinner hangs forever — poll has no timeout]] ✅ done — `VerdictPoller` bounded, PR #122 | AFK | [#118](https://github.com/samfarls55/gettoit/issues/118) | — |
-| bug-11 | [[issues/bug-11-fixture-factories-in-app-target\|Move snapshot/preview fixture factories out of the iOS app target]] — needs-triage | — | [#140](https://github.com/samfarls55/gettoit/issues/140) | — |
+| bug-11 | [[issues/bug-11-fixture-factories-in-app-target\|Move snapshot/preview fixture factories out of the iOS app target]] — ready-for-agent | AFK | [#140](https://github.com/samfarls55/gettoit/issues/140) | — |
 
 ### Spec gaps
 
