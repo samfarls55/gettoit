@@ -83,23 +83,14 @@ export const REPUTATION_NO_PREFERENCE = "no_preference";
 // Public types
 // ───────────────────────────────────────────────────────────────────────
 
-/** The three preference axes. Mirrors the Swift `Q5FactorialCard.Axis`
- *  / `PreferenceFunction.Axis` enums (kept as one type here — the port
- *  has no separate factorial-surface type). */
-export type Axis = "cuisine" | "reputation" | "vibe";
+// `Axis` and `Q5Rating` are the tiny wire-contract types. ADR 0014
+// makes `votes-wire.ts` the single, leaf-module home for them so the
+// web app can import the same definitions; this module re-exports them
+// so existing engine-side consumers keep importing from here unchanged.
+export type { Axis, Q5Rating } from "./votes-wire.ts";
+import type { Axis, Q5Rating } from "./votes-wire.ts";
 
 const ALL_AXES: readonly Axis[] = ["cuisine", "reputation", "vibe"];
-
-/** One Q5 factorial card's excitement rating, tagged with the axis that
- *  card deviates on. The Q5 factorial emits exactly three cards — one
- *  per axis — and the member rates each 1…5. Mirrors the Swift
- *  `Q5Rating` struct. */
-export interface Q5Rating {
-  /** The factorial axis the rated card deviates on. */
-  droppedAxis: Axis;
-  /** The member's 1…5 excitement rating for that card. */
-  score: number;
-}
 
 /** A member's stated Q1–Q4 profile. Mirrors the Swift
  *  `Q5MemberProfile` struct. */

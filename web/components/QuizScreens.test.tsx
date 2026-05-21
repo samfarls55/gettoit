@@ -1,46 +1,63 @@
-// GetToIt web — quiz screen smoke tests.
+// GetToIt web — v1.1 quiz screen smoke tests (tb-WF-10).
 //
-// Stress-tests the controlled-state contract — every screen is a
-// "dumb" rendering of (state, callbacks). The lifted state lives in
+// Stress-tests the controlled-state contract — every screen is a "dumb"
+// rendering of (state, callbacks). The lifted state lives in
 // `SessionRoom`; these tests prove each screen renders the canonical
-// surface and surfaces the right callbacks.
+// v1.1 surface and surfaces the right callbacks.
 
 import { describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
-import { DUMMY_CANDIDATES, seedRegret } from "../lib/quiz";
+import type { QuizCandidate } from "../lib/candidate-fetch";
 
 import {
-  QuizQ1Vetoes,
+  QuizQ1Cuisine,
   QuizQ2Budget,
-  QuizQ3Distance,
+  QuizQ3Reputation,
   QuizQ4Vibe,
-  QuizQ5Regret,
+  QuizQ5,
 } from "./QuizScreens";
 
-describe("QuizQ1Vetoes", () => {
-  it("renders all six chips and toggles via the callback", () => {
+const FACTORIAL_CARDS: QuizCandidate[] = [
+  { id: "v-cuisine", name: "Pico's Taqueria", meta: "Mexican · $$ · 8 min", droppedAxis: "cuisine" },
+  { id: "v-reputation", name: "Ren Soba House", meta: "Japanese · $$ · 12 min", droppedAxis: "reputation" },
+  { id: "v-vibe", name: "Bar Pastoral", meta: "Italian · $$ · 5 min", droppedAxis: "vibe" },
+];
+
+describe("QuizQ1Cuisine", () => {
+  it("renders the eight cuisine chips plus No preference and toggles", () => {
     const calls: string[] = [];
     render(
-      <QuizQ1Vetoes
-        selected={new Set(["shellfish"])}
-        onToggle={(c) => calls.push(c)}
+      <QuizQ1Cuisine
+        selection={{ cuisines: new Set(["mexican"]), noPreference: false }}
+        onToggleCuisine={(c) => calls.push(c)}
+        onToggleNoPreference={() => {}}
         onAdvance={() => {}}
       />,
     );
-    // All six veto labels visible.
-    for (const label of [
-      "Gluten",
-      "Dairy",
-      "Shellfish",
-      "Needs vegan options",
-      "Halal-only",
-      "Nothing tonight",
-    ]) {
+    for (const label of ["Mexican", "Italian", "Japanese", "No preference"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    fireEvent.click(screen.getByText("Gluten"));
-    expect(calls).toEqual(["gluten"]);
+    fireEvent.click(screen.getByText("Italian"));
+    expect(calls).toEqual(["italian"]);
+  });
+
+  it("disables unselected chips once the 3-cap is reached", () => {
+    render(
+      <QuizQ1Cuisine
+        selection={{
+          cuisines: new Set(["mexican", "thai", "italian"]),
+          noPreference: false,
+        }}
+        onToggleCuisine={() => {}}
+        onToggleNoPreference={() => {}}
+        onAdvance={() => {}}
+      />,
+    );
+    // An unselected chip at the cap is disabled.
+    expect(screen.getByRole("button", { name: "Japanese" })).toBeDisabled();
+    // A selected chip stays tappable (so it can be deselected).
+    expect(screen.getByRole("button", { name: "Mexican" })).not.toBeDisabled();
   });
 });
 
@@ -54,76 +71,104 @@ describe("QuizQ2Budget", () => {
         onAdvance={() => {}}
       />,
     );
-    expect(screen.getByText("$")).toBeInTheDocument();
     expect(screen.getByText("$$$$")).toBeInTheDocument();
     fireEvent.click(screen.getByText("$$"));
     expect(calls).toEqual([2]);
   });
 });
 
-describe("QuizQ3Distance", () => {
-  it("renders the canonical 5-stop set and the active value", () => {
-    const calls: number[] = [];
+describe("QuizQ3Reputation", () => {
+  it("renders the five reputation chips and dispatches", () => {
+    const calls: string[] = [];
     render(
-      <QuizQ3Distance
-        value={15}
-        onSelect={(v) => calls.push(v)}
+      <QuizQ3Reputation
+        value="no_preference"
+        onSelect={(id) => calls.push(id)}
         onAdvance={() => {}}
       />,
     );
-    // "15" appears as the display value and as a stop button; assert
-    // both presences by counting nodes via the role lookup.
-    expect(screen.getAllByText("15").length).toBeGreaterThanOrEqual(2);
-    fireEvent.click(screen.getByRole("button", { name: "30" }));
-    expect(calls).toEqual([30]);
+    for (const label of ["Popular", "Hidden gem", "Classic", "New", "No preference"]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByText("Hidden gem"));
+    expect(calls).toEqual(["hidden_gem"]);
   });
 });
 
 describe("QuizQ4Vibe", () => {
-  it("renders the current vibe word and the 5 stops", () => {
+  it("renders the v1.1 vibe vocabulary and the 5 stops", () => {
     const calls: number[] = [];
     render(
-      <QuizQ4Vibe
-        value={2}
-        onSelect={(i) => calls.push(i)}
-        onAdvance={() => {}}
-      />,
+      <QuizQ4Vibe value={2} onSelect={(i) => calls.push(i)} onAdvance={() => {}} />,
     );
-    expect(screen.getByText("BUZZY")).toBeInTheDocument();
+    // v1.1 vocabulary — SOCIAL is the mid-scale word, not the retired BUZZY.
+    expect(screen.getByText("SOCIAL")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("vibe ROWDY"));
     expect(calls).toEqual([4]);
   });
 });
 
-describe("QuizQ5Regret", () => {
-  it("renders each candidate and dispatches rate events", () => {
+describe("QuizQ5", () => {
+  it("renders the loading state while the candidate fetch is in flight", () => {
+    render(
+      <QuizQ5
+        state="loading"
+        candidates={[]}
+        ratings={{}}
+        onRate={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("quiz-q5-loading")).toBeInTheDocument();
+  });
+
+  it("renders the three factorial cards and dispatches rate events", () => {
     const calls: Array<[string, number]> = [];
     render(
-      <QuizQ5Regret
-        candidates={DUMMY_CANDIDATES}
-        ratings={seedRegret(DUMMY_CANDIDATES)}
+      <QuizQ5
+        state="default"
+        candidates={FACTORIAL_CARDS}
+        ratings={{ "v-cuisine": 3, "v-reputation": 3, "v-vibe": 3 }}
         onRate={(id, score) => calls.push([id, score])}
         onSubmit={() => {}}
       />,
     );
-    for (const c of DUMMY_CANDIDATES) {
+    for (const c of FACTORIAL_CARDS) {
       expect(screen.getByText(c.name)).toBeInTheDocument();
     }
-    fireEvent.click(screen.getByLabelText("Pico's Taqueria regret 5"));
-    expect(calls).toEqual([["dummy-pico", 5]]);
+    fireEvent.click(screen.getByLabelText("Pico's Taqueria excitement 5"));
+    expect(calls).toEqual([["v-cuisine", 5]]);
+  });
+
+  it("renders the no-results honest-degradation mode without fictitious venues", () => {
+    render(
+      <QuizQ5
+        state="no-results"
+        candidates={[]}
+        ratings={{}}
+        onRate={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("quiz-q5-no-results")).toBeInTheDocument();
+    expect(screen.getByText("No spots to rate near you.")).toBeInTheDocument();
+    // The no-results CTA, not the default "Drop the verdict".
+    expect(
+      screen.getByRole("button", { name: /head to the verdict/i }),
+    ).toBeInTheDocument();
   });
 
   it("disables the CTA while submitting", () => {
     render(
-      <QuizQ5Regret
-        candidates={DUMMY_CANDIDATES}
-        ratings={seedRegret(DUMMY_CANDIDATES)}
+      <QuizQ5
+        state="default"
+        candidates={FACTORIAL_CARDS}
+        ratings={{}}
         onRate={() => {}}
         onSubmit={() => {}}
         submitting
       />,
     );
-    const cta = screen.getByRole("button", { name: /submitting/i });
-    expect(cta).toBeDisabled();
+    expect(screen.getByRole("button", { name: /submitting/i })).toBeDisabled();
   });
 });

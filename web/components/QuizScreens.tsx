@@ -1,16 +1,17 @@
-// GetToIt web — Q1–Q5 quiz screens.
+// GetToIt web — Q1–Q5 quiz screens, v1.1 (tb-WF-10).
 //
-// Web equivalents of:
-//   * design-system/code/screens/ScreenQ1Vetoes.jsx
-//   * design-system/code/screens/ScreenQ2Budget.jsx
-//   * design-system/code/screens/ScreenQ3Distance.jsx
-//   * design-system/code/screens/ScreenQ4Vibe.jsx
-//   * design-system/code/screens/ScreenQ5Regret.jsx
+// Web equivalents of the iOS v1.1 quiz surfaces (`QuizQ1Cuisine`,
+// `QuizQ2Budget`, `QuizQ3Reputation`, `QuizQ4Vibe`, `QuizQ5Regret`,
+// `QuizQ5NoResults`). The authoritative spec is
+// `design-system/surfaces/03-quiz.md` — these are 1:1 ports threaded
+// onto real data (props instead of internal state) so `SessionRoom` can
+// hold the quiz state. Per ADR 0003 the web fallback re-implements the
+// design-system surfaces rather than importing the JSX.
 //
-// Per ADR 0003, the web fallback does NOT import from
-// `design-system/code/`. These components are 1:1 ports threaded onto
-// real data (props instead of internal state) so the parent session
-// page can hold the QuizCoordinator-equivalent state.
+// v1.1 (tb-WF-10): the retired v1 questions (Q1 dietary vetoes, Q3
+// walk-distance) are replaced by the v1.1 scenario questions (Q1 cuisine
+// craving, Q3 reputation/discovery). Q5 renders the strict-factorial
+// probe + the `no-results` honest-degradation mode (ADR 0013).
 
 "use client";
 
@@ -18,11 +19,14 @@ import { type CSSProperties } from "react";
 
 import {
   BUDGET_TIERS,
-  VETO_OPTIONS,
+  CUISINE_OPTIONS,
+  REPUTATION_NO_PREFERENCE,
+  REPUTATION_OPTIONS,
   VIBE_LABELS,
-  WALK_STOPS,
-  type Candidate,
+  type CuisineSelection,
 } from "../lib/quiz";
+import { hasFreeCuisineSlot } from "../lib/quiz";
+import type { QuizCandidate } from "../lib/candidate-fetch";
 
 import {
   CTADock,
@@ -50,15 +54,22 @@ const contentWrap: CSSProperties = {
   paddingBottom: 32,
 };
 
-export function QuizQ1Vetoes({
-  selected,
-  onToggle,
+// ───────────────────────────────────────────────────────────────────────
+// Q1 — Cuisine craving (capped multi-select chips)
+// ───────────────────────────────────────────────────────────────────────
+
+export function QuizQ1Cuisine({
+  selection,
+  onToggleCuisine,
+  onToggleNoPreference,
   onAdvance,
 }: {
-  selected: ReadonlySet<string>;
-  onToggle: (chip: string) => void;
+  selection: CuisineSelection;
+  onToggleCuisine: (id: string) => void;
+  onToggleNoPreference: () => void;
   onAdvance: () => void;
 }) {
+  const atCap = !hasFreeCuisineSlot(selection);
   return (
     <GradientSurface stop="q1">
       <div style={canvasWrap}>
@@ -68,8 +79,8 @@ export function QuizQ1Vetoes({
           <QuestionHeader
             index={1}
             total={5}
-            title="Any hard no's tonight?"
-            sub="Tap everything that's off the table."
+            title="What are you craving?"
+            sub="Pick up to 3 — or tap No preference."
           />
           <div
             style={{
@@ -79,14 +90,25 @@ export function QuizQ1Vetoes({
               gap: 10,
             }}
           >
-            {VETO_OPTIONS.map((opt) => (
-              <Chip
-                key={opt.id}
-                label={opt.label}
-                selected={selected.has(opt.id)}
-                onClick={() => onToggle(opt.id)}
-              />
-            ))}
+            {CUISINE_OPTIONS.map((opt) => {
+              const isSel = selection.cuisines.has(opt.id);
+              return (
+                <Chip
+                  key={opt.id}
+                  label={opt.label}
+                  selected={isSel}
+                  // Once 3 are picked the remaining unselected chips
+                  // disable; a selected chip stays tappable to deselect.
+                  disabled={atCap && !isSel}
+                  onClick={() => onToggleCuisine(opt.id)}
+                />
+              );
+            })}
+            <Chip
+              label="No preference"
+              selected={selection.noPreference}
+              onClick={onToggleNoPreference}
+            />
           </div>
           <CTADock>
             <PillCTA label="Next" onClick={onAdvance} />
@@ -96,6 +118,10 @@ export function QuizQ1Vetoes({
     </GradientSurface>
   );
 }
+
+// ───────────────────────────────────────────────────────────────────────
+// Q2 — Spend cap (single-select tier)
+// ───────────────────────────────────────────────────────────────────────
 
 export function QuizQ2Budget({
   tier,
@@ -191,13 +217,17 @@ export function QuizQ2Budget({
   );
 }
 
-export function QuizQ3Distance({
+// ───────────────────────────────────────────────────────────────────────
+// Q3 — Reputation / discovery (single-select chips)
+// ───────────────────────────────────────────────────────────────────────
+
+export function QuizQ3Reputation({
   value,
   onSelect,
   onAdvance,
 }: {
-  value: number;
-  onSelect: (minutes: 5 | 10 | 15 | 20 | 30) => void;
+  value: string;
+  onSelect: (id: string) => void;
   onAdvance: () => void;
 }) {
   return (
@@ -209,90 +239,25 @@ export function QuizQ3Distance({
           <QuestionHeader
             index={3}
             total={5}
-            title="How far is too far?"
-            sub="Max walk from here, right now."
+            title="What kind of place?"
+            sub="The standing of the spot, not the food."
           />
-          <div style={{ marginTop: 36, padding: "0 22px", textAlign: "center" }}>
-            <div
-              className="gti-display"
-              style={{
-                fontSize: 100,
-                lineHeight: 0.9,
-                color: "var(--paper)",
-                letterSpacing: "-0.04em",
-              }}
-            >
-              {value}
-              <span
-                style={{
-                  fontSize: 36,
-                  fontWeight: 700,
-                  opacity: 0.7,
-                  marginLeft: 6,
-                  verticalAlign: "super",
-                  letterSpacing: 0.08,
-                  textTransform: "uppercase",
-                }}
-              >
-                min
-              </span>
-            </div>
-            <div
-              style={{
-                marginTop: 26,
-                display: "flex",
-                gap: 6,
-                justifyContent: "space-between",
-              }}
-            >
-              {WALK_STOPS.map((t) => {
-                const selected = value === t;
-                return (
-                  <button
-                    type="button"
-                    key={t}
-                    onClick={() => onSelect(t)}
-                    aria-pressed={selected}
-                    style={{
-                      appearance: "none",
-                      border: 0,
-                      cursor: "pointer",
-                      flex: 1,
-                      padding: "12px 0",
-                      borderRadius: 12,
-                      background: selected
-                        ? "var(--sun)"
-                        : "rgba(255,255,255,0.08)",
-                      color: selected ? "var(--ink)" : "var(--paper)",
-                      fontFamily: "var(--ff-body)",
-                      fontWeight: 800,
-                      fontSize: 14,
-                      boxShadow: selected
-                        ? "0 10px 22px rgba(255,210,63,0.32)"
-                        : "inset 0 0 0 1px rgba(255,255,255,0.32)",
-                      transition: "all 180ms var(--ease-out)",
-                    }}
-                  >
-                    {t}
-                  </button>
-                );
-              })}
-            </div>
-            <div
-              style={{
-                marginTop: 14,
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 0.12,
-                textTransform: "uppercase",
-                opacity: 0.6,
-              }}
-            >
-              <span>Around the corner</span>
-              <span>Half a city</span>
-            </div>
+          <div
+            style={{
+              padding: "24px 22px 0",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 10,
+            }}
+          >
+            {REPUTATION_OPTIONS.map((opt) => (
+              <Chip
+                key={opt.id}
+                label={opt.label}
+                selected={value === opt.id}
+                onClick={() => onSelect(opt.id)}
+              />
+            ))}
           </div>
           <CTADock>
             <PillCTA label="Next" onClick={onAdvance} />
@@ -302,6 +267,10 @@ export function QuizQ3Distance({
     </GradientSurface>
   );
 }
+
+// ───────────────────────────────────────────────────────────────────────
+// Q4 — Vibe energy (cardinal scale)
+// ───────────────────────────────────────────────────────────────────────
 
 export function QuizQ4Vibe({
   value,
@@ -421,14 +390,24 @@ export function QuizQ4Vibe({
   );
 }
 
-export function QuizQ5Regret({
+// ───────────────────────────────────────────────────────────────────────
+// Q5 — Preference probe (3 factorial cards × 5 buttons)
+// ───────────────────────────────────────────────────────────────────────
+
+/** The Q5 candidate state — drives which mode Q5 renders. Mirrors the
+ *  iOS `QuizCoordinator.Q5CandidatesState`. */
+export type Q5State = "loading" | "default" | "no-results";
+
+export function QuizQ5({
+  state,
   candidates,
   ratings,
   onRate,
   onSubmit,
   submitting,
 }: {
-  candidates: ReadonlyArray<Candidate>;
+  state: Q5State;
+  candidates: ReadonlyArray<QuizCandidate>;
   ratings: Record<string, number>;
   onRate: (candidateId: string, score: number) => void;
   onSubmit: () => void;
@@ -440,121 +419,261 @@ export function QuizQ5Regret({
         <div style={contentWrap}>
           <TopBar step={5} total={5} />
           <div style={{ height: 40 }} />
-          <QuestionHeader
-            index={5}
-            total={5}
-            title="If we don't go here, how much would you mind?"
-            sub="Three places cleared everyone's filters. Rate each."
-          />
-          <div
-            style={{
-              marginTop: 22,
-              padding: "0 22px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            {candidates.map((p) => (
-              <Glass key={p.id} soft style={{ padding: 14, borderRadius: 18 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "baseline",
-                    marginBottom: 10,
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: "var(--ff-display)",
-                        fontWeight: 900,
-                        fontSize: 17,
-                        color: "var(--paper)",
-                        lineHeight: 1.1,
-                      }}
-                    >
-                      {p.name}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 600,
-                        marginTop: 3,
-                        color: "rgba(255,255,255,0.7)",
-                        letterSpacing: 0.08,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {p.meta}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  {[1, 2, 3, 4, 5].map((n) => {
-                    const sel = ratings[p.id] === n;
-                    return (
-                      <button
-                        type="button"
-                        key={n}
-                        onClick={() => onRate(p.id, n)}
-                        aria-label={`${p.name} regret ${n}`}
-                        aria-pressed={sel}
-                        style={{
-                          appearance: "none",
-                          border: 0,
-                          cursor: "pointer",
-                          flex: 1,
-                          minHeight: 44,
-                          borderRadius: 10,
-                          background: sel
-                            ? "var(--sun)"
-                            : "rgba(255,255,255,0.10)",
-                          color: sel ? "var(--ink)" : "var(--paper)",
-                          fontFamily: "var(--ff-body)",
-                          fontWeight: 800,
-                          fontSize: 14,
-                          boxShadow: sel
-                            ? "0 8px 18px rgba(255,210,63,0.32)"
-                            : "inset 0 0 0 1px rgba(255,255,255,0.22)",
-                          transition: "all 180ms var(--ease-out)",
-                        }}
-                      >
-                        {n}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: 6,
-                    fontSize: 9,
-                    fontWeight: 700,
-                    opacity: 0.6,
-                    letterSpacing: 0.12,
-                    textTransform: "uppercase",
-                    color: "var(--paper)",
-                  }}
-                >
-                  <span>Don&apos;t mind</span>
-                  <span>Really mind</span>
-                </div>
-              </Glass>
-            ))}
-          </div>
-          <CTADock>
-            <PillCTA
-              label={submitting ? "Submitting…" : "Drop the verdict"}
-              fill="sun"
-              disabled={submitting}
-              onClick={onSubmit}
+          {state === "loading" ? (
+            <Q5Loading />
+          ) : state === "no-results" ? (
+            <Q5NoResults onSubmit={onSubmit} submitting={submitting} />
+          ) : (
+            <Q5Default
+              candidates={candidates}
+              ratings={ratings}
+              onRate={onRate}
+              onSubmit={onSubmit}
+              submitting={submitting}
             />
-          </CTADock>
+          )}
         </div>
       </div>
     </GradientSurface>
   );
 }
+
+function Q5Loading() {
+  return (
+    <div
+      data-testid="quiz-q5-loading"
+      style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 14,
+        padding: "0 32px",
+        textAlign: "center",
+      }}
+    >
+      <p
+        style={{
+          fontFamily: "var(--ff-body)",
+          fontWeight: 700,
+          fontSize: "var(--fz-eyebrow)",
+          letterSpacing: "var(--tr-eyebrow)",
+          textTransform: "uppercase",
+          opacity: 0.78,
+          margin: 0,
+        }}
+      >
+        Lining up spots
+      </p>
+      <p
+        style={{
+          fontFamily: "var(--ff-body)",
+          fontWeight: 600,
+          fontSize: "var(--fz-body)",
+          opacity: 0.86,
+          margin: 0,
+        }}
+      >
+        Finding three places near you to rate…
+      </p>
+    </div>
+  );
+}
+
+// `no-results` mode — design-system surfaces/03-quiz.md §"no-results
+// mode". Centered headline + body in place of the rater cards; the
+// `Drop the verdict` CTA is replaced by `Head to the verdict`. Locked
+// copy — do not paraphrase.
+function Q5NoResults({
+  onSubmit,
+  submitting,
+}: {
+  onSubmit: () => void;
+  submitting?: boolean;
+}) {
+  return (
+    <>
+      <div
+        data-testid="quiz-q5-no-results"
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 14,
+          padding: "0 32px",
+          textAlign: "center",
+        }}
+      >
+        <h2
+          className="gti-display"
+          style={{
+            fontSize: "var(--fz-display-m)",
+            lineHeight: 0.92,
+            color: "var(--paper)",
+            margin: 0,
+          }}
+        >
+          No spots to rate near you.
+        </h2>
+        <p
+          style={{
+            fontFamily: "var(--ff-body)",
+            fontWeight: 500,
+            fontSize: "var(--fz-body)",
+            lineHeight: 1.45,
+            opacity: 0.86,
+            margin: 0,
+          }}
+        >
+          Couldn&apos;t line up rateable spots in your radius tonight. Your
+          other answers still count — the verdict lands without this step.
+        </p>
+      </div>
+      <CTADock>
+        <PillCTA
+          label={submitting ? "Submitting…" : "Head to the verdict"}
+          fill="sun"
+          disabled={submitting}
+          onClick={onSubmit}
+        />
+      </CTADock>
+    </>
+  );
+}
+
+function Q5Default({
+  candidates,
+  ratings,
+  onRate,
+  onSubmit,
+  submitting,
+}: {
+  candidates: ReadonlyArray<QuizCandidate>;
+  ratings: Record<string, number>;
+  onRate: (candidateId: string, score: number) => void;
+  onSubmit: () => void;
+  submitting?: boolean;
+}) {
+  return (
+    <>
+      <QuestionHeader
+        index={5}
+        total={5}
+        title="How excited does each of these make you?"
+        sub="Three real spots near you. Rate each."
+      />
+      <div
+        style={{
+          marginTop: 22,
+          padding: "0 22px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+        }}
+      >
+        {candidates.map((p) => (
+          <Glass key={p.id} soft style={{ padding: 14, borderRadius: 18 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                marginBottom: 10,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontFamily: "var(--ff-display)",
+                    fontWeight: 900,
+                    fontSize: 17,
+                    color: "var(--paper)",
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {p.name}
+                </div>
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    marginTop: 3,
+                    color: "rgba(255,255,255,0.7)",
+                    letterSpacing: 0.08,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {p.meta}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[1, 2, 3, 4, 5].map((n) => {
+                const sel = ratings[p.id] === n;
+                return (
+                  <button
+                    type="button"
+                    key={n}
+                    onClick={() => onRate(p.id, n)}
+                    aria-label={`${p.name} excitement ${n}`}
+                    aria-pressed={sel}
+                    style={{
+                      appearance: "none",
+                      border: 0,
+                      cursor: "pointer",
+                      flex: 1,
+                      minHeight: 44,
+                      borderRadius: 10,
+                      background: sel
+                        ? "var(--sun)"
+                        : "rgba(255,255,255,0.10)",
+                      color: sel ? "var(--ink)" : "var(--paper)",
+                      fontFamily: "var(--ff-body)",
+                      fontWeight: 800,
+                      fontSize: 14,
+                      boxShadow: sel
+                        ? "0 8px 18px rgba(255,210,63,0.32)"
+                        : "inset 0 0 0 1px rgba(255,255,255,0.22)",
+                      transition: "all 180ms var(--ease-out)",
+                    }}
+                  >
+                    {n}
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 6,
+                fontSize: 9,
+                fontWeight: 700,
+                opacity: 0.6,
+                letterSpacing: 0.12,
+                textTransform: "uppercase",
+                color: "var(--paper)",
+              }}
+            >
+              <span>Not for me</span>
+              <span>Can&apos;t wait</span>
+            </div>
+          </Glass>
+        ))}
+      </div>
+      <CTADock>
+        <PillCTA
+          label={submitting ? "Submitting…" : "Drop the verdict"}
+          fill="sun"
+          disabled={submitting}
+          onClick={onSubmit}
+        />
+      </CTADock>
+    </>
+  );
+}
+
+export { REPUTATION_NO_PREFERENCE };

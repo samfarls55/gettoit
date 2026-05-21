@@ -1,28 +1,24 @@
-// GetToIt web — mixed-platform integration test.
+// GetToIt web — mixed-platform integration test (v1.1, tb-WF-10).
 //
-// TB-15 AC: "Integration tests for a mixed-platform room (iOS + web
-// members) where both contribute to a verdict." This test simulates a
-// 4-person room (1 web user, 3 iOS users), drives each member's
-// answers through the same `buildVoteRow` path the web submit uses,
-// and then shapes the verdict view with the engine's output. The
-// resulting view is exactly what the web `VerdictReadOnly` surface
-// renders and exactly what iOS's `VerdictStore` shapes for the same
-// row — see `ios/Sources/App/VerdictStore.swift` for the canonical
-// shaping the web copy mirrors.
+// Originally TB-15: "Integration tests for a mixed-platform room
+// (iOS + web members) where both contribute to a verdict." This test
+// proves two seams:
 //
-// The engine itself runs server-side in `compute-verdict`; here we
-// pin the row contents the engine would emit for a deterministic
-// input set and prove the web shaping matches. This is the surface
-// equivalent of the iOS `VerdictStoreTests` suite.
+//   1. The web `buildVoteRow` emits the SAME generic `q1`..`q5` jsonb
+//      wire shape iOS does — both platforms build the slot envelope via
+//      the shared `votes-wire.ts` contract (ADR 0014), so the row
+//      `compute-verdict` reads is platform-agnostic.
+//   2. `shapeVerdictView` shapes the read-only verdict surface
+//      identically to the iOS `VerdictStore`.
+//
+// tb-WF-10 brought the web quiz to v1.1: `buildVoteRow` now writes the
+// generic-slot envelope, not the retired v1 typed columns. The verdict
+// engine runs server-side in `compute-verdict`; here we pin the row
+// contents for a deterministic input set.
 
 import { describe, expect, it } from "vitest";
 
-import {
-  buildVoteRow,
-  DUMMY_CANDIDATES,
-  seedRegret,
-  toggleVeto,
-} from "./quiz";
+import { buildVoteRow } from "./quiz";
 
 import {
   actionFor,
@@ -41,38 +37,49 @@ const IOS_USER_2 = "cccccccc-0000-0000-0000-000000000003";
 const IOS_USER_3 = "dddddddd-0000-0000-0000-000000000004";
 
 describe("mixed-platform room — web + iOS members", () => {
-  // Step 1 — each member submits their vote. The shape is identical
-  // for both platforms — `buildVoteRow` (web) and
-  // `QuizCoordinator.buildRow` (iOS) emit the same payload.
+  // Step 1 — a web member submits their v1.1 vote. `buildVoteRow` wraps
+  // the typed answers in the generic `{ meta, answer }` slot envelopes
+  // — the SAME shape the iOS `QuizCoordinator.VoteRow` encoder emits.
   const webVoteRow = buildVoteRow({
     roomId: ROOM_ID,
     userId: WEB_USER,
-    q1Vetoes: toggleVeto(new Set(), "shellfish"),
-    q2Budget: 2,
-    q3WalkMinutes: 15,
-    q4Vibe: 3, // wanted lively
-    q5Regret: { ...seedRegret(DUMMY_CANDIDATES), "dummy-pico": 5 },
+    cuisines: new Set(["mexican", "thai"]),
+    noPreference: false,
+    budget: 2,
+    reputation: "popular",
+    vibe: 3, // wanted lively
+    q5Ratings: [
+      { droppedAxis: "cuisine", score: 5 },
+      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "vibe", score: 3 },
+    ],
   });
 
-  it("web client emits the same wire shape iOS does for the same answers", () => {
-    expect(webVoteRow).toEqual({
-      room_id: ROOM_ID,
-      user_id: WEB_USER,
-      q1_vetoes: ["shellfish"],
-      q2_budget: 2,
-      q3_walk_minutes: 15,
-      q4_vibe: 3,
-      q5_regret: {
-        "dummy-pico": 5,
-        "dummy-ren": 3,
-        "dummy-pastoral": 3,
-      },
-    });
+  it("web client emits the generic q1..q5 jsonb slots compute-verdict reads", () => {
+    expect(webVoteRow.room_id).toBe(ROOM_ID);
+    expect(webVoteRow.user_id).toBe(WEB_USER);
+    // Generic envelope — dispatched on meta.question_kind, not column.
+    expect(webVoteRow.q1.meta.question_kind).toBe("cuisine_craving");
+    expect(webVoteRow.q1.answer.cuisines).toEqual(["mexican", "thai"]);
+    expect(webVoteRow.q2.meta.question_kind).toBe("budget_cap");
+    expect(webVoteRow.q2.answer.tier).toBe(2);
+    expect(webVoteRow.q3.meta.question_kind).toBe("reputation");
+    expect(webVoteRow.q3.answer.reputation).toBe("popular");
+    expect(webVoteRow.q4.meta.question_kind).toBe("vibe");
+    expect(webVoteRow.q4.answer.level).toBe(3);
+    expect(webVoteRow.q5.meta.question_kind).toBe("regret");
+    expect(webVoteRow.q5.answer.ratings).toEqual([
+      { droppedAxis: "cuisine", score: 5 },
+      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "vibe", score: 3 },
+    ]);
   });
 
-  // Step 2 — server-side, the engine writes a verdict + cuts + the
-  // votes rows are visible to every room member through RLS. The
-  // shaping helpers run identically on both clients.
+  // Step 2 — server-side, the engine writes a verdict + cuts. The
+  // shaping helpers run identically on both clients. `VoteSummaryRow`
+  // is the verdict-engine-projected receipt shape (the `verdict_for_room`
+  // RPC projects the generic slots back to it server-side); the verdict
+  // READ path is unchanged by tb-WF-10.
   const verdictRow: VerdictRow = {
     id: "v-1",
     room_id: ROOM_ID,
@@ -109,41 +116,37 @@ describe("mixed-platform room — web + iOS members", () => {
   };
 
   const allVotes: VoteSummaryRow[] = [
-    // Web user — wanted lively
     {
       user_id: WEB_USER,
       q1_vetoes: ["shellfish"],
       q2_budget: 2,
       q3_walk_minutes: 15,
       q4_vibe: 3,
-      q5_regret: webVoteRow.q5_regret,
+      q5_regret: { "o-pico": 5 },
     },
-    // iOS user 1 — filtered shellfish (came in via iOS)
     {
       user_id: IOS_USER_1,
       q1_vetoes: ["shellfish"],
       q2_budget: 4,
       q3_walk_minutes: 30,
       q4_vibe: 2,
-      q5_regret: { "dummy-pico": 4 },
+      q5_regret: { "o-pico": 4 },
     },
-    // iOS user 2 — capped at $$
     {
       user_id: IOS_USER_2,
       q1_vetoes: [],
       q2_budget: 2,
       q3_walk_minutes: 30,
       q4_vibe: 2,
-      q5_regret: { "dummy-pico": 4 },
+      q5_regret: { "o-pico": 4 },
     },
-    // iOS user 3 — capped at 15 min walk
     {
       user_id: IOS_USER_3,
       q1_vetoes: [],
       q2_budget: 4,
       q3_walk_minutes: 15,
       q4_vibe: 2,
-      q5_regret: { "dummy-pico": 4 },
+      q5_regret: { "o-pico": 4 },
     },
   ];
 
@@ -164,14 +167,10 @@ describe("mixed-platform room — web + iOS members", () => {
     expect(view.timeBadge.audience).toBe("All four of you");
     expect(view.ruleText).toBe(verdictRow.rule_text);
 
-    // Cuts surface the option name from the engine's row.
     expect(view.cuts).toEqual([
       { name: "Ren Soba", reason: "over budget cap" },
     ]);
 
-    // Each member gets a receipt — the web user's receipt is shaped
-    // identically to the iOS members' receipts since the shaping path
-    // is `actionFor()`, which is platform-agnostic.
     expect(view.receipts).toHaveLength(allVotes.length);
     const byUser = Object.fromEntries(
       view.receipts.map((r, i) => [allVotes[i].user_id, r.action]),

@@ -1,26 +1,53 @@
-// GetToIt web — quiz constants + vote-row shaping.
+// GetToIt web — v1.1 quiz constants + vote-row shaping (tb-WF-10).
 //
-// Mirrors `ios/Sources/App/QuizCoordinator.swift` and the schema in
-// `supabase/migrations/20260513215000000_votes.sql`. The wire shape is
-// intentionally identical to the iOS payload so the same `votes` row
-// emerges regardless of which platform submitted it; the VerdictEngine
-// (compute-verdict Edge Function) consumes both equally.
+// The web fallback's quiz, brought to v1.1 parity with the iOS app
+// (`ios/Sources/App/QuizCoordinator.swift`) and the verdict engine.
+//
+// The vote WIRE SHAPE is no longer hand-mirrored here. Per ADR 0014 the
+// `{ meta, answer }` envelope + the `buildVotesSlotsFromLegacyAnswers`
+// builder live in the leaf module `supabase/functions/_shared/votes-wire.ts`,
+// imported directly below. The pre-v1.1 `web/lib/quiz.ts` wrote the
+// retired v1 typed columns (`q1_vetoes` / `q3_walk_minutes` / …); a web
+// invitee voting through it produced a row `compute-verdict` could no
+// longer read. This module now writes the generic `q1`..`q5` jsonb slots.
+//
+// The Q1-Q4 surface constants (cuisine ids, budget tiers, reputation
+// chips, vibe labels) re-implement the iOS `QuizCuisine` / `QuizReputation`
+// / `QuizConstants` vocabularies. Per ADR 0003 the web fallback
+// re-implements design-system surfaces rather than importing the JSX;
+// the id strings are the engine contract and must match iOS exactly.
 
-export const VIBE_LABELS = ["HUSHED", "MELLOW", "BUZZY", "LOUD", "ROWDY"] as const;
+import {
+  buildVotesSlotsFromLegacyAnswers,
+  type Q5Rating,
+  type VotesSlotInsert,
+} from "../../supabase/functions/_shared/votes-wire";
 
-export const VETO_NOTHING = "nothing_tonight";
+// ───────────────────────────────────────────────────────────────────────
+// Q1 — Cuisine craving (multi-select, capped at 3)
+// ───────────────────────────────────────────────────────────────────────
 
-// Display order matches `QuizVeto.displayOrder` in iOS.
-export const VETO_OPTIONS: Array<{ id: string; label: string }> = [
-  { id: "gluten", label: "Gluten" },
-  { id: "dairy", label: "Dairy" },
-  { id: "shellfish", label: "Shellfish" },
-  { id: "vegan_options", label: "Needs vegan options" },
-  { id: "halal_only", label: "Halal-only" },
-  { id: VETO_NOTHING, label: "Nothing tonight" },
+/** The cap on Q1 cuisine picks — mirrors `QuizCoordinator.cuisineCap`. */
+export const CUISINE_CAP = 3;
+
+/** Q1 cuisine options. The `id` is the stable engine wire value, the
+ *  `label` is displayed copy. Display order matches iOS `QuizCuisine`. */
+export const CUISINE_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: "mexican", label: "Mexican" },
+  { id: "italian", label: "Italian" },
+  { id: "japanese", label: "Japanese" },
+  { id: "chinese", label: "Chinese" },
+  { id: "thai", label: "Thai" },
+  { id: "indian", label: "Indian" },
+  { id: "american", label: "American" },
+  { id: "mediterranean", label: "Mediterranean" },
 ];
 
-// Q2 budget tiers — 1=$, 2=$$, 3=$$$, 4=$$$$.
+// ───────────────────────────────────────────────────────────────────────
+// Q2 — Spend cap
+// ───────────────────────────────────────────────────────────────────────
+
+/** Q2 budget tiers — 1=$, 2=$$, 3=$$$, 4=$$$$. */
 export const BUDGET_TIERS: Array<{ tier: 1 | 2 | 3 | 4; label: string; sub: string }> = [
   { tier: 1, label: "$", sub: "Under $15" },
   { tier: 2, label: "$$", sub: "$15 – $30" },
@@ -28,82 +55,147 @@ export const BUDGET_TIERS: Array<{ tier: 1 | 2 | 3 | 4; label: string; sub: stri
   { tier: 4, label: "$$$$", sub: "No cap" },
 ];
 
-// Q3 walk-minute stops — must match the migration check constraint.
-export const WALK_STOPS = [5, 10, 15, 20, 30] as const;
+// ───────────────────────────────────────────────────────────────────────
+// Q3 — Reputation / discovery (single-select)
+// ───────────────────────────────────────────────────────────────────────
 
-export type VoteRow = {
-  room_id: string;
-  user_id: string;
-  q1_vetoes: string[];
-  q2_budget: number;
-  q3_walk_minutes: number;
-  q4_vibe: number;
-  q5_regret: Record<string, number>;
-};
+/** The neutral, non-pruning Q3 answer and Q3 default. */
+export const REPUTATION_NO_PREFERENCE = "no_preference";
 
-// Mirrors `QuizCoordinator.toggleVeto` — "nothing_tonight" is mutually
-// exclusive with all other chips.
-export function toggleVeto(current: ReadonlySet<string>, chip: string): Set<string> {
-  const next = new Set(current);
-  if (chip === VETO_NOTHING) {
-    return next.has(VETO_NOTHING) ? new Set() : new Set([VETO_NOTHING]);
-  }
-  next.delete(VETO_NOTHING);
-  if (next.has(chip)) {
-    next.delete(chip);
-  } else {
-    next.add(chip);
-  }
-  return next;
-}
-
-export const QUIZ_DEFAULTS = {
-  q1_vetoes: [] as string[],
-  q2_budget: 1 as 1 | 2 | 3 | 4,
-  q3_walk_minutes: 15 as (typeof WALK_STOPS)[number],
-  q4_vibe: 2,
-} as const;
-
-export type Candidate = { id: string; name: string; meta: string };
-
-// Dummy candidates for the Q5 rater on the web fallback. The real
-// candidate set lands from the `options` table once the room has been
-// seeded by PlacesProxy; until then the web client renders the same
-// three fixture cards as iOS so the surface still functions if the
-// room was created before the candidates landed (e.g. solo testing
-// rooms in dev).
-export const DUMMY_CANDIDATES: Candidate[] = [
-  { id: "dummy-pico", name: "Pico's Taqueria", meta: "Mexican · $$ · 8 min" },
-  { id: "dummy-ren", name: "Ren Soba House", meta: "Japanese · $$ · 12 min" },
-  { id: "dummy-pastoral", name: "Bar Pastoral", meta: "Italian · $$ · 5 min" },
+/** Q3 reputation chips. Single-select. Display order matches iOS
+ *  `QuizReputation`. */
+export const REPUTATION_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: "popular", label: "Popular" },
+  { id: "hidden_gem", label: "Hidden gem" },
+  { id: "classic", label: "Classic" },
+  { id: "new", label: "New" },
+  { id: REPUTATION_NO_PREFERENCE, label: "No preference" },
 ];
 
-// Seed Q5 ratings at the spec'd midpoint (3) so the surface renders
-// with a chosen state per card.
-export function seedRegret(candidates: ReadonlyArray<Candidate>): Record<string, number> {
-  const seed: Record<string, number> = {};
-  for (const c of candidates) seed[c.id] = 3;
-  return seed;
+// ───────────────────────────────────────────────────────────────────────
+// Q4 — Vibe energy (cardinal 5-point scale)
+// ───────────────────────────────────────────────────────────────────────
+
+/** Q4 vibe vocabulary — the v1.1 energy/loudness scale. Mirrors the
+ *  design-system `vibe-labels` token (`QUIET · CHILL · SOCIAL · LIVELY ·
+ *  ROWDY`) and iOS `GTIVibeLabels.all`. The v1 `HUSHED · MELLOW · BUZZY
+ *  · LOUD · ROWDY` vocabulary was retired by the v1.1 quiz redesign. */
+export const VIBE_LABELS = ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"] as const;
+
+// ───────────────────────────────────────────────────────────────────────
+// Quiz state defaults
+// ───────────────────────────────────────────────────────────────────────
+
+export const QUIZ_DEFAULTS = {
+  /** Q1 — no cuisine picked. The "No preference" flag also starts off. */
+  cuisines: [] as string[],
+  /** Q2 — defaults to tier 1, the same as iOS. */
+  budget: 1 as 1 | 2 | 3 | 4,
+  /** Q3 — the neutral, non-pruning answer. */
+  reputation: REPUTATION_NO_PREFERENCE,
+  /** Q4 — mid-scale (SOCIAL). */
+  vibe: 2,
+} as const;
+
+// ───────────────────────────────────────────────────────────────────────
+// Q1 cuisine toggle — cap + "No preference" mutual exclusion
+// ───────────────────────────────────────────────────────────────────────
+
+/** The Q1 cuisine answer — the (capped) craved set plus the mutually-
+ *  exclusive "No preference" flag. The two are never both populated. */
+export interface CuisineSelection {
+  cuisines: ReadonlySet<string>;
+  noPreference: boolean;
 }
 
-// Build the wire row from current state. Sorted vetoes for determinism
-// in tests; the server cares about set semantics.
+/** Toggle a Q1 cuisine chip. Mirrors `QuizCoordinator.toggleCuisine`:
+ *  - selecting a cuisine clears the "No preference" flag;
+ *  - the set is capped at `CUISINE_CAP` — a pick that would exceed it
+ *    is a no-op; deselecting always works (it frees a slot). */
+export function toggleCuisine(
+  current: CuisineSelection,
+  id: string,
+): CuisineSelection {
+  const next = new Set(current.cuisines);
+  if (next.has(id)) {
+    next.delete(id);
+    return { cuisines: next, noPreference: current.noPreference };
+  }
+  // A new selection — cap-gated.
+  if (next.size >= CUISINE_CAP) return current;
+  next.add(id);
+  return { cuisines: next, noPreference: false };
+}
+
+/** Toggle the mutually-exclusive "No preference" cuisine option.
+ *  Mirrors `QuizCoordinator.toggleCuisineNoPreference`. */
+export function toggleCuisineNoPreference(
+  current: CuisineSelection,
+): CuisineSelection {
+  if (current.noPreference) {
+    return { cuisines: current.cuisines, noPreference: false };
+  }
+  return { cuisines: new Set(), noPreference: true };
+}
+
+/** True while the cuisine set has room for another pick — the Q1
+ *  surface dims unselected chips when this is false. */
+export function hasFreeCuisineSlot(selection: CuisineSelection): boolean {
+  return selection.cuisines.size < CUISINE_CAP;
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// The vote row — generic q1..q5 jsonb slots
+// ───────────────────────────────────────────────────────────────────────
+
+/** A `votes` table insert row. `q1`..`q5` are the generic
+ *  `{ meta, answer }` jsonb slots built by `votes-wire.ts`. */
+export interface VoteRow extends VotesSlotInsert {
+  room_id: string;
+  user_id: string;
+}
+
+/** Build the generic-slot `votes` row from the member's v1.1 answers.
+ *
+ *  The five typed answers are wrapped into the `{ meta, answer }`
+ *  envelopes by the shared `buildVotesSlotsFromLegacyAnswers` builder —
+ *  the SAME builder the edge functions use — so a web-invitee vote round
+ *  is readable by `compute-verdict` end-to-end. */
 export function buildVoteRow(args: {
   roomId: string;
   userId: string;
-  q1Vetoes: ReadonlySet<string>;
-  q2Budget: number;
-  q3WalkMinutes: number;
-  q4Vibe: number;
-  q5Regret: Record<string, number>;
+  cuisines: ReadonlySet<string>;
+  noPreference: boolean;
+  budget: number;
+  reputation: string;
+  vibe: number;
+  q5Ratings: Q5Rating[];
 }): VoteRow {
+  // "No preference" on Q1 is a genuine zero-weight signal — it writes an
+  // empty craved set, exactly as iOS does (`QuizFetchAnswers` zeroes the
+  // cuisine list when `q1NoPreference`).
+  const cuisines = args.noPreference
+    ? []
+    : Array.from(args.cuisines).sort();
+  const slots = buildVotesSlotsFromLegacyAnswers({
+    q1_vetoes: [],
+    q2_budget: args.budget,
+    cuisines,
+    reputation: args.reputation,
+    q4_vibe: args.vibe,
+    q5_ratings: args.q5Ratings,
+  });
   return {
     room_id: args.roomId,
     user_id: args.userId,
-    q1_vetoes: Array.from(args.q1Vetoes).sort(),
-    q2_budget: args.q2Budget,
-    q3_walk_minutes: args.q3WalkMinutes,
-    q4_vibe: args.q4Vibe,
-    q5_regret: args.q5Regret,
+    q1: slots.q1,
+    q2: slots.q2,
+    q3: slots.q3,
+    q4: slots.q4,
+    q5: slots.q5,
   };
 }
+
+// Re-export the wire types web callers need, so they don't reach across
+// the repo boundary themselves.
+export type { Q5Rating } from "../../supabase/functions/_shared/votes-wire";
