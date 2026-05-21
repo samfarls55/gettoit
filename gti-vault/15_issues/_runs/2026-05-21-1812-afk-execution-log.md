@@ -30,8 +30,8 @@ Concurrency cap: 2 (default).
 | sg-WF-6  | #159 | merged | afk/sg-WF-6  | [#201](https://github.com/samfarls55/gettoit/pull/201) | wave 1; reroll-window deadline + apply_reroll guard; migration live on gettoit-prod |
 | sg-WF-8  | #194 | merged | afk/sg-WF-8  | [#200](https://github.com/samfarls55/gettoit/pull/200) | wave 1; S00a + web mint affordance; unblocks tb-WF-13, tb-WF-14 |
 | tb-WF-10 | #190 | merged | afk/tb-WF-10 | [#202](https://github.com/samfarls55/gettoit/pull/202) | wave 1; web quiz v1.1 port + votes-wire leaf module |
-| tb-WF-11 | #192 | building | afk/tb-WF-11 | — | wave 2; unblocked by sg-WF-5 |
-| tb-WF-12 | #193 | waiting | afk/tb-WF-12 | — | blocked by tb-WF-11 |
+| tb-WF-11 | #192 | merged | afk/tb-WF-11 | [#203](https://github.com/samfarls55/gettoit/pull/203) | wave 2; invitee shell foundation + members.display_name |
+| tb-WF-12 | #193 | building | afk/tb-WF-12 | — | wave 3; unblocked by tb-WF-11 |
 | tb-WF-13 | #195 | waiting | afk/tb-WF-13 | — | blocked by tb-WF-12 (sg-WF-8 cleared) |
 | tb-WF-14 | #196 | waiting | afk/tb-WF-14 | — | blocked by tb-WF-13 (sg-WF-8 cleared) |
 
@@ -51,3 +51,5 @@ Concurrency cap: 2 (default).
 - 18:58 — Re-scan: tb-WF-11 ready (sg-WF-5 cleared); tb-WF-13/14 blockers narrowed to the chain only (sg-WF-8 cleared). Dispatching tb-WF-11 (#192) into the free slot — runs parallel to tb-WF-10.
 - 19:22 — tb-WF-10 MERGED via PR #202 (squash 4961e18). 5/9 done. Adjacency flagged by subagent (not fixed, out of scope): web verdict-*read* path (`web/lib/verdict.ts` VoteSummaryRow + SessionRoom verdict load) still references the retired v1 typed `votes` columns dropped by the generic-jsonb migration — read-side receipts should move to the `verdict_for_room` RPC projection. Candidate follow-up issue; surfaced to user at close-out.
 - 19:22 — Free slot cannot be filled: only remaining work is the sequential chain tb-WF-12→13→14, all blocked behind tb-WF-11 (still building). Holding at 1 in flight.
+- 19:48 — tb-WF-11 MERGED via PR #203 (squash 3807085). 6/9 done. Subagent noted a pre-existing `tsc --noEmit` type error in `web/lib/quiz.test.ts:128-129` left by tb-WF-10 — not CI-gated (web lane runs test+build only). Surfaced to user at close-out.
+- 19:48 — Re-scan: tb-WF-12 ready. Dispatching tb-WF-12 (#193). tb-WF-13/14 still chained behind it — 1 in flight by necessity.
