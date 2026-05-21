@@ -1,7 +1,7 @@
 ---
 issue: tb-WF-13
 title: Claim code mint side — claim_codes table + mint edge function + web affordance
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 195
@@ -37,3 +37,42 @@ The code carries the whole identity, not one Plan — one redemption later bring
 
 - [[sg-wf-8-account-claim-design-system|sg-WF-8]] (#194) — the web mint-affordance design-system spec.
 - [[tb-wf-12-web-invitee-shell-reclick|tb-WF-12]] (#193) — builds the v1.1 web Waiting screen + read-only verdict card the affordance attaches to.
+
+## Comments
+
+**Done 2026-05-21 (PR #PRNUM).** Landed the mint half of the claim-code
+bridge end-to-end:
+
+- **`claim_codes` table** — migration `20260525000000000_claim_codes.sql`.
+  Maps an 8-char code to the encrypted refresh token, a ~30-min TTL
+  (`expires_at` default), the minting `user_id`, and a single-use
+  `redeemed_at` marker. RLS-locked the `app_config` way: RLS enabled,
+  zero policies, table grants revoked from `anon` / `authenticated` — so
+  only the service-role key (the two Edge Functions) reaches it.
+- **`mint-claim-code` Edge Function** — authed by the caller's live
+  web-session JWT, generates a single-use 8-char code from an
+  unambiguous alphabet (no `O/0`, `I/1/l`), encrypts the caller's
+  refresh token (AES-GCM, runtime `CLAIM_CODE_ENC_KEY` secret), stores
+  the row with a PK-collision retry, and returns the code. Re-mintable.
+- **Web wiring** — the `GettingTheAppAffordance` component (lazy mint on
+  tap, revealed code in a `Glass` `soft` card, re-mint, quiet retry on
+  failure) plus `web/lib/claim-code.ts` (the Edge Function client). The
+  affordance is wired onto the web Waiting screen (via `SessionRoom`)
+  and the §C read-only verdict card (via `InviteShell` → `WebVerdictCard`)
+  — absent from the quiz chrome and the §D / §E terminals.
+- **Encryption design** — application-layer AES-GCM in a shared
+  `_shared/claim-code.ts` helper (so tb-WF-14's redeem side reuses it),
+  not a Postgres `pgcrypto` column default — the key stays a runtime
+  Edge Function secret, never in the database. See
+  [[../../../60_engineering/claim-code-mint-encryption|claim-code-mint-encryption]].
+
+Tests: 16 new edge-function tests (mint success, unauthed rejection,
+code uniqueness / collision retry, encryption round-trip) + 11 shared
+claim-code primitive tests + 13 new web tests (affordance render, lazy
+mint, re-mint, failure). Full suites green (432 edge, 158 web),
+`npm run build` and `node design-system/scripts/verify.mjs` green.
+
+Follow-up: the live `mint-claim-code` function returns
+`mint_claim_code_misconfigured` until the `CLAIM_CODE_ENC_KEY` repo
+secret is added (`openssl rand -base64 32`) — the CI edge-deploy lane
+pushes it when present and warns (does not fail) when absent.

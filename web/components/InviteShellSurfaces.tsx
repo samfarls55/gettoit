@@ -27,6 +27,10 @@
 
 import { type CSSProperties } from "react";
 
+import {
+  GettingTheAppAffordance,
+  type MintClaimCode,
+} from "./GettingTheAppAffordance";
 import { GTIMark, Glass, GradientSurface, PillCTA } from "./SunsetPop";
 
 // The shared content column from the surface doc §"Shared shell chrome":
@@ -63,13 +67,25 @@ const shellWrap: CSSProperties = {
  *
  *  Plan name + verdict venue only — no receipts, no per-axis cuts
  *  (`votes` is ephemeral and gone by the time a Plan is decided). No
- *  primary CTA: the card is terminal-by-completion. */
+ *  primary CTA: the card is terminal-by-completion.
+ *
+ *  sg-WF-8 / tb-WF-13 — the one install-adjacent affordance the card
+ *  carries is the low-key "Getting the app?" claim-code mint line. When
+ *  `onMintClaimCode` is wired, it renders as a quiet footer below the
+ *  verdict card; it is not a primary CTA and never competes with the
+ *  plan name + venue for the eye (surface doc §C — No primary CTA). */
 export function WebVerdictCard({
   planName,
   verdictPlaceName,
+  onMintClaimCode,
 }: {
   planName: string;
   verdictPlaceName: string;
+  /** sg-WF-8 / tb-WF-13 — the lazy claim-code mint call. When provided,
+   *  the "Getting the app?" affordance renders below the verdict card.
+   *  The web invitee shell wires it; absent it the card stays purely
+   *  CTA-less. */
+  onMintClaimCode?: MintClaimCode;
 }) {
   return (
     <GradientSurface stop="verdict">
@@ -115,6 +131,21 @@ export function WebVerdictCard({
             </div>
           </Glass>
         </div>
+        {/*
+          sg-WF-8 / tb-WF-13 — the "Getting the app?" mint affordance.
+          Below the verdict card, before the bottom `auto` spacer — a
+          quiet footer line (surface doc §C — Position (§C verdict
+          card)). `shellColumn` carries the centered max-width 360
+          column the card uses, so the footer aligns with it.
+        */}
+        {onMintClaimCode ? (
+          <div
+            style={{ ...shellColumn, flex: "0 0 auto", paddingTop: 20 }}
+            data-testid="web-verdict-getting-the-app"
+          >
+            <GettingTheAppAffordance onMint={onMintClaimCode} />
+          </div>
+        ) : null}
       </div>
     </GradientSurface>
   );

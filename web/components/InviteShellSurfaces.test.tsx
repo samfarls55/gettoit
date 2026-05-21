@@ -45,6 +45,51 @@ describe("WebVerdictCard (web-01 §C)", () => {
       screen.getByTestId("gradient-surface-verdict"),
     ).toBeInTheDocument();
   });
+
+  // ── sg-WF-8 / tb-WF-13 — "Getting the app?" mint affordance ────────
+
+  it("omits the 'Getting the app?' affordance when onMintClaimCode is absent", () => {
+    render(<WebVerdictCard planName="Plan" verdictPlaceName="Venue" />);
+    expect(
+      screen.queryByTestId("web-verdict-getting-the-app"),
+    ).toBeNull();
+  });
+
+  it("renders the 'Getting the app?' affordance when onMintClaimCode is wired", () => {
+    render(
+      <WebVerdictCard
+        planName="Plan"
+        verdictPlaceName="Venue"
+        onMintClaimCode={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByTestId("web-verdict-getting-the-app"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /getting the app\?/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("lazily mints — onMintClaimCode is not called until the affordance is tapped", async () => {
+    const onMintClaimCode = vi.fn().mockResolvedValue("MINT2345");
+    render(
+      <WebVerdictCard
+        planName="Plan"
+        verdictPlaceName="Venue"
+        onMintClaimCode={onMintClaimCode}
+      />,
+    );
+    // Not minted on render — lazy.
+    expect(onMintClaimCode).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /getting the app\?/i }),
+    );
+    expect(onMintClaimCode).toHaveBeenCalledTimes(1);
+    const code = await screen.findByTestId("getting-the-app-code");
+    expect(code).toHaveTextContent("MINT2345");
+  });
 });
 
 // ── §D PlanClosedTerminal ───────────────────────────────────────────

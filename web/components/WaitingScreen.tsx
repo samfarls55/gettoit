@@ -16,10 +16,22 @@
 // identity. Mirrors the conditional render in
 // `design-system/code/screens/ScreenWaiting.jsx`'s sg-03 branch.
 
+// tb-WF-13 (workflow-overhaul) addition — the sg-WF-8 "Getting the app?"
+// claim-code mint affordance. Renders as a quiet line below the
+// "Download the app" dock when `onMintClaimCode` is wired (the web
+// invitee shell on the Waiting screen). It is the same affordance the
+// §C read-only verdict card carries; it is absent from the quiz chrome
+// and from the §D / §E terminals. See
+// `design-system/surfaces/web-01-invitee-shell.md` §"Getting the app?".
+
 "use client";
 
 import { type CSSProperties } from "react";
 
+import {
+  GettingTheAppAffordance,
+  type MintClaimCode,
+} from "./GettingTheAppAffordance";
 import { AvatarDot, GTIMark, GradientSurface, MEMBER_COLORS, PillCTA } from "./SunsetPop";
 
 export type WaitingMemberView = {
@@ -53,6 +65,14 @@ export type WaitingScreenProps = {
    *  URL itself; the side effects belong to the host page so they
    *  stay testable in isolation. */
   onDownloadApp?: () => void;
+  /** sg-WF-8 / tb-WF-13 — the lazy claim-code mint call. When provided,
+   *  the "Getting the app?" affordance renders as a quiet line below
+   *  the Download dock; tapping it lazily mints a single-use claim code
+   *  via this handler (the `mint-claim-code` Edge Function). The web
+   *  invitee shell wires it on the Waiting screen; off the shell (the
+   *  `/s/` session route) it is omitted and the affordance does not
+   *  render. */
+  onMintClaimCode?: MintClaimCode;
 };
 
 const canvasWrap: CSSProperties = {
@@ -77,6 +97,7 @@ export function WaitingScreen({
   outstandingName,
   isAnonymous = false,
   onDownloadApp,
+  onMintClaimCode,
 }: WaitingScreenProps) {
   const answered = members.filter((m) => m.answered).length;
   const total = members.length;
@@ -253,6 +274,23 @@ export function WaitingScreen({
               >
                 Then your votes save with you
               </div>
+            </div>
+          ) : null}
+
+          {/*
+            sg-WF-8 / tb-WF-13 — the "Getting the app?" claim-code mint
+            affordance. A quiet line in the dock, BELOW the "Download
+            the app" CTA, never above the primary "N of M are in" state
+            (surface doc §"Getting the app?" — Position (web Waiting)).
+            Renders only when the host wired `onMintClaimCode` (the web
+            invitee shell on the Waiting screen).
+          */}
+          {onMintClaimCode ? (
+            <div
+              style={{ padding: "0 22px 18px" }}
+              data-testid="waiting-getting-the-app-dock"
+            >
+              <GettingTheAppAffordance onMint={onMintClaimCode} />
             </div>
           ) : null}
         </div>
