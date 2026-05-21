@@ -56,28 +56,17 @@ public struct SignInScreen: View {
         case linking
     }
 
-    /// tb-WF-14 — the "Voted on the web?" account-claim affordance's
-    /// local state, per the sg-WF-8 spec §"Behavior":
-    ///   * collapsed — the quiet "Voted on the web?" text link; the
-    ///                 default. A non-web user ignores it.
-    ///   * entry     — the revealed code-entry state: teaching copy,
-    ///                 the soft-glass field, and the submit CTA.
-    ///   * redeeming — a redeem is in flight; the submit CTA disables.
-    public enum ClaimPhase: Equatable {
-        case collapsed
-        case entry
-        case redeeming
-    }
-
     @State private var phase: Phase = .idle
     @State private var errorMessage: String?
 
-    // tb-WF-14 — claim-affordance state. `internal` (not `private`) so
-    // unit tests can drive the reveal + submit directly via
-    // `@testable import GetToIt`, matching the `onSaveTapped` seam.
-    @State var claimPhase: ClaimPhase = .collapsed
-    @State var claimCode: String = ""
-    @State var claimErrorMessage: String?
+    // tb-WF-14 — the "Voted on the web?" account-claim affordance's
+    // state lives in an `@Observable` model (not a SwiftUI `@State`
+    // value) so it is unit-testable on a bare `SignInScreen` struct —
+    // `@State` value writes do not persist outside a render. The screen
+    // `@State`-stores a stable model reference; SwiftUI tracks the
+    // model's `@Observable` mutations. `internal` (not `private`) so
+    // unit tests can read `claim` directly via `@testable import`.
+    @State var claim: ClaimAffordanceModel
 
     @FocusState private var claimFieldFocused: Bool
 
@@ -95,6 +84,7 @@ public struct SignInScreen: View {
         self.auth = auth
         self.appleProvider = appleProvider ?? LiveAppleSignInProvider()
         self.onSignedIn = onSignedIn
+        _claim = State(initialValue: ClaimAffordanceModel(auth: auth))
     }
 
     public var body: some View {
@@ -221,7 +211,7 @@ public struct SignInScreen: View {
     /// state" / §"Revealed state".
     @ViewBuilder
     private var claimAffordance: some View {
-        switch claimPhase {
+        switch claim.phase {
         case .collapsed:
             votedOnTheWebLink
         case .entry, .redeeming:
@@ -255,8 +245,8 @@ public struct SignInScreen: View {
     /// claim-code field, and the "Bring my Plans over" submit CTA.
     /// sg-WF-8 §"Revealed state".
     private var codeEntryState: some View {
-        let redeeming = (claimPhase == .redeeming)
-        let trimmed = claimCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        let redeeming = (claim.phase == .redeeming)
+        let trimmed = claim.code.trimmingCharacters(in: .whitespacesAndNewlines)
         let submitDisabled = trimmed.isEmpty || redeeming
         return VStack(alignment: .leading, spacing: GTISpacing.step3) {
             // Teaching copy — tells a user without a code how to mint
@@ -273,7 +263,7 @@ public struct SignInScreen: View {
             // a 1px glass stroke; the sun-yellow caret is the focus
             // signal. A claim code is an opaque token — characters
             // autocapitalize, autocorrect off.
-            TextField("", text: $claimCode, prompt:
+            TextField("", text: $claim.code, prompt:
                 Text("Enter your code")
                     .foregroundStyle(GTIColor.TextOnGradient.tertiary)
             )
@@ -306,7 +296,7 @@ public struct SignInScreen: View {
             // Inline error — non-blocking, retryable. Same treatment as
             // the Apple-flow error line; `role="alert"` equivalent via
             // the announcement trait.
-            if let claimErrorMessage {
+            if let claimErrorMessage = claim.errorMessage {
                 Text(claimErrorMessage)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.7))
@@ -394,57 +384,26 @@ public struct SignInScreen: View {
         }
     }
 
-    /// tb-WF-14 — reveal the code-entry state. The quiet "Voted on the
-    /// web?" link is consumed by the reveal (it does not persist beside
-    /// the open field — sg-WF-8 §"Behavior" #2); the field autofocuses
-    /// so the keyboard rises.
-    /// Internal (not `private`) so unit tests can drive the reveal
-    /// directly via `@testable import GetToIt`.
+    /// tb-WF-14 — reveal the code-entry state. Delegates the state
+    /// transition to `ClaimAffordanceModel` and additionally moves
+    /// keyboard focus to the field so it rises on reveal (sg-WF-8
+    /// §"Behavior" #2). Internal (not `private`) so unit tests can
+    /// drive the reveal directly via `@testable import GetToIt`.
     func onVotedOnTheWebTapped() {
-        guard claimPhase == .collapsed else { return }
-        claimPhase = .entry
-        claimErrorMessage = nil
-        claimFieldFocused = true
+        claim.reveal()
+        if claim.phase == .entry {
+            claimFieldFocused = true
+        }
     }
 
-    /// tb-WF-14 — submit the typed claim code. On success the
-    /// coordinator reaches `.anonymous` (the carried web identity is in
-    /// the keychain) and the surface re-renders so the Apple tap then
-    /// routes through `linkApple` — the user has NOT signed in yet, they
-    /// still tap the Apple pill (sg-WF-8 §"Behavior" #3). On a bad /
-    /// expired / used / mistyped code the inline error line appears and
-    /// the field stays open for a retry; nothing is destroyed (#4).
-    /// Internal (not `private`) so unit tests can drive the submit
-    /// directly.
+    /// tb-WF-14 — submit the typed claim code. Delegates to
+    /// `ClaimAffordanceModel.submit`: on success the coordinator
+    /// reaches `.anonymous` and the affordance collapses (the user
+    /// still taps the Apple pill, which now routes through `linkApple`
+    /// — sg-WF-8 §"Behavior" #3); on a bad / expired / used / mistyped
+    /// code the model surfaces the retryable inline error and keeps the
+    /// field open (#4). Internal so unit tests can drive the submit.
     func onBringMyPlansOverTapped() async {
-        guard claimPhase == .entry else { return }
-        let trimmed = claimCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        // The CTA is disabled while the field is empty; this guard is
-        // belt-and-braces (an `onSubmit` from an empty field, a stale
-        // tap) so an empty redeem never reaches the network.
-        guard !trimmed.isEmpty else { return }
-
-        claimPhase = .redeeming
-        claimErrorMessage = nil
-        do {
-            // The coordinator invokes redeem-claim-code, installs the
-            // carried anonymous session into the keychain, and reaches
-            // `.anonymous`. The Apple pill's next tap is now `linkApple`.
-            _ = try await auth.redeemClaimCode(trimmed)
-            // Success: the dock re-renders. The code-entry state has
-            // done its job; collapse it. The user still must tap the
-            // Apple pill (the claim does not sign them in).
-            claimPhase = .collapsed
-            claimCode = ""
-        } catch {
-            // Every recoverable redeem failure — bad / expired / used /
-            // mistyped code, rate-limit, transport — collapses to one
-            // retryable inline error per the sg-WF-8 spec. The
-            // code-entry state stays open so the user re-types or goes
-            // back to the web link for a fresh code.
-            claimPhase = .entry
-            claimErrorMessage =
-                "That code didn't work. Generate a fresh one from your web link."
-        }
+        await claim.submit()
     }
 }

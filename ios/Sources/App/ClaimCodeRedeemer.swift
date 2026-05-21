@@ -171,3 +171,84 @@ public struct LiveClaimCodeRedeemer: ClaimCodeRedeemer {
         }
     }
 }
+
+// MARK: - S00a "Voted on the web?" affordance model (tb-WF-14)
+
+/// The presentation state of the S00a "Voted on the web?" account-claim
+/// affordance, lifted out of `SignInScreen` into an `@Observable` model
+/// so it is unit-testable the same way `AuthCoordinator` is.
+///
+/// SwiftUI `@State` value-type properties only persist while the view
+/// is mounted in a hierarchy; a unit test that invokes a handler on a
+/// bare `SignInScreen` struct cannot observe `@State` writes. By
+/// holding the affordance's mutable state in an `@Observable` reference
+/// type the screen instead `@State`-stores a stable object reference,
+/// and the tests drive `ClaimAffordanceModel` directly — mirroring the
+/// `AuthCoordinator` test seam.
+@MainActor
+@Observable
+public final class ClaimAffordanceModel {
+    /// The affordance's local phase, per the sg-WF-8 spec §"Behavior":
+    ///   * collapsed — the quiet "Voted on the web?" text link; default.
+    ///   * entry     — the revealed code-entry state.
+    ///   * redeeming — a redeem is in flight; the submit CTA disables.
+    public enum Phase: Equatable {
+        case collapsed
+        case entry
+        case redeeming
+    }
+
+    public private(set) var phase: Phase = .collapsed
+    /// The user's typed claim code — two-way bound to the soft-glass
+    /// text field.
+    public var code: String = ""
+    /// The non-blocking inline error line, or nil when clear.
+    public private(set) var errorMessage: String?
+
+    /// The locked sg-WF-8 inline-error copy. Every recoverable redeem
+    /// failure — bad / expired / used / mistyped code, rate-limit,
+    /// transport — collapses to this one retryable line.
+    static let errorCopy =
+        "That code didn't work. Generate a fresh one from your web link."
+
+    private let auth: AuthCoordinator
+
+    public init(auth: AuthCoordinator) {
+        self.auth = auth
+    }
+
+    /// Reveal the code-entry state. The quiet link is consumed by the
+    /// reveal (sg-WF-8 §"Behavior" #2).
+    public func reveal() {
+        guard phase == .collapsed else { return }
+        phase = .entry
+        errorMessage = nil
+    }
+
+    /// Submit the typed claim code. On success the coordinator reaches
+    /// `.anonymous` (the carried web identity is in the keychain) and
+    /// the affordance collapses — the user still must tap the Apple
+    /// pill, which now routes through `linkApple`. On a bad / expired /
+    /// used / mistyped code the inline error appears and the code-entry
+    /// state stays open for a retry; nothing is destroyed.
+    public func submit() async {
+        guard phase == .entry else { return }
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The CTA is disabled while the field is empty; this guard is
+        // belt-and-braces so an empty redeem never reaches the network.
+        guard !trimmed.isEmpty else { return }
+
+        phase = .redeeming
+        errorMessage = nil
+        do {
+            _ = try await auth.redeemClaimCode(trimmed)
+            // Success: the dock re-renders. The code-entry state has
+            // done its job; collapse it.
+            phase = .collapsed
+            code = ""
+        } catch {
+            phase = .entry
+            errorMessage = Self.errorCopy
+        }
+    }
+}
