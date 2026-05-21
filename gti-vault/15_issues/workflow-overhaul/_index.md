@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/workflow-overhaul
 purpose: Workflow-overhaul phase — Plans as persistent named items, list-as-landing, collapsed Setup screen, three nav verbs (Back/Exit/Delete)
-status: filed 2026-05-19 — 15 issues (6 spec-gaps + 9 tracer-bullets); 2 remain HITL (sg-WF-5, sg-WF-6) pending further grilling. sg-WF-4 grilled + 5 new iOS-port tracer-bullets (tb-WF-5..9) filed 2026-05-20; tb-WF-1..9 all merged 2026-05-20 — the tracer-bullet sequence for this phase is complete.
+status: filed 2026-05-19; iOS tracer-bullet sequence tb-WF-1..9 all merged 2026-05-20. sg-WF-5 grilled 2026-05-21 and decomposed via /to-issues into the web invitee shell slices (tb-WF-11 → tb-WF-12) plus sibling tb-WF-10 (web quiz port) and sibling sg-WF-7 (account claim). sg-WF-7 grilled 2026-05-21 (claim-code bridge — ADR 0015 + decision doc) and decomposed via /to-issues into sg-WF-8 + tb-WF-13/14. 22 issues total (8 spec-gaps + 14 tracer-bullets); 7 web/account-claim issues open and ready-for-agent (sg-WF-5, sg-WF-8, tb-WF-10/11/12/13/14). sg-WF-6 is the only remaining HITL item pending a grill.
 ---
 
 # 15_issues/workflow-overhaul — Index
@@ -30,8 +30,10 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | sg-WF-2 | [[issues/sg-wf-2-quiz-back-exit-chrome\|Quiz Back + Exit chrome — S03 surface additions]] | AFK | [#155](https://github.com/samfarls55/gettoit/issues/155) | done 2026-05-19 |
 | sg-WF-3 | [[issues/sg-wf-3-s04-timer-sweep\|S04 timer sweep — finalize removal beyond the stale marker]] | AFK | [#156](https://github.com/samfarls55/gettoit/issues/156) | done 2026-05-19 |
 | sg-WF-4 | [[issues/sg-wf-4-plan-list-surface\|Plan list surface — design-system spec + JSX]] | AFK | [#157](https://github.com/samfarls55/gettoit/issues/157) | done 2026-05-20 |
-| sg-WF-5 | [[issues/sg-wf-5-web-invitee-flow\|Web invitee single-link flow — design needed]] | HITL | [#158](https://github.com/samfarls55/gettoit/issues/158) | — |
+| sg-WF-5 | [[issues/sg-wf-5-web-invitee-flow\|Web invitee single-link flow — design-system surface doc]] | AFK | [#158](https://github.com/samfarls55/gettoit/issues/158) | grilled 2026-05-21 |
 | sg-WF-6 | [[issues/sg-wf-6-reroll-window-deadline\|Reroll window deadline mechanism — needs minor grill]] | HITL | [#159](https://github.com/samfarls55/gettoit/issues/159) | — |
+| sg-WF-7 | [[issues/sg-wf-7-web-invitee-account-claim\|Web invitee account claim — cross-context identity bridge]] | HITL | [#191](https://github.com/samfarls55/gettoit/issues/191) | grilled 2026-05-21 — decomposed |
+| sg-WF-8 | [[issues/sg-wf-8-account-claim-design-system\|Account-claim design-system amendment — S00a + web mint affordance]] | AFK | [#194](https://github.com/samfarls55/gettoit/issues/194) | — |
 
 ### Tracer-bullets
 
@@ -46,10 +48,15 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | tb-WF-7 | [[issues/tb-wf-7-plan-list-joiner-resume\|iOS Plan list — Joiner journey (JOINED chip + resume-from-state)]] | AFK | [#176](https://github.com/samfarls55/gettoit/issues/176) | done 2026-05-20 |
 | tb-WF-8 | [[issues/tb-wf-8-plan-list-decided-history\|iOS Plan list — Decided + History sections + lifecycle transitions]] | AFK | [#177](https://github.com/samfarls55/gettoit/issues/177) | done 2026-05-20 |
 | tb-WF-9 | [[issues/tb-wf-9-plan-list-destructive-actions\|iOS Plan list — Three-dot menu + delete + leave]] | AFK | [#178](https://github.com/samfarls55/gettoit/issues/178) | done 2026-05-20 |
+| tb-WF-10 | [[issues/tb-wf-10-web-quiz-v11-port\|Web quiz v1.1 port + shared votes-wire extraction]] | AFK | [#190](https://github.com/samfarls55/gettoit/issues/190) | — |
+| tb-WF-11 | [[issues/tb-wf-11-web-invitee-shell-foundation\|Web invitee shell foundation — landing, name entry, members.display_name]] | AFK | [#192](https://github.com/samfarls55/gettoit/issues/192) | sg-WF-5 |
+| tb-WF-12 | [[issues/tb-wf-12-web-invitee-shell-reclick\|Web invitee shell re-click behaviors — resume, read-only, leave]] | AFK | [#193](https://github.com/samfarls55/gettoit/issues/193) | tb-WF-11 |
+| tb-WF-13 | [[issues/tb-wf-13-claim-code-mint\|Claim code mint side — claim_codes table + mint edge function + web affordance]] | AFK | [#195](https://github.com/samfarls55/gettoit/issues/195) | sg-WF-8, tb-WF-12 |
+| tb-WF-14 | [[issues/tb-wf-14-claim-code-redeem\|Claim code redeem side — redeem edge function + S00a code entry + linkApple]] | AFK | [#196](https://github.com/samfarls55/gettoit/issues/196) | sg-WF-8, tb-WF-13 |
 
 ### Dependency notes
 
-- **sg-WF-5, sg-WF-6** remain HITL — pending follow-up grills.
+- **sg-WF-6** remains HITL — pending a follow-up grill. **sg-WF-7** was grilled 2026-05-21 (claim-code bridge — see the web invitee flow note below); sg-WF-5 was also grilled 2026-05-21.
 - **tb-WF-2** consumes sg-WF-2 (Quiz Back+Exit chrome spec) — done.
 - **tb-WF-3** consumes sg-WF-3 (S04 timer sweep spec) — done.
 - **tb-WF-4** consumed sg-WF-1 (Setup spec) + tb-WF-1 (Plans table). Amended 2026-05-20 to fold in the Q7 lift-out (solo/group mode-conditional rendering, 5/6 controls); merged 2026-05-20. The retired `InitiatorScreen.swift` + `ParametersScreen.swift` (and their tests) are deleted; the design-system JSX for the superseded surfaces stays in the tree as spec history. `Save for later` lands on S00 Landing until tb-WF-5 wires the iOS Plan list.
@@ -59,7 +66,23 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 - **tb-WF-8** merged 2026-05-20 (PR #186) — landed the Decided + History sections end-to-end: `plans.verdict_fired_at` + `plans.expired_at` sort-key columns; `set_plan_decided_active` amended to stamp `verdict_fired_at`; new `set_plan_decided_expired` SECURITY DEFINER function with three event paths converging on it (per-minute `cron_expire_reroll_windows` worker, AFTER INSERT trigger on `rerolls` for 3rd-burn, AFTER INSERT trigger on `check_ins` for any outcome); two new RPCs (`plans_decided_for_user` + `plans_history_for_user`) inline the verdict's place name and project a `role` column so the iOS surface can render the JOINED chip + tap-route without an N+1 lookup; iOS PlanListScreen renders 2-line cards with `sortedDecided` / `sortedHistory` pure helpers, the History section is collapsible with per-user UserDefaults persistence (state held in a small `@Observable` class for unit-test friendliness), and a new `DecidedHistoryTapDestination` router mounts the full or read-only VerdictScreen per surface §"Tap behavior". Known follow-up: the exact "23:59:59 next-calendar-day local-TZ" reroll-window deadline computation remains sg-WF-6's territory; this slice's cron worker honours whatever `reroll_window_closes_at` carries (today the tb-WF-1 placeholder `now() + interval '2 days'`).
 - **tb-WF-9** merged 2026-05-20 (PR #188) — landed the destructive-action C-25 Action Dot Menu (custom popover primitive, NOT SwiftUI `Menu` so destructive items render in the same white-on-glass register with no red), the four-variant C-16 confirm sheet (`pendingDelete` / `decidedActiveDelete` / `historyDelete` / `joinedLeave` with locked copy from `surfaces/00-plan-list.md §"Confirm sheet copy (LOCKED)"`), and the end-to-end delete + leave journeys. `PlanDeleteCoordinator` flips `rooms.status='expired'` first (the existing session-ended broadcast joiners observe via `WaitingStore.RoomStatus.expired` from TB-07) then deletes the Plan; joiner leave reuses `MemberLeaveStore.leave(...)` from tb-WF-2. No new migration was needed — existing RLS (`plans_delete_creator`, `rooms_update_creator`, `members_delete_self`) covers authorization. With this merge the workflow-overhaul tracer-bullet sequence (tb-WF-1..9) is fully landed.
 
-The remaining HITL items (sg-WF-5 web-invitee flow, sg-WF-6 reroll-window deadline) need follow-up `/grill-with-docs` rounds before they can be promoted to `ready-for-agent`. The downstream tracer-bullets for those (web invitee wire, reroll-window iOS lifecycle) will be filed once those grills resolve.
+- **tb-WF-10** — web quiz v1.1 port + the `supabase/functions/_shared/votes-wire.ts` extraction. Filed 2026-05-21 from the sg-WF-5 grill; not blocked, but a delivery pair with the shell (tb-WF-11/12). Records [[../../60_engineering/adr/0014-web-consumes-shared-votes-wire|ADR 0014]] (web's first deliberate cross-sibling import).
+- **tb-WF-11** consumes sg-WF-5 (the web invitee shell surface doc) — the shell foundation: `/join/<roomId>` scaffold, name entry, the additive `members.display_name` migration.
+- **tb-WF-12** consumes tb-WF-11 — the re-click behaviors (resume / read-only / leave); adds no new schema or server code (reuses `members.quiz_progress`, the decided/history RPCs, and `members_delete_self`).
+
+**Account-claim batch (decomposed from sg-WF-7, 2026-05-21).** The sg-WF-7 `/grill-with-docs` round was decomposed via `/to-issues` into 3 AFK issues — outcomes in [[../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]], architecture in [[../../60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]].
+
+- **sg-WF-8** — the design-system amendment: the S00a "Voted on the web?" affordance + code-entry surface, and the low-key "Getting the app?" mint affordance on the web Waiting screen + read-only verdict card. The S00a portion can start immediately; the web-surface portion consumes the sg-WF-5 web invitee surface doc.
+- **tb-WF-13** consumes sg-WF-8 + tb-WF-12 — the mint side: a `claim_codes` table + migration (service-role-only RLS, holds the encrypted refresh token), the `mint-claim-code` edge function, and the web "Getting the app?" affordance wiring. The web layer attaches to the v1.1 web surfaces tb-WF-12 builds.
+- **tb-WF-14** consumes sg-WF-8 + tb-WF-13 — the redeem side: the `redeem-claim-code` edge function, S00a code entry, and iOS redeem → keychain → the existing `linkApple` path. The Apple round-trip itself is TestFlight-verified, not CI.
+
+sg-WF-6 (reroll-window deadline) is now the only remaining HITL issue in the phase.
+
+**Web invitee flow (grilled 2026-05-21).** The sg-WF-5 follow-up `/grill-with-docs` round locked the web invitee single-link flow — outcomes in [[../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]], with the cross-sibling vote-contract import recorded in [[../../60_engineering/adr/0014-web-consumes-shared-votes-wire|ADR 0014]]. `/to-issues` decomposed it into the surface-doc spec-gap (sg-WF-5) plus two shell-wiring tracer-bullets (tb-WF-11 → tb-WF-12), with a sibling quiz-port tracer-bullet (tb-WF-10) and a sibling HITL account-claim issue (sg-WF-7). sg-WF-5 + tb-WF-10/11/12 are all `ready-for-agent`.
+
+**Web invitee account claim (grilled 2026-05-21).** The sg-WF-7 follow-up `/grill-with-docs` round locked the cross-context identity bridge — outcomes in [[../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]], architecture in [[../../60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]]. A single-use claim code carries the browser anonymous session into the freshly-installed app *before* Apple sign-in, so the existing S00a `linkApple` path upgrades it (zero row migration). Same-device + before-sign-in only; after-sign-in recovery deferred to a future feature. Next step: `/to-issues` decomposition into a sg → tb pair (the web-side build slice sequences after tb-WF-11 / tb-WF-12).
+
+The remaining HITL item — sg-WF-6 (reroll-window deadline) — needs a follow-up `/grill-with-docs` round before it can be promoted to `ready-for-agent`.
 
 ## Schema cleanup follow-ups
 

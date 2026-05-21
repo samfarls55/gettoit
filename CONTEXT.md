@@ -20,6 +20,14 @@ _Avoid_: signed-in user, authenticated user, Apple account (the account is on Ap
 The surface (`design-system/surfaces/00a-signin.md`) rendered on iOS launch when the current auth state is anything other than Linked-Apple. One Sign-in-with-Apple pill, no skip. v1.1 closure of the iOS half of [[gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s anonymous-default.
 _Avoid_: sign-up page, sign-up screen, onboarding screen, welcome screen, account creation page (see Flagged ambiguities).
 
+**Account claim**:
+The process by which a Web invitee who installs the iOS app carries their browser-held Anonymous session into the app *before* completing Apple sign-in, so that S00a upgrades that existing identity via `linkApple` (preserving `user_id`, zero row migration) instead of `signInWithApple` minting a fresh, disjoint account. **Same-device only** — browser and app on one phone. **Before-sign-in only** — the claim must complete on S00a *before* the Sign-in-with-Apple tap; once a Linked-Apple session exists there is no in-app recovery (that would require an account merge — deferred to a future feature). If the claim is skipped, Apple sign-in mints a new `user_id` and the web vote strands; the only recovery is delete-and-reinstall (which returns the user to a fresh S00a), within the 30-day anonymous-identity TTL. The carrier is a **Claim code**. See [[gti-vault/15_issues/workflow-overhaul/issues/sg-wf-7-web-invitee-account-claim|sg-WF-7]].
+_Avoid_: account merge (no merge — the Apple identity attaches to the *existing* anonymous user; nothing is merged), account linking (collides with `linkApple`, which is only the final upgrade step, not the cross-context transport).
+
+**Claim code**:
+The short, single-use, short-lived code shown on the web fallback that carries a Web invitee's Anonymous session key from the browser into a freshly-installed app. Entered on S00a *before* the Sign-in-with-Apple tap. **Per-person, not per-Plan** — redeeming one code brings over every web Plan that anonymous identity voted in, because the code carries the whole identity, not a single Plan.
+_Avoid_: invite code (the SMS deep-link is the invite; the claim code is a different artifact, used post-install), pairing code, OTP (not an authentication factor — it is an identity-transport token).
+
 ### Quiz redesign vocabulary (v1.1, 2026-05-15)
 
 **Parameter**:
@@ -95,11 +103,12 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 - An **Anonymous session** can upgrade to a **Linked-Apple session** via `AuthCoordinator.linkApple`, preserving the `user_id` and all owned rows (rooms, votes, members, events).
 - The **S00a Sign-in Gate** is the iOS entry point that converts any non-Linked-Apple state into a **Linked-Apple session**. It is the ONLY surface that mints a Linked-Apple session on iOS.
 - A **Linked-Apple session** is durable across reinstalls keyed by the device's Apple identity. An **Anonymous session** is durable only until the keychain is cleared or the app is deleted.
+- An **Account claim** reuses the existing S00a `linkApple` path unchanged — its only new work is transporting the Anonymous session from browser to app keychain via a **Claim code**. Once the session is in the keychain, S00a treats the user identically to a pre-v1.1 legacy-carryover anonymous install.
 - A **Parameter** is set on session setup and constrains the entire quiz that follows. A **Scenario question** is asked of every member during the quiz, and its answer is per-member. A **Profile** value is read silently per member without re-asking.
 - The conditional Q3 structure (indoor/outdoor only if dine-in **Parameter**) means quiz question identity depends on session parameters. Schema must support per-session question-slot variability.
 - The **Q5 preference probe** draws its three cards from the **Candidate pool**; the verdict engine ranks the same **Candidate pool**. They are one set — the **Candidate-pool floor** is what guarantees they cannot diverge.
 - The **Candidate-pool floor** is a fetch-time (Stage 1) venue-*class* hard filter, applied alongside geo / radius / price / meal-time. It is orthogonal to cuisine, which is a Stage-2 soft scoring axis in the verdict engine and never strict-filters the fetch.
-- A **Plan** is the durable owner; a **Room** is the ephemeral container for one quiz round. A Plan owns at most one active Room (the in-flight round). Launching a `pending` Plan mints a new Room. On verdict, the Room closes and the Plan transitions to `decided-active`. A reroll mints a new Room against the same Plan. Once the Plan transitions to `decided-expired`, no new Rooms may be minted against it. Plan name, status, params, and the stamped verdict survive Room lifecycle; the Room's `votes` / `options` rows do not.
+- A **Plan** is the durable owner; a **Room** is the ephemeral container for one quiz round. A Plan owns at most one active Room (the in-flight round). Launching a `pending` Plan mints a new Room. On verdict, the Room closes and the Plan transitions to `decided-active`. A reroll re-runs the verdict on that **same** Room in place — it does not mint a new Room (the 3-burn cap is per-Room). Once the Plan transitions to `decided-expired`, no new Rooms may be minted against it. Plan name, status, params, and the stamped verdict survive Room lifecycle; the Room's `votes` / `options` rows do not.
 
 ## Example dialogue
 

@@ -1,0 +1,98 @@
+---
+issue: sg-WF-7
+title: Web invitee account claim — cross-context identity bridge
+status: needs-triage
+type: HITL
+feature: workflow-overhaul
+github_issue: 191
+created: 2026-05-21
+grilled: 2026-05-21
+---
+
+# sg-WF-7 — Web invitee account claim
+
+## Parent
+
+[[../../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]] §Q8 — the app-installed branch. The web invitee grill identified this gap as real and directed it be filed as its own buildable issue rather than folded into the sg-WF-5 shell. Related: [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] (`linkApple` anonymous-upgrade) and [[../../../CONTEXT|CONTEXT.md]] → Plan member.
+
+## The gap
+
+A web invitee votes in the browser, then **installs the iOS app and signs in with Apple**. Sign-in with Apple mints a **fresh Apple `user_id`** with no relation to the web anonymous `user_id` held in the browser's `localStorage`. Consequences:
+
+- The in-flight Plan does not appear on the new Account member's Plan list.
+- Re-entering the Plan would force a re-vote — the browser vote is **stranded** (a member row keyed to the old anonymous `user_id`).
+
+This is the one web-invitee scenario the sg-WF-5 grill could not close by construction — the others all resolve through the per-room anonymous-session model. This one needs a cross-context identity bridge.
+
+## Desired end-state
+
+When a web invitee installs the app and signs in, the **web anonymous identity is linked into the Apple Account** — `user_id` preserved, every row keyed off it (members, votes, `quiz_progress`) carried along, **zero row migration**. This is exactly the [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] `linkApple` model. Once linked:
+
+- The open Plan appears on the user's Plan list (a `Joined` card).
+- Subsequent link taps follow the normal Account-member workflow.
+
+Most of that end-state is **already built** — tb-WF-7 landed `joined_plans_for_user` + resume-from-state. The thing this issue must design and build is the bridge, not the destination.
+
+## The hard core — what the grill must resolve
+
+`linkApple` upgrades an anonymous session **only when that anonymous session is already in the app keychain**. Here it is not — it lives in the **browser's `localStorage`**, a separate storage context the freshly-installed app cannot read. The bridge channel that carries the anonymous identity from browser to app keychain is an open design space:
+
+- **Claim code.** A short code shown on the web Waiting screen; the user types it into the app, which redeems it for the anonymous session.
+- **Clipboard-based deferred deep link.** The web app writes a token to the clipboard; the app reads it on first launch.
+- **Third-party deferred-deep-link SDK.** A dependency that solves deferred deep links off-the-shelf — a dependency decision in its own right.
+
+Each has real tradeoffs (friction, reliability, privacy posture, a new dependency). Picking one is a `/grill-with-docs`-sized decision.
+
+## Grill outcome (2026-05-21)
+
+Resolved in a `/grill-with-docs` round. Full decisions:
+[[../../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]];
+architecture in [[../../../60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]].
+
+- **Channel — claim code.** The web fallback mints a short, single-use,
+  short-TTL claim code carrying the anonymous session key; the user
+  enters it on S00a *before* the Sign-in-with-Apple tap, which then
+  becomes `linkApple`. Clipboard, deferred-deep-link SDK, and a
+  Universal Link round-trip were all rejected — the deciding lens is
+  the `linkApple` ordering constraint (the anonymous session must be in
+  the keychain before Apple sign-in).
+- **Scope — same-device, before-sign-in, per-person.** Browser and app
+  on one phone; the claim completes on S00a only; one code carries the
+  whole identity (every web Plan that identity voted in).
+- **Surfacing.** Low-key "Getting the app?" mint affordance on the web
+  Waiting screen *and* the read-only verdict card (lazy mint on tap);
+  a secondary "Voted on the web?" code-entry on S00a with teaching
+  copy honest about the ~30-day anonymous-identity TTL.
+- **Failure boundary.** Skip the code → web data strands; only recovery
+  is delete-and-reinstall within the 30-day window. All after-sign-in
+  recovery (empty + populated Apple account) is **deferred to a future
+  feature**.
+
+The destination is already built — S00a's `SignInScreen` already routes
+an in-keychain anonymous session through `linkApple`. The build is the
+transport only: a `claim_codes` table + migration, two edge functions
+(mint / redeem), an S00a design-system amendment, and web affordances
+on Waiting + the read-only verdict card.
+
+**Next step:** decompose via `/to-issues` along the established sg → tb
+pairing (the build spans a design-system amendment + schema + edge
+functions + web/iOS wiring — larger than one AFK slice). The web-side
+build slice is sequenced after tb-WF-11 / tb-WF-12 (which build the web
+Waiting screen + read-only verdict card the mint affordance attaches
+to).
+
+## Things already locked (do NOT re-grill)
+
+- The end-state is `linkApple`-style: preserve `user_id`, zero row migration ([[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]).
+- After the link, the Plan surfaces on the Plan list and behaves as a normal `Joined` Plan — the destination is built (tb-WF-7).
+- Web invitee identity itself is the anonymous Supabase session in `localStorage` ([[../../../50_product/workflow-overhaul-web-invitee-flow|web-invitee-flow]] §Q3) — not in question here.
+
+## Acceptance criteria (after grill)
+
+- [x] A `/grill-with-docs` round picks the bridge channel and records the decision — claim code; recorded in [[../../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]] + [[../../../60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]] (2026-05-21).
+- [ ] This issue is decomposed via `/to-issues` into a sg → tb pair (build is larger than one AFK slice) — the grilled outcomes are inlined above.
+- [ ] After decomposition: the bridge is implemented end-to-end — a web invitee who installs the app and claims keeps their `user_id`, their vote is not stranded, and the Plan appears on their list.
+
+## Blocked by
+
+Grill complete (2026-05-21). Next: `/to-issues` decomposition. The web-side build slice is further sequenced after tb-WF-11 / tb-WF-12.
