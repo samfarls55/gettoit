@@ -32,8 +32,8 @@ Concurrency cap: 2 (default).
 | tb-WF-10 | #190 | merged | afk/tb-WF-10 | [#202](https://github.com/samfarls55/gettoit/pull/202) | wave 1; web quiz v1.1 port + votes-wire leaf module |
 | tb-WF-11 | #192 | merged | afk/tb-WF-11 | [#203](https://github.com/samfarls55/gettoit/pull/203) | wave 2; invitee shell foundation + members.display_name |
 | tb-WF-12 | #193 | merged | afk/tb-WF-12 | [#204](https://github.com/samfarls55/gettoit/pull/204) | wave 3; invitee shell re-click behaviors; ADR 0017 |
-| tb-WF-13 | #195 | building | afk/tb-WF-13 | — | wave 4; 1st subagent crashed (infra), re-dispatched fresh |
-| tb-WF-14 | #196 | waiting | afk/tb-WF-14 | — | blocked by tb-WF-13 (sg-WF-8 cleared) |
+| tb-WF-13 | #195 | merged | afk/tb-WF-13 | [#205](https://github.com/samfarls55/gettoit/pull/205) | wave 4; claim-code mint side; needs CLAIM_CODE_ENC_KEY secret (HITL) |
+| tb-WF-14 | #196 | building | afk/tb-WF-14 | — | wave 5; unblocked by tb-WF-13 — final issue |
 
 ## Event log
 - 18:12 — Preflight: tree was dirty (in-progress vault triage); user authorised
@@ -57,3 +57,5 @@ Concurrency cap: 2 (default).
 - 20:18 — Re-scan: tb-WF-13 ready. Dispatching tb-WF-13 (#195). tb-WF-14 chained behind it.
 - 20:26 — tb-WF-13 subagent CRASHED (API socket closed, transient infra error) after 39 tool calls. Investigated: no remote branch, no PR, issue #195 still open, the crashed worktree's afk/tb-WF-13 branch never advanced past base — zero salvageable work. Not an issue-level failure; the run continues.
 - 20:26 — Force-removed the crashed worktree + deleted the stale afk/tb-WF-13 branch to free the name. Re-dispatching tb-WF-13 fresh from current main (173a42a).
+- 20:47 — tb-WF-13 (retry) MERGED via PR #205 (squash 986fca4). 8/9 done. HITL follow-up: a `CLAIM_CODE_ENC_KEY` GitHub repo secret must be added (`openssl rand -base64 32`) — until then the live `mint-claim-code` function returns `mint_claim_code_misconfigured`. Surfaced to user at close-out.
+- 20:47 — Re-scan: tb-WF-14 ready — the final issue, 0 waiting. Dispatching tb-WF-14 (#196).
