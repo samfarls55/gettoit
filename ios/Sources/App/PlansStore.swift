@@ -752,6 +752,44 @@ public final class PlansStore {
         }
     }
 
+    /// sg-WF-6 — resolve a Plan's *current* lifecycle `status` in one
+    /// lightweight PostgREST read. The S00 Plan list's Decided / History
+    /// rows are a point-in-time snapshot: a Plan can transition
+    /// `decided-active → decided-expired` (its reroll window closing —
+    /// per ADR 0016, the three-way close) after the list was last
+    /// loaded. The Decided-card tap path calls this so it routes off the
+    /// Plan's live status, not the possibly-stale list row — an expired
+    /// Plan must open the read-only verdict screen (no reroll
+    /// affordance), never the full one.
+    ///
+    /// Best-effort: returns `nil` on any transport / RLS failure or
+    /// when the Plan row is gone. The caller falls back to the snapshot
+    /// status — the server-side `apply_reroll` guard (ADR 0016 §3) is
+    /// the authoritative backstop, so a stale-snapshot fallback is at
+    /// worst cosmetic (a rejected reroll tap).
+    ///
+    /// The `plans_select_creator` RLS policy gates the read to the
+    /// Plan's creator; a Joined-card tap reads through the Decided /
+    /// History RPC's own role projection instead, so this lookup is
+    /// only consulted on the Created (owner) path where RLS admits it.
+    public func fetchPlanStatus(planID: UUID) async -> LifecycleState? {
+        struct Row: Decodable {
+            let status: LifecycleState
+        }
+        do {
+            let rows: [Row] = try await client
+                .from("plans")
+                .select("status")
+                .eq("id", value: planID.uuidString.lowercased())
+                .limit(1)
+                .execute()
+                .value
+            return rows.first?.status
+        } catch {
+            return nil
+        }
+    }
+
     /// Apply a partial update to a Plan and return the refreshed row.
     public func update(
         planID: UUID,

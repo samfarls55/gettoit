@@ -1,7 +1,7 @@
 ---
 issue: sg-WF-6
 title: Reroll window deadline mechanism
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 159
@@ -76,3 +76,7 @@ The existing check-in feature has a latent inconsistency surfaced during the gri
 
 - **2026-05-19** — filed as HITL, `needs-triage`, pending a grill.
 - **2026-05-21** — `/grill-with-docs` session resolved the timezone anchor, the server-authoritative guard, and the client-reflection rule; ratified the tb-WF-8 three-way close. Outcomes recorded in [[../../../60_engineering/adr/0016-plan-reroll-window-enforcement|ADR 0016]] and the §Q9 amendment. Re-triaged to `ready-for-agent` / AFK.
+
+## Comments
+
+- **2026-05-21** — done. AFK run on `afk/sg-WF-6` (PR #201). New migration `20260523000000000_reroll_window_deadline.sql` amends `set_plan_decided_active` to the search-area-TZ `date_trunc('day', now() AT TIME ZONE tz) + interval '2 days' - interval '1 second' AT TIME ZONE tz` deadline (placeholder removed) and adds the time-exact `{"error":"window_closed"}` guard to `apply_reroll` (null-`plan_id` rooms pass through). The deadline formula is also ported to `supabase/functions/_shared/reroll-window.ts` so the Deno lane can exercise the math end-to-end (non-UTC zone, UTC fallback, calendar-boundary, spring-forward DST). iOS: `PlansStore.fetchPlanStatus(planID:)` + a pure `PlanListScreen.tapRoute(role:status:)` overload — the Decided-card tap path re-resolves the Plan's live `status` at tap time, so a Plan whose window closed since the list loaded routes to the read-only verdict screen. `design-system/surfaces/07-reroll.md` carries the additive reroll-window amendment + CHANGELOG line. The check-in `snoozed` adjacency (flagged above, NOT in scope) is tracked separately as a v1.1 bug.

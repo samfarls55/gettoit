@@ -661,10 +661,9 @@ public struct RootView: View {
         }
     }
 
-    /// tb-WF-8 — dispatch a Decided / History card tap via the pure
-    /// `PlanListScreen.tapRoute(for:)` helper. Each destination flips
-    /// a different `@State` slot so the precedence chain renders the
-    /// right surface on the next SwiftUI tick.
+    /// tb-WF-8 — dispatch a Decided / History card tap. Each
+    /// destination flips a different `@State` slot so the precedence
+    /// chain renders the right surface on the next SwiftUI tick.
     ///
     /// Created (`role=owner`) cards route to either the full or
     /// read-only VerdictScreen depending on Decided-active vs
@@ -674,21 +673,62 @@ public struct RootView: View {
     /// `LateJoinerStore.fetchReadOnlyPayload(roomID:)` — the API is
     /// shape-compatible (returns the same `Verdict` value the
     /// VerdictScreen consumes).
+    ///
+    /// sg-WF-6 — the destination is resolved against the Plan's
+    /// *current* `status` fetched at tap time, not the snapshot status
+    /// on the (possibly-stale) list row. A Plan whose reroll window
+    /// closed since the list was last loaded must route to the
+    /// read-only verdict screen (no reroll affordance), not the full
+    /// one. See `openDecidedOrHistoryVerdict`.
     @MainActor
     private func handleDecidedOrHistoryTap(
         row: PlansStore.DecidedPlanRow,
         userID: UUID,
         coordinators: Coordinators
     ) {
-        let destination = PlanListScreen.tapRoute(for: row)
         Task {
             await openDecidedOrHistoryVerdict(
-                plan: row.plan,
-                destination: destination,
+                row: row,
                 userID: userID,
                 coordinators: coordinators
             )
         }
+    }
+
+    /// tb-WF-8 / sg-WF-6 — resolve the Plan's current lifecycle status,
+    /// derive the §"Tap behavior" destination from it, look up the
+    /// linked room id, fetch the read-only verdict payload, and flip
+    /// the right `@State` slot for the precedence chain to mount the
+    /// right surface. Best-effort — a transient failure leaves the
+    /// user on the Plan list.
+    ///
+    /// sg-WF-6 — the routing status comes from
+    /// `PlansStore.fetchPlanStatus` (a fresh single-row read), not the
+    /// snapshot `row.plan.status`. If that re-fetch fails the snapshot
+    /// status is used as a fallback; the server-side `apply_reroll`
+    /// guard (ADR 0016 §3) is the authoritative backstop, so a stale
+    /// fallback is at worst a cosmetically-stale full verdict screen
+    /// whose reroll tap the server rejects.
+    private func openDecidedOrHistoryVerdict(
+        row: PlansStore.DecidedPlanRow,
+        userID: UUID,
+        coordinators: Coordinators
+    ) async {
+        let plan = row.plan
+        // Re-resolve the Plan's status at tap time. fetchPlanStatus
+        // is best-effort — fall back to the snapshot on a nil result.
+        let liveStatus = await coordinators.plansStore
+            .fetchPlanStatus(planID: plan.id) ?? plan.status
+        let destination = PlanListScreen.tapRoute(
+            role: row.role,
+            status: liveStatus
+        )
+        await openDecidedOrHistoryVerdict(
+            plan: plan,
+            destination: destination,
+            userID: userID,
+            coordinators: coordinators
+        )
     }
 
     /// tb-WF-8 — look up the room id linked to a Decided / History
