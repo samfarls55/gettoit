@@ -65,3 +65,6 @@ out/
 .svelte-kit/
 .turbo/
 coverage/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

@@ -27,6 +27,9 @@ import {
   type QuestionSlot,
   type VotesRow,
 } from "../_shared/votes-schema.ts";
+// tb-WF-11 — resolves each member's name from the joined
+// `members.display_name`, falling back to the `m<uuid>` placeholder.
+import { resolveMemberDisplayName } from "./member-display-name.ts";
 // `HardVeto` is referenced by the `fetchProfileVetoes` adapter method
 // below; import it so `deno check` resolves the type.
 import type { HardVeto } from "../_shared/verdict-engine.ts";
@@ -129,17 +132,50 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         console.warn("compute-verdict fetchVotes failed:", error.message);
         return [];
       }
+      // tb-WF-11 — join `members.display_name` for the room. The web
+      // invitee shell (sg-WF-5 surface §A) writes a real name onto the
+      // `members` row when a Web invitee enters one on the name-entry
+      // surface; iOS members have no name-entry surface so their
+      // `display_name` stays NULL. `votes` and `members` share the
+      // (room_id, user_id) key but carry no FK between them, so this is
+      // a separate read folded into a map rather than a PostgREST
+      // embed. A failed members read degrades to "no names" — every
+      // member then resolves to the `m<uuid>` placeholder, the same
+      // behavior as before this column existed.
+      const memberNames = new Map<string, string | null>();
+      {
+        const { data: memberRows, error: memberErr } = await client
+          .from("members")
+          .select("user_id, display_name")
+          .eq("room_id", room_id);
+        if (memberErr) {
+          console.warn(
+            "compute-verdict fetchVotes members join failed:",
+            memberErr.message,
+          );
+        } else {
+          for (
+            const m of (memberRows ?? []) as Array<
+              { user_id: string; display_name: string | null }
+            >
+          ) {
+            memberNames.set(m.user_id, m.display_name);
+          }
+        }
+      }
       // The receipts surface wants a lowercase first name per
-      // verdict-screen-spec §"Copy register". For TB-06 we don't yet
-      // have a stable display-name source — anonymous users have no
-      // user_metadata. Surface the short uuid prefix as a placeholder;
-      // TB-08 (ratification) or TB-12 (Apple upgrade) will introduce
-      // a real `display_name`.
+      // verdict-screen-spec §"Copy register". `resolveMemberDisplayName`
+      // returns the joined `members.display_name` when set, and falls
+      // back to the legacy `"m" + userId.slice(0, 4)` placeholder when
+      // it is NULL (iOS members, which have no name-entry surface).
       return (data ?? []).map((row) => {
         const userId = row.user_id as string;
         const votesRow: VotesRow = {
           user_id: userId,
-          display_name: `m${userId.slice(0, 4)}`,
+          display_name: resolveMemberDisplayName(
+            userId,
+            memberNames.get(userId),
+          ),
           q1: (row.q1 ?? null) as QuestionSlot | null,
           q2: (row.q2 ?? null) as QuestionSlot | null,
           q3: (row.q3 ?? null) as QuestionSlot | null,

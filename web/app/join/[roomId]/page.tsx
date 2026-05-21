@@ -1,17 +1,21 @@
 // GetToIt web — /join/<roomId> route.
 //
-// Universal-Link landing surface for the web fallback. The iMessage
-// preview unfurls this route on hosts that don't have the iOS app
-// installed. We render the canonical S02b invite card and route the
-// "Answer in browser" CTA to `/s/<roomId>` (the actual session).
+// tb-WF-11 — the web invitee shell. The iMessage / SMS deep link
+// `/join/<roomId>` lands a cold invitee directly on the shell scaffold:
+// `InviteShell` ensures the anonymous Supabase session, and on a first
+// landing renders the name-entry surface (web-01 §A), then hands the
+// invitee into the quiz once they have a `members` row.
 //
-// Server-rendered. We don't fetch the room here (RLS would block
-// anonymous fetches anyway) — the page is a pure marketing surface
-// keyed by the URL.
+// `generateMetadata` below still emits the OG / Twitter unfurl card the
+// iMessage rich-link preview reads — that preview is separate from the
+// rendered page body. The page itself is `force-dynamic` because the
+// shell is a client component driven by the per-browser anon session.
+//
+// Canonical spec: design-system/surfaces/web-01-invitee-shell.md.
 
 import type { Metadata } from "next";
 
-import { InviteWebCard } from "../../../components/InviteWebCard";
+import { InviteShell } from "../../../components/InviteShell";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +85,7 @@ export default function JoinPage({
         inset: 0,
       }}
     >
-      <InviteWebCard roomId={params.roomId} />
+      <InviteShell roomId={params.roomId} />
     </main>
   );
 }
