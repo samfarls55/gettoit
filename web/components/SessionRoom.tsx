@@ -60,7 +60,10 @@ import {
 
 import { APP_STORE_URL } from "../lib/app-store";
 import { ensureAnonSession, getSupabaseClient } from "../lib/supabase";
+import { writeQuizProgress } from "../lib/invitee-shell";
+import type { QuizProgressState } from "../lib/quiz-progress";
 
+import { LeaveConfirmSheet } from "./InviteShellSurfaces";
 import {
   QuizQ1Cuisine,
   QuizQ2Budget,
@@ -119,20 +122,50 @@ function readMealTime(params: RoomsRow["session_params"]): MealTime {
     : "dinner";
 }
 
-export function SessionRoom({ roomId }: { roomId: string }) {
+export function SessionRoom({
+  roomId,
+  initialProgress,
+  onLeave,
+}: {
+  roomId: string;
+  /** tb-WF-12 (web-01 §B) — the web invitee's in-flight quiz state, as
+   *  read off `members.quiz_progress` by the shell on a re-click. When
+   *  present, boot hydrates the quiz answers and resumes at
+   *  `lastIndex` instead of restarting at Q1. Absent on the `/s/`
+   *  session route and on a fresh first-landing. */
+  initialProgress?: QuizProgressState;
+  /** tb-WF-12 (web-01 §E) — when provided, the Q1–Q5 quiz chrome
+   *  carries a `Leave` affordance; confirming it calls this handler.
+   *  The shell drops the `members` row and routes to the "you left
+   *  this plan" terminal. Absent off the web invitee shell. */
+  onLeave?: () => Promise<void> | void;
+}) {
   const [phase, setPhase] = useState<Phase>({ kind: "booting" });
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Quiz state — v1.1.
+  // Quiz state — v1.1. Seeded from `initialProgress` when the shell
+  // handed a resume payload (web-01 §B); otherwise the quiz defaults.
   const [cuisine, setCuisine] = useState<CuisineSelection>(() => ({
-    cuisines: new Set(),
-    noPreference: false,
+    cuisines: new Set(initialProgress?.cuisines ?? []),
+    noPreference: initialProgress?.noPreference ?? false,
   }));
-  const [budget, setBudget] = useState<number>(QUIZ_DEFAULTS.budget);
-  const [reputation, setReputation] = useState<string>(
-    QUIZ_DEFAULTS.reputation,
+  const [budget, setBudget] = useState<number>(
+    initialProgress?.budget ?? QUIZ_DEFAULTS.budget,
   );
-  const [vibe, setVibe] = useState<number>(QUIZ_DEFAULTS.vibe);
+  const [reputation, setReputation] = useState<string>(
+    initialProgress?.reputation ?? QUIZ_DEFAULTS.reputation,
+  );
+  const [vibe, setVibe] = useState<number>(
+    initialProgress?.vibe ?? QUIZ_DEFAULTS.vibe,
+  );
+
+  // §E — the leave-confirm sheet open state + in-flight flag.
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  // The resume payload is read once by the shell and is stable for the
+  // life of this mount; a ref keeps it out of the boot effect's deps.
+  const initialProgressRef = useRef(initialProgress);
 
   // Q5 candidate-fetch state.
   const [q5State, setQ5State] = useState<Q5State>("loading");
@@ -287,7 +320,8 @@ export function SessionRoom({ roomId }: { roomId: string }) {
         channelRef.current = channel;
 
         // Did the caller already vote on a prior visit? Skip ahead to
-        // Waiting/Verdict (idempotent — votes has a unique PK).
+        // Waiting/Verdict (idempotent — votes has a unique PK). This is
+        // the web-01 §B "already voted → Waiting" resume case.
         if (
           ((voteRows as VotesPresenceRow[] | null) ?? []).some(
             (v) => v.user_id === uid,
@@ -299,9 +333,18 @@ export function SessionRoom({ roomId }: { roomId: string }) {
           room?.status === "locked"
         ) {
           // Verdict already shipped; treat the user as a late-joiner.
+          // web-01 §B "verdict → Verdict" resume case.
           setPhase({ kind: "waiting" });
         } else {
-          setPhase({ kind: "quiz", step: 1 });
+          // web-01 §B mid-quiz resume — start on the last-answered
+          // question the shell read off `members.quiz_progress`. A
+          // fresh first-landing has `initialProgress` absent / at
+          // `lastIndex` 1, so this still starts at Q1 for new
+          // invitees. `clampStep` guards a malformed payload.
+          setPhase({
+            kind: "quiz",
+            step: clampStep(initialProgressRef.current?.lastIndex),
+          });
         }
       } catch (err) {
         if (cancelled) return;
@@ -482,9 +525,37 @@ export function SessionRoom({ roomId }: { roomId: string }) {
   // Quiz handlers.
   // ────────────────────────────────────────────────────────────────
 
-  const handleAdvance = useCallback((nextStep: 1 | 2 | 3 | 4 | 5) => {
-    setPhase({ kind: "quiz", step: nextStep });
-  }, []);
+  // Snapshot the current quiz answers into a `quiz_progress` payload.
+  // Used on every advance so a re-clicking invitee resumes with their
+  // prior answers intact (web-01 §B, decision doc §Q5).
+  const snapshotProgress = useCallback(
+    (lastIndex: number): QuizProgressState => ({
+      lastIndex,
+      cuisines: cuisine.noPreference
+        ? []
+        : Array.from(cuisine.cuisines).sort(),
+      noPreference: cuisine.noPreference,
+      budget,
+      reputation,
+      vibe,
+    }),
+    [budget, cuisine, reputation, vibe],
+  );
+
+  const handleAdvance = useCallback(
+    (nextStep: 1 | 2 | 3 | 4 | 5) => {
+      setPhase({ kind: "quiz", step: nextStep });
+      // Persist the in-flight progress so a re-click resumes here.
+      // Best-effort (`writeQuizProgress` swallows failures) — the
+      // advance must never block on the round-trip.
+      void writeQuizProgress(
+        getSupabaseClient(),
+        roomId,
+        snapshotProgress(nextStep),
+      );
+    },
+    [roomId, snapshotProgress],
+  );
 
   const handleSubmit = useCallback(async () => {
     if (!userId) return;
@@ -552,6 +623,36 @@ export function SessionRoom({ roomId }: { roomId: string }) {
   }, [budget, candidates, cuisine, q5Ratings, reputation, roomId, userId, vibe]);
 
   // ────────────────────────────────────────────────────────────────
+  // §E — Leave (web-01 §E, decision doc §Q7).
+  // ────────────────────────────────────────────────────────────────
+
+  /** Confirm the leave: drop the `members` row via the shell's
+   *  `onLeave` handler. On a rejected delete the sheet stays open with
+   *  the error swallowed silently — the invitee can retry or dismiss;
+   *  routing to the terminal as if the leave succeeded would be a lie. */
+  const handleLeaveConfirm = useCallback(async () => {
+    if (!onLeave || leaving) return;
+    setLeaving(true);
+    try {
+      await onLeave();
+      // On success the shell unmounts this `SessionRoom` for the
+      // "you left this plan" terminal — no local phase change needed.
+    } catch {
+      // Delete failed — keep the invitee on the quiz with the sheet
+      // open. `leaving` resets so they can retry or dismiss.
+    } finally {
+      setLeaving(false);
+    }
+  }, [leaving, onLeave]);
+
+  // The Q1–Q5 chrome only gets a `Leave` affordance when the shell
+  // wired `onLeave` (the web invitee shell). Off that host it is
+  // omitted — the `/s/` session route has no leave verb.
+  const quizLeaveHandler = onLeave
+    ? () => setLeaveConfirmOpen(true)
+    : undefined;
+
+  // ────────────────────────────────────────────────────────────────
   // Render
   // ────────────────────────────────────────────────────────────────
 
@@ -583,9 +684,10 @@ export function SessionRoom({ roomId }: { roomId: string }) {
   }
 
   if (phase.kind === "quiz") {
+    let screen: JSX.Element | null = null;
     switch (phase.step) {
       case 1:
-        return (
+        screen = (
           <QuizQ1Cuisine
             selection={cuisine}
             onToggleCuisine={(id) =>
@@ -595,34 +697,42 @@ export function SessionRoom({ roomId }: { roomId: string }) {
               setCuisine((prev) => toggleCuisineNoPreference(prev))
             }
             onAdvance={() => handleAdvance(2)}
+            onLeave={quizLeaveHandler}
           />
         );
+        break;
       case 2:
-        return (
+        screen = (
           <QuizQ2Budget
             tier={budget}
             onSelect={(tier) => setBudget(tier)}
             onAdvance={() => handleAdvance(3)}
+            onLeave={quizLeaveHandler}
           />
         );
+        break;
       case 3:
-        return (
+        screen = (
           <QuizQ3Reputation
             value={reputation}
             onSelect={(id) => setReputation(id)}
             onAdvance={() => handleAdvance(4)}
+            onLeave={quizLeaveHandler}
           />
         );
+        break;
       case 4:
-        return (
+        screen = (
           <QuizQ4Vibe
             value={vibe}
             onSelect={(idx) => setVibe(idx)}
             onAdvance={() => handleAdvance(5)}
+            onLeave={quizLeaveHandler}
           />
         );
+        break;
       case 5:
-        return (
+        screen = (
           <QuizQ5
             state={q5State}
             candidates={candidates}
@@ -631,9 +741,29 @@ export function SessionRoom({ roomId }: { roomId: string }) {
               setQ5Ratings((prev) => ({ ...prev, [id]: score }))
             }
             onSubmit={handleSubmit}
+            onLeave={quizLeaveHandler}
           />
         );
+        break;
     }
+    return (
+      <>
+        {screen}
+        {/* §E — the leave-confirm sheet overlays the quiz when the
+            chrome `Leave` affordance is tapped. The web invitee shell
+            is the only host that wires `onLeave`. */}
+        {leaveConfirmOpen ? (
+          <LeaveConfirmSheet
+            leaving={leaving}
+            onConfirm={handleLeaveConfirm}
+            onDismiss={() => {
+              if (leaving) return;
+              setLeaveConfirmOpen(false);
+            }}
+          />
+        ) : null}
+      </>
+    );
   }
 
   if (phase.kind === "submitting") {
@@ -760,6 +890,16 @@ async function emitDownloadCtaEvent({
   } catch {
     // Swallow — telemetry must never block the App Store handoff.
   }
+}
+
+/** Clamp a resume `lastIndex` into the 1..5 quiz-step range. A missing
+ *  / malformed payload resumes at Q1 — `quiz_progress` is a resume
+ *  convenience, never a verdict input, so a bad value costs a re-walk,
+ *  never an error. */
+function clampStep(value: number | undefined): 1 | 2 | 3 | 4 | 5 {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 1;
+  const clamped = Math.min(5, Math.max(1, Math.round(value)));
+  return clamped as 1 | 2 | 3 | 4 | 5;
 }
 
 // Lightweight duplicate-key detection for the votes insert. Mirrors

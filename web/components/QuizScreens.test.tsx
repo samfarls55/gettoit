@@ -5,7 +5,7 @@
 // `SessionRoom`; these tests prove each screen renders the canonical
 // v1.1 surface and surfaces the right callbacks.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import type { QuizCandidate } from "../lib/candidate-fetch";
@@ -105,6 +105,56 @@ describe("QuizQ4Vibe", () => {
     expect(screen.getByText("SOCIAL")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("vibe ROWDY"));
     expect(calls).toEqual([4]);
+  });
+});
+
+// tb-WF-12 (web-01 §E) — the `Leave` affordance the web invitee shell
+// wires onto the Q1–Q5 quiz chrome. It renders on the chrome's trailing
+// slot only when an `onLeave` handler is passed; off the chrome, the
+// existing quiz screens are unchanged.
+describe("quiz-chrome Leave affordance (web-01 §E)", () => {
+  it("renders a Leave control on Q1 when onLeave is provided", () => {
+    const onLeave = vi.fn();
+    render(
+      <QuizQ1Cuisine
+        selection={{ cuisines: new Set(), noPreference: false }}
+        onToggleCuisine={() => {}}
+        onToggleNoPreference={() => {}}
+        onAdvance={() => {}}
+        onLeave={onLeave}
+      />,
+    );
+    const leave = screen.getByRole("button", { name: /^leave$/i });
+    fireEvent.click(leave);
+    expect(onLeave).toHaveBeenCalledTimes(1);
+  });
+
+  it("omits the Leave control when onLeave is not provided", () => {
+    render(
+      <QuizQ1Cuisine
+        selection={{ cuisines: new Set(), noPreference: false }}
+        onToggleCuisine={() => {}}
+        onToggleNoPreference={() => {}}
+        onAdvance={() => {}}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /^leave$/i })).toBeNull();
+  });
+
+  it("renders the Leave control on Q5 too", () => {
+    const onLeave = vi.fn();
+    render(
+      <QuizQ5
+        state="loading"
+        candidates={[]}
+        ratings={{}}
+        onRate={() => {}}
+        onSubmit={() => {}}
+        onLeave={onLeave}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^leave$/i }));
+    expect(onLeave).toHaveBeenCalledTimes(1);
   });
 });
 
