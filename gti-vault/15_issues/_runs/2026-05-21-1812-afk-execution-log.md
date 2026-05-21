@@ -32,7 +32,7 @@ Concurrency cap: 2 (default).
 | tb-WF-10 | #190 | merged | afk/tb-WF-10 | [#202](https://github.com/samfarls55/gettoit/pull/202) | wave 1; web quiz v1.1 port + votes-wire leaf module |
 | tb-WF-11 | #192 | merged | afk/tb-WF-11 | [#203](https://github.com/samfarls55/gettoit/pull/203) | wave 2; invitee shell foundation + members.display_name |
 | tb-WF-12 | #193 | merged | afk/tb-WF-12 | [#204](https://github.com/samfarls55/gettoit/pull/204) | wave 3; invitee shell re-click behaviors; ADR 0017 |
-| tb-WF-13 | #195 | building | afk/tb-WF-13 | — | wave 4; unblocked by tb-WF-12 |
+| tb-WF-13 | #195 | building | afk/tb-WF-13 | — | wave 4; 1st subagent crashed (infra), re-dispatched fresh |
 | tb-WF-14 | #196 | waiting | afk/tb-WF-14 | — | blocked by tb-WF-13 (sg-WF-8 cleared) |
 
 ## Event log
@@ -55,3 +55,5 @@ Concurrency cap: 2 (default).
 - 19:48 — Re-scan: tb-WF-12 ready. Dispatching tb-WF-12 (#193). tb-WF-13/14 still chained behind it — 1 in flight by necessity.
 - 20:18 — tb-WF-12 MERGED via PR #204 (squash fb0161d). 7/9 done. ADR 0017 added (web-invitee re-click RLS routing). Adjacency flagged by subagent: `web/components/InviteWebCard.tsx` is genuinely dead code (referenced only by its own test) — candidate cleanup issue. (Note: tb-WF-11's earlier claim that `/s/[sessionId]` is dead was wrong — that route still hosts SessionRoom.)
 - 20:18 — Re-scan: tb-WF-13 ready. Dispatching tb-WF-13 (#195). tb-WF-14 chained behind it.
+- 20:26 — tb-WF-13 subagent CRASHED (API socket closed, transient infra error) after 39 tool calls. Investigated: no remote branch, no PR, issue #195 still open, the crashed worktree's afk/tb-WF-13 branch never advanced past base — zero salvageable work. Not an issue-level failure; the run continues.
+- 20:26 — Force-removed the crashed worktree + deleted the stale afk/tb-WF-13 branch to free the name. Re-dispatching tb-WF-13 fresh from current main (173a42a).
