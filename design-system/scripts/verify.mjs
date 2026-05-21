@@ -11,6 +11,8 @@
 //      (TB-15 — mirrors the design-system sweep against the Next.js fallback)
 //   5. Every surface doc (surfaces/0N-*.md) has frontmatter listing the JSX it owns, every
 //      JSX in code/screens/ is claimed by exactly one surface doc (no orphan/double-claim)
+//   6. The web invitee shell surface doc (surfaces/web-NN-*.md) exists and covers all
+//      five locked surfaces/states (sg-WF-5 — web-only spec, no paired JSX in this repo)
 //
 // Exit code 0 = clean, 1 = any failure.
 
@@ -190,6 +192,64 @@ if (pairingErrors.length) {
   pairingErrors.forEach(e => failures.push(e));
 } else {
   notes.push(`surface↔jsx pairing: ${surfaceDocs.length} surface docs claim ${allScreenJsx.length} screens, no orphans / double-claims`);
+}
+
+// ── 5. Web invitee shell surface doc (sg-WF-5) ─────────────
+//
+// The web invitee shell is a web-only surface tree (the iMessage/SMS
+// `/join/<roomId>` flow). It lives under a `web-NN-*` namespace rather
+// than the `NN-*` ritual-arc namespace because (a) it never reaches an
+// iOS surface and (b) its JSX is built by the paired shell-wiring
+// tracer-bullets (tb-WF-11 / tb-WF-12) in `web/`, not as design-system
+// `code/screens/` JSX — so the §4 surface↔jsx pairing check (which only
+// matches `NN[a-z]?-*.md`) intentionally skips it. This check is the
+// gate that the spec-gap doc itself stays present and complete.
+const webInviteeDocs = fs.existsSync(surfacesDir)
+  ? fs.readdirSync(surfacesDir).filter(n => /^web-\d{2}-.*\.md$/.test(n))
+  : [];
+if (webInviteeDocs.length === 0) {
+  failures.push(
+    'web invitee shell: no surfaces/web-NN-*.md found — sg-WF-5 surface doc missing'
+  );
+} else {
+  // The five locked surfaces/states from the decision doc §Q4–Q7.
+  // Each must be addressed by a heading or table-of-states row.
+  const requiredMarkers = [
+    'Name entry',
+    'Resume',
+    'verdict card',
+    'closed',
+    'Leave',
+  ];
+  for (const docName of webInviteeDocs) {
+    const text = fs.readFileSync(path.join(surfacesDir, docName), 'utf8');
+    const missing = requiredMarkers.filter(
+      m => !text.toLowerCase().includes(m.toLowerCase())
+    );
+    if (missing.length) {
+      failures.push(
+        `surfaces/${docName}: web invitee shell doc missing coverage of: ${missing.join(', ')}`
+      );
+    }
+    // The doc must reference the decision doc for behavior and must
+    // document the cross-browser / cleared-storage resume limitation
+    // (decision doc §Q3) as an accepted constraint.
+    if (!text.includes('workflow-overhaul-web-invitee-flow')) {
+      failures.push(
+        `surfaces/${docName}: must reference the decision doc (workflow-overhaul-web-invitee-flow)`
+      );
+    }
+    if (!/cross-browser/i.test(text) || !/cleared.?storage/i.test(text)) {
+      failures.push(
+        `surfaces/${docName}: must document the cross-browser / cleared-storage resume limitation (decision doc §Q3)`
+      );
+    }
+  }
+  if (failures.every(f => !f.startsWith('surfaces/web-') && !f.startsWith('web invitee'))) {
+    notes.push(
+      `web invitee shell: ${webInviteeDocs.length} doc(s) cover all five locked surfaces/states`
+    );
+  }
 }
 
 finish();
