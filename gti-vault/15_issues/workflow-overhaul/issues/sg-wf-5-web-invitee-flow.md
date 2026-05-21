@@ -1,7 +1,7 @@
 ---
 issue: sg-WF-5
 title: Web invitee single-link flow — design-system surface doc
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 158
@@ -55,3 +55,5 @@ None — the follow-up grill (the prior blocker) is complete.
 ## Comments
 
 **2026-05-21 — grilled, re-triaged, decomposed.** The follow-up `/grill-with-docs` round resolved all eight open questions (locked in [[../../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]]); status `needs-triage` → `ready-for-agent`, type `HITL` → `AFK`. `/to-issues` then narrowed this issue to the surface-doc spec-gap and filed two paired tracer-bullets — tb-WF-11 (shell foundation) and tb-WF-12 (re-click behaviors) — alongside the already-filed siblings tb-WF-10 (#190) and sg-WF-7 (#191).
+
+**2026-05-21 — done (AFK).** Landed `design-system/surfaces/web-01-invitee-shell.md` — the first `web-NN-*` namespaced surface doc. It covers all five locked surfaces/states (A name entry, B resume routing, C read-only verdict card, D "this plan is closed" terminal, E quiz-chrome Leave + "you left this plan" terminal), references the decision doc for behavior throughout, and documents the §Q3 cross-browser / cleared-storage resume limitation as an accepted constraint. The `web-NN-*` namespace was chosen over a `NN-*` ritual-arc name precisely because the shell is web-only — its JSX is built in `web/` by tb-WF-11/tb-WF-12, not as design-system `code/screens/` JSX, so the `verify.mjs` surface↔jsx pairing gate (which matches only `NN[a-z]?-*.md`) would have failed against a `NN-*` doc with no claimable JSX. A new sixth `verify.mjs` check gates the `web-NN-*` doc's presence + five-surface coverage instead. No new component, no new token. `verify.mjs` green. Merged via PR #197.
