@@ -49,3 +49,18 @@ These are **mechanical** — the system actually applies them. The reason isn't 
 - **3rd (last) reroll.** Stamp changes to `"1 LEFT"`. CTA: `"Reroll · last one"`. Extra body line: `"After this, tonight is committed."`
 - **No rerolls left.** This surface is not reachable — surface 06's footer reads "No rerolls left" instead.
 - **Group veto of reroll** (v2 mechanic). v1 ships with initiator-only reroll.
+
+## Amendment — reroll window (workflow-overhaul, sg-WF-6)
+
+> Additive. The S07 friction model above — the 3-burn cap, reason-as-constraint, initiator-only reroll — is unchanged. This section documents the **outer time bound** that sits around the burn budget once a Plan reaches its verdict.
+
+When the workflow-overhaul promoted the session into a durable **Plan**, the reroll budget gained a companion: a **reroll window** with a wall-clock deadline. A verdict is correctable *for a bounded interval*, not indefinitely.
+
+- **Outer time bound.** Independent of how many of the 3 burns remain, the reroll window **closes at the end of the next calendar day** — `23:59:59` on the day *after* the verdict fired, measured in the Plan's **search-area timezone** (not the device timezone). A verdict that fires Friday evening is rerollable through end of Saturday, search-area time; come Sunday the window is closed even if no burn was ever spent.
+- **Three-way close.** A Plan leaves the reroll-eligible state on whichever of three events lands first:
+  1. **Window closes** — the calendar-day deadline above passes.
+  2. **3rd burn** — the reroll budget is exhausted (the existing cap).
+  3. **Check-in** — any member files a check-in of any outcome (the meal happened; a reroll is moot).
+- **Verdict-screen affordance once the window has closed.** A Plan whose window has closed is `decided-expired`; tapping it from the S00 Plan list opens the **read-only verdict screen**, which renders **no reroll tertiary at all** — the affordance is absent, not disabled. This is distinct from the cap-exhausted edge case already documented above (*No rerolls left*): cap-exhaustion is a still-`decided-active` Plan whose surface 06 footer reads `"No rerolls left"`; a closed window is a terminal `decided-expired` Plan that never surfaces the reroll path. The two reach the user through different screens.
+
+The enforcement is server-authoritative and time-exact: a reroll attempted past the deadline is rejected by the backend even if a stale client still shows the affordance. The decision record is [ADR 0016](../../gti-vault/60_engineering/adr/0016-plan-reroll-window-enforcement.md); the deadline and three-way-close mechanics are not a design-system concern beyond the affordance-presence rule stated here.

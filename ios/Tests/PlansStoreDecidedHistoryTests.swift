@@ -221,4 +221,21 @@ final class PlansStoreDecidedHistoryTests: XCTestCase {
         let _: (UUID) async throws -> [PlansStore.DecidedPlanRow] =
             store.plansHistoryForList(userID:)
     }
+
+    /// sg-WF-6 — `fetchPlanStatus(planID:)` resolves a Plan's *current*
+    /// lifecycle status in one read so the Decided-card tap path routes
+    /// off the live status, not a stale list snapshot. It is best-effort
+    /// (`async` returning an optional, never `throws`): a transient
+    /// failure yields `nil` and the caller falls back to the snapshot.
+    /// The live PostgREST round-trip is covered by the integration lane;
+    /// this test pins the symbol + the typed, non-throwing signature.
+    func testFetchPlanStatusSignatureExistsOnPlansStore() async throws {
+        let client = SupabaseClient(
+            supabaseURL: URL(string: "https://example.supabase.co")!,
+            supabaseKey: "test-anon-key"
+        )
+        let store = PlansStore(client: client)
+        let _: (UUID) async -> PlansStore.LifecycleState? =
+            store.fetchPlanStatus(planID:)
+    }
 }

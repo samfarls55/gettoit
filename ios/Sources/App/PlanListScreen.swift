@@ -373,7 +373,30 @@ public struct PlanListScreen: View {
     public static func tapRoute(
         for row: PlansStore.DecidedPlanRow
     ) -> DecidedHistoryTapDestination {
-        switch (row.role, row.plan.status) {
+        tapRoute(role: row.role, status: row.plan.status)
+    }
+
+    /// sg-WF-6 — the §"Tap behavior" destination computed from an
+    /// explicit `role` + a *freshly resolved* lifecycle `status`,
+    /// rather than the status carried on a possibly-stale list row.
+    ///
+    /// The S00 Plan list's Decided / History sections are a snapshot:
+    /// a `decided-active` Plan can transition to `decided-expired` (its
+    /// reroll window closing — ADR 0016's three-way close) after the
+    /// list was last loaded. The Decided-card tap path re-fetches the
+    /// Plan's current status (`PlansStore.fetchPlanStatus`) and routes
+    /// through this overload so an expired Plan opens the read-only
+    /// verdict screen — which renders no reroll affordance — instead of
+    /// the full one.
+    ///
+    /// `tapRoute(for:)` delegates here with the row's snapshot status,
+    /// preserving its behavior for call sites that have not (or cannot)
+    /// re-fetch.
+    public static func tapRoute(
+        role: PlansStore.DecidedPlanRow.Role,
+        status: PlansStore.LifecycleState
+    ) -> DecidedHistoryTapDestination {
+        switch (role, status) {
         case (.owner, .decidedActive):       return .createdVerdictFull
         case (.owner, .decidedExpired):      return .createdVerdictReadOnly
         case (.joined, .decidedActive):      return .joinedVerdictReadOnlyActive

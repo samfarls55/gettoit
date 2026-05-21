@@ -270,6 +270,68 @@ final class PlanListScreenDecidedHistoryTests: XCTestCase {
         )
     }
 
+    // MARK: - tap routing off a freshly-resolved status (sg-WF-6)
+
+    /// sg-WF-6 — `tapRoute(role:status:)` derives the destination from
+    /// an explicit, freshly-fetched status rather than a stale list
+    /// row. A Created Plan that is still decided-active routes to the
+    /// full VerdictScreen (reroll affordance present).
+    func testTapRouteRoleStatusCreatedActiveIsFullVerdict() {
+        XCTAssertEqual(
+            PlanListScreen.tapRoute(role: .owner, status: .decidedActive),
+            .createdVerdictFull
+        )
+    }
+
+    /// sg-WF-6 — the load-bearing case. A Created Plan whose list row
+    /// still reads `decided-active` but whose reroll window has since
+    /// closed (live status `decided-expired`) must route to the
+    /// read-only verdict screen — NOT the full one. The tap path
+    /// re-fetches the status and calls this overload with the fresh
+    /// value, so an expired Plan never opens the reroll affordance.
+    func testTapRouteRoleStatusCreatedExpiredIsReadOnlyVerdict() {
+        XCTAssertEqual(
+            PlanListScreen.tapRoute(role: .owner, status: .decidedExpired),
+            .createdVerdictReadOnly
+        )
+    }
+
+    /// sg-WF-6 — Joined cards stay read-only on both live statuses.
+    func testTapRouteRoleStatusJoinedActiveIsReadOnlyActive() {
+        XCTAssertEqual(
+            PlanListScreen.tapRoute(role: .joined, status: .decidedActive),
+            .joinedVerdictReadOnlyActive
+        )
+    }
+
+    func testTapRouteRoleStatusJoinedExpiredIsReadOnlyHistory() {
+        XCTAssertEqual(
+            PlanListScreen.tapRoute(role: .joined, status: .decidedExpired),
+            .joinedVerdictReadOnlyHistory
+        )
+    }
+
+    /// sg-WF-6 — `tapRoute(for:)` and `tapRoute(role:status:)` agree
+    /// when fed the same role + status: the row overload is a thin
+    /// delegate over the explicit one, so a stale snapshot and a fresh
+    /// re-fetch produce identical routing for identical inputs.
+    func testTapRouteForRowDelegatesToRoleStatusOverload() {
+        for role in [PlansStore.DecidedPlanRow.Role.owner, .joined] {
+            for status in [PlansStore.LifecycleState.decidedActive, .decidedExpired] {
+                let row = Self.makeDecidedRow(
+                    name: "Friday dinner",
+                    status: status,
+                    role: role
+                )
+                XCTAssertEqual(
+                    PlanListScreen.tapRoute(for: row),
+                    PlanListScreen.tapRoute(role: role, status: status),
+                    "tapRoute(for:) must delegate to tapRoute(role:status:)"
+                )
+            }
+        }
+    }
+
     // MARK: - History-collapse persistence (per-user, across remount)
 
     /// The History collapse state defaults to expanded ("first
