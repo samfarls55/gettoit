@@ -27,13 +27,13 @@ Concurrency cap: 2 (default).
 |---|---|---|---|---|---|
 | bug-11   | #140 | merged | afk/bug-11   | [#198](https://github.com/samfarls55/gettoit/pull/198) | wave 1; iOS fixture factories moved to test target + hygiene guard |
 | sg-WF-5  | #158 | merged | afk/sg-WF-5  | [#199](https://github.com/samfarls55/gettoit/pull/199) | wave 1; Web-01 invitee shell surface doc; unblocked tb-WF-11 |
-| sg-WF-6  | #159 | building | afk/sg-WF-6  | — | wave 1; grilled 2026-05-21, ADR 0016 |
+| sg-WF-6  | #159 | merged | afk/sg-WF-6  | [#201](https://github.com/samfarls55/gettoit/pull/201) | wave 1; reroll-window deadline + apply_reroll guard; migration live on gettoit-prod |
 | sg-WF-8  | #194 | merged | afk/sg-WF-8  | [#200](https://github.com/samfarls55/gettoit/pull/200) | wave 1; S00a + web mint affordance; unblocks tb-WF-13, tb-WF-14 |
 | tb-WF-10 | #190 | building | afk/tb-WF-10 | — | wave 1 |
-| tb-WF-11 | #192 | waiting | afk/tb-WF-11 | — | blocked by sg-WF-5 |
+| tb-WF-11 | #192 | building | afk/tb-WF-11 | — | wave 2; unblocked by sg-WF-5 |
 | tb-WF-12 | #193 | waiting | afk/tb-WF-12 | — | blocked by tb-WF-11 |
-| tb-WF-13 | #195 | waiting | afk/tb-WF-13 | — | blocked by sg-WF-8, tb-WF-12 |
-| tb-WF-14 | #196 | waiting | afk/tb-WF-14 | — | blocked by sg-WF-8, tb-WF-13 |
+| tb-WF-13 | #195 | waiting | afk/tb-WF-13 | — | blocked by tb-WF-12 (sg-WF-8 cleared) |
+| tb-WF-14 | #196 | waiting | afk/tb-WF-14 | — | blocked by tb-WF-13 (sg-WF-8 cleared) |
 
 ## Event log
 - 18:12 — Preflight: tree was dirty (in-progress vault triage); user authorised
@@ -47,3 +47,5 @@ Concurrency cap: 2 (default).
 - 18:25 — Both slots free; wave 1 has 3 ready left (sg-WF-6, sg-WF-8, tb-WF-10). Dispatching sg-WF-6 (#159) + sg-WF-8 (#194); tb-WF-10 queued.
 - 18:38 — sg-WF-8 MERGED via PR #200 (squash 45db9a6). S00a account-claim surface + web mint affordance. Unblocks tb-WF-13, tb-WF-14.
 - 18:38 — Slot freed; dispatching tb-WF-10 (#190) — last wave-1 issue. sg-WF-6 still building.
+- 18:58 — sg-WF-6 MERGED via PR #201 (squash b67dc6f). Subagent rebased cleanly, resolving a CHANGELOG conflict vs sg-WF-8. Wave 1 complete: bug-11, sg-WF-5, sg-WF-6, sg-WF-8 merged; tb-WF-10 still building.
+- 18:58 — Re-scan: tb-WF-11 ready (sg-WF-5 cleared); tb-WF-13/14 blockers narrowed to the chain only (sg-WF-8 cleared). Dispatching tb-WF-11 (#192) into the free slot — runs parallel to tb-WF-10.
