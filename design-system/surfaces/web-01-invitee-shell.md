@@ -188,6 +188,12 @@ does not restyle them; it only routes into them. The resume *into Q5*
 re-fires the per-member candidate fetch — an inherited limitation that belongs
 to the quiz port (tb-WF-10), not the shell (decision doc §Q5).
 
+The **web Waiting surface** carries one shell-owned addition: the low-key
+`"Getting the app?"` claim-code mint affordance — spec'd in §"Getting the
+app?" below. It is additive to the existing Waiting port (a quiet line in the
+dock, below the existing chrome) and is the same affordance §C's read-only
+verdict card carries. Off the quiz, off the §D / §E terminals.
+
 ### Accepted constraint — cross-browser / cleared-storage resume
 
 **Resume only works within the same browser, with storage intact.** Identity is
@@ -246,18 +252,17 @@ open, the venue name cross-fades to the new value (`all 320ms var(--ease-out)`,
 the same transition the web fallback uses for live state changes). The invitee
 takes no action — they are a read-only observer of the initiator's reroll.
 
-### No CTA
+### No primary CTA
 
 The read-only verdict card has **no primary CTA**. A Web invitee has no reroll,
 no ratify, no "start a new decision" path — they were invited to one Plan and
 that Plan is decided. The card is terminal-by-completion: closing the tab is the
 exit. (Contrast §D, which is terminal-by-failure and also has no CTA.)
 
-> **Spec adjacency — not built here.** sg-WF-8 layers a low-key "Getting the
-> app?" claim-code mint affordance onto this card (and the web Waiting screen).
-> That affordance is spec'd by sg-WF-8 and wired by tb-WF-13; this doc leaves a
-> documented seam for it but does not spec it. The base card above is
-> CTA-less; sg-WF-8's affordance is additive and quiet.
+The one install-adjacent affordance the card carries is the low-key
+`"Getting the app?"` claim-code mint line — spec'd in §"Getting the app?"
+below. It is **not** a primary CTA: it is a quiet single line, additive to the
+CTA-less base card, and it never competes with the verdict for the eye.
 
 ### Copy register
 
@@ -397,6 +402,100 @@ is open without needing a button.
 
 ---
 
+## "Getting the app?" mint affordance (sg-WF-8)
+
+> **Spec amendment — sg-WF-8.** Added 2026-05-21. Architecture:
+> [[../../gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]];
+> grilled decisions:
+> [[../../gti-vault/50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]]
+> §Q4–Q5. This section specs the visual / copy / motion layer of the web side
+> of the [[../../CONTEXT|Account claim]] bridge. The mint wiring — the
+> `claim_codes` table, the `mint-claim-code` edge function, the lazy-mint call
+> — is owned by **tb-WF-13**. This doc leaves no seam: it is the full contract
+> tb-WF-13 consumes.
+
+A [[../../CONTEXT|Web invitee]] who votes in the browser and then installs the
+iOS app gets a **fresh, disjoint Apple `user_id`** the moment they sign in —
+their browser vote strands ([[../../gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]] §Context).
+The bridge is a single-use [[../../CONTEXT|Claim code]] that carries the
+browser's anonymous session into the app *before* the Apple tap. This affordance
+is where the web side **mints** that code; the app side that **receives** it is
+[[00a-signin|S00a]] §"Voted on the web?".
+
+### Where it appears
+
+The mint affordance lives on **every "membership resolved" web surface** — and
+only those:
+
+| Surface | Affordance present? | Why |
+|---|---|---|
+| §B → web Waiting screen | **Yes** | The invitee finished voting; they have a real membership and a stable identity worth carrying over. |
+| §C → read-only verdict card | **Yes** | A returning user reconnecting *old* data lands on **decided** rooms, which render §C — not Waiting. A Waiting-only affordance would leave that user nowhere to mint (decision doc §Q5). |
+| §A → name entry | No | No vote yet — nothing to claim. |
+| §A quiz (Q1–Q5) chrome | No | Finish voting first; a mint line on the quiz distracts from the one task (decision doc §Q5). |
+| §D → "This plan is closed" terminal | **No** | The identity has aged out past the 30-day TTL or never resolved — there is nothing to claim. The terminal stays CTA-less. |
+| §E → "You left this plan" terminal | No | The invitee discarded their membership; nothing to carry. |
+
+Because the claim is **per-person** (the code carries the whole anonymous
+identity, not one Plan — decision doc §Q3), reaching **one** decided room is
+enough to mint a code that recovers every web Plan that identity voted in.
+
+### Default (collapsed) state — the quiet line
+
+The affordance is a **low-key single line**, not a banner and not a hard
+upsell — it respects the web-invitee-flow §Q7 "the web fallback is plumbing,
+not a growth surface" lock. It helps a user who has *already decided* to
+install; it pushes nobody.
+
+| Element | Spec |
+|---|---|
+| Treatment | a single `eyebrow`-token line (Inter 700 / 11 / tracking 0.18em / UPPERCASE), white 0.6 (`--text-tertiary`), tappable, 44pt-tall hit row — the same quiet treatment the rest of the design system uses for secondary text links |
+| Position (web Waiting) | in the dock, **below** the existing Waiting chrome (avatar row, headline, the "Download the app" CTA) — never above the primary "N of M are in" state |
+| Position (§C verdict card) | below the verdict card, before the bottom `auto` spacer — a quiet footer line, never competing with the plan name + venue |
+| Label | `"Getting the app?"` — see §"Copy register" |
+| Motion | `gti-fade-up` on first paint with the rest of the surface; no independent entrance |
+
+### Revealed state — the minted code
+
+Tapping `"Getting the app?"` **lazily mints** the claim code (the code is
+generated **on the tap**, never eagerly — keeps the surface clean, never mints
+unused codes, and mints at the moment of intent because the code carries a live
+session key that can go stale — decision doc §Q4). The revealed state replaces
+the quiet line in place — it is not a route change — and shows:
+
+| Element | Spec |
+|---|---|
+| The code | the minted claim code, in a single `Glass` card (`soft` fill), `mono-tag`-token type scaled up for legibility (IBM Plex Mono, UPPERCASE, generous tracking), white (`--paper`), centered. The mono treatment makes an opaque token easy to read character-by-character. |
+| Instructions | a short plain line below the code — see §"Copy register". It points the user at the S00a `"Voted on the web?"` entry. |
+| No copy-button dependency | the code is displayed for the user to read and type into the app; a clipboard-copy convenience button is a tb-WF-13 implementation nicety, not a design-system requirement, and it must not be the *only* path to the code. |
+
+While the revealed state is open the surface still live-updates as normal (§C's
+Realtime rebroadcast, §B's resume chrome) — minting a code does not freeze the
+surface.
+
+### Copy register
+
+- **`"Getting the app?"`** — the collapsed-state label. Question-form,
+  warm-friend register; it offers help to a user already on their way, it does
+  not sell. NEVER `"Download now"`, NEVER `"Don't lose your votes!"` (loss-bait
+  upsell), NEVER `"Get the app"` (sales register).
+- **Instructions (revealed state)** — `"Enter this code in the app under
+  “Voted on the web?” to bring this Plan with you."` Plain, one job: it names
+  *where in the app* the code goes. The copy is honest — it says "this Plan,"
+  the concrete thing in front of the user, and does not over-claim a full
+  account restore. NEVER `"Restore your account"`, NEVER `"Sync everything"`.
+- The minted code is shown verbatim; the shell never paraphrases or formats it
+  beyond the mono-tag display treatment.
+
+### No new token, no new component
+
+The collapsed line is the existing `eyebrow`-token text-link treatment; the
+revealed code sits in the existing `Glass` component (`soft` fill) with the
+existing `mono-tag` type token; every color resolves to a registered token
+(`--text-tertiary`, `--paper`, the default `Glass` fill). **No new token, no
+new component.** If a future mint-affordance need cannot be met from this set,
+that is a spec gap to flag in `design-system/` — not an inline literal.
+
 ## What this surface tree defends against
 
 - **Capability-URL identity leak.** The `/join/<roomId>` link is forward-by-
@@ -432,13 +531,15 @@ inline px easing literals beyond the spacing scale.
 | Gradient stops | `gradient.surfaces.initiator` (§A, §B), `.verdict` (§C), `.midnight` (§D, §E) |
 | Accent / focus | `--sun` (input focus ring) |
 | Surface text | `--paper` (primary), white 0.78 (secondary), `--text-tertiary` white 0.6 |
-| Glass | `--glass-fill-soft`, `--glass-stroke` (name input); default `Glass` fill (§C verdict card) |
+| Glass | `--glass-fill-soft`, `--glass-stroke` (name input); default `Glass` fill (§C verdict card); `Glass` `soft` fill (sg-WF-8 minted-code card) |
 | Radii | `--r-row` (12, name input), `--r-sheet` (26, leave confirm card) |
-| Type | `eyebrow`, `gti-display` (Inter 900), `body`, `cta` |
+| Type | `eyebrow` (incl. the sg-WF-8 "Getting the app?" line), `gti-display` (Inter 900), `body`, `cta`, `mono-tag` (sg-WF-8 minted-code display) |
 | Motion | `gti-fade-up` 380ms `--ease-out-soft` (surface entrance); `--ease-out` 140/320ms (focus, live update) |
 
-No new token, no new component. If a future shell need cannot be met from this
-table, that is a spec gap — flag it in `design-system/`, do not inline a value.
+No new token, no new component — the sg-WF-8 `"Getting the app?"` mint
+affordance is pure composition of the rows above. If a future shell need cannot
+be met from this table, that is a spec gap — flag it in `design-system/`, do
+not inline a value.
 
 ## Out of scope (owned elsewhere)
 
@@ -449,12 +550,19 @@ table, that is a spec gap — flag it in `design-system/`, do not inline a value
   the `members.display_name` migration (tb-WF-11); the resume read, the
   read-only verdict card wiring, the leave wiring (tb-WF-12). This doc is the
   contract; those tracer-bullets are the build.
-- **The web Waiting surface** — already an existing web fallback port; the
-  shell routes into it, does not restyle it.
-- **The app-installed account-claim bridge** — a Web invitee who installs the
-  iOS app gets a fresh Apple `user_id` unlinked to their web anonymous
-  identity. Sibling issue **sg-WF-7** and its decomposed build issues
-  (sg-WF-8 / tb-WF-13 / tb-WF-14); see [[../../gti-vault/50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]].
+- **The web Waiting surface base** — already an existing web fallback port; the
+  shell routes into it and does not restyle it. The one shell-owned addition is
+  the sg-WF-8 `"Getting the app?"` mint line documented above — additive, not a
+  restyle.
+- **The claim-code mint wiring** — the `claim_codes` table + migration, the
+  `mint-claim-code` edge function, and the lazy-mint call behind the
+  `"Getting the app?"` tap are owned by **tb-WF-13**. This doc specs the
+  affordance's visual / copy / motion layer only.
+- **The app-side claim entry** — the S00a `"Voted on the web?"` affordance that
+  *receives* the minted code is spec'd in [[00a-signin|S00a]] (sg-WF-8) and
+  wired by tb-WF-14. The two halves of the [[../../CONTEXT|Account claim]]
+  bridge — web mint here, app redeem on S00a — are one feature split across two
+  surfaces.
 - **iOS member display names.** §A introduces the system's first real
   `members.display_name` source, for Web invitees only. iOS members still
   render the `m<uuid>` placeholder — closing that is a separate decision
@@ -463,6 +571,9 @@ table, that is a spec gap — flag it in `design-system/`, do not inline a value
 ## Cross-references
 
 - [[../../gti-vault/50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]] — the decision doc; locked behavior for every surface above (Q1–Q8). **This doc never re-decides what that doc locked.**
+- [[../../gti-vault/50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]] — the decision doc for the sg-WF-8 `"Getting the app?"` mint affordance (Q4–Q5).
+- [[../../gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]] — the claim-code bridge architecture the mint affordance feeds.
+- [[00a-signin|S00a]] — the app-side `"Voted on the web?"` claim entry that receives the code this affordance mints.
 - [[03-quiz|S03 Quiz]] — the quiz the shell routes into; owns the `QuizChrome` `Leave` affordance §E reuses.
 - [[04-waiting|S04 Waiting]] — the web Waiting surface §B routes into.
 - [[05-verdict|S05 Verdict]] — the iOS verdict surface; §C's read-only card is the web invitee's far-smaller analogue (plan name + venue only).

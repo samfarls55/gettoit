@@ -33,7 +33,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | sg-WF-5 | [[issues/sg-wf-5-web-invitee-flow\|Web invitee single-link flow — design-system surface doc]] | AFK | [#158](https://github.com/samfarls55/gettoit/issues/158) | done 2026-05-21 |
 | sg-WF-6 | [[issues/sg-wf-6-reroll-window-deadline\|Reroll window deadline mechanism]] | AFK | [#159](https://github.com/samfarls55/gettoit/issues/159) | grilled 2026-05-21 |
 | sg-WF-7 | [[issues/sg-wf-7-web-invitee-account-claim\|Web invitee account claim — cross-context identity bridge]] | HITL | [#191](https://github.com/samfarls55/gettoit/issues/191) | grilled 2026-05-21 — decomposed |
-| sg-WF-8 | [[issues/sg-wf-8-account-claim-design-system\|Account-claim design-system amendment — S00a + web mint affordance]] | AFK | [#194](https://github.com/samfarls55/gettoit/issues/194) | — |
+| sg-WF-8 | [[issues/sg-wf-8-account-claim-design-system\|Account-claim design-system amendment — S00a + web mint affordance]] | AFK | [#194](https://github.com/samfarls55/gettoit/issues/194) | done 2026-05-21 |
 
 ### Tracer-bullets
 
@@ -72,7 +72,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 
 **Account-claim batch (decomposed from sg-WF-7, 2026-05-21).** The sg-WF-7 `/grill-with-docs` round was decomposed via `/to-issues` into 3 AFK issues — outcomes in [[../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]], architecture in [[../../60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]].
 
-- **sg-WF-8** — the design-system amendment: the S00a "Voted on the web?" affordance + code-entry surface, and the low-key "Getting the app?" mint affordance on the web Waiting screen + read-only verdict card. The S00a portion can start immediately; the web-surface portion consumes the sg-WF-5 web invitee surface doc.
+- **sg-WF-8 done 2026-05-21** — the design-system amendment landed both halves in one slice (sg-WF-5 was already merged): `surfaces/00a-signin.md` gained the S00a "Voted on the web?" affordance + code-entry state (+ the two-state `ScreenSignIn.jsx`), and `surfaces/web-01-invitee-shell.md` gained the low-key "Getting the app?" mint affordance on the web Waiting screen (§B) + read-only verdict card (§C). TTL-honest copy per ADR 0006; no new component / token; `verify.mjs` + new `test-account-claim.mjs` green. tb-WF-13 / tb-WF-14 now have their spec contract.
 - **tb-WF-13** consumes sg-WF-8 + tb-WF-12 — the mint side: a `claim_codes` table + migration (service-role-only RLS, holds the encrypted refresh token), the `mint-claim-code` edge function, and the web "Getting the app?" affordance wiring. The web layer attaches to the v1.1 web surfaces tb-WF-12 builds.
 - **tb-WF-14** consumes sg-WF-8 + tb-WF-13 — the redeem side: the `redeem-claim-code` edge function, S00a code entry, and iOS redeem → keychain → the existing `linkApple` path. The Apple round-trip itself is TestFlight-verified, not CI.
 
