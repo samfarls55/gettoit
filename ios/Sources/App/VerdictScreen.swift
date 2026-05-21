@@ -78,69 +78,10 @@ public struct VerdictScreen: View {
             self.cuts = cuts
         }
 
-        /// JSX-fixture-shaped verdict used by snapshot tests and by the
-        /// design-system parity preview. `// placeholder: marketing-branding pass`
-        /// applies to the strings.
-        public static func fixture() -> Verdict {
-            // placeholder: marketing-branding pass
-            Verdict(
-                placeName: "Pico's Taqueria",
-                metaLine: "Mexican · $$ · 8 min walk",
-                timeBadge: TimeBadge(time: "7:00 PM", audience: "All four of you"),
-                ruleText: "Budget cap cut Ren Soba. Pico's had the lowest regret-of-omission.",
-                receipts: [
-                    Receipt(name: "you",  action: "wanted lively"),
-                    Receipt(name: "alex", action: "filtered shellfish"),
-                    Receipt(name: "maya", action: "capped at $30"),
-                    Receipt(name: "sam",  action: "capped at 15 min walk"),
-                ],
-                cuts: [
-                    Cut(name: "Ren Soba",   reason: "over budget cap"),
-                    Cut(name: "Café Lou",   reason: "shellfish veto"),
-                    Cut(name: "Halal Cart", reason: "outside walk range"),
-                ]
-            )
-        }
-
-        /// TB-13 — JSX-fixture-shaped solo verdict. Used by the
-        /// `solo` mode snapshot tests and the design-system parity
-        /// preview. Empty receipts list (the surface suppresses the
-        /// row anyway), empty cuts (the engine still produces them for
-        /// a multi-candidate solo run, but the fixture keeps the
-        /// minimal shape). Time-badge audience is `"You"` (singular).
-        /// Rule text names the rule that produced the verdict — no
-        /// `"N of M"` framing. `// placeholder: marketing-branding pass`
-        /// applies to the strings.
-        public static func soloFixture() -> Verdict {
-            // placeholder: marketing-branding pass
-            Verdict(
-                placeName: "Pico's Taqueria",
-                metaLine: "Mexican · $$ · 8 min walk",
-                timeBadge: TimeBadge(time: "7:00 PM", audience: "You"),
-                ruleText: "Pico's was the only candidate that fit every constraint.",
-                receipts: [],
-                cuts: []
-            )
-        }
-
-        /// JSX-fixture-shaped no-survivor verdict — drives the
-        /// `noSurvivor` mode snapshot tests + the design-system
-        /// parity preview. The hero stacks as "NO SPOT / FITS" via
-        /// the placeholder `placeName`; the engine writes the same
-        /// load-bearing rule_text in aggregate-rule register.
-        /// `// placeholder: marketing-branding pass` applies to the
-        /// strings.
-        public static func noSurvivorFixture() -> Verdict {
-            // placeholder: marketing-branding pass
-            Verdict(
-                placeName: "No spot fits",
-                metaLine: "Vegan options · $$ cap · 15 min walk",
-                timeBadge: TimeBadge(time: "", audience: ""),
-                ruleText: "Vegan options left no candidates within walking distance tonight.",
-                receipts: [],
-                cuts: []
-            )
-        }
+        // Snapshot/smoke-test fixture factories — `fixture()`,
+        // `soloFixture()`, `noSurvivorFixture()` — were relocated to the
+        // test target (`Tests/ScreenFixtures.swift`) by bug-11 so the
+        // shipped binary carries no fictitious venue strings.
     }
 
     public struct TimeBadge: Equatable, Sendable {

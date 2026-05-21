@@ -67,15 +67,9 @@ public struct CheckinScreen: View {
             self.metaLine = metaLine
         }
 
-        public static func fixture() -> Plate {
-            Plate(
-                roomID: UUID(),
-                verdictID: UUID(),
-                placeName: "Pico's Taqueria",
-                verdictAt: "Wed Apr 23 · 7:00 PM",
-                metaLine: "4 in · 8 min walk"
-            )
-        }
+        // The `fixture()` factory was relocated to the test target
+        // (`Tests/ScreenFixtures.swift`) by bug-11 so the shipped binary
+        // carries no fictitious venue strings.
     }
 
     public enum Outcome: String, Equatable, Sendable, CaseIterable {
