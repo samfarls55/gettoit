@@ -8,7 +8,7 @@
 //   * TB-06 ticket (gti-vault/15_issues/v1/issues/tb-06-verdict-engine-clean-run.md)
 //   * Engine spec: supabase/functions/_shared/verdict-engine.ts
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.43.4";
 import {
   type ComputeVerdictDataAdapter,
   type ComputeVerdictEnv,

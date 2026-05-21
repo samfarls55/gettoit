@@ -9,7 +9,7 @@
 //   * TB-08 ticket (gti-vault/15_issues/v1/issues/tb-08-ratification-push-hard-close.md)
 //   * Apple, "Sending Notification Requests to APNs"
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.43.4";
 import {
   APNS_HOST,
   type ApnsDeliveryAdapter,

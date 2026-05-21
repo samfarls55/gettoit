@@ -32,7 +32,7 @@
 //   * ADR 0002 (gti-vault/60_engineering/adr/0002-places-data-foursquare-mapkit.md)
 //   * TB-05 (gti-vault/15_issues/v1/issues/tb-05-foursquare-placesproxy.md)
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.43.4";
 import {
   type CacheAdapter,
   type CacheRow,

@@ -7,7 +7,7 @@
 //   * TB-16 ticket (gti-vault/15_issues/v1/issues/tb-16-privacy-legal-delete.md)
 //   * ADR 0006 (gti-vault/60_engineering/adr/0006-privacy-posture-v1.md)
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { createClient } from "npm:@supabase/supabase-js@2.43.4";
 import { type DeleteUserEnv, handleRequest } from "./handler.ts";
 
 function buildAdminClient(env: DeleteUserEnv) {
