@@ -1,7 +1,7 @@
 ---
 issue: sg-WF-8
 title: Account-claim design-system amendment — S00a + web mint affordance
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 194
@@ -43,3 +43,12 @@ Matching JSX in `design-system/code/`. If the spec needs a token or component th
 ## Blocked by
 
 None for the S00a amendment — can start immediately. The web-surface amendment consumes the sg-WF-5 web invitee surface doc; sequence that portion after [[sg-wf-5-web-invitee-flow|sg-WF-5]] (#158) if it has not yet landed.
+
+## Comments
+
+- **Done 2026-05-21** (AFK, branch `afk/sg-WF-8`). sg-WF-5 was already merged, so both halves of the amendment landed in one slice.
+  - **S00a** — `surfaces/00a-signin.md` gained a `## "Voted on the web?" account-claim affordance` section: a quiet, secondary `eyebrow`-token text link beneath the Apple pill that reveals a code-entry state (TTL-honest teaching copy + a single soft-glass claim-code input reusing the web-01 §A / C-23 input pattern + a `"Bring my Plans over"` `PillCTA white` submit). `code/screens/ScreenSignIn.jsx` got the two-state JSX, driven by a `claimCodeOpen` prop the caller (tb-WF-14) owns. Motion / Accessibility / Out-of-scope sections amended to cover the new state.
+  - **Web side** — `surfaces/web-01-invitee-shell.md` gained a `## "Getting the app?" mint affordance (sg-WF-8)` section: a low-key single `eyebrow`-token line on the §B web Waiting screen and the §C read-only verdict card (only those two membership-resolved surfaces). Tapping it lazily mints a claim code shown in a `Glass` `soft` card with `mono-tag` type, with instructions pointing at the S00a entry. The pre-existing §C "Spec adjacency" placeholder note was replaced by the real spec.
+  - **Copy** — TTL-honest per ADR 0006: `"bring back your recent web Plans"`, never "recover all your history". S00a CTA `"Bring my Plans over"`, affordance label `"Voted on the web?"`; web label `"Getting the app?"`.
+  - **No new component, no new token** — pure composition of existing primitives (`eyebrow` text link, soft-glass input, `PillCTA white`, `Glass`, `mono-tag`). `node design-system/scripts/verify.mjs` green; new structural test `scripts/test-account-claim.mjs` (44 assertions) green via a real red→green TDD cycle.
+  - Wiring stays out of scope by design: the redeem side is tb-WF-14, the mint side is tb-WF-13.
