@@ -1,8 +1,8 @@
 ---
 title: Web fallback setup — Vercel env vars + Realtime contract
 status: living
-last-updated: 2026-05-14
-related: tb-15, adr-0003
+last-updated: 2026-05-21
+related: tb-15, tb-WF-10, adr-0003, adr-0013, adr-0014
 ---
 
 # Web fallback — setup notes
@@ -65,11 +65,45 @@ Per [[adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] §"Web fallback v
 
 The web build pulls `design-system/code/tokens.css` directly via `app/layout.tsx`, so token mutations flow into the web surface without a code change.
 
+## v1.1 quiz port (tb-WF-10)
+
+The web quiz was brought to v1.1 parity in tb-WF-10. Two implementation
+notes for future readers:
+
+- **The vote wire shape is the shared `votes-wire.ts` leaf module.** Per
+  [[adr/0014-web-consumes-shared-votes-wire|ADR 0014]], `web/lib/quiz.ts`
+  no longer hand-mirrors the `{ meta, answer }` envelope — it imports
+  `supabase/functions/_shared/votes-wire.ts` directly. That is the *only*
+  sanctioned cross-sibling import; do not generalise it.
+- **The factorial / classifier / fetch planner are re-implemented in
+  `web/lib/candidate-fetch.ts`, not imported.** There is a server-side
+  TypeScript port of the venue classifier (`_shared/venue-classifier.ts`)
+  and preference function (`_shared/preference-function.ts`), but those
+  import engine code (`verdict-engine.ts`) and so are *not* leaf modules
+  — importing them would drag the whole verdict engine into the web
+  bundle. ADR 0014's leaf-module rule and ADR 0003's "web re-implements
+  the spec" rule both point the same way: `candidate-fetch.ts` is a
+  faithful, separately-tested port of the iOS `Q5VenueClassifier` /
+  `Q5FactorialCardGenerator` / `FoursquareFetchPlanner`, with the
+  classifier thresholds kept byte-identical so the web and server
+  classify the same venue the same way.
+- **Web has no MapKit fallback (ADR 0002).** A thin / failed / thrown
+  `places-proxy` call degrades straight to the Q5 `no-results` screen —
+  there is no second data source. The web client never renders a
+  fictitious venue ([[adr/0013-no-fictitious-fallback-venues|ADR 0013]]).
+
 ## Testing
 
 `web/` runs vitest as `npm test`:
 
-- `lib/quiz.test.ts` — quiz state-machine helpers (toggleVeto, wire-shape).
+- `lib/quiz.test.ts` — v1.1 quiz state helpers (cuisine toggle + cap,
+  generic-slot wire-shape).
+- `lib/candidate-fetch.test.ts` — the N+1 fetch planner, the venue
+  classifier, the strict-factorial card generator, and the end-to-end
+  per-member fetch (incl. the no-results honest-degradation paths).
+- `lib/web-vote-round.test.ts` — integration: a full web quiz round
+  builds a `votes` row carrying the kinds + answer shapes
+  `compute-verdict` dispatches on.
 - `lib/verdict.test.ts` — verdict shaping (action, metaLine, audienceCopy, survivingHardNeeds, shapeVerdictView).
 - `lib/mixed-platform.test.ts` — TB-15 integration AC: a 4-person room with one web + three iOS members shapes the identical verdict view.
 - `components/*.test.tsx` — surface-level smoke for each screen (InviteWebCard, QuizScreens, WaitingScreen, VerdictReadOnly).

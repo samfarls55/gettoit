@@ -1,116 +1,165 @@
-// GetToIt web — quiz helper unit tests.
+// GetToIt web — v1.1 quiz helper unit tests (tb-WF-10).
 
 import { describe, expect, it } from "vitest";
 
 import {
   BUDGET_TIERS,
-  DUMMY_CANDIDATES,
-  VETO_NOTHING,
-  VETO_OPTIONS,
-  VIBE_LABELS,
-  WALK_STOPS,
   buildVoteRow,
-  seedRegret,
-  toggleVeto,
+  CUISINE_CAP,
+  CUISINE_OPTIONS,
+  hasFreeCuisineSlot,
+  REPUTATION_NO_PREFERENCE,
+  REPUTATION_OPTIONS,
+  toggleCuisine,
+  toggleCuisineNoPreference,
+  VIBE_LABELS,
+  type CuisineSelection,
 } from "./quiz";
 
-describe("toggleVeto", () => {
-  it("adds a chip that isn't selected", () => {
-    expect(Array.from(toggleVeto(new Set(), "gluten")).sort()).toEqual([
-      "gluten",
-    ]);
+const EMPTY: CuisineSelection = { cuisines: new Set(), noPreference: false };
+
+describe("toggleCuisine", () => {
+  it("adds a cuisine that isn't selected", () => {
+    const next = toggleCuisine(EMPTY, "mexican");
+    expect(Array.from(next.cuisines)).toEqual(["mexican"]);
+    expect(next.noPreference).toBe(false);
   });
 
-  it("removes a chip that's already selected", () => {
-    expect(toggleVeto(new Set(["gluten"]), "gluten")).toEqual(new Set());
-  });
-
-  it("clears other chips when 'nothing_tonight' is selected", () => {
-    expect(
-      toggleVeto(new Set(["gluten", "dairy"]), VETO_NOTHING),
-    ).toEqual(new Set([VETO_NOTHING]));
-  });
-
-  it("clears 'nothing_tonight' when another chip is selected", () => {
-    expect(toggleVeto(new Set([VETO_NOTHING]), "gluten")).toEqual(
-      new Set(["gluten"]),
+  it("removes a cuisine that's already selected", () => {
+    const next = toggleCuisine(
+      { cuisines: new Set(["mexican"]), noPreference: false },
+      "mexican",
     );
+    expect(next.cuisines.size).toBe(0);
   });
 
-  it("toggling 'nothing_tonight' off empties the set", () => {
-    expect(toggleVeto(new Set([VETO_NOTHING]), VETO_NOTHING)).toEqual(
-      new Set(),
+  it("clears the No-preference flag when a cuisine is selected", () => {
+    const next = toggleCuisine(
+      { cuisines: new Set(), noPreference: true },
+      "thai",
     );
+    expect(next.noPreference).toBe(false);
+    expect(Array.from(next.cuisines)).toEqual(["thai"]);
+  });
+
+  it("caps selection at 3 — a 4th pick is a no-op", () => {
+    const three: CuisineSelection = {
+      cuisines: new Set(["mexican", "thai", "italian"]),
+      noPreference: false,
+    };
+    const next = toggleCuisine(three, "japanese");
+    expect(next).toBe(three); // unchanged
+    expect(next.cuisines.size).toBe(CUISINE_CAP);
+  });
+
+  it("deselecting always works even at the cap", () => {
+    const three: CuisineSelection = {
+      cuisines: new Set(["mexican", "thai", "italian"]),
+      noPreference: false,
+    };
+    const next = toggleCuisine(three, "thai");
+    expect(next.cuisines.size).toBe(2);
   });
 });
 
-describe("seedRegret", () => {
-  it("seeds every candidate at the spec midpoint (3)", () => {
-    expect(seedRegret(DUMMY_CANDIDATES)).toEqual({
-      "dummy-pico": 3,
-      "dummy-ren": 3,
-      "dummy-pastoral": 3,
+describe("toggleCuisineNoPreference", () => {
+  it("selecting No preference clears every cuisine", () => {
+    const next = toggleCuisineNoPreference({
+      cuisines: new Set(["mexican", "thai"]),
+      noPreference: false,
     });
+    expect(next.noPreference).toBe(true);
+    expect(next.cuisines.size).toBe(0);
+  });
+
+  it("re-tapping No preference clears it", () => {
+    const next = toggleCuisineNoPreference({
+      cuisines: new Set(),
+      noPreference: true,
+    });
+    expect(next.noPreference).toBe(false);
+  });
+});
+
+describe("hasFreeCuisineSlot", () => {
+  it("is false once the 3-cap is reached", () => {
+    expect(
+      hasFreeCuisineSlot({
+        cuisines: new Set(["mexican", "thai", "italian"]),
+        noPreference: false,
+      }),
+    ).toBe(false);
+  });
+  it("is true below the cap", () => {
+    expect(hasFreeCuisineSlot(EMPTY)).toBe(true);
   });
 });
 
 describe("buildVoteRow", () => {
-  it("emits the wire shape the votes table expects", () => {
+  it("emits the generic q1..q5 jsonb slots, not the v1 typed columns", () => {
     const row = buildVoteRow({
       roomId: "00000000-0000-0000-0000-000000000aaa",
       userId: "00000000-0000-0000-0000-000000000bbb",
-      q1Vetoes: new Set(["dairy", "gluten"]),
-      q2Budget: 2,
-      q3WalkMinutes: 15,
-      q4Vibe: 3,
-      q5Regret: { "dummy-pico": 5 },
+      cuisines: new Set(["thai", "mexican"]),
+      noPreference: false,
+      budget: 2,
+      reputation: "popular",
+      vibe: 3,
+      q5Ratings: [
+        { droppedAxis: "cuisine", score: 5 },
+        { droppedAxis: "reputation", score: 2 },
+        { droppedAxis: "vibe", score: 4 },
+      ],
     });
-    expect(row).toEqual({
-      room_id: "00000000-0000-0000-0000-000000000aaa",
-      user_id: "00000000-0000-0000-0000-000000000bbb",
-      q1_vetoes: ["dairy", "gluten"],
-      q2_budget: 2,
-      q3_walk_minutes: 15,
-      q4_vibe: 3,
-      q5_regret: { "dummy-pico": 5 },
-    });
+    expect(row.room_id).toBe("00000000-0000-0000-0000-000000000aaa");
+    expect(row.user_id).toBe("00000000-0000-0000-0000-000000000bbb");
+    // Generic envelope shape — no q1_vetoes / q3_walk_minutes columns.
+    expect(row.q1.meta.question_kind).toBe("cuisine_craving");
+    expect(row.q1.answer.cuisines).toEqual(["mexican", "thai"]); // sorted
+    expect(row.q2.meta.question_kind).toBe("budget_cap");
+    expect(row.q2.answer.tier).toBe(2);
+    expect(row.q3.meta.question_kind).toBe("reputation");
+    expect(row.q3.answer.reputation).toBe("popular");
+    expect(row.q4.meta.question_kind).toBe("vibe");
+    expect(row.q4.answer.level).toBe(3);
+    expect(row.q5.meta.question_kind).toBe("regret");
+    expect(row.q5.answer.ratings).toHaveLength(3);
+    // No retired v1 columns leak onto the row.
+    expect((row as Record<string, unknown>).q1_vetoes).toBeUndefined();
+    expect((row as Record<string, unknown>).q3_walk_minutes).toBeUndefined();
   });
 
-  it("sorts vetoes deterministically", () => {
+  it("writes an empty cuisine set when No preference is chosen", () => {
     const row = buildVoteRow({
-      roomId: "00000000-0000-0000-0000-000000000aaa",
-      userId: "00000000-0000-0000-0000-000000000bbb",
-      q1Vetoes: new Set(["shellfish", "dairy", "gluten"]),
-      q2Budget: 1,
-      q3WalkMinutes: 10,
-      q4Vibe: 2,
-      q5Regret: {},
+      roomId: "r",
+      userId: "u",
+      cuisines: new Set(["thai"]),
+      noPreference: true,
+      budget: 4,
+      reputation: REPUTATION_NO_PREFERENCE,
+      vibe: 2,
+      q5Ratings: [],
     });
-    expect(row.q1_vetoes).toEqual(["dairy", "gluten", "shellfish"]);
+    expect(row.q1.answer.cuisines).toEqual([]);
   });
 });
 
 describe("schema invariants", () => {
-  it("has the canonical 5 vibe labels", () => {
-    expect(VIBE_LABELS).toEqual([
-      "HUSHED",
-      "MELLOW",
-      "BUZZY",
-      "LOUD",
-      "ROWDY",
-    ]);
+  it("uses the v1.1 vibe vocabulary, not the retired v1 labels", () => {
+    expect(VIBE_LABELS).toEqual(["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"]);
   });
 
-  it("has the canonical 6 veto options", () => {
-    expect(VETO_OPTIONS).toHaveLength(6);
-    expect(VETO_OPTIONS.map((v) => v.id)).toContain(VETO_NOTHING);
+  it("has the canonical 8 cuisine options", () => {
+    expect(CUISINE_OPTIONS).toHaveLength(8);
+    expect(CUISINE_OPTIONS.map((c) => c.id)).toContain("mexican");
+  });
+
+  it("has the canonical 5 reputation chips including No preference", () => {
+    expect(REPUTATION_OPTIONS).toHaveLength(5);
+    expect(REPUTATION_OPTIONS.map((r) => r.id)).toContain(REPUTATION_NO_PREFERENCE);
   });
 
   it("has the canonical 4 budget tiers", () => {
     expect(BUDGET_TIERS.map((t) => t.tier)).toEqual([1, 2, 3, 4]);
-  });
-
-  it("has the canonical 5 walk stops matching the migration check constraint", () => {
-    expect(WALK_STOPS).toEqual([5, 10, 15, 20, 30]);
   });
 });

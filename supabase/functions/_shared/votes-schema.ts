@@ -40,78 +40,45 @@
 // inputs — `hard_vetoes` + a per-candidate `scores` map.
 
 import type { HardVeto, MemberVote } from "./verdict-engine.ts";
-import type { Axis, Q5MemberProfile, Q5Rating } from "./preference-function.ts";
+import type { Q5MemberProfile } from "./preference-function.ts";
+// ADR 0014 — the vote WIRE CONTRACT (the `{ meta, answer }` envelope,
+// the question-kind taxonomy, and the legacy-answers builder) lives in
+// the leaf module `votes-wire.ts`, imported here AND by the web app so
+// there is exactly one definition. `votes-schema.ts` carries only the
+// engine-facing READ layer (the mapping into `MemberVote` /
+// `MemberPreferenceInputs`), which imports engine code and is therefore
+// not web-portable.
+import {
+  buildVotesSlotsFromLegacyAnswers,
+  QUESTION_KINDS,
+} from "./votes-wire.ts";
+import type {
+  Axis,
+  LegacyTypedAnswers,
+  Q5Rating,
+  QuestionKind,
+  QuestionMeta,
+  QuestionSlot,
+  VotesSlotInsert,
+} from "./votes-wire.ts";
 
-// ───────────────────────────────────────────────────────────────────────
-// Question-kind taxonomy
-// ───────────────────────────────────────────────────────────────────────
-//
-// The kinds the verdict engine + the quiz currently write. Each maps to
-// the `MemberVote` field(s) it contributes:
-//
-//   * dietary_veto    — Q1-era dietary chips → `q1_vetoes` (hard veto).
-//   * budget_cap      — Q2 spend cap → `q2_budget` (hard veto).
-//   * cuisine_craving — Q1 (v1.1) cuisine craving. A soft preference
-//                       scored by `prefFn`, NOT a hard veto — it
-//                       contributes nothing to the EBA prune. The
-//                       member-local `prefFn`/`scores` carry it.
-//   * reputation      — Q3 (v1.1) reputation/discovery. Soft, same.
-//   * walk_minutes    — legacy Q3. Retired from the v1.1 quiz (moved to
-//                       the parameters bucket) but kept in the taxonomy
-//                       so a legacy vote row still maps without a throw.
-//   * vibe            — Q4 vibe energy. Soft, scored by `prefFn`.
-//   * regret          — Q5 preference probe. The `answer.scores` map is
-//                       the member's per-candidate cached score, which
-//                       the engine reads directly as the satisficing /
-//                       maximin score.
-//   * profile_veto    — TB-12 profile allergies / dietary restrictions /
-//                       cuisine NEVERS. Feeds the engine's generic
-//                       `hard_vetoes` channel. Not written by the quiz
-//                       (profile data is sticky, set on the account);
-//                       the kind exists so a profile slot maps cleanly
-//                       once TB-12 wires the seeding path.
-
-export const QUESTION_KINDS = [
-  "dietary_veto",
-  "budget_cap",
-  "cuisine_craving",
-  "reputation",
-  "walk_minutes",
-  "vibe",
-  "regret",
-  "profile_veto",
-] as const;
-
-export type QuestionKind = typeof QUESTION_KINDS[number];
+// Re-export the wire types so existing engine-side consumers
+// (`compute-verdict`, the test suites) keep importing them from
+// `votes-schema.ts` unchanged — the move into `votes-wire.ts` is
+// transparent to every reader of the schema module.
+export {
+  buildVotesSlotsFromLegacyAnswers,
+  QUESTION_KINDS,
+};
+export type {
+  LegacyTypedAnswers,
+  QuestionKind,
+  QuestionMeta,
+  QuestionSlot,
+  VotesSlotInsert,
+};
 
 const QUESTION_KIND_SET: ReadonlySet<string> = new Set(QUESTION_KINDS);
-
-// ───────────────────────────────────────────────────────────────────────
-// Slot shape — the `{ meta, answer }` jsonb envelope
-// ───────────────────────────────────────────────────────────────────────
-
-/** Per-session question metadata. `question_kind` is required and
- *  load-bearing; everything else is descriptive and never read by the
- *  mapper (kept for audit / replay of what the member actually saw). */
-export interface QuestionMeta {
-  /** The discriminator the mapping layer dispatches on. */
-  question_kind: QuestionKind;
-  /** The prompt string the session displayed. Optional, not read. */
-  prompt?: string;
-  /** The option labels the session offered. Optional, not read. */
-  options?: string[];
-  /** Free-form per-session metadata — anything a later slice wants to
-   *  stamp onto the slot without a migration. Never read by the mapper. */
-  [extra: string]: unknown;
-}
-
-/** One quiz answer as stored in a generic jsonb slot. */
-export interface QuestionSlot {
-  meta: QuestionMeta;
-  /** The response payload. Shape depends on `meta.question_kind` —
-   *  see the per-kind `answer` readers below. */
-  answer: Record<string, unknown>;
-}
 
 /** A `votes` table row as read from Postgres. The five slots are
  *  nullable: a slot is `null` when the session did not ask that
@@ -310,94 +277,12 @@ export function mapVotesRowToMemberVote(row: VotesRow): MemberVote {
 // Inverse — build the jsonb row a write path inserts
 // ───────────────────────────────────────────────────────────────────────
 //
-// The current iOS quiz still produces typed answers per question. Until
-// every write path emits the generic envelope natively, this helper
-// wraps the typed answers in the `{ meta, answer }` slot shape, so the
-// existing quiz keeps writing — and the engine keeps reading —
-// end-to-end.
-
-export interface LegacyTypedAnswers {
-  /** Q1-era dietary veto chips. */
-  q1_vetoes: string[];
-  /** Q2 spend cap tier. */
-  q2_budget: number;
-  /** Q1 (v1.1) craved cuisine tokens. Soft preference. */
-  cuisines?: string[];
-  /** Q3 (v1.1) reputation chip. Soft preference. */
-  reputation?: string;
-  /** Q4 vibe energy index 0..4. Soft preference. */
-  q4_vibe?: number;
-  /** Q5 factorial preference probe — one `{ droppedAxis, score }` entry
-   *  per factorial card (cuisine-drop / reputation-drop / vibe-drop).
-   *  TB-24: the canonical v1.1 probe shape, replacing the pre-TB-23
-   *  per-venue `q5_scores` score map. `compute-verdict` reads this via
-   *  `mapVotesRowToPreferenceInputs` to re-weight each member's
-   *  preference function. */
-  q5_ratings: Q5Rating[];
-}
-
-/** The five generic slots, ready to insert into `votes.q1`..`q5`. */
-export interface VotesSlotInsert {
-  q1: QuestionSlot;
-  q2: QuestionSlot;
-  q3: QuestionSlot;
-  q4: QuestionSlot;
-  q5: QuestionSlot;
-}
-
-/** Wrap typed quiz answers in the generic `{ meta, answer }` envelopes.
- *  Q1 carries the v1.1 `cuisine_craving` kind; Q3 carries `reputation`.
- *  The `meta.prompt` strings are illustrative session copy — carried
- *  for audit, never read by the mapper.
- *
- *  TB-24: the Q5 `regret` slot emits `answer.ratings` — the canonical
- *  v1.1 factorial probe shape `[{ droppedAxis, score }]` that
- *  `mapVotesRowToPreferenceInputs` / `readQ5Ratings` consume. The
- *  pre-TB-23 per-venue `answer.scores` map is NOT emitted: tb-23 moved
- *  verdict scoring server-side and the Q5 ratings are now the
- *  preference *probe*, not the candidate scores, so a parallel
- *  `answer.scores` would be a dead second shape on the slot. */
-export function buildVotesSlotsFromLegacyAnswers(
-  answers: LegacyTypedAnswers,
-): VotesSlotInsert {
-  return {
-    q1: {
-      meta: {
-        question_kind: "cuisine_craving",
-        prompt: "What are you craving tonight?",
-      },
-      answer: { cuisines: answers.cuisines ?? [] },
-    },
-    q2: {
-      meta: {
-        question_kind: "budget_cap",
-        prompt: "Where's the ceiling tonight?",
-      },
-      answer: { tier: answers.q2_budget },
-    },
-    q3: {
-      meta: {
-        question_kind: "reputation",
-        prompt: "What kind of place are you after?",
-      },
-      answer: { reputation: answers.reputation ?? "no_preference" },
-    },
-    q4: {
-      meta: {
-        question_kind: "vibe",
-        prompt: "What's the energy you're after?",
-      },
-      answer: { level: answers.q4_vibe ?? 2 },
-    },
-    q5: {
-      meta: {
-        question_kind: "regret",
-        prompt: "How excited does each of these make you?",
-      },
-      answer: { ratings: answers.q5_ratings },
-    },
-  };
-}
+// `buildVotesSlotsFromLegacyAnswers` (and `LegacyTypedAnswers` /
+// `VotesSlotInsert`) wrap the quiz's typed answers in the generic
+// `{ meta, answer }` slot shape. ADR 0014 moved them into the leaf
+// module `votes-wire.ts` so the web app and the edge functions build
+// the slot shape from one source; they are re-exported above so this
+// module's existing importers are unaffected.
 
 // ───────────────────────────────────────────────────────────────────────
 // TB-23 — preference-input extraction (the prefFn build path)

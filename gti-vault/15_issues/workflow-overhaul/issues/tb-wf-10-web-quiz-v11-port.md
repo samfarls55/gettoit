@@ -1,7 +1,7 @@
 ---
 issue: tb-WF-10
 title: Web quiz v1.1 port + shared votes-wire extraction
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 190
@@ -61,3 +61,37 @@ Porting the real per-member Foursquare fetch to web introduces FSQ Premium-bille
 ## Blocked by
 
 None — can start now. Delivery pair with [[sg-wf-5-web-invitee-flow|sg-WF-5]]; the `votes-wire.ts` extracted here is the contract the sg-WF-5 shell-wiring tracer-bullet consumes.
+
+## Comments
+
+**Done 2026-05-21 — merged (PR #201).** Both parts landed.
+
+*Part 1.* `supabase/functions/_shared/votes-wire.ts` is the new leaf
+module — it carries the `Axis` / `Q5Rating` types (defined inline, not
+imported, so it stays relative-import-free per ADR 0014), the
+question-kind taxonomy, the `{ meta, answer }` slot types, and
+`buildVotesSlotsFromLegacyAnswers`. `votes-schema.ts` and
+`preference-function.ts` re-import + re-export it, so every existing
+edge-function importer is unaffected; all 372 `deno test` cases pass.
+
+*Part 2.* The web quiz is at v1.1 parity: `web/lib/quiz.ts`'s
+hand-mirror is gone, replaced by v1.1 scenario-question constants + a
+`buildVoteRow` that writes the generic `q1`..`q5` jsonb slots via the
+shared builder. `web/lib/candidate-fetch.ts` is a faithful TypeScript
+port of the iOS per-member fetch stack (planner, classifier, strict
+factorial); the new `QuizScreens` render Q1 cuisine craving, Q3
+reputation, and the Q5 factorial probe with its `no-results`
+honest-degradation mode. `SessionRoom` fires the per-member
+`places-proxy` fetch whenever Q5 becomes the active step (so a resume
+into Q5 re-fires it), persists the raw union into `member_fetches`, and
+writes the generic-slot `votes` row. `DUMMY_CANDIDATES` is deleted. Web
+CI lane green (`npm test` — 78 tests, `npm run build`).
+
+**Adjacency flagged (not fixed — out of scope).** The web verdict-READ
+path (`web/lib/verdict.ts` `VoteSummaryRow` + `SessionRoom`'s verdict
+load) still references the retired v1 typed `votes` columns
+(`q1_vetoes` / `q2_budget` / `q3_walk_minutes` / …), which the generic-
+jsonb migration dropped. tb-WF-10 is the quiz WRITE path; the read-path
+receipts should move to the `verdict_for_room` RPC projection (the
+server already projects the generic slots back to the legacy receipt
+shape there). Worth a follow-up issue.

@@ -174,11 +174,15 @@ export function QuestionHeader({
 export function Chip({
   label,
   selected,
+  disabled,
   onClick,
   style,
 }: {
   label: string;
   selected?: boolean;
+  /** C-04 `disabled` row — dimmed, non-interactive. Q1 uses it once the
+   *  cuisine 3-cap is reached (an unselected chip becomes disabled). */
+  disabled?: boolean;
   onClick?: () => void;
   style?: CSSProperties;
 }) {
@@ -189,7 +193,7 @@ export function Chip({
     fontWeight: 700,
     padding: "14px 22px",
     borderRadius: 999,
-    cursor: "pointer",
+    cursor: disabled ? "not-allowed" : "pointer",
     transition: "all 180ms var(--ease-out)",
     minHeight: 48,
     display: "inline-flex",
@@ -197,6 +201,27 @@ export function Chip({
     gap: 8,
     ...style,
   };
+  // C-04 `disabled` — the unselected chip dimmed to 0.4 white text on
+  // the soft fill. A selected chip is never disabled (it must stay
+  // tappable to deselect), so this branch only ever runs unselected.
+  if (disabled && !selected) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled
+        aria-pressed="false"
+        style={{
+          ...base,
+          background: "rgba(255,255,255,0.04)",
+          color: "rgba(255,255,255,0.4)",
+          border: "1.5px solid rgba(255,255,255,0.23)",
+        }}
+      >
+        {label}
+      </button>
+    );
+  }
   if (selected) {
     return (
       <button
