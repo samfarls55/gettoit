@@ -65,15 +65,18 @@ public final class AuthCoordinator {
     private let client: SupabaseClient
     private let linker: any SupabaseAuthLinker
     private let deleter: any SupabaseAccountDeleter
+    private let claimRedeemer: any ClaimCodeRedeemer
 
     public init(
         client: SupabaseClient,
         linker: (any SupabaseAuthLinker)? = nil,
-        deleter: (any SupabaseAccountDeleter)? = nil
+        deleter: (any SupabaseAccountDeleter)? = nil,
+        claimRedeemer: (any ClaimCodeRedeemer)? = nil
     ) {
         self.client = client
         self.linker = linker ?? LiveSupabaseAuthLinker(client: client)
         self.deleter = deleter ?? LiveSupabaseAccountDeleter(client: client)
+        self.claimRedeemer = claimRedeemer ?? LiveClaimCodeRedeemer(client: client)
     }
 
     /// Sign the device in as a fresh anonymous identity. Subsequent
@@ -175,6 +178,68 @@ public final class AuthCoordinator {
 
     public enum SignInError: Error, Equatable {
         case haveAnonymousSession
+    }
+
+    /// tb-WF-14 / ADR 0015 — redeem a web-invitee claim code on S00a.
+    ///
+    /// A Web invitee who voted in the browser and then installed the
+    /// app types the claim code minted by the web "Getting the app?"
+    /// affordance into the S00a "Voted on the web?" field. Redeeming it
+    /// carries the browser's anonymous Supabase session into the app
+    /// keychain — so the subsequent Sign-in-with-Apple tap routes
+    /// through `linkApple` (preserving the carried `user_id`) instead
+    /// of minting a fresh, disjoint identity.
+    ///
+    /// The `ClaimCodeRedeemer` seam does the two-step work: invoke the
+    /// `redeem-claim-code` Edge Function, then install the returned
+    /// anonymous session into the keychain. On success the coordinator
+    /// transitions to `.anonymous(carriedUserID)` — exactly the
+    /// legacy-anonymous state the S00a gate already handles, and from
+    /// which the Apple tap dispatches to `linkApple`.
+    ///
+    /// Claimable only from the fresh-install gate. The claim is a
+    /// before-sign-in affordance (ADR 0015 §Decision "before-sign-in
+    /// only"); there is no in-app, post-sign-in claim. If a session
+    /// already exists — `.anonymous` (nothing to claim onto) or
+    /// `.linkedApple` (already signed in) — the redeem is rejected with
+    /// `ClaimError.notClaimable` and no Edge Function call is made.
+    ///
+    /// Failure modes:
+    ///   * Already signed in / has a session → throws
+    ///     `ClaimError.notClaimable`; state unchanged; redeemer not
+    ///     invoked.
+    ///   * Bad / expired / used / mistyped code, or a transport / server
+    ///     failure → the redeemer throws `ClaimCodeRedeemError`; it is
+    ///     rethrown unchanged and the coordinator stays `.idle` so S00a
+    ///     can show a retryable inline error. Nothing is installed,
+    ///     nothing is destroyed.
+    @discardableResult
+    public func redeemClaimCode(_ code: String) async throws -> UUID {
+        // The claim is fresh-install-only. A coordinator that already
+        // holds an identity (anonymous or linked) has nothing to claim
+        // onto — redeeming would either be a no-op or a silent identity
+        // swap. Refuse loudly before any network call.
+        guard case .idle = state else {
+            throw ClaimError.notClaimable
+        }
+
+        // The redeemer invokes the Edge Function and installs the
+        // carried anonymous session into the keychain. A failure is
+        // rethrown unchanged; the coordinator stays `.idle` so the S00a
+        // code-entry state survives for a retry.
+        let carriedID = try await claimRedeemer.redeem(code: code)
+
+        // The carried web identity is now resident in the keychain and
+        // is anonymous (it has not linked Apple). Surface `.anonymous`
+        // so S00a re-renders and the Apple tap becomes `linkApple`.
+        self.state = .anonymous(userID: carriedID)
+        return carriedID
+    }
+
+    public enum ClaimError: Error, Equatable {
+        /// A claim code can only be redeemed from the fresh-install
+        /// S00a gate (`.idle`). A session already exists.
+        case notClaimable
     }
 
     /// Link the current anonymous identity to a Sign-in-with-Apple

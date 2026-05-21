@@ -386,13 +386,14 @@ jobs:
         # set here. We push the Foursquare key before the deploy so the
         # function is live and configured in one CI run.
         #
-        # tb-WF-13 — CLAIM_CODE_ENC_KEY (the AES-GCM key the
-        # mint-claim-code function encrypts the web refresh token under)
-        # is pushed here too WHEN PRESENT. Unlike FOURSQUARE_API_KEY a
-        # missing CLAIM_CODE_ENC_KEY does not fail the lane — it is a
-        # new secret; the function still deploys and returns
-        # `mint_claim_code_misconfigured` until the repo secret is
-        # added. Generate a key with:
+        # tb-WF-13 / tb-WF-14 — CLAIM_CODE_ENC_KEY (the AES-GCM key the
+        # mint-claim-code function encrypts the web refresh token under
+        # and the redeem-claim-code function decrypts it with) is pushed
+        # here too WHEN PRESENT. Unlike FOURSQUARE_API_KEY a missing
+        # CLAIM_CODE_ENC_KEY does not fail the lane — it is a new secret;
+        # both functions still deploy and return
+        # `mint_claim_code_misconfigured` / `redeem_claim_code_misconfigured`
+        # until the repo secret is added. Generate a key with:
         #   `openssl rand -base64 32`
         if: steps.gate.outputs.skip == 'false'
         run: |
@@ -410,8 +411,9 @@ jobs:
               --project-ref "$SUPABASE_PROJECT_REF" \
               CLAIM_CODE_ENC_KEY="$CLAIM_CODE_ENC_KEY"
           else
-            echo "CLAIM_CODE_ENC_KEY secret is not set — mint-claim-code will" >&2
-            echo "return mint_claim_code_misconfigured until it is added." >&2
+            echo "CLAIM_CODE_ENC_KEY secret is not set — mint-claim-code and" >&2
+            echo "redeem-claim-code will return *_misconfigured until it is" >&2
+            echo "added." >&2
           fi
       - name: supabase functions deploy (places-proxy + companions)
         # Deploy every Edge Function in supabase/functions/. `_shared`
@@ -423,7 +425,7 @@ jobs:
           set -euo pipefail
           supabase functions deploy places-proxy \
             --project-ref "$SUPABASE_PROJECT_REF"
-          for fn in apns-sender compute-verdict delete-user mint-claim-code; do
+          for fn in apns-sender compute-verdict delete-user mint-claim-code redeem-claim-code; do
             echo "Deploying $fn"
             supabase functions deploy "$fn" \
               --project-ref "$SUPABASE_PROJECT_REF"
