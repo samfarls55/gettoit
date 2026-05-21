@@ -1,6 +1,6 @@
 ---
 run: 2026-05-21-1812
-status: running
+status: done
 ---
 
 # AFK Execution Run — 2026-05-21-1812
@@ -33,7 +33,7 @@ Concurrency cap: 2 (default).
 | tb-WF-11 | #192 | merged | afk/tb-WF-11 | [#203](https://github.com/samfarls55/gettoit/pull/203) | wave 2; invitee shell foundation + members.display_name |
 | tb-WF-12 | #193 | merged | afk/tb-WF-12 | [#204](https://github.com/samfarls55/gettoit/pull/204) | wave 3; invitee shell re-click behaviors; ADR 0017 |
 | tb-WF-13 | #195 | merged | afk/tb-WF-13 | [#205](https://github.com/samfarls55/gettoit/pull/205) | wave 4; claim-code mint side; needs CLAIM_CODE_ENC_KEY secret (HITL) |
-| tb-WF-14 | #196 | building | afk/tb-WF-14 | — | wave 5; unblocked by tb-WF-13 — final issue |
+| tb-WF-14 | #196 | merged | afk/tb-WF-14 | [#206](https://github.com/samfarls55/gettoit/pull/206) | wave 5; claim-code redeem side + S00a entry; final issue |
 
 ## Event log
 - 18:12 — Preflight: tree was dirty (in-progress vault triage); user authorised
@@ -59,3 +59,32 @@ Concurrency cap: 2 (default).
 - 20:26 — Force-removed the crashed worktree + deleted the stale afk/tb-WF-13 branch to free the name. Re-dispatching tb-WF-13 fresh from current main (173a42a).
 - 20:47 — tb-WF-13 (retry) MERGED via PR #205 (squash 986fca4). 8/9 done. HITL follow-up: a `CLAIM_CODE_ENC_KEY` GitHub repo secret must be added (`openssl rand -base64 32`) — until then the live `mint-claim-code` function returns `mint_claim_code_misconfigured`. Surfaced to user at close-out.
 - 20:47 — Re-scan: tb-WF-14 ready — the final issue, 0 waiting. Dispatching tb-WF-14 (#196).
+- 21:10 — tb-WF-14 MERGED via PR #206 (squash 2033ba1). 9/9 done. Subagent needed one CI iteration (S00a affordance state lifted to an `@Observable` model to be unit-testable). Orchestrator fixed a tracker-sync gap: the subagent's close-out commit added the closing note + `_index.md` row but left the vault `status:` at `ready-for-agent` — corrected to `done`.
+- 21:10 — Final re-scan from /workspace: 0 ready, 0 waiting, 0 excluded. Work set fully drained. Run complete.
+
+## Close-out
+
+**Result: 9/9 AFK issues merged. 0 escalated, 0 failed, 0 stranded.**
+
+Completed (issue — PR):
+- bug-11 — [#198](https://github.com/samfarls55/gettoit/pull/198) — iOS fixture factories moved off the app target + hygiene guard
+- sg-WF-5 — [#199](https://github.com/samfarls55/gettoit/pull/199) — Web-01 invitee shell surface doc
+- sg-WF-8 — [#200](https://github.com/samfarls55/gettoit/pull/200) — S00a account-claim design-system amendment
+- sg-WF-6 — [#201](https://github.com/samfarls55/gettoit/pull/201) — reroll-window deadline mechanism + ADR 0016
+- tb-WF-10 — [#202](https://github.com/samfarls55/gettoit/pull/202) — web quiz v1.1 port + votes-wire leaf module
+- tb-WF-11 — [#203](https://github.com/samfarls55/gettoit/pull/203) — web invitee shell foundation + members.display_name
+- tb-WF-12 — [#204](https://github.com/samfarls55/gettoit/pull/204) — web invitee shell re-click behaviors + ADR 0017
+- tb-WF-13 — [#205](https://github.com/samfarls55/gettoit/pull/205) — claim-code mint side
+- tb-WF-14 — [#206](https://github.com/samfarls55/gettoit/pull/206) — claim-code redeem side
+
+Skipped / excluded: none. No HITL-blocked issues; no needs-info issues.
+
+Incidents:
+- tb-WF-13's first subagent crashed on a transient API socket error before pushing anything; cleaned up and re-dispatched fresh — second attempt merged cleanly.
+
+### Follow-ups for the human (action required / suggested)
+
+1. **[ACTION REQUIRED] Add the `CLAIM_CODE_ENC_KEY` GitHub repo secret** (`openssl rand -base64 32`). Until set, the live `mint-claim-code` and `redeem-claim-code` Edge Functions return `*_misconfigured` — the web-invitee account-claim bridge is non-functional in production without it. A missing key is only a CI *warning*, so this will not surface as a failed check.
+2. **[SUGGESTED] File a follow-up issue: web verdict-read path on retired vote columns.** `web/lib/verdict.ts` (`VoteSummaryRow`) + `SessionRoom`'s verdict load still reference the v1 typed `votes` columns dropped by the generic-jsonb migration; receipts should move to the `verdict_for_room` RPC projection. Flagged by tb-WF-10.
+3. **[SUGGESTED] Fix the `tsc --noEmit` type error** at `web/lib/quiz.test.ts:128-129` (left by tb-WF-10). Not CI-gated — the web lane runs only `npm test` + `npm run build`. Flagged by tb-WF-11.
+4. **[SUGGESTED] Retire dead code `web/components/InviteWebCard.tsx`** — referenced only by its own test. Flagged by tb-WF-12.
