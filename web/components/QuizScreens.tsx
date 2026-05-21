@@ -63,18 +63,22 @@ export function QuizQ1Cuisine({
   onToggleCuisine,
   onToggleNoPreference,
   onAdvance,
+  onLeave,
 }: {
   selection: CuisineSelection;
   onToggleCuisine: (id: string) => void;
   onToggleNoPreference: () => void;
   onAdvance: () => void;
+  /** tb-WF-12 (web-01 §E) — the web invitee shell's quiz-chrome Leave
+   *  affordance. Renders the chrome `Leave` control when provided. */
+  onLeave?: () => void;
 }) {
   const atCap = !hasFreeCuisineSlot(selection);
   return (
     <GradientSurface stop="q1">
       <div style={canvasWrap}>
         <div style={contentWrap}>
-          <TopBar step={1} total={5} />
+          <TopBar step={1} total={5} onLeave={onLeave} />
           <div style={{ height: 40 }} />
           <QuestionHeader
             index={1}
@@ -127,16 +131,19 @@ export function QuizQ2Budget({
   tier,
   onSelect,
   onAdvance,
+  onLeave,
 }: {
   tier: number;
   onSelect: (tier: 1 | 2 | 3 | 4) => void;
   onAdvance: () => void;
+  /** tb-WF-12 (web-01 §E) — quiz-chrome Leave affordance. */
+  onLeave?: () => void;
 }) {
   return (
     <GradientSurface stop="q2">
       <div style={canvasWrap}>
         <div style={contentWrap}>
-          <TopBar step={2} total={5} />
+          <TopBar step={2} total={5} onLeave={onLeave} />
           <div style={{ height: 40 }} />
           <QuestionHeader
             index={2}
@@ -225,16 +232,19 @@ export function QuizQ3Reputation({
   value,
   onSelect,
   onAdvance,
+  onLeave,
 }: {
   value: string;
   onSelect: (id: string) => void;
   onAdvance: () => void;
+  /** tb-WF-12 (web-01 §E) — quiz-chrome Leave affordance. */
+  onLeave?: () => void;
 }) {
   return (
     <GradientSurface stop="q3">
       <div style={canvasWrap}>
         <div style={contentWrap}>
-          <TopBar step={3} total={5} />
+          <TopBar step={3} total={5} onLeave={onLeave} />
           <div style={{ height: 40 }} />
           <QuestionHeader
             index={3}
@@ -276,17 +286,20 @@ export function QuizQ4Vibe({
   value,
   onSelect,
   onAdvance,
+  onLeave,
 }: {
   value: number;
   onSelect: (index: number) => void;
   onAdvance: () => void;
+  /** tb-WF-12 (web-01 §E) — quiz-chrome Leave affordance. */
+  onLeave?: () => void;
 }) {
   const word = VIBE_LABELS[value] ?? VIBE_LABELS[0];
   return (
     <GradientSurface stop="q4">
       <div style={canvasWrap}>
         <div style={contentWrap}>
-          <TopBar step={4} total={5} />
+          <TopBar step={4} total={5} onLeave={onLeave} />
           <div style={{ height: 40 }} />
           <QuestionHeader
             index={4}
@@ -405,6 +418,7 @@ export function QuizQ5({
   onRate,
   onSubmit,
   submitting,
+  onLeave,
 }: {
   state: Q5State;
   candidates: ReadonlyArray<QuizCandidate>;
@@ -412,12 +426,14 @@ export function QuizQ5({
   onRate: (candidateId: string, score: number) => void;
   onSubmit: () => void;
   submitting?: boolean;
+  /** tb-WF-12 (web-01 §E) — quiz-chrome Leave affordance. */
+  onLeave?: () => void;
 }) {
   return (
     <GradientSurface stop="q5">
       <div style={canvasWrap}>
         <div style={contentWrap}>
-          <TopBar step={5} total={5} />
+          <TopBar step={5} total={5} onLeave={onLeave} />
           <div style={{ height: 40 }} />
           {state === "loading" ? (
             <Q5Loading />

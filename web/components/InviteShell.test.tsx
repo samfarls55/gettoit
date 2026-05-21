@@ -31,9 +31,18 @@ vi.mock("../lib/supabase", () => ({
 
 const findMembership = vi.fn();
 const createMembership = vi.fn();
+// tb-WF-12 — the re-click helpers the shell now calls once a membership
+// resolves. The first-landing path (no `members` row) never reaches
+// them; the "already a member" path routes through `readRoomPlanState`.
+const readRoomPlanState = vi.fn();
+const readQuizProgress = vi.fn();
+const leaveMembership = vi.fn();
 vi.mock("../lib/invitee-shell", () => ({
   findMembership: (...args: unknown[]) => findMembership(...args),
   createMembership: (...args: unknown[]) => createMembership(...args),
+  readRoomPlanState: (...args: unknown[]) => readRoomPlanState(...args),
+  readQuizProgress: (...args: unknown[]) => readQuizProgress(...args),
+  leaveMembership: (...args: unknown[]) => leaveMembership(...args),
 }));
 
 import { InviteShell } from "./InviteShell";
@@ -45,6 +54,11 @@ beforeEach(() => {
   getSupabaseClient.mockReset().mockReturnValue({});
   findMembership.mockReset();
   createMembership.mockReset().mockResolvedValue(undefined);
+  // Default the re-click reads to the still-open / fresh-quiz path so
+  // the first-landing tests are unaffected by the new routing.
+  readRoomPlanState.mockReset().mockResolvedValue({ kind: "open" });
+  readQuizProgress.mockReset().mockResolvedValue({ lastIndex: 1 });
+  leaveMembership.mockReset().mockResolvedValue(undefined);
 });
 
 describe("InviteShell — first landing", () => {

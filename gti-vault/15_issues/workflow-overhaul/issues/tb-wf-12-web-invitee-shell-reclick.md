@@ -1,7 +1,7 @@
 ---
 issue: tb-WF-12
 title: Web invitee shell re-click behaviors — resume, read-only, leave
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 193
@@ -40,12 +40,20 @@ This slice adds **no new schema and no new server code** — every server-side p
 
 ## Acceptance criteria
 
-- [ ] Re-clicking the link mid-quiz resumes at the last-answered question with prior answers intact; a post-submit re-click routes to Waiting; a post-verdict re-click routes to Verdict.
-- [ ] Re-clicking a decided Plan shows the read-only verdict card; an unresolved membership shows the "this plan is closed" terminal.
-- [ ] The quiz-chrome `Leave` affordance drops the `members` row after the confirm step and shows the "you left this plan" terminal; a subsequent re-click is a fresh first-landing.
-- [ ] No new migration and no new edge-function code are introduced.
-- [ ] Web CI lane (`npm test`, `npm run build`, `npm run lint`) is green.
+- [x] Re-clicking the link mid-quiz resumes at the last-answered question with prior answers intact; a post-submit re-click routes to Waiting; a post-verdict re-click routes to Verdict.
+- [x] Re-clicking a decided Plan shows the read-only verdict card; an unresolved membership shows the "this plan is closed" terminal.
+- [x] The quiz-chrome `Leave` affordance drops the `members` row after the confirm step and shows the "you left this plan" terminal; a subsequent re-click is a fresh first-landing.
+- [x] No new migration and no new edge-function code are introduced.
+- [x] Web CI lane (`npm test`, `npm run build`) is green. (`npm run lint` is not a configured CI gate — the `web` lane in `ci.yml` runs `npm ci` + `npm test` + `npm run build` only; `next lint` has no eslint config and prompts interactively.)
 
 ## Blocked by
 
 - [[tb-wf-11-web-invitee-shell-foundation|tb-WF-11]] — the shell scaffold + member-creating first landing this builds on.
+
+## Comments
+
+**2026-05-21 — done (PR #205).** Landed the four re-click behaviors on the tb-WF-11 foundation. New web files: `lib/quiz-progress.ts` (the `members.quiz_progress` pack/unpack contract), `components/InviteShellSurfaces.tsx` (the §C verdict card, §D closed terminal, §E left terminal + leave-confirm sheet). Extended `lib/invitee-shell.ts` (`readQuizProgress`, `writeQuizProgress`, `readRoomPlanState`, `leaveMembership`), `InviteShell` (re-click boot routing + §C Realtime live-update), `SessionRoom` (resume hydration from `quiz_progress`, progress writes on advance, the leave flow), and the `TopBar` / Q1–Q5 chrome (the `Leave` affordance). No new migration, no new edge-function code — reuses `members.quiz_progress` + `members_progress_upsert`, `plans_decided_for_user` / `plans_history_for_user`, and `members_delete_self`.
+
+Key autonomous call: `rooms` carries a membership-gated SELECT policy, so the shell cannot tell a genuine first-timer apart from a TTL-purged member / stranger on a *decided* Plan without new server code. Per the surface doc §B single-path lock, a no-membership click routes to §A name entry; §D ("this plan is closed") is reached when a membership resolves at boot but the room read inside `readRoomPlanState` comes back empty — the membership aged out mid-session. Documented in [[../../../60_engineering/adr/0017-web-invitee-reclick-rls-routing|ADR 0017]].
+
+Adjacency noted, not actioned (out of #193 scope): `web/components/InviteWebCard.tsx` is referenced only by its own test — genuinely dead since tb-WF-11 retired the `ScreenInviteWeb` web port path. A separate cleanup issue should retire it. The `/s/[sessionId]` route is **not** dead — it still hosts `SessionRoom`.

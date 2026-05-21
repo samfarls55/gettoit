@@ -73,10 +73,17 @@ export function TopBar({
   step = 0,
   total = 5,
   onClose,
+  onLeave,
 }: {
   step?: number;
   total?: number;
   onClose?: () => void;
+  /** tb-WF-12 (web-01 §E) — when provided, the chrome renders a `Leave`
+   *  affordance in the trailing slot. The web invitee shell passes it
+   *  on the Q1–Q5 quiz chrome so a Web invitee can leave an in-flight
+   *  quiz; off the chrome (Waiting, Verdict) it is omitted. The joiner
+   *  role label is `Leave`, not `Exit` (S03 §"Role-conditional labels"). */
+  onLeave?: () => void;
 }) {
   return (
     <div
@@ -124,6 +131,30 @@ export function TopBar({
           />
         ))}
       </div>
+      {onLeave ? (
+        <button
+          type="button"
+          onClick={onLeave}
+          style={{
+            appearance: "none",
+            border: 0,
+            background: "transparent",
+            color: "var(--paper)",
+            padding: 4,
+            cursor: "pointer",
+            fontFamily: "var(--ff-body)",
+            fontWeight: 700,
+            fontSize: "var(--fz-eyebrow)",
+            letterSpacing: "var(--tr-eyebrow)",
+            textTransform: "uppercase",
+            lineHeight: 1,
+            opacity: 0.85,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Leave
+        </button>
+      ) : null}
     </div>
   );
 }

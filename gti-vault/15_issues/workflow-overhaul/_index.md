@@ -50,7 +50,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | tb-WF-9 | [[issues/tb-wf-9-plan-list-destructive-actions\|iOS Plan list — Three-dot menu + delete + leave]] | AFK | [#178](https://github.com/samfarls55/gettoit/issues/178) | done 2026-05-20 |
 | tb-WF-10 | [[issues/tb-wf-10-web-quiz-v11-port\|Web quiz v1.1 port + shared votes-wire extraction]] | AFK | [#190](https://github.com/samfarls55/gettoit/issues/190) | done 2026-05-21 |
 | tb-WF-11 | [[issues/tb-wf-11-web-invitee-shell-foundation\|Web invitee shell foundation — landing, name entry, members.display_name]] | AFK | [#192](https://github.com/samfarls55/gettoit/issues/192) | done 2026-05-21 |
-| tb-WF-12 | [[issues/tb-wf-12-web-invitee-shell-reclick\|Web invitee shell re-click behaviors — resume, read-only, leave]] | AFK | [#193](https://github.com/samfarls55/gettoit/issues/193) | tb-WF-11 |
+| tb-WF-12 | [[issues/tb-wf-12-web-invitee-shell-reclick\|Web invitee shell re-click behaviors — resume, read-only, leave]] | AFK | [#193](https://github.com/samfarls55/gettoit/issues/193) | done 2026-05-21 |
 | tb-WF-13 | [[issues/tb-wf-13-claim-code-mint\|Claim code mint side — claim_codes table + mint edge function + web affordance]] | AFK | [#195](https://github.com/samfarls55/gettoit/issues/195) | sg-WF-8, tb-WF-12 |
 | tb-WF-14 | [[issues/tb-wf-14-claim-code-redeem\|Claim code redeem side — redeem edge function + S00a code entry + linkApple]] | AFK | [#196](https://github.com/samfarls55/gettoit/issues/196) | sg-WF-8, tb-WF-13 |
 
