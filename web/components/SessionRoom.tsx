@@ -59,6 +59,7 @@ import {
 } from "../lib/verdict";
 
 import { APP_STORE_URL } from "../lib/app-store";
+import { mintClaimCode } from "../lib/claim-code";
 import { ensureAnonSession, getSupabaseClient } from "../lib/supabase";
 import { writeQuizProgress } from "../lib/invitee-shell";
 import type { QuizProgressState } from "../lib/quiz-progress";
@@ -788,6 +789,13 @@ export function SessionRoom({
             window.open(APP_STORE_URL, "_blank", "noopener,noreferrer");
           }
         }}
+        // sg-WF-8 / tb-WF-13 — the "Getting the app?" claim-code mint
+        // affordance. The web invitee on the Waiting screen has a real
+        // membership + a stable anonymous identity worth carrying over;
+        // tapping the affordance lazily mints a single-use code via the
+        // `mint-claim-code` Edge Function. `mintClaimCode` reads its own
+        // refresh token off the live session — no args needed here.
+        onMintClaimCode={() => mintClaimCode()}
       />
     );
   }

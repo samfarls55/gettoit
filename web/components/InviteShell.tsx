@@ -53,6 +53,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { ensureAnonSession, getSupabaseClient } from "../lib/supabase";
+import { mintClaimCode } from "../lib/claim-code";
 import {
   createMembership,
   findMembership,
@@ -289,11 +290,15 @@ export function InviteShell({ roomId }: { roomId: string }) {
 
   if (phase.kind === "decided") {
     // §C — read-only verdict card. Terminal-by-completion: no CTA, the
-    // exit is closing the tab.
+    // exit is closing the tab. The one install-adjacent affordance is
+    // the sg-WF-8 / tb-WF-13 "Getting the app?" claim-code mint line —
+    // a returning user reconnecting old data lands on decided rooms,
+    // which render §C, so the card must carry the mint affordance.
     return (
       <WebVerdictCard
         planName={phase.planName}
         verdictPlaceName={phase.verdictPlaceName}
+        onMintClaimCode={() => mintClaimCode()}
       />
     );
   }

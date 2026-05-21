@@ -87,4 +87,59 @@ describe("WaitingScreen", () => {
     );
     expect(screen.queryByTestId("waiting-download-dock")).toBeNull();
   });
+
+  // ── sg-WF-8 / tb-WF-13 — "Getting the app?" mint affordance ────────
+
+  it("omits the 'Getting the app?' affordance when onMintClaimCode is absent", () => {
+    render(
+      <WaitingScreen
+        members={members}
+        secondsRemaining={462}
+        isAnonymous={true}
+      />,
+    );
+    expect(screen.queryByTestId("waiting-getting-the-app-dock")).toBeNull();
+  });
+
+  it("renders the 'Getting the app?' affordance below the dock when wired", () => {
+    render(
+      <WaitingScreen
+        members={members}
+        secondsRemaining={462}
+        isAnonymous={true}
+        onMintClaimCode={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByTestId("waiting-getting-the-app-dock"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /getting the app\?/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("lazily mints the code on tap, then renders it with instructions", async () => {
+    const onMintClaimCode = vi.fn().mockResolvedValue("WAIT2345");
+    render(
+      <WaitingScreen
+        members={members}
+        secondsRemaining={462}
+        isAnonymous={true}
+        onMintClaimCode={onMintClaimCode}
+      />,
+    );
+    // Lazy — not minted on render.
+    expect(onMintClaimCode).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /getting the app\?/i }),
+    );
+    expect(onMintClaimCode).toHaveBeenCalledTimes(1);
+
+    const code = await screen.findByTestId("getting-the-app-code");
+    expect(code).toHaveTextContent("WAIT2345");
+    expect(
+      screen.getByTestId("getting-the-app-instructions"),
+    ).toHaveTextContent(/voted on the web\?/i);
+  });
 });
