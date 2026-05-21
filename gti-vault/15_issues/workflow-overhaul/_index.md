@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/workflow-overhaul
 purpose: Workflow-overhaul phase — Plans as persistent named items, list-as-landing, collapsed Setup screen, three nav verbs (Back/Exit/Delete)
-status: filed 2026-05-19; iOS tracer-bullet sequence tb-WF-1..9 all merged 2026-05-20. sg-WF-5 grilled 2026-05-21 and decomposed via /to-issues into the web invitee shell slices (tb-WF-11 → tb-WF-12) plus sibling tb-WF-10 (web quiz port) and sibling sg-WF-7 (account claim). sg-WF-7 grilled 2026-05-21 (claim-code bridge — ADR 0015 + decision doc) and decomposed via /to-issues into sg-WF-8 + tb-WF-13/14. 22 issues total (8 spec-gaps + 14 tracer-bullets); 7 web/account-claim issues open and ready-for-agent (sg-WF-5, sg-WF-8, tb-WF-10/11/12/13/14). sg-WF-6 is the only remaining HITL item pending a grill.
+status: filed 2026-05-19; iOS tracer-bullet sequence tb-WF-1..9 all merged 2026-05-20. sg-WF-5 grilled 2026-05-21 and decomposed via /to-issues into the web invitee shell slices (tb-WF-11 → tb-WF-12) plus sibling tb-WF-10 (web quiz port) and sibling sg-WF-7 (account claim). sg-WF-7 grilled 2026-05-21 (claim-code bridge — ADR 0015 + decision doc) and decomposed via /to-issues into sg-WF-8 + tb-WF-13/14. sg-WF-6 grilled 2026-05-21 (reroll-window enforcement — ADR 0016) and re-triaged to ready-for-agent/AFK. 22 issues total (8 spec-gaps + 14 tracer-bullets); 8 issues open and ready-for-agent (sg-WF-5, sg-WF-6, sg-WF-8, tb-WF-10/11/12/13/14). No HITL items remain in the phase.
 ---
 
 # 15_issues/workflow-overhaul — Index
@@ -31,7 +31,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | sg-WF-3 | [[issues/sg-wf-3-s04-timer-sweep\|S04 timer sweep — finalize removal beyond the stale marker]] | AFK | [#156](https://github.com/samfarls55/gettoit/issues/156) | done 2026-05-19 |
 | sg-WF-4 | [[issues/sg-wf-4-plan-list-surface\|Plan list surface — design-system spec + JSX]] | AFK | [#157](https://github.com/samfarls55/gettoit/issues/157) | done 2026-05-20 |
 | sg-WF-5 | [[issues/sg-wf-5-web-invitee-flow\|Web invitee single-link flow — design-system surface doc]] | AFK | [#158](https://github.com/samfarls55/gettoit/issues/158) | grilled 2026-05-21 |
-| sg-WF-6 | [[issues/sg-wf-6-reroll-window-deadline\|Reroll window deadline mechanism — needs minor grill]] | HITL | [#159](https://github.com/samfarls55/gettoit/issues/159) | — |
+| sg-WF-6 | [[issues/sg-wf-6-reroll-window-deadline\|Reroll window deadline mechanism]] | AFK | [#159](https://github.com/samfarls55/gettoit/issues/159) | grilled 2026-05-21 |
 | sg-WF-7 | [[issues/sg-wf-7-web-invitee-account-claim\|Web invitee account claim — cross-context identity bridge]] | HITL | [#191](https://github.com/samfarls55/gettoit/issues/191) | grilled 2026-05-21 — decomposed |
 | sg-WF-8 | [[issues/sg-wf-8-account-claim-design-system\|Account-claim design-system amendment — S00a + web mint affordance]] | AFK | [#194](https://github.com/samfarls55/gettoit/issues/194) | — |
 
@@ -56,7 +56,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 
 ### Dependency notes
 
-- **sg-WF-6** remains HITL — pending a follow-up grill. **sg-WF-7** was grilled 2026-05-21 (claim-code bridge — see the web invitee flow note below); sg-WF-5 was also grilled 2026-05-21.
+- **sg-WF-6** was grilled 2026-05-21 (reroll-window enforcement — [[../../60_engineering/adr/0016-plan-reroll-window-enforcement|ADR 0016]]) and re-triaged to `ready-for-agent` / AFK. **sg-WF-7** was grilled 2026-05-21 (claim-code bridge — see the web invitee flow note below); sg-WF-5 was also grilled 2026-05-21.
 - **tb-WF-2** consumes sg-WF-2 (Quiz Back+Exit chrome spec) — done.
 - **tb-WF-3** consumes sg-WF-3 (S04 timer sweep spec) — done.
 - **tb-WF-4** consumed sg-WF-1 (Setup spec) + tb-WF-1 (Plans table). Amended 2026-05-20 to fold in the Q7 lift-out (solo/group mode-conditional rendering, 5/6 controls); merged 2026-05-20. The retired `InitiatorScreen.swift` + `ParametersScreen.swift` (and their tests) are deleted; the design-system JSX for the superseded surfaces stays in the tree as spec history. `Save for later` lands on S00 Landing until tb-WF-5 wires the iOS Plan list.
@@ -76,13 +76,13 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 - **tb-WF-13** consumes sg-WF-8 + tb-WF-12 — the mint side: a `claim_codes` table + migration (service-role-only RLS, holds the encrypted refresh token), the `mint-claim-code` edge function, and the web "Getting the app?" affordance wiring. The web layer attaches to the v1.1 web surfaces tb-WF-12 builds.
 - **tb-WF-14** consumes sg-WF-8 + tb-WF-13 — the redeem side: the `redeem-claim-code` edge function, S00a code entry, and iOS redeem → keychain → the existing `linkApple` path. The Apple round-trip itself is TestFlight-verified, not CI.
 
-sg-WF-6 (reroll-window deadline) is now the only remaining HITL issue in the phase.
+With sg-WF-6 grilled, no HITL issues remain in the phase.
 
 **Web invitee flow (grilled 2026-05-21).** The sg-WF-5 follow-up `/grill-with-docs` round locked the web invitee single-link flow — outcomes in [[../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]], with the cross-sibling vote-contract import recorded in [[../../60_engineering/adr/0014-web-consumes-shared-votes-wire|ADR 0014]]. `/to-issues` decomposed it into the surface-doc spec-gap (sg-WF-5) plus two shell-wiring tracer-bullets (tb-WF-11 → tb-WF-12), with a sibling quiz-port tracer-bullet (tb-WF-10) and a sibling HITL account-claim issue (sg-WF-7). sg-WF-5 + tb-WF-10/11/12 are all `ready-for-agent`.
 
 **Web invitee account claim (grilled 2026-05-21).** The sg-WF-7 follow-up `/grill-with-docs` round locked the cross-context identity bridge — outcomes in [[../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]], architecture in [[../../60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]]. A single-use claim code carries the browser anonymous session into the freshly-installed app *before* Apple sign-in, so the existing S00a `linkApple` path upgrades it (zero row migration). Same-device + before-sign-in only; after-sign-in recovery deferred to a future feature. Next step: `/to-issues` decomposition into a sg → tb pair (the web-side build slice sequences after tb-WF-11 / tb-WF-12).
 
-The remaining HITL item — sg-WF-6 (reroll-window deadline) — needs a follow-up `/grill-with-docs` round before it can be promoted to `ready-for-agent`.
+**Reroll window deadline (grilled 2026-05-21).** The sg-WF-6 `/grill-with-docs` round resolved the enforcement *how* — outcomes in [[../../60_engineering/adr/0016-plan-reroll-window-enforcement|ADR 0016]] and the [[../../50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] §Q9 amendment. The deadline anchors to the Plan's search-area timezone; `apply_reroll` gains a time-exact server guard; client reflection is fetch-on-appear; the tb-WF-8 three-way close (cron / 3rd burn / check-in) is ratified unchanged. sg-WF-6 re-triaged to `ready-for-agent` / AFK — its scope is the deadline-formula + guard migration, the iOS fetch-on-appear tap path, and the additive S07 amendment. With this, no HITL items remain in the phase.
 
 ## Schema cleanup follow-ups
 

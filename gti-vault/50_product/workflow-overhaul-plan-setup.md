@@ -137,6 +137,13 @@ Full def in `[[../../CONTEXT|CONTEXT.md]] → Plan reroll window`.
 
 **Rejected:** end of same calendar day (punishingly short for late-night verdicts), rolling 24h (cuts at unintuitive times), meal-occasion-based (couples reroll to a parameter that should be orthogonal), until-commit (abandoned Plans sit in `decided-active` forever).
 
+> **Amendment 2026-05-21** (from the sg-WF-6 `/grill-with-docs` session — enforcement *how*, recorded in [[../60_engineering/adr/0016-plan-reroll-window-enforcement|ADR 0016]]):
+> - **Timezone anchor.** The "user's local timezone" is the Plan's **search-area** timezone — `plans.location.timeZoneIdentifier`, resolved by the C-23 LocationPicker — NOT the creator's device timezone (which is never stored). `reroll_window_closes_at` is computed once at the `pending → decided-active` transition and stored as a fixed `timestamptz`.
+> - **Server-authoritative close.** `apply_reroll` rejects a reroll when the linked Plan is `decided-expired`, or `decided-active` with `reroll_window_closes_at <= now()` — time-exact, so the per-minute close cron's ~60s lag never admits a stale reroll.
+> - **Three-way close ratified as built.** The tb-WF-8 mechanism stands unchanged: per-minute `cron_expire_reroll_windows`, the 3rd-burn `rerolls` trigger, and the `check_ins` trigger (any member, any outcome — harmless because a check-in lands 12–24h post-verdict, after the meal).
+> - **Client reflection: fetch-on-appear.** iOS does not subscribe `plans` to Realtime and does not poll it. The Decided-card tap path resolves the Plan's current `status` at tap time so an expired Plan routes to the read-only verdict screen.
+> - The additive `design-system/surfaces/07-reroll.md` amendment is sg-WF-6 AFK-implementation scope.
+
 ### Q10 — Validation
 **Locked:** name required for both CTAs, rest defaults.
 
