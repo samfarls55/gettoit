@@ -28,8 +28,8 @@ Concurrency cap: 2 (default).
 | bug-11   | #140 | merged | afk/bug-11   | [#198](https://github.com/samfarls55/gettoit/pull/198) | wave 1; iOS fixture factories moved to test target + hygiene guard |
 | sg-WF-5  | #158 | merged | afk/sg-WF-5  | [#199](https://github.com/samfarls55/gettoit/pull/199) | wave 1; Web-01 invitee shell surface doc; unblocked tb-WF-11 |
 | sg-WF-6  | #159 | building | afk/sg-WF-6  | — | wave 1; grilled 2026-05-21, ADR 0016 |
-| sg-WF-8  | #194 | building | afk/sg-WF-8  | — | wave 1; unblocks tb-WF-13, tb-WF-14 |
-| tb-WF-10 | #190 | queued | afk/tb-WF-10 | — | wave 1 |
+| sg-WF-8  | #194 | merged | afk/sg-WF-8  | [#200](https://github.com/samfarls55/gettoit/pull/200) | wave 1; S00a + web mint affordance; unblocks tb-WF-13, tb-WF-14 |
+| tb-WF-10 | #190 | building | afk/tb-WF-10 | — | wave 1 |
 | tb-WF-11 | #192 | waiting | afk/tb-WF-11 | — | blocked by sg-WF-5 |
 | tb-WF-12 | #193 | waiting | afk/tb-WF-12 | — | blocked by tb-WF-11 |
 | tb-WF-13 | #195 | waiting | afk/tb-WF-13 | — | blocked by sg-WF-8, tb-WF-12 |
@@ -45,3 +45,5 @@ Concurrency cap: 2 (default).
 - 18:25 — sg-WF-5 MERGED via PR #199 (squash 826f656). Web-01 invitee shell surface doc + 6th verify.mjs check. Unblocks tb-WF-11.
 - 18:25 — Orchestrator note: the Bash shell cwd had drifted into a subagent worktree; all orchestrator git ops now pinned with `git -C /workspace`. Subagent worktrees were correctly isolated — no cross-contamination.
 - 18:25 — Both slots free; wave 1 has 3 ready left (sg-WF-6, sg-WF-8, tb-WF-10). Dispatching sg-WF-6 (#159) + sg-WF-8 (#194); tb-WF-10 queued.
+- 18:38 — sg-WF-8 MERGED via PR #200 (squash 45db9a6). S00a account-claim surface + web mint affordance. Unblocks tb-WF-13, tb-WF-14.
+- 18:38 — Slot freed; dispatching tb-WF-10 (#190) — last wave-1 issue. sg-WF-6 still building.
