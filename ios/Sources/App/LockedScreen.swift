@@ -58,21 +58,9 @@ public struct LockedScreen: View {
             self.rerollsTotal = rerollsTotal
         }
 
-        /// JSX-fixture-shaped plate used by snapshot tests + the
-        /// design-system parity preview.
-        public static func fixture() -> Plate {
-            var dc = DateComponents()
-            dc.year = 2026; dc.month = 5; dc.day = 14
-            dc.hour = 18; dc.minute = 48; dc.second = 32
-            let date = Calendar(identifier: .gregorian).date(from: dc)!
-            return Plate(
-                placeName: "Pico's",
-                time: "7:00",
-                lockedAt: date,
-                rerollsRemaining: 2,
-                rerollsTotal: 3
-            )
-        }
+        // The `fixture()` factory was relocated to the test target
+        // (`Tests/ScreenFixtures.swift`) by bug-11 so the shipped binary
+        // carries no fictitious venue strings.
     }
 
     public enum CloseMotion: String, Sendable {
