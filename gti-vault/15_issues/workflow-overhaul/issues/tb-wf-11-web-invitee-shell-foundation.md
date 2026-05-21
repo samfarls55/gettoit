@@ -1,7 +1,7 @@
 ---
 issue: tb-WF-11
 title: Web invitee shell foundation — landing, name entry, members.display_name
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 192
@@ -53,3 +53,13 @@ The web invitee shell scaffold and the first-landing name entry, end-to-end: a c
 ## Blocked by
 
 - [[sg-wf-5-web-invitee-flow|sg-WF-5]] — the design-system surface doc this slice implements.
+
+## Comments
+
+**Done 2026-05-21** (AFK, branch `afk/tb-WF-11`). Landed the three pieces:
+
+- **Migration** `20260524000000000_members_display_name.sql` — additive nullable `members.display_name text` column, no default. NULL is the explicit "no name entered" signal the verdict fallback keys on (iOS members keep it).
+- **Server** — `compute-verdict.fetchVotes` now reads `members.display_name` for the room and resolves each member's name through the new pure `compute-verdict/member-display-name.ts` helper: joined name when set, the legacy `m<uuid>` placeholder when NULL. `votes`/`members` carry no FK, so the join is a separate read folded into a map rather than a PostgREST embed; a failed members read degrades to "all placeholders" (pre-column behavior).
+- **Web** — `/join/[roomId]` now renders the new `InviteShell` state machine (`components/InviteShell.tsx`): ensures the anon Supabase session, looks up the `members` row, and on a first landing shows the name-entry surface (`components/NameEntry.tsx`, web-01 §A) before handing into the quiz. Surface A built per the sg-WF-5 surface doc — single text input, 30-char `maxLength` cap, CTA disabled until trimmed-non-empty, `Your name` placeholder. Data layer in `lib/invitee-shell.ts`.
+
+All five acceptance criteria met; web suite (69 tests) + edge-function suite (394 tests) + `design-system/scripts/verify.mjs` all green. Adjacency flagged: `InviteWebCard` + the `/s/[roomId]` route are now unreferenced (the old invite-card flow) — left in place, candidate cleanup for tb-WF-12.

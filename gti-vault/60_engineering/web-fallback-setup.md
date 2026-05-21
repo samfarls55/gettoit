@@ -34,8 +34,8 @@ The values mirror the existing iOS-side GH-Actions secrets. The Vercel→Supabas
 ## Routes shipped
 
 - `/` — placeholder landing (TB-01).
-- `/join/[roomId]` — Universal Link landing (S02b invite card). Routes to `/s/<roomId>`.
-- `/s/[sessionId]` — live session (anon auth + quiz + waiting + read-only verdict).
+- `/join/[roomId]` — the web invitee shell (tb-WF-11). The iMessage/SMS deep link lands here; `InviteShell` ensures the anon Supabase session, and on a first landing renders the name-entry surface (`NameEntry`, web-01 §A) before handing into the quiz (`SessionRoom`). `generateMetadata` still emits the OG unfurl card. **Before tb-WF-11** this route rendered the S02b invite card (`InviteWebCard`) and routed to `/s/<roomId>`.
+- `/s/[sessionId]` — live session (anon auth + quiz + waiting + read-only verdict). **Now unreferenced** after tb-WF-11 — `/join` mounts `SessionRoom` directly. `InviteWebCard` + this route are dead code, candidate cleanup for tb-WF-12.
 - `/.well-known/apple-app-site-association` — AASA file (TB-00).
 
 ## Realtime contract
