@@ -1,7 +1,7 @@
 ---
 issue: tb-WF-14
 title: Claim code redeem side — redeem edge function + S00a code entry + linkApple
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 196
@@ -26,14 +26,18 @@ The end-to-end win: a web invitee who installs the app and claims keeps their `u
 
 ## Acceptance criteria
 
-- [ ] `redeem-claim-code` redeems a valid code once (single-use burn), rejects expired / redeemed / unknown codes, and is rate-limited.
-- [ ] S00a renders the "Voted on the web?" entry + code field per the sg-WF-8 spec.
-- [ ] Submitting a valid code installs the anonymous session in the keychain; `AuthCoordinator` reaches `.anonymous` and the Apple tap routes through `linkApple`, preserving the `user_id`.
-- [ ] A bad / expired / used / mistyped code shows a visible, retryable error; nothing is destroyed.
-- [ ] Edge-function tests cover redeem success, double-redeem rejection, expiry rejection, and rate-limiting.
-- [ ] iOS tests cover the redeem → keychain → `.anonymous` transition and the error path (the `linkApple` state-machine contract is already covered; the Apple round-trip is TestFlight-verified).
+- [x] `redeem-claim-code` redeems a valid code once (single-use burn), rejects expired / redeemed / unknown codes, and is rate-limited.
+- [x] S00a renders the "Voted on the web?" entry + code field per the sg-WF-8 spec.
+- [x] Submitting a valid code installs the anonymous session in the keychain; `AuthCoordinator` reaches `.anonymous` and the Apple tap routes through `linkApple`, preserving the `user_id`.
+- [x] A bad / expired / used / mistyped code shows a visible, retryable error; nothing is destroyed.
+- [x] Edge-function tests cover redeem success, double-redeem rejection, expiry rejection, and rate-limiting.
+- [x] iOS tests cover the redeem → keychain → `.anonymous` transition and the error path (the `linkApple` state-machine contract is already covered; the Apple round-trip is TestFlight-verified).
 
 ## Blocked by
 
 - [[sg-wf-8-account-claim-design-system|sg-WF-8]] (#194) — the S00a design-system spec.
 - [[tb-wf-13-claim-code-mint|tb-WF-13]] (#195) — the `claim_codes` table + a real minted code to redeem.
+
+## Comments
+
+- **2026-05-21 — done (PR #206).** Redeem half shipped end to end. `supabase/functions/redeem-claim-code/` — a pure handler (rate-limit, `claim_codes` lookup, single-use burn all dependency-injected) reusing the shared `_shared/claim-code.ts` crypto helper; rejects expired (410) / already-redeemed + concurrent-race (409) / unknown (404) / malformed (400) codes, and an in-memory sliding-window rate limiter (10 / IP / 10 min) guards against guessing. iOS — `ClaimCodeRedeemer` invokes the function then installs the carried session into the keychain via `auth.refreshSession(refreshToken:)`; `AuthCoordinator.redeemClaimCode` is fresh-install-gate-only and lands `.anonymous`; the S00a "Voted on the web?" affordance is pure composition of existing primitives. 32 new edge tests + iOS unit tests for the redeem state machine and the affordance. Two non-obvious calls documented in the source: the redeem function has **no caller-auth gate** (a fresh-install app has no JWT — the unguessable single-use short-TTL code plus rate limiting is the credential, per ADR 0015), and the rate limiter is **in-memory not DB-backed** (the structural defenses carry the weight; a global limiter is a clean future upgrade). One CI fix mid-run: the S00a affordance state was lifted into an `@Observable ClaimAffordanceModel` so it is unit-testable (SwiftUI `@State` value writes do not persist outside a render). Closes the account-claim bridge — its mint counterpart tb-WF-13 merged earlier the same day.

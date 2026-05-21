@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/workflow-overhaul
 purpose: Workflow-overhaul phase — Plans as persistent named items, list-as-landing, collapsed Setup screen, three nav verbs (Back/Exit/Delete)
-status: filed 2026-05-19; iOS tracer-bullet sequence tb-WF-1..9 all merged 2026-05-20. sg-WF-5 grilled 2026-05-21 and decomposed via /to-issues into the web invitee shell slices (tb-WF-11 → tb-WF-12) plus sibling tb-WF-10 (web quiz port) and sibling sg-WF-7 (account claim); sg-WF-5 surface doc done 2026-05-21. sg-WF-7 grilled 2026-05-21 (claim-code bridge — ADR 0015 + decision doc) and decomposed via /to-issues into sg-WF-8 + tb-WF-13/14. sg-WF-6 grilled 2026-05-21 (reroll-window enforcement — ADR 0016) and merged 2026-05-21 (PR #201) — reroll-window deadline + server guard done. 22 issues total (8 spec-gaps + 14 tracer-bullets); 6 issues open and ready-for-agent (sg-WF-8, tb-WF-10/11/12/13/14). No HITL items remain in the phase.
+status: filed 2026-05-19; iOS tracer-bullet sequence tb-WF-1..9 all merged 2026-05-20. sg-WF-5 grilled 2026-05-21 and decomposed via /to-issues into the web invitee shell slices (tb-WF-11 → tb-WF-12) plus sibling tb-WF-10 (web quiz port) and sibling sg-WF-7 (account claim); sg-WF-5 surface doc done 2026-05-21. sg-WF-7 grilled 2026-05-21 (claim-code bridge — ADR 0015 + decision doc) and decomposed via /to-issues into sg-WF-8 + tb-WF-13/14. sg-WF-6 grilled 2026-05-21 (reroll-window enforcement — ADR 0016) and merged 2026-05-21 (PR #201) — reroll-window deadline + server guard done. The account-claim bridge is complete: tb-WF-13 (mint, PR #205) + tb-WF-14 (redeem, PR #206) both merged 2026-05-21. 22 issues total (8 spec-gaps + 14 tracer-bullets); all decomposed issues merged — the workflow-overhaul phase issue backlog is clear. No HITL items remain in the phase.
 ---
 
 # 15_issues/workflow-overhaul — Index
@@ -52,7 +52,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | tb-WF-11 | [[issues/tb-wf-11-web-invitee-shell-foundation\|Web invitee shell foundation — landing, name entry, members.display_name]] | AFK | [#192](https://github.com/samfarls55/gettoit/issues/192) | done 2026-05-21 |
 | tb-WF-12 | [[issues/tb-wf-12-web-invitee-shell-reclick\|Web invitee shell re-click behaviors — resume, read-only, leave]] | AFK | [#193](https://github.com/samfarls55/gettoit/issues/193) | done 2026-05-21 |
 | tb-WF-13 | [[issues/tb-wf-13-claim-code-mint\|Claim code mint side — claim_codes table + mint edge function + web affordance]] | AFK | [#195](https://github.com/samfarls55/gettoit/issues/195) | done 2026-05-21 |
-| tb-WF-14 | [[issues/tb-wf-14-claim-code-redeem\|Claim code redeem side — redeem edge function + S00a code entry + linkApple]] | AFK | [#196](https://github.com/samfarls55/gettoit/issues/196) | sg-WF-8, tb-WF-13 |
+| tb-WF-14 | [[issues/tb-wf-14-claim-code-redeem\|Claim code redeem side — redeem edge function + S00a code entry + linkApple]] | AFK | [#196](https://github.com/samfarls55/gettoit/issues/196) | done 2026-05-21 |
 
 ### Dependency notes
 
