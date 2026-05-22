@@ -1,11 +1,13 @@
-// GetToIt web — VerdictReadOnly render test.
+// GetToIt web — VerdictReadOnly render test (web-01 §C).
 //
-// Proves the read-only verdict surface matches the iOS shape for the
-// same backing data (TB-15 AC: "the web verdict renders the same
-// content as the iOS verdict"). The shaping is unit-tested in
-// `lib/verdict.test.ts`; this test is the surface-level smoke.
+// Proves the web invitee verdict surface conforms to the locked
+// `design-system/surfaces/web-01-invitee-shell.md` §C "Read-only
+// verdict card": eyebrow, plan name, the verdict venue card, and the
+// "Getting the app?" mint line — and nothing else (bug-17). No
+// receipts, no cuts drawer, no rule text, no time badge, no primary
+// CTA.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
 import type { VerdictView } from "../lib/verdict";
@@ -14,66 +16,106 @@ import { VerdictReadOnly } from "./VerdictReadOnly";
 
 const defaultView: VerdictView = {
   mode: "default",
-  placeName: "Pico's Taqueria",
-  metaLine: "Mexican · $$ · 8 min walk",
-  timeBadge: { time: "7:00 PM", audience: "All four of you" },
-  ruleText: "Budget cap cut Ren Soba.",
-  receipts: [
-    { name: "mu1", action: "wanted lively" },
-    { name: "mu2", action: "filtered shellfish" },
-  ],
-  cuts: [{ name: "Ren Soba", reason: "over budget cap" }],
+  planName: "Friday dinner",
+  verdictPlaceName: "Pico's Taqueria",
 };
 
 const noSurvivorView: VerdictView = {
   mode: "no-survivor",
-  placeName: "No spot fits",
-  metaLine: "vegan options · 10 min walk",
-  ruleText:
-    "Vegan options left no candidates within walking distance tonight.",
+  planName: "Friday dinner",
 };
 
-describe("VerdictReadOnly — default", () => {
-  it("renders hero, meta, rule, receipts and the cuts drawer", () => {
+describe("VerdictReadOnly — default (web-01 §C)", () => {
+  it("renders the eyebrow, plan name and verdict venue card", () => {
     render(<VerdictReadOnly view={defaultView} />);
-    expect(screen.getByTestId("verdict-hero")).toHaveTextContent(
-      /pico's\s*taqueria/i,
+    expect(screen.getByText(/tonight's verdict/i)).toBeInTheDocument();
+    expect(screen.getByText("Friday dinner")).toBeInTheDocument();
+    expect(screen.getByTestId("web-verdict-venue")).toHaveTextContent(
+      "Pico's Taqueria",
     );
-    expect(screen.getByTestId("verdict-meta")).toHaveTextContent(
-      "Mexican · $$ · 8 min walk",
-    );
-    expect(screen.getByTestId("verdict-rule")).toHaveTextContent(
-      "Budget cap cut Ren Soba.",
-    );
-    expect(screen.getByTestId("verdict-receipts")).toBeInTheDocument();
-    // Receipt chips render their names.
-    expect(screen.getByText("mu1")).toBeInTheDocument();
-    expect(screen.getByText("mu2")).toBeInTheDocument();
-    // Cuts drawer is closed by default; opens on click.
-    expect(screen.queryByTestId("verdict-cuts-list")).toBeNull();
-    fireEvent.click(screen.getByTestId("verdict-cuts-open"));
-    expect(screen.getByTestId("verdict-cuts-list")).toBeInTheDocument();
-    expect(screen.getByText("Ren Soba")).toBeInTheDocument();
   });
 
-  it("has no ratification / reroll / check-in affordance per TB-15 read-only rule", () => {
+  it("renders on the verdict gradient stop", () => {
     render(<VerdictReadOnly view={defaultView} />);
-    // The iOS surface offers "I'm in" (committed) — we never render that copy.
-    expect(screen.queryByText(/I'm in/i)).toBeNull();
-    expect(screen.queryByText(/widen radius/i)).toBeNull();
-    expect(screen.queryByText(/start over/i)).toBeNull();
+    expect(
+      screen.getByTestId("gradient-surface-verdict"),
+    ).toBeInTheDocument();
+  });
+
+  it("renders no receipts, no cuts drawer, no rule text and no time badge", () => {
+    render(<VerdictReadOnly view={defaultView} />);
+    // §C — plan name + venue only. All of the TB-15-era machinery is
+    // gone.
+    expect(screen.queryByTestId("verdict-receipts")).toBeNull();
+    expect(screen.queryByTestId("verdict-cuts-open")).toBeNull();
+    expect(screen.queryByTestId("verdict-cuts-list")).toBeNull();
+    expect(screen.queryByTestId("verdict-rule")).toBeNull();
+    expect(screen.queryByText("7:00 PM")).toBeNull();
+  });
+
+  it("has no primary CTA — the card is terminal-by-completion", () => {
+    render(<VerdictReadOnly view={defaultView} />);
+    // No "Start a new decision" / ratify / reroll affordance.
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByText(/start a new decision/i)).toBeNull();
   });
 });
 
-describe("VerdictReadOnly — no-survivor", () => {
-  it("renders the no-survivor hero + rule without the time badge", () => {
+describe("VerdictReadOnly — no-survivor (web-01 §C, bug-17 minimal variant)", () => {
+  it("renders the plan name + a 'No spot fits' venue card", () => {
     render(<VerdictReadOnly view={noSurvivorView} />);
-    expect(screen.getByTestId("verdict-hero")).toHaveTextContent(/no spot/i);
-    expect(screen.getByTestId("verdict-rule")).toHaveTextContent(
-      /no candidates within walking distance/i,
+    expect(screen.getByText("Friday dinner")).toBeInTheDocument();
+    expect(screen.getByTestId("web-verdict-venue")).toHaveTextContent(
+      "No spot fits",
     );
-    expect(screen.queryByText("7:00 PM")).toBeNull();
-    expect(screen.queryByTestId("verdict-receipts")).toBeNull();
-    expect(screen.queryByTestId("verdict-cuts-open")).toBeNull();
+  });
+
+  it("renders no votes-derived meta line and no primary CTA", () => {
+    render(<VerdictReadOnly view={noSurvivorView} />);
+    expect(screen.queryByTestId("verdict-meta")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("VerdictReadOnly — 'Getting the app?' mint line", () => {
+  it("omits the mint affordance when onMintClaimCode is absent", () => {
+    render(<VerdictReadOnly view={defaultView} />);
+    expect(
+      screen.queryByTestId("web-verdict-getting-the-app"),
+    ).toBeNull();
+  });
+
+  it("renders the mint affordance on both variants when wired", () => {
+    const { rerender } = render(
+      <VerdictReadOnly view={defaultView} onMintClaimCode={vi.fn()} />,
+    );
+    expect(
+      screen.getByTestId("web-verdict-getting-the-app"),
+    ).toBeInTheDocument();
+
+    rerender(
+      <VerdictReadOnly view={noSurvivorView} onMintClaimCode={vi.fn()} />,
+    );
+    expect(
+      screen.getByTestId("web-verdict-getting-the-app"),
+    ).toBeInTheDocument();
+  });
+
+  it("mints a claim code from the verdict surface on tap", async () => {
+    const onMintClaimCode = vi.fn().mockResolvedValue("MINT2345");
+    render(
+      <VerdictReadOnly
+        view={defaultView}
+        onMintClaimCode={onMintClaimCode}
+      />,
+    );
+    // Lazy — not minted until the affordance is tapped.
+    expect(onMintClaimCode).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: /getting the app\?/i }),
+    );
+    expect(onMintClaimCode).toHaveBeenCalledTimes(1);
+    const code = await screen.findByTestId("getting-the-app-code");
+    expect(code).toHaveTextContent("MINT2345");
   });
 });

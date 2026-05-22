@@ -51,17 +51,15 @@ import {
 
 import {
   shapeVerdictView,
-  type CutRow,
   type OptionRow,
   type VerdictRow,
   type VerdictView,
-  type VoteSummaryRow,
 } from "../lib/verdict";
 
 import { APP_STORE_URL } from "../lib/app-store";
 import { mintClaimCode } from "../lib/claim-code";
 import { ensureAnonSession, getSupabaseClient } from "../lib/supabase";
-import { writeQuizProgress } from "../lib/invitee-shell";
+import { readRoomPlanState, writeQuizProgress } from "../lib/invitee-shell";
 import type { QuizProgressState } from "../lib/quiz-progress";
 
 import { LeaveConfirmSheet } from "./InviteShellSurfaces";
@@ -384,7 +382,20 @@ export function SessionRoom({
     return () => window.clearInterval(interval);
   }, [deadlineAt]);
 
-  // Fetch verdict when the room flips to verdict_ready.
+  // Fetch the verdict when the room flips to verdict_ready.
+  //
+  // bug-17 — the web invitee verdict surface conforms to the locked
+  // `web-01-invitee-shell` §C: plan name + verdict venue only. So the
+  // verdict read needs just two things — the verdict `method` (default
+  // vs `no_survivor`) and the plan name + winning venue name. It no
+  // longer loads `option_cuts` or `votes`: §C carries no receipts and
+  // no per-axis cuts.
+  //
+  // `plans` carries a creator-only SELECT policy, so a web invitee
+  // cannot read `plans.name` directly. `readRoomPlanState` resolves the
+  // plan name + verdict place name through the joiner-readable
+  // `plans_decided_for_user` / `plans_history_for_user` RPCs — the same
+  // path the `/join/<roomId>` shell uses for its §C decided card.
   useEffect(() => {
     if (
       roomStatus !== "verdict_ready" &&
@@ -392,73 +403,62 @@ export function SessionRoom({
     ) {
       return;
     }
+    if (!userId) return;
     let cancelled = false;
     async function loadVerdict() {
       try {
         const client = getSupabaseClient();
-        const { data: verdictRows } = await client
-          .from("verdicts")
-          .select("id, room_id, option_id, computed_at, method, rule_text")
-          .eq("room_id", roomId)
-          .limit(1);
+        const [{ data: verdictRows }, planState] = await Promise.all([
+          client
+            .from("verdicts")
+            .select("id, room_id, option_id, computed_at, method, rule_text")
+            .eq("room_id", roomId)
+            .limit(1),
+          readRoomPlanState(client, roomId, userId as string),
+        ]);
         const verdict = (verdictRows as VerdictRow[] | null)?.[0];
         if (!verdict) return;
 
-        if (verdict.method === "no_survivor") {
-          if (cancelled) return;
-          const view = shapeVerdictView({
-            verdict,
-            winningOption: null,
-            cuts: [],
-            cutOptions: {},
-            votes: [],
-            memberCount: members.length,
-          });
-          if (view) setPhase({ kind: "verdict", view });
-          return;
-        }
+        // The joiner RPC inlines the plan name + the winning venue
+        // name. A room with no linked Plan (a pre-workflow-overhaul
+        // leftover) resolves `open` — fall back to an empty plan name;
+        // §C still renders a venue-only card.
+        const planName =
+          planState.kind === "decided" ? planState.planName : "";
+        let verdictPlaceName =
+          planState.kind === "decided" ? planState.verdictPlaceName : "";
 
-        const [
-          { data: optionRows },
-          { data: cutRows },
-        ] = await Promise.all([
-          client
+        // Default-mode fallback: when the RPC carried no venue name
+        // (an unlinked room), read the winning `options` row directly
+        // — `options` is web-member-readable (`options_select_room_members`).
+        if (
+          verdict.method !== "no_survivor" &&
+          !verdictPlaceName &&
+          verdict.option_id
+        ) {
+          const { data: optionRows } = await client
             .from("options")
             .select("id, payload")
-            .eq("id", verdict.option_id ?? "")
-            .limit(1),
-          client
-            .from("option_cuts")
-            .select("verdict_id, option_id, cut_reason, cut_text")
-            .eq("verdict_id", verdict.id),
-        ]);
-
-        const winningOption = (optionRows as OptionRow[] | null)?.[0] ?? null;
-        const cuts = (cutRows as CutRow[] | null) ?? [];
-
-        const cutOptionIds = cuts.map((c) => c.option_id);
-        const cutOptionsMap: Record<string, OptionRow> = {};
-        if (cutOptionIds.length > 0) {
-          const { data: cutOptionRows } = await client
-            .from("options")
-            .select("id, payload")
-            .in("id", cutOptionIds);
-          for (const row of (cutOptionRows as OptionRow[] | null) ?? []) {
-            cutOptionsMap[row.id] = row;
-          }
+            .eq("id", verdict.option_id)
+            .limit(1);
+          const winning = (optionRows as OptionRow[] | null)?.[0];
+          verdictPlaceName = winning?.payload.name ?? "";
         }
 
         if (cancelled) return;
         const view = shapeVerdictView({
           verdict,
-          winningOption,
-          cuts,
-          cutOptions: cutOptionsMap,
-          // The receipt list is shaped from `members`; the verdict-engine
-          // mapping layer owns vote interpretation. tb-WF-10 leaves the
-          // read-side receipts as-is — see the issue's Adjacencies.
-          votes: [] as VoteSummaryRow[],
-          memberCount: members.length,
+          planName,
+          // §C default-mode venue. `no_survivor` ignores this and
+          // shows the "No spot fits" card; an empty string here on a
+          // default verdict is shaped to "Unnamed".
+          winningOption:
+            verdict.method === "no_survivor"
+              ? null
+              : {
+                  id: verdict.option_id ?? "",
+                  payload: { name: verdictPlaceName },
+                },
         });
         if (view) setPhase({ kind: "verdict", view });
       } catch {
@@ -469,7 +469,7 @@ export function SessionRoom({
     return () => {
       cancelled = true;
     };
-  }, [members.length, roomId, roomStatus]);
+  }, [roomId, roomStatus, userId]);
 
   // ────────────────────────────────────────────────────────────────
   // Q5 per-member candidate fetch.
@@ -800,8 +800,18 @@ export function SessionRoom({
     );
   }
 
-  // phase.kind === "verdict"
-  return <VerdictReadOnly view={phase.view} />;
+  // phase.kind === "verdict" — the web-01 §C read-only verdict card.
+  // sg-WF-8 / tb-WF-13 — the "Getting the app?" claim-code mint line.
+  // §C requires it on the verdict card: a returning invitee of a
+  // decided Plan lands on §C, not Waiting, so a Waiting-only affordance
+  // would strand them (bug-17 grill Q3). `mintClaimCode` reads its own
+  // refresh token off the live session — no args needed here.
+  return (
+    <VerdictReadOnly
+      view={phase.view}
+      onMintClaimCode={() => mintClaimCode()}
+    />
+  );
 }
 
 /** Build a `PlacesProxyCaller` over the deployed `places-proxy` Edge
