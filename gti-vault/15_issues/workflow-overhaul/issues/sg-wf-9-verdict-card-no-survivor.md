@@ -1,7 +1,7 @@
 ---
 issue: sg-WF-9
 title: web-01-invitee-shell §C does not spec the no-survivor decided-plan case
-status: ready-for-agent
+status: done
 type: AFK
 feature: workflow-overhaul
 github_issue: 215
@@ -151,3 +151,27 @@ web code describe the same surface regardless of which merges first:
 - The §C "Live update" reroll cross-fade — a separate web-code follow-up
   ([[bug-20-web-verdict-live-update-unwired|bug-20]]).
 - Any change to §A / §B / §D / §E of `web-01-invitee-shell.md`.
+
+### Closed 2026-05-22 — done (PR #217)
+
+Amended `web-01-invitee-shell.md` §C with an explicit no-survivor variant:
+a `### No-survivor variant` subsection (a `> Spec amendment — sg-WF-9`
+callout, a layout sub-table, and register notes), a two-variant intro
+paragraph, a `"No spot fits"` copy-register entry, and a Live-update note
+for the variant. The variant keeps §C's minimal register — `verdict`
+gradient, eyebrow `"Tonight's verdict"` (unchanged — a no-survivor outcome
+*is* the verdict), plan name, and the literal `No spot fits` in the same
+single `Glass` card the venue case uses, in the venue slot. No
+votes-derived meta line, no body copy, no primary CTA; the `"Getting the
+app?"` mint line still renders below the card. Ratifies the interim
+treatment bug-17 (#207) ships in web code. No new token, no new component;
+`locked-date` unchanged (sg-WF-8 precedent — a `> Spec amendment` callout).
+
+Decisions: eyebrow stays `"Tonight's verdict"` rather than a
+variant-specific eyebrow (the issue left this as an in-register agent
+call); card copy is the literal `No spot fits`, matching bug-17 and the
+iOS S05 no-survivor screen-reader copy verbatim. TDD via a new
+`scripts/test-verdict-no-survivor.mjs` structural test (red→green,
+18/18 passing) — mirrors `test-account-claim.mjs`; `verify.mjs`'s
+web-invitee-doc check tests only fixed marker strings and cannot catch a
+missing variant. `node design-system/scripts/verify.mjs` green.

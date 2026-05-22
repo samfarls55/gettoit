@@ -34,7 +34,7 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | sg-WF-6 | [[issues/sg-wf-6-reroll-window-deadline\|Reroll window deadline mechanism]] | AFK | [#159](https://github.com/samfarls55/gettoit/issues/159) | done 2026-05-21 |
 | sg-WF-7 | [[issues/sg-wf-7-web-invitee-account-claim\|Web invitee account claim — cross-context identity bridge]] | HITL | [#191](https://github.com/samfarls55/gettoit/issues/191) | done 2026-05-22 — grilled + decomposed into sg-WF-8 + tb-WF-13/14 |
 | sg-WF-8 | [[issues/sg-wf-8-account-claim-design-system\|Account-claim design-system amendment — S00a + web mint affordance]] | AFK | [#194](https://github.com/samfarls55/gettoit/issues/194) | done 2026-05-21 |
-| sg-WF-9 | [[issues/sg-wf-9-verdict-card-no-survivor\|web-01-invitee-shell §C does not spec the no-survivor decided-plan case]] | AFK | [#215](https://github.com/samfarls55/gettoit/issues/215) | ready-for-agent 2026-05-22 |
+| sg-WF-9 | [[issues/sg-wf-9-verdict-card-no-survivor\|web-01-invitee-shell §C does not spec the no-survivor decided-plan case]] | AFK | [#215](https://github.com/samfarls55/gettoit/issues/215) | done 2026-05-22 — PR #217 |
 
 ### Tracer-bullets
 
