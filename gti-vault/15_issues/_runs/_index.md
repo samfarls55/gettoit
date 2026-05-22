@@ -15,3 +15,4 @@ Live + archived progress logs from `/execute-issues` runs. One file per run, nam
 | 2026-05-21-1812 | done | [[2026-05-21-1812-afk-execution-log]] — workflow-overhaul wave-2 + v1.1 bug-11, 9/9 AFK merged, 0 escalated (tb-WF-13 re-dispatched after an infra crash) |
 | 2026-05-22-1404 | done | [[2026-05-22-1404-afk-execution-log]] — v1.1 bug batch (bug-16/18/19), concurrency 3, 3/3 merged, 0 escalated |
 | 2026-05-22-1436 | done | [[2026-05-22-1436-afk-execution-log]] — web-01 §C verdict batch (bug-17, sg-WF-9), 2/2 merged, 0 escalated (bug-17 ios CI hung 80m — infra flake, recovered via resume subagent) |
+| 2026-05-22-1708 | done | [[2026-05-22-1708-afk-execution-log]] — v1.1 bug-20 (web verdict §C live-update re-fetch on reroll), 1/1 merged, 0 escalated |
