@@ -230,6 +230,12 @@ decision doc §Q6. A Web invitee never has a reroll affordance (reroll is
 initiator-only), so the two decided states are indistinguishable to them and
 collapse to one card.
 
+§C has two variants on one skeleton: the **default variant** (a decided Plan
+with a winning venue) specced under §"Layout" below, and the **no-survivor
+variant** (a decided Plan whose verdict is `method: no_survivor`, with no venue)
+specced under §"No-survivor variant". Both render the same wordmark → eyebrow →
+plan name → single card → mint line; only the card's contents differ.
+
 ### Layout
 
 | Element | Spec |
@@ -244,6 +250,51 @@ collapse to one card.
 chip — `votes` is ephemeral and is gone by the time a Plan is decided (decision
 doc §Q6). This card is a read, not the full S05 Verdict surface.
 
+The Layout table above is the **default variant** — a decided Plan with a
+winning venue. A decided Plan can also carry a `no_survivor` verdict, which has
+no venue for the card's venue slot; that case is the no-survivor variant below.
+
+### No-survivor variant
+
+> **Spec amendment — sg-WF-9.** Added 2026-05-22. The original §C (locked
+> 2026-05-21) specced the read-only verdict card for the venue case only. A
+> decided Plan whose verdict carries `method: no_survivor` — the engine's
+> outcome when no candidate survives the combined constraints — is a real,
+> reachable state: it has a resolving membership and a real verdict row, so
+> §B's resume routing ("Plan decided → §C") lands it on §C. This subsection
+> closes that gap. It **ratifies the interim treatment**
+> [[../../gti-vault/15_issues/v1.1/issues/bug-17-web-verdict-surface-conformance|bug-17]]
+> (#207) ships in web code, so the spec and the web code describe the same
+> surface regardless of which lands first. No new token, no new component.
+
+A decided Plan whose verdict is `method: no_survivor` renders the **same card
+in the same minimal register** — this is still a read, not the full S05 Verdict
+surface — with the venue slot replaced. The Web invitee cannot reroll or widen
+the radius (those are initiator-only), so there is no recovery affordance to
+add; the no-survivor card is read-only and terminal-by-completion exactly as
+the venue case is.
+
+| Element | Spec |
+|---|---|
+| Gradient stop | `verdict` — unchanged. A no-survivor Plan is still a decided, resolved outcome; it does not switch to the `midnight` failure register (that is §D's, for a membership that does not resolve). |
+| Eyebrow | `eyebrow` token, white 0.78, label `"Tonight's verdict"` — **unchanged from the venue case.** A no-survivor outcome *is* the verdict (the engine wrote a verdict row); the eyebrow stays past-tense-implicit and the variant needs no eyebrow of its own. This keeps §C single-eyebrow. |
+| Plan name | `gti-display` (Inter 900), 32px on web, white, `text-wrap: balance`, 1–2 lines — unchanged from the venue case. |
+| No-survivor card | the literal copy `No spot fits`, in the same single `Glass` card the venue case uses (default fill, Inter 800 / 22, white, centered, padding `20 18`) — it occupies the venue slot in place of a venue name. |
+| Vertical rhythm | wordmark → auto → eyebrow → 10 → plan name → 18 → no-survivor card → auto — identical to the venue case. |
+
+**Plan name + the `No spot fits` card only.** As in the venue case, there is
+**no votes-derived meta / hard-needs line** — the iOS S05 no-survivor mode
+surfaces the surviving hard needs (`"Vegan options · $$ cap · 15 min walk"`),
+but that line's only data source is `votes`, which is ephemeral and gone by the
+time a Plan is decided (decision doc §Q6). The far-smaller web §C card never had
+that data and does not show the line. No body copy — the `No spot fits` card
+carries the outcome, the same way the venue card carries the venue.
+
+The variant has **no primary CTA** — it inherits §C's CTA-less posture (a Web
+invitee has no reroll, no widen, no "start a new decision" path). The low-key
+`"Getting the app?"` claim-code mint line still renders below the card, exactly
+as it does on the venue case — see §"Getting the app?" below.
+
 ### Live update
 
 During `decided-active` the card **live-updates on the existing Realtime
@@ -251,6 +302,11 @@ rebroadcast** — if a reroll changes the verdict while the invitee has the card
 open, the venue name cross-fades to the new value (`all 320ms var(--ease-out)`,
 the same transition the web fallback uses for live state changes). The invitee
 takes no action — they are a read-only observer of the initiator's reroll.
+
+This applies to the no-survivor variant too: an initiator widen / reroll that
+turns a `no_survivor` verdict into a venue cross-fades the `No spot fits` card
+to the new venue name (and vice versa) on the same transition — the card's
+contents swap, the skeleton does not.
 
 ### No primary CTA
 
@@ -272,8 +328,16 @@ CTA-less base card, and it never competes with the verdict for the eye.
   that already happened).
 - **Place name** — UPPERCASE via the display treatment, the same finality
   statement S05 makes.
+- **No-survivor card `"No spot fits"`** (sg-WF-9) — flat statement of the
+  outcome, in the same register the iOS S05 no-survivor mode reads to a screen
+  reader (`"No spot fits"`). It is a finality statement, not an apology. NEVER
+  `"No results"` / `"Nothing found"` (search-engine register), NEVER
+  `"Oops, no luck"` (cute-failure register) — nothing went wrong; the engine
+  ran and the honest answer is that no spot cleared the constraints.
 - No "you missed it" / "this already happened" body copy — the past-tense
-  eyebrow carries the timing; spelling it out would read as a scold.
+  eyebrow carries the timing; spelling it out would read as a scold. The
+  no-survivor variant likewise carries **no body copy** — the `No spot fits`
+  card is the whole message.
 
 ---
 
