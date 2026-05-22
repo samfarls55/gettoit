@@ -250,7 +250,7 @@ Filed as HITL bugs at `needs-triage`:
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| bug-17 | [[issues/bug-17-web-verdict-surface-conformance\|Web verdict surface does not conform to locked web-01-invitee-shell §C]] — ready-for-agent (re-scoped 2026-05-22) | AFK | [#207](https://github.com/samfarls55/gettoit/issues/207) | — |
+| bug-17 | [[issues/bug-17-web-verdict-surface-conformance\|Web verdict surface does not conform to locked web-01-invitee-shell §C]] ✅ done (PR #219) | AFK | [#207](https://github.com/samfarls55/gettoit/issues/207) | — |
 | bug-18 | [[issues/bug-18-web-quiz-test-tsc-type-error\|tsc --noEmit type error in web/lib/quiz.test.ts is not CI-gated]] — done (PR #213) | AFK | [#208](https://github.com/samfarls55/gettoit/issues/208) | — |
 | bug-19 | [[issues/bug-19-dead-code-invitewebcard\|Retire dead code web/components/InviteWebCard.tsx]] — done (PR #212) | AFK | [#209](https://github.com/samfarls55/gettoit/issues/209) | — |
 
