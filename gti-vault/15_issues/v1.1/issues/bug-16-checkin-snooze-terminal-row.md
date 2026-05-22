@@ -1,7 +1,7 @@
 ---
 issue: bug-16
 title: Check-in "Ask me later" writes a terminal row; the real outcome can never be reported
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 197
 created: 2026-05-21
@@ -91,3 +91,30 @@ Keep the immediate `snoozed` write unchanged (it stays metric-excluded by design
 - The metric-exclusion treatment of the `snoozed` outcome.
 
 The agent has full autonomy on the exact replacement copy — maintainer reviews wording drift on the PR.
+
+### Closed 2026-05-22 — done (PR #210)
+
+Fork B shipped. The third option's machine outcome (`snoozed`) and the
+`SupabaseCheckinWriter` write path are unchanged — the `snoozed` row
+stays terminal and metric-excluded by design. Only user-facing copy
+moved:
+
+- Option label `Ask me later` -> `I'd rather not say`; sub `Not sure
+  yet` -> `We'll leave it blank`.
+- Snoozed confirmation split into its own `switch` arm (it had shared
+  the `skipped` "Ok — tomorrow." / "We'll pop back tonight…" copy, which
+  itself implied a re-ask): headline `Ok — no worries.`, body `We've
+  left this one blank — no follow-up. See you next session.`
+
+Reconciled `design-system/surfaces/08-checkin.md` (three-options
+section, copy register, coercion-defense line, edge cases), the C-18
+component spec in `components.md`, the canonical `ScreenCheckin.jsx`, and
+`gti-vault/60_engineering/checkin-telemetry.md` so the rationale matches
+the terminal-write reality. `v1-prd.md` left untouched as a frozen v1
+historical record.
+
+Added two regression-guard tests (`testThirdOptionCopyDoesNotPromiseAReAsk`,
+`testSnoozedConfirmationBodyDoesNotPromiseAReAsk`) that fail if any
+deferral-implying word ("later", "snooze", "tomorrow", "pop back", …)
+re-enters the third-option or snoozed-confirmation copy. CI `ios` lane
+green. `node design-system/scripts/verify.mjs` all six gates green.
