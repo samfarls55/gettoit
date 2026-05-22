@@ -156,7 +156,7 @@ public struct PlanDisambigSheet: View {
 
     /// C-05 ghost pill — transparent fill, 1.5pt white-0.5 stroke,
     /// 60pt tall, radius 999. Matches the existing ghost-pill register
-    /// (CheckinScreen `Ask me later` row).
+    /// (CheckinScreen `I'd rather not say` row).
     private func ghostPill(
         label: String,
         accessibilityID: String,

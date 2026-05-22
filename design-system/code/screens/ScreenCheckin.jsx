@@ -3,7 +3,11 @@
 // One tap from a lock-screen notification — three big options, no form.
 
 function ScreenCheckin({ onAdvance }) {
-  const [tap, setTap] = React.useState(null);    // 'went' | 'skipped' | 'snooze'
+  // 'went' | 'skipped' | 'snooze' — the 'snooze' id commits the
+  // `snoozed` outcome. bug-16: that write is terminal (one row per
+  // user per room), so the third option's copy no longer promises a
+  // re-ask — it reads as "didn't decide / leave it blank".
+  const [tap, setTap] = React.useState(null);
   const [why, setWhy] = React.useState(null);
 
   return (
@@ -47,9 +51,9 @@ function ScreenCheckin({ onAdvance }) {
               display: 'flex', flexDirection: 'column', gap: 10,
             }}>
               {[
-                { id: 'went',    label: 'We went',      sub: 'And it was great',    fill: 'sun'   },
-                { id: 'skipped', label: 'We skipped',   sub: 'Something came up',   fill: 'white' },
-                { id: 'snooze',  label: 'Ask me later', sub: 'Not sure yet',        fill: 'ghost' },
+                { id: 'went',    label: 'We went',            sub: 'And it was great',     fill: 'sun'   },
+                { id: 'skipped', label: 'We skipped',         sub: 'Something came up',    fill: 'white' },
+                { id: 'snooze',  label: "I'd rather not say", sub: "We'll leave it blank", fill: 'ghost' },
               ].map(o => (
                 <button key={o.id} onClick={() => setTap(o.id)} style={{
                   appearance: 'none', cursor: 'pointer', border: 0,
@@ -102,7 +106,9 @@ function ScreenCheckin({ onAdvance }) {
               animation: 'gti-fade-up 320ms var(--ease-out-soft) both',
             }}>
               <div className="gti-display" style={{ fontSize: 36, letterSpacing: '-0.02em', lineHeight: 1 }}>
-                {tap === 'went' ? '☼ Got it.' : 'Ok — tomorrow.'}
+                {tap === 'went'
+                  ? '☼ Got it.'
+                  : tap === 'skipped' ? 'Ok — tomorrow.' : 'Ok — no worries.'}
               </div>
               <p style={{
                 margin: '14px auto 0', maxWidth: 280,
@@ -110,7 +116,9 @@ function ScreenCheckin({ onAdvance }) {
               }}>
                 {tap === 'went'
                   ? "Your follow-through is the only metric that matters. We'll remember Pico's worked."
-                  : "We'll pop back tonight before your usual session window."}
+                  : tap === 'skipped'
+                    ? "We'll pop back tonight before your usual session window."
+                    : "We've left this one blank — no follow-up. See you next session."}
               </p>
             </div>
           )}

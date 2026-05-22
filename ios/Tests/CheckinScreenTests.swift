@@ -3,10 +3,11 @@
 // Same SwiftUI "smoke + spec snapshot" pattern as the other surface
 // tests. Asserts:
 //   * The three tap rows are stable & match the locked copy register.
+//   * The third row's copy does not promise a re-ask (bug-16, fork B).
 //   * The skipped path reveals the reason-chip row with the locked
 //     reason vocabulary.
 //   * The confirmation plate copy matches the locked S08 register
-//     (`"☼ Got it."` / `"Ok — tomorrow."`).
+//     (`"☼ Got it."` / `"Ok — tomorrow."` / `"Ok — no worries."`).
 //   * The reason-chip taxonomy matches the surface spec.
 //   * The view materialises under default + skipped + snoozed + went
 //     states.
@@ -80,9 +81,30 @@ final class CheckinScreenTests: XCTestCase {
         XCTAssertEqual(rows[1].outcome, .skipped)
         XCTAssertEqual(rows[1].label, "We skipped")
         XCTAssertEqual(rows[1].sub, "Something came up")
+        // bug-16 (fork B): the third option commits a terminal `snoozed`
+        // row that can never be re-answered. Its copy must NOT promise a
+        // re-ask — re-labelled to a "didn't decide / leave it blank"
+        // register, not a "snooze".
         XCTAssertEqual(rows[2].outcome, .snoozed)
-        XCTAssertEqual(rows[2].label, "Ask me later")
-        XCTAssertEqual(rows[2].sub, "Not sure yet")
+        XCTAssertEqual(rows[2].label, "I'd rather not say")
+        XCTAssertEqual(rows[2].sub, "We'll leave it blank")
+    }
+
+    func testThirdOptionCopyDoesNotPromiseAReAsk() {
+        // bug-16 — regression guard. The third option's label + sub
+        // must not imply a deferral / re-prompt the system never honors.
+        let third = CheckinScreen.optionRows[2]
+        let forbidden = ["later", "ask", "snooze", "tomorrow", "tonight", "remind"]
+        for word in forbidden {
+            XCTAssertFalse(
+                third.label.lowercased().contains(word),
+                "Third-option label must not promise a re-ask (found '\(word)')"
+            )
+            XCTAssertFalse(
+                third.sub.lowercased().contains(word),
+                "Third-option sub must not promise a re-ask (found '\(word)')"
+            )
+        }
     }
 
     func testReasonChipsMatchTheLockedTaxonomy() {
@@ -109,15 +131,28 @@ final class CheckinScreenTests: XCTestCase {
     }
 
     func testConfirmationCopyMatchesLockedRegister() {
-        // S08 §"Copy register" — `"And it was great"` / `"Something
-        // came up"`. The confirmation plate:
+        // S08 §"Copy register" — the confirmation plate:
         //   went    → `"☼ Got it."`
         //   skipped → `"Ok — tomorrow."`
-        //   snoozed → `"Ok — tomorrow."` (same — "ask later" goes
-        //             through the same "we'll pop back tonight" plate)
+        //   snoozed → `"Ok — no worries."` (bug-16, fork B — the
+        //             `snoozed` write is terminal, so the plate must
+        //             not promise a re-ask).
         XCTAssertEqual(CheckinScreen.confirmationHeadline(for: .went), "☼ Got it.")
         XCTAssertEqual(CheckinScreen.confirmationHeadline(for: .skipped), "Ok — tomorrow.")
-        XCTAssertEqual(CheckinScreen.confirmationHeadline(for: .snoozed), "Ok — tomorrow.")
+        XCTAssertEqual(CheckinScreen.confirmationHeadline(for: .snoozed), "Ok — no worries.")
+    }
+
+    func testSnoozedConfirmationBodyDoesNotPromiseAReAsk() {
+        // bug-16 — the `snoozed` outcome is a terminal `check_ins` row.
+        // The confirmation body must not tell the user we'll pop back.
+        let body = CheckinScreen.confirmationBody(for: .snoozed, placeName: "Pico's Taqueria")
+        let forbidden = ["pop back", "later", "tonight", "tomorrow", "remind", "ask again"]
+        for word in forbidden {
+            XCTAssertFalse(
+                body.lowercased().contains(word),
+                "Snoozed confirmation body must not promise a re-ask (found '\(word)')"
+            )
+        }
     }
 
     func testFooterEyebrowCopyMatchesLockedRegister() {
