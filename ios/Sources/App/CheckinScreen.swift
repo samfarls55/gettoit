@@ -4,15 +4,22 @@
 // surface feeds the north-star metric (% of verdicts followed-through).
 // Designed to be tappable in 2 seconds from a lock-screen tap:
 //
-//   * Three big rows — `We went` / `We skipped` / `Ask me later`.
+//   * Three big rows — `We went` / `We skipped` / `I'd rather not say`.
 //   * On `We skipped` → reveal a single-row chip taxonomy and a
-//     `Done` CTA. On `We went` / `Ask me later` → confirmation plate
-//     fades up immediately.
+//     `Done` CTA. On `We went` / `I'd rather not say` → confirmation
+//     plate fades up immediately.
 //   * One tap commits the outcome; the surface routes onward.
+//
+// bug-16 note: the third row commits the `snoozed` outcome (unchanged
+// machine value), but the copy no longer promises a re-ask. The
+// `check_ins` `(room_id, user_id)` PK makes any first write terminal,
+// so a "snooze" was a deferral the scheduler never honored. The row is
+// now an honest "didn't decide / leave it blank" register.
 //
 // Why this surface defends against (per `surfaces/08-checkin.md`):
 //   * Survey-induced abandonment — no multi-question form.
-//   * Coercion — snooze is first-class.
+//   * Coercion — an opt-out ("I'd rather not say") is first-class; the
+//     user is never forced into a binary.
 //   * Algorithm framing — footer eyebrow names the contract.
 //   * Notification fatigue — one tap, no follow-up nag.
 //
@@ -125,21 +132,33 @@ public struct CheckinScreen: View {
 
     /// Locked copy register from `surfaces/08-checkin.md` §"Copy
     /// register" + the canonical JSX in `ScreenCheckin.jsx`.
+    ///
+    /// bug-16 (fork B): the third row still commits the `snoozed`
+    /// outcome, but its copy no longer promises a re-ask. The
+    /// `(room_id, user_id)` PK makes the `snoozed` write terminal — the
+    /// user can never report a real outcome afterward — so "Ask me
+    /// later" was a deferral the system never honored. Re-labelled to a
+    /// "didn't decide / leave it blank" register.
     public static let optionRows: [OptionRow] = [
-        OptionRow(outcome: .went,    label: "We went",      sub: "And it was great",  fill: .sun),
-        OptionRow(outcome: .skipped, label: "We skipped",   sub: "Something came up", fill: .white),
-        OptionRow(outcome: .snoozed, label: "Ask me later", sub: "Not sure yet",      fill: .ghost),
+        OptionRow(outcome: .went,    label: "We went",            sub: "And it was great",     fill: .sun),
+        OptionRow(outcome: .skipped, label: "We skipped",         sub: "Something came up",    fill: .white),
+        OptionRow(outcome: .snoozed, label: "I'd rather not say", sub: "We'll leave it blank", fill: .ghost),
     ]
 
     public static let questionCopy = "Did you go?"
     public static let footerEyebrow = "ONE TAP, THEN WE'RE GONE FOR THE DAY."
 
-    /// `"☼ Got it."` for went; `"Ok — tomorrow."` for skipped + snoozed.
+    /// `"☼ Got it."` for went; `"Ok — tomorrow."` for skipped;
+    /// `"Ok — no worries."` for snoozed.
+    ///
+    /// bug-16: snoozed gets its own headline. The `snoozed` write is
+    /// terminal, so the plate must not echo the skipped path's
+    /// re-ask-implying "tomorrow".
     public static func confirmationHeadline(for outcome: Outcome) -> String {
         switch outcome {
         case .went:    return "☼ Got it."
         case .skipped: return "Ok — tomorrow."
-        case .snoozed: return "Ok — tomorrow."
+        case .snoozed: return "Ok — no worries."
         }
     }
 
@@ -149,8 +168,13 @@ public struct CheckinScreen: View {
             // S08 §"Copy register" — the truth-naming footer line.
             // The implicature is that the system remembers.
             return "Your follow-through is the only metric that matters. We'll remember \(placeName) worked."
-        case .skipped, .snoozed:
+        case .skipped:
             return "We'll pop back tonight before your usual session window."
+        case .snoozed:
+            // bug-16 (fork B) — the `snoozed` row is terminal and
+            // metric-excluded. Be honest: no re-prompt, this verdict is
+            // left blank.
+            return "We've left this one blank — no follow-up. See you next session."
         }
     }
 

@@ -5,7 +5,9 @@ purpose: TB-14 — Next-day check-in (S08), CheckinScheduler pg_cron, telemetry 
 
 # Check-in + telemetry — TB-14
 
-The metric loop that makes the v1 thesis observable. 12–24 hours after a verdict, every room member with a registered APNs push token receives a single push notification asking `"Did you go?"`. Tapping it opens S08 (`We went` / `We skipped` / `Ask me later`). The skip path opens a reason chip row. Responses land in `check_ins`; SQL views compute the north-star metric and two secondary metrics.
+The metric loop that makes the v1 thesis observable. 12–24 hours after a verdict, every room member with a registered APNs push token receives a single push notification asking `"Did you go?"`. Tapping it opens S08 (`We went` / `We skipped` / `I'd rather not say`). The skip path opens a reason chip row. Responses land in `check_ins`; SQL views compute the north-star metric and two secondary metrics.
+
+> The third option commits `outcome='snoozed'` — a metric-excluded, **terminal** write (`check_ins` PK is `(room_id, user_id)`; the first row wins). Despite the machine token's name it is not a deferral: bug-16 (fork B) re-labelled the option from `Ask me later` to `I'd rather not say` because the system has no re-prompt path. See [[bug-16-checkin-snooze-terminal-row]].
 
 ## Where the canonical code lives
 

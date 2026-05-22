@@ -309,7 +309,7 @@ Three large tap rows. Selecting opens a follow-up.
 |---|---|---|---|---|
 | `We went` | `var(--sun)` | `var(--ink)` | `shadow-cta-sun` | "And it was great" |
 | `We skipped` | `#FFFFFF` | `var(--ink)` | `shadow-cta-white` | "Something came up" |
-| `Ask me later` | transparent + `1.5px white 0.5` | `#FFFFFF` | none | "Not sure yet" |
+| `I'd rather not say` | transparent + `1.5px white 0.5` | `#FFFFFF` | none | "We'll leave it blank" |
 
 | Element | Spec |
 |---|---|
@@ -318,7 +318,7 @@ Three large tap rows. Selecting opens a follow-up.
 | Sub | Inter 600 / 11 / tracking 0.06 / opacity 0.7 |
 
 After `We skipped`: chip row (C-04) of reasons: `Wallet/time · Group bailed · Place was packed · Mood shifted · Other`.
-After `We went` or `Snooze`: confirmation plate with a one-liner. Always a single tap surface — never a form.
+After `We went` or `I'd rather not say`: confirmation plate with a one-liner. Always a single tap surface — never a form.
 
 ---
 
