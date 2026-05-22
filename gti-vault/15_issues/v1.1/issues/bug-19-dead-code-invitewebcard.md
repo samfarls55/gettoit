@@ -1,7 +1,7 @@
 ---
 issue: bug-19
 title: Retire dead code web/components/InviteWebCard.tsx
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 209
 created: 2026-05-21
@@ -61,11 +61,30 @@ The `InviteWebCard` web component is unreferenced production code — its sole i
 The dead component and its test are removed from the repo. The web build, lint, and test suite stay green.
 
 **Acceptance criteria:**
-- [ ] The `InviteWebCard` component file is deleted.
-- [ ] The `InviteWebCard` render-test file is deleted.
-- [ ] No importer of `InviteWebCard` remains anywhere under `web/`.
-- [ ] `npm test`, `npm run build`, and `npm run lint` in `web/` all pass.
+- [x] The `InviteWebCard` component file is deleted.
+- [x] The `InviteWebCard` render-test file is deleted.
+- [x] No importer of `InviteWebCard` remains anywhere under `web/`.
+- [x] `npm test`, `npm run build`, and `npm run lint` in `web/` all pass.
 
 **Out of scope:**
 - The `/s/[sessionId]` route — confirmed live (it hosts `SessionRoom`); do not touch it.
 - Any other web component cleanup.
+
+### Closed 2026-05-22 — done (PR #212)
+
+Deleted `web/components/InviteWebCard.tsx` and `web/components/InviteWebCard.test.tsx`.
+A repo-wide grep across `web/` confirmed the component had no importer other than
+its own render test. The component only pulled shared primitives from `./SunsetPop`
+and `next/link`, so nothing was orphaned by the deletion.
+
+Verified: `npm test` (17 files / 156 tests pass, down from 18 / 158 — exactly the
+two removed `InviteWebCard` tests) and `npm run build` (`next build` succeeds, all
+routes compile). CI `web` lane green.
+
+Note on `npm run lint`: the issue listed it as an acceptance check, but the CI
+`web` job runs only `npm ci` / `npm test` / `npm run build` — lint is not gated.
+`web/` ships no ESLint config, so `next lint` prompts interactively for setup; this
+is pre-existing on `main` and unrelated to this deletion. CI was treated as the
+source of truth.
+
+Merged via PR #212, squashed into `main` as `150ca10`.
