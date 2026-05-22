@@ -1,7 +1,7 @@
 ---
 issue: bug-20
 title: Web verdict surface does not live-update on a reroll (web-01 §C cross-fade unwired)
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 216
 created: 2026-05-22
@@ -177,3 +177,33 @@ venue name changes; the fix is solely to make the re-fetch fire.
 - The verdict read shape (plan name + venue only) — settled by bug-17.
 - The `/join/<roomId>` shell's fresh-load decided card — it fetches on mount,
   needs no live-update wiring.
+
+### Done 2026-05-22 — merged (PR #220)
+
+> *AFK execution closing note.*
+
+Fixed in `web/components/SessionRoom.tsx`. The verdict-fetch effect was keyed
+`[roomId, roomStatus, userId]`; an in-place reroll keeps `roomStatus` at
+`verdict_ready`, so the `verdict_ready` rebroadcast re-set the status to its
+current value, React bailed on the unchanged state, the effect deps did not
+change, and the card stayed frozen on the stale venue.
+
+**Fix:** added a monotonic `verdictRefetchSignal` counter. The `verdict_ready`
+broadcast handler bumps it on every rebroadcast; the `rooms` UPDATE handler also
+bumps it when the new status is still `verdict_ready` / `locked` (a reroll can
+arrive as an UPDATE that does not move the status). The counter is folded into
+the verdict-fetch effect's deps — a counter always changes, so the fetch
+re-runs on every rebroadcast. The effect's status guard is unchanged, so the
+first load still fires exactly once on the initial `verdict_ready` (the counter
+starts at 0 — no double-fetch on mount). The re-fetch flows through the existing
+`shapeVerdictView` path, so a reroll that swaps the default ↔ no-survivor
+variants updates the card across both. The venue-name cross-fade was already
+wired in `WebVerdictCard` (bug-17) and plays automatically once the rendered
+venue name changes — untouched.
+
+**Tests:** new integration test
+`web/components/SessionRoom.verdict-live-update.test.tsx` (test-first, RED → GREEN)
+covers: rebroadcast → re-fetch → updated venue; default ↔ no-survivor variant
+flips both directions; and the single-fetch-on-first-render guard. Full web
+suite (152 tests), `npm run build`, `npm run typecheck`, and
+`design-system/scripts/verify.mjs` all green.
