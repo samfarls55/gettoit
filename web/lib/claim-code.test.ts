@@ -1,16 +1,21 @@
 // Tests for the web claim-code mint client (tb-WF-13).
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 
-import { mintClaimCode, type ClaimCodeMintDeps } from "./claim-code";
+import { mintClaimCode } from "./claim-code";
 
 /** A fake Supabase client with just the surface `mintClaimCode` touches:
  *  `auth.getSession()` (for the refresh token) and
- *  `functions.invoke()` (the mint-claim-code Edge Function call). */
+ *  `functions.invoke()` (the mint-claim-code Edge Function call).
+ *
+ *  Returns the non-optional `SupabaseClient` so callers get a defined
+ *  value — `ClaimCodeMintDeps["client"]` is optional, which would force
+ *  every test to narrow before reaching into `.functions`. */
 function fakeClient(opts: {
   refreshToken?: string | null;
   invokeResult?: { data: unknown; error: unknown };
-}): ClaimCodeMintDeps["client"] {
+}): SupabaseClient {
   return {
     auth: {
       getSession: () =>
@@ -32,7 +37,7 @@ function fakeClient(opts: {
         ),
       ),
     },
-  } as unknown as ClaimCodeMintDeps["client"];
+  } as unknown as SupabaseClient;
 }
 
 describe("mintClaimCode", () => {
@@ -48,8 +53,12 @@ describe("mintClaimCode", () => {
     expect(code).toBe("WXYZ6789");
 
     // The Edge Function was invoked with the refresh token in the body.
-    const invoke = (client.functions as { invoke: ReturnType<typeof vi.fn> })
-      .invoke;
+    // `fakeClient` swaps in a `vi.fn()` for `functions.invoke`; the cast
+    // routes through `unknown` because the real `FunctionsClient` type
+    // does not overlap the mock shape.
+    const invoke = (
+      client.functions as unknown as { invoke: ReturnType<typeof vi.fn> }
+    ).invoke;
     expect(invoke).toHaveBeenCalledWith("mint-claim-code", {
       body: { refresh_token: "v1.rt_webtoken" },
     });

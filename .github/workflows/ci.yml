@@ -80,7 +80,7 @@ jobs:
         run: node design-system/scripts/verify.mjs
 
   web:
-    name: web (next build + vitest)
+    name: web (tsc + next build + vitest)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -93,6 +93,11 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      # `tsc --noEmit` over the whole web project — test files included.
+      # `next build` only type-checks files in the build graph, so type
+      # errors confined to test files (bug-18) shipped silently green
+      # before this gate.
+      - run: npm run typecheck
       - run: npm test
       - run: npm run build
 

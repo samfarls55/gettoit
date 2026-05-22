@@ -124,9 +124,12 @@ describe("buildVoteRow", () => {
     expect(row.q4.answer.level).toBe(3);
     expect(row.q5.meta.question_kind).toBe("regret");
     expect(row.q5.answer.ratings).toHaveLength(3);
-    // No retired v1 columns leak onto the row.
-    expect((row as Record<string, unknown>).q1_vetoes).toBeUndefined();
-    expect((row as Record<string, unknown>).q3_walk_minutes).toBeUndefined();
+    // No retired v1 columns leak onto the row. `VoteRow` has no index
+    // signature, so the cast routes through `unknown` to probe for
+    // off-type keys without TypeScript rejecting it as a non-overlap.
+    const rowKeys = row as unknown as Record<string, unknown>;
+    expect(rowKeys.q1_vetoes).toBeUndefined();
+    expect(rowKeys.q3_walk_minutes).toBeUndefined();
   });
 
   it("writes an empty cuisine set when No preference is chosen", () => {
