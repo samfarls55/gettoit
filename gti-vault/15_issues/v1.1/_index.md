@@ -274,7 +274,7 @@ workflow-overhaul design-system surface.
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| bug-20 | [[issues/bug-20-web-verdict-live-update-unwired\|Web verdict surface does not live-update on a reroll]] — ready-for-agent | AFK | [#216](https://github.com/samfarls55/gettoit/issues/216) | — |
+| bug-20 | [[issues/bug-20-web-verdict-live-update-unwired\|Web verdict surface does not live-update on a reroll]] ✅ done | AFK | [#216](https://github.com/samfarls55/gettoit/issues/216) | — |
 
 ## Cross-references
 

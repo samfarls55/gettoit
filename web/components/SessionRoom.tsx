@@ -184,6 +184,18 @@ export function SessionRoom({
   const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
 
+  // bug-20 — a monotonic re-fetch signal for the §C verdict live-update.
+  // An initiator reroll re-runs the verdict in place: room status stays
+  // `verdict_ready`, so a `verdict_ready` rebroadcast (or a `rooms`
+  // UPDATE that keeps the status decided) sets `roomStatus` to its
+  // current value and React bails — the verdict-fetch effect, keyed on
+  // room id / status / user id, would never re-fire. The broadcast +
+  // UPDATE handlers bump this counter instead; the counter always
+  // changes, so folding it into the effect's deps re-runs the fetch on
+  // every rebroadcast. It starts at 0 and the effect's status guard
+  // still gates the first load, so there is no double-fetch on mount.
+  const [verdictRefetchSignal, setVerdictRefetchSignal] = useState(0);
+
   const channelRef = useRef<ReturnType<
     ReturnType<typeof getSupabaseClient>["channel"]
   > | null>(null);
@@ -309,10 +321,24 @@ export function SessionRoom({
               const row = payload.new as RoomsRow;
               setRoomStatus(row.status);
               setDeadlineAt(row.deadline_at);
+              // bug-20 — a `rooms` UPDATE that keeps the room decided
+              // (an in-place reroll fires as an UPDATE that does not
+              // move the status off `verdict_ready` / `locked`) must
+              // still re-fetch the §C verdict; the status set above is
+              // a no-op so the effect deps would not change on their
+              // own. Bump the re-fetch signal.
+              if (row.status === "verdict_ready" || row.status === "locked") {
+                setVerdictRefetchSignal((n) => n + 1);
+              }
             },
           )
           .on("broadcast", { event: "verdict_ready" }, () => {
             setRoomStatus("verdict_ready");
+            // bug-20 — the rebroadcast re-sets `roomStatus` to its
+            // current value on an in-place reroll, so React bails and
+            // the verdict-fetch effect's deps do not change. Bump the
+            // monotonic re-fetch signal so the §C card live-updates.
+            setVerdictRefetchSignal((n) => n + 1);
           });
 
         channel.subscribe();
@@ -382,7 +408,20 @@ export function SessionRoom({
     return () => window.clearInterval(interval);
   }, [deadlineAt]);
 
-  // Fetch the verdict when the room flips to verdict_ready.
+  // Fetch the verdict when the room flips to verdict_ready — and
+  // re-fetch on every subsequent `verdict_ready` rebroadcast.
+  //
+  // bug-20 — `web-01-invitee-shell` §C "Live update": while the §C
+  // verdict card is open, an initiator reroll that changes the verdict
+  // must live-update the card. A reroll re-runs the verdict in place,
+  // so `roomStatus` stays `verdict_ready` — folding `verdictRefetchSignal`
+  // (bumped by the broadcast / UPDATE handlers) into the deps re-runs
+  // this effect on every rebroadcast. The re-fetch flows through the
+  // existing shaping path, so a reroll that swaps the default and
+  // no-survivor variants updates the card across both. The venue-name
+  // cross-fade is already wired in `WebVerdictCard` (a keyed re-mount +
+  // a 320ms `var(--ease-out)` animation) and plays automatically once
+  // the rendered venue name changes.
   //
   // bug-17 — the web invitee verdict surface conforms to the locked
   // `web-01-invitee-shell` §C: plan name + verdict venue only. So the
@@ -469,7 +508,7 @@ export function SessionRoom({
     return () => {
       cancelled = true;
     };
-  }, [roomId, roomStatus, userId]);
+  }, [roomId, roomStatus, userId, verdictRefetchSignal]);
 
   // ────────────────────────────────────────────────────────────────
   // Q5 per-member candidate fetch.
