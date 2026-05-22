@@ -251,7 +251,7 @@ Filed as HITL bugs at `needs-triage`:
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
 | bug-17 | [[issues/bug-17-web-verdict-read-retired-votes-columns\|Web verdict-read path still references retired v1 typed `votes` columns]] — needs-triage | HITL | [#207](https://github.com/samfarls55/gettoit/issues/207) | — |
-| bug-18 | [[issues/bug-18-web-quiz-test-tsc-type-error\|tsc --noEmit type error in web/lib/quiz.test.ts is not CI-gated]] — needs-triage | HITL | [#208](https://github.com/samfarls55/gettoit/issues/208) | — |
+| bug-18 | [[issues/bug-18-web-quiz-test-tsc-type-error\|tsc --noEmit type error in web/lib/quiz.test.ts is not CI-gated]] — done (PR #213) | AFK | [#208](https://github.com/samfarls55/gettoit/issues/208) | — |
 | bug-19 | [[issues/bug-19-dead-code-invitewebcard\|Retire dead code web/components/InviteWebCard.tsx]] — needs-triage | HITL | [#209](https://github.com/samfarls55/gettoit/issues/209) | — |
 
 - **bug-17** — tb-WF-10 ported the web quiz *write* path to the generic `votes`

@@ -1,7 +1,7 @@
 ---
 issue: bug-18
 title: tsc --noEmit type error in web/lib/quiz.test.ts is not CI-gated
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 208
 created: 2026-05-21
@@ -80,3 +80,24 @@ The web CI lane runs only `npm test` (Vitest) and `npm run build` (`next build`)
 - Changing the runtime intent of any test assertion.
 - Type errors outside the `web/` project.
 - The retired-`votes`-column read path — tracked separately in bug-17.
+
+### Closed 2026-05-22 — done (PR #213)
+
+Fixed all three `tsc --noEmit` errors and added the CI gate:
+
+- `quiz.test.ts:128-129` — the `VoteRow` -> `Record<string, unknown>` casts now
+  route through `unknown` (hoisted to a local `rowKeys`). Assertion unchanged.
+- `claim-code.test.ts` — `fakeClient` return type changed from the optional
+  `ClaimCodeMintDeps["client"]` to the non-optional `SupabaseClient`, clearing
+  the `TS18048`; the `FunctionsClient` -> `{ invoke: Mock }` cast now routes
+  through `unknown`.
+- Added a `typecheck` npm script (`tsc --noEmit`) to `web/package.json` and an
+  `npm run typecheck` step to the `web` job in `.github/workflows/ci.yml`. The
+  step runs before `npm test` / `npm run build`.
+
+Acceptance verified: `npx tsc --noEmit` in `web/` exits 0; `npm test` passes
+158/158; `npm run build` succeeds. All CI lanes green on PR #213.
+
+Adjacency flagged on the PR: `npm run lint` (`next lint`) is interactive on a
+fresh checkout — no ESLint config exists in `web/` on `main` and the web CI
+lane never ran lint. Pre-existing, left untouched (strict scope).
