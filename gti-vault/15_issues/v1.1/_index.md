@@ -250,18 +250,31 @@ Filed as HITL bugs at `needs-triage`:
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| bug-17 | [[issues/bug-17-web-verdict-read-retired-votes-columns\|Web verdict-read path still references retired v1 typed `votes` columns]] — needs-triage | HITL | [#207](https://github.com/samfarls55/gettoit/issues/207) | — |
+| bug-17 | [[issues/bug-17-web-verdict-surface-conformance\|Web verdict surface does not conform to locked web-01-invitee-shell §C]] — ready-for-agent (re-scoped 2026-05-22) | AFK | [#207](https://github.com/samfarls55/gettoit/issues/207) | — |
 | bug-18 | [[issues/bug-18-web-quiz-test-tsc-type-error\|tsc --noEmit type error in web/lib/quiz.test.ts is not CI-gated]] — done (PR #213) | AFK | [#208](https://github.com/samfarls55/gettoit/issues/208) | — |
 | bug-19 | [[issues/bug-19-dead-code-invitewebcard\|Retire dead code web/components/InviteWebCard.tsx]] — done (PR #212) | AFK | [#209](https://github.com/samfarls55/gettoit/issues/209) | — |
 
-- **bug-17** — tb-WF-10 ported the web quiz *write* path to the generic `votes`
-  slots but not the verdict *read* path; `web/lib/verdict.ts` + `SessionRoom`
-  still read dropped v1 typed columns.
+- **bug-17** — re-scoped 2026-05-22 via `/triage` + `/grill-with-docs`. The
+  filed symptom did not reproduce (`SessionRoom` already passes `votes: []`;
+  the suggested `verdict_for_room` RPC does not exist). Real defect: the web
+  verdict surface does not conform to the locked `web-01-invitee-shell.md` §C
+  (plan name + venue only). ready-for-agent (AFK).
 - **bug-18** — a `tsc --noEmit` error in `web/lib/quiz.test.ts` left by
   tb-WF-10; the web CI lane runs only `npm test` + `next build`, so it ships
   green.
 - **bug-19** — `web/components/InviteWebCard.tsx` is dead code after the
   tb-WF-11 / tb-WF-12 invitee-shell rebuild.
+
+## bug-17 grill follow-up (2026-05-22)
+
+The bug-17 re-scoping `/grill-with-docs` session surfaced two follow-ups. One
+is filed here; the sibling — the §C no-survivor spec-gap — is filed in the
+workflow-overhaul folder as `sg-WF-9` (#215), since it amends a
+workflow-overhaul design-system surface.
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| bug-20 | [[issues/bug-20-web-verdict-live-update-unwired\|Web verdict surface does not live-update on a reroll]] — needs-triage | — | [#216](https://github.com/samfarls55/gettoit/issues/216) | bug-17 |
 
 ## Cross-references
 
