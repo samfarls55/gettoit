@@ -1,7 +1,7 @@
 ---
 folder: 15_issues/workflow-overhaul
 purpose: Workflow-overhaul phase — Plans as persistent named items, list-as-landing, collapsed Setup screen, three nav verbs (Back/Exit/Delete)
-status: filed 2026-05-19; iOS tracer-bullet sequence tb-WF-1..9 all merged 2026-05-20. sg-WF-5 grilled 2026-05-21 and decomposed via /to-issues into the web invitee shell slices (tb-WF-11 → tb-WF-12) plus sibling tb-WF-10 (web quiz port) and sibling sg-WF-7 (account claim); sg-WF-5 surface doc done 2026-05-21. sg-WF-7 grilled 2026-05-21 (claim-code bridge — ADR 0015 + decision doc) and decomposed via /to-issues into sg-WF-8 + tb-WF-13/14. sg-WF-6 grilled 2026-05-21 (reroll-window enforcement — ADR 0016) and merged 2026-05-21 (PR #201) — reroll-window deadline + server guard done. The account-claim bridge is complete: tb-WF-13 (mint, PR #205) + tb-WF-14 (redeem, PR #206) both merged 2026-05-21. 22 issues total (8 spec-gaps + 14 tracer-bullets), all merged; one follow-up spec-gap filed 2026-05-22 — sg-WF-9 (#215, needs-triage), the web-01 §C no-survivor gap surfaced by the bug-17 grill. No HITL items remain in the phase.
+status: filed 2026-05-19; iOS tracer-bullet sequence tb-WF-1..9 all merged 2026-05-20. sg-WF-5 grilled 2026-05-21 and decomposed via /to-issues into the web invitee shell slices (tb-WF-11 → tb-WF-12) plus sibling tb-WF-10 (web quiz port) and sibling sg-WF-7 (account claim); sg-WF-5 surface doc done 2026-05-21. sg-WF-7 grilled 2026-05-21 (claim-code bridge — ADR 0015 + decision doc) and decomposed via /to-issues into sg-WF-8 + tb-WF-13/14. sg-WF-6 grilled 2026-05-21 (reroll-window enforcement — ADR 0016) and merged 2026-05-21 (PR #201) — reroll-window deadline + server guard done. The account-claim bridge is complete: tb-WF-13 (mint, PR #205) + tb-WF-14 (redeem, PR #206) both merged 2026-05-21. 22 issues total (8 spec-gaps + 14 tracer-bullets), all merged; one follow-up spec-gap filed 2026-05-22 — sg-WF-9 (#215, ready-for-agent/AFK), the web-01 §C no-survivor gap surfaced by the bug-17 grill. No HITL items remain in the phase.
 ---
 
 # 15_issues/workflow-overhaul — Index
@@ -32,9 +32,9 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 | sg-WF-4 | [[issues/sg-wf-4-plan-list-surface\|Plan list surface — design-system spec + JSX]] | AFK | [#157](https://github.com/samfarls55/gettoit/issues/157) | done 2026-05-20 |
 | sg-WF-5 | [[issues/sg-wf-5-web-invitee-flow\|Web invitee single-link flow — design-system surface doc]] | AFK | [#158](https://github.com/samfarls55/gettoit/issues/158) | done 2026-05-21 |
 | sg-WF-6 | [[issues/sg-wf-6-reroll-window-deadline\|Reroll window deadline mechanism]] | AFK | [#159](https://github.com/samfarls55/gettoit/issues/159) | done 2026-05-21 |
-| sg-WF-7 | [[issues/sg-wf-7-web-invitee-account-claim\|Web invitee account claim — cross-context identity bridge]] | HITL | [#191](https://github.com/samfarls55/gettoit/issues/191) | grilled 2026-05-21 — decomposed |
+| sg-WF-7 | [[issues/sg-wf-7-web-invitee-account-claim\|Web invitee account claim — cross-context identity bridge]] | HITL | [#191](https://github.com/samfarls55/gettoit/issues/191) | done 2026-05-22 — grilled + decomposed into sg-WF-8 + tb-WF-13/14 |
 | sg-WF-8 | [[issues/sg-wf-8-account-claim-design-system\|Account-claim design-system amendment — S00a + web mint affordance]] | AFK | [#194](https://github.com/samfarls55/gettoit/issues/194) | done 2026-05-21 |
-| sg-WF-9 | [[issues/sg-wf-9-verdict-card-no-survivor\|web-01-invitee-shell §C does not spec the no-survivor decided-plan case]] | — | [#215](https://github.com/samfarls55/gettoit/issues/215) | needs-triage (filed 2026-05-22) |
+| sg-WF-9 | [[issues/sg-wf-9-verdict-card-no-survivor\|web-01-invitee-shell §C does not spec the no-survivor decided-plan case]] | AFK | [#215](https://github.com/samfarls55/gettoit/issues/215) | ready-for-agent 2026-05-22 |
 
 ### Tracer-bullets
 
