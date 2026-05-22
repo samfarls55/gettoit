@@ -13,3 +13,4 @@ Live + archived progress logs from `/execute-issues` runs. One file per run, nam
 | 2026-05-19-1932 | done | [[2026-05-19-1932-afk-execution-log]] — verdict-spinner batch (bug-12/13/14 + ops-01), 4/4 merged, 0 escalated |
 | 2026-05-19-1839 | done | [[2026-05-19-1839-afk-execution-log]] — workflow-overhaul wave-1, 6/6 AFK merged (sg-WF-1/2/3, tb-WF-1/2/3), 0 escalated, tb-WF-4 still HITL-gated |
 | 2026-05-21-1812 | done | [[2026-05-21-1812-afk-execution-log]] — workflow-overhaul wave-2 + v1.1 bug-11, 9/9 AFK merged, 0 escalated (tb-WF-13 re-dispatched after an infra crash) |
+| 2026-05-22-1404 | done | [[2026-05-22-1404-afk-execution-log]] — v1.1 bug batch (bug-16/18/19), concurrency 3, 3/3 merged, 0 escalated |
