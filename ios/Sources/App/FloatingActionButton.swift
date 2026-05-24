@@ -2,14 +2,26 @@
 //
 // The bottom-right circular create button on S00 Plan list, and the
 // canonical Sunset Pop FAB primitive for any future surface needing a
-// single persistent create affordance. Glass body, sun-yellow glyph,
-// 56pt diameter, light shadow. Sits anchored 18pt off the trailing +
+// single persistent create affordance. Ink-2 body, sun-yellow glyph,
+// sun-tinted halo, 56pt diameter. Sits anchored 18pt off the trailing +
 // bottom edges of the host surface.
 //
 // Spec: `design-system/components.md §C-26` + JSX reference in
 // `design-system/code/components.jsx` (`FloatingActionButton`). Visual
 // values lift from `GTITokens.swift` per repo CLAUDE.md — no inline
 // hex / px / easing.
+//
+// Visual register: T1 ink-fill (bug-23, 2026-05-24). Replaces the
+// original glass body + black-0.18 shadow combo that broke
+// `impeccable`'s "Glassmorphism as default" absolute ban — see
+// `components.md §C-26 → "Why ink-fill"` for the full rationale. The
+// SwiftUI port drops `.ultraThinMaterial` glass + the white-stroke
+// border overlay, switches the disc to `GTIColor.ink2`, and applies the
+// new `GTIShadow.fab` sun-tinted halo via the generated `.gtiShadow(_:)`
+// helper. The 0.08-white inset highlight from the CSS `--shadow-fab`
+// recipe is intentionally dropped on iOS — it does not read on a 56pt
+// disc and SwiftUI does not natively render multi-stop shadows; the
+// outer sun halo is the load-bearing piece.
 //
 // Behavior — single tap target; the FAB emits `onTap`, the host owns
 // navigation. On the Plan list the host opens the disambig sheet.
@@ -83,22 +95,17 @@ public struct FloatingActionButton: View {
 
     public var body: some View {
         Button(action: onTap) {
-            // Glass body per the C-26 spec — `ultraThinMaterial` gives
-            // the backdrop blur + saturate composition the JSX
-            // requests; a thin white-glass tint sits on top so the
-            // disc reads as warm glass against the gradient.
-            // `components.md §C-26 → SwiftUI primitive` codifies this
-            // shape.
+            // T1 ink-fill body per the C-26 spec — `GTIColor.ink2`
+            // disc, no border, sun-tinted `GTIShadow.fab` halo. Glass
+            // + black-shadow combo retired in bug-23 (see file header
+            // for the full rationale). `components.md §C-26 → SwiftUI
+            // primitive` codifies this shape.
             Text(glyph)
                 .font(.system(size: Self.glyphSize, weight: .black))
                 .foregroundStyle(GTIColor.sun)
                 .frame(width: Self.diameter, height: Self.diameter)
-                .background(.ultraThinMaterial, in: Circle())
-                .background(GTIColor.Glass.fill, in: Circle())
-                .overlay(
-                    Circle().stroke(Color.white.opacity(0.32), lineWidth: 0.75)
-                )
-                .shadow(color: Color.black.opacity(0.18), radius: 12, x: 0, y: 8)
+                .background(GTIColor.ink2, in: Circle())
+                .gtiShadow(GTIShadow.fab)
         }
         .buttonStyle(FABPressStyle())
         .accessibilityLabel(accessibilityLabelText)

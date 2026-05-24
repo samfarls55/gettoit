@@ -1,11 +1,12 @@
 ---
 issue: bug-23
 title: Plan list "+" FAB does not fit the Sunset Pop visual register — rework against Impeccable reference
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 223
 created: 2026-05-24
 grilled: 2026-05-24
+closed: 2026-05-24
 ---
 
 # bug-23 — Plan list "+" FAB visual register mismatch
@@ -107,3 +108,22 @@ User dogfood, 2026-05-24.
 ### Adjacency flagged, not filed
 
 The shadow audit during the grill noted the FAB was the only major elevated primitive on a generic-dark shadow. If any other primitive (search `tokens.json` for `rgba(0,0,0,*)` shadows) is found to read generic for the same reason, file separately — not folded into bug-23.
+
+## Comments
+
+### 2026-05-24 — AFK execution closed
+
+Shipped on `afk/bug-23`. Token + spec + JSX + iOS all landed in one PR:
+
+- `tokens.json` gained `shadow.fab` (sun-tinted halo `0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08)`).
+- `scripts/gen-css.mjs` now emits `--shadow-fab` in `code/tokens.css`.
+- `scripts/gen-swift.mjs` now emits a `GTIShadow` enum + `.gtiShadow(_:)` `View` extension; `GTIShadow.fab` carries the outer drop (`color: sun@0.32, radius: 32, x: 0, y: 12`). Multi-stop CSS recipes' inset / spread layers are not lifted because SwiftUI's `.shadow(...)` renders one drop layer; the 0.08-white inset on a 56pt disc does not read on iOS.
+- `components.md §C-26` rewritten: new "Why ink-fill" rationale section, Visual spec table swaps `Background` to `var(--ink-2)`, `Border` to `none`, `Shadow` to `var(--shadow-fab)`. SwiftUI snippet swapped to `.background(GTIColor.ink2, in: Circle()).gtiShadow(GTIShadow.fab)`.
+- `code/components.jsx` `FloatingActionButton` drops glass + blur + glass border + black-shadow combo; uses `var(--ink-2)` + `border: none` + `var(--shadow-fab)`.
+- `ios/Sources/App/FloatingActionButton.swift` drops `.ultraThinMaterial` + glass border overlay + black-0.18 shadow literal; uses `GTIColor.ink2` + `.gtiShadow(GTIShadow.fab)`.
+- `surfaces/00-plan-list.md` untouched (external FAB contract unchanged).
+- `CHANGELOG.md` carries `BREAKING:` entry naming bug-23.
+- New `scripts/test-fab-rework.mjs` (34 assertions, mirrors `test-plan-list.mjs` pattern) gates the whole rework.
+- iOS `FloatingActionButtonTests` extended with two new tests pinning `GTIShadow.fab` recipe values + asserting it is not equal to `GTIShadow.ctaWhite` (the generic-dark recipe).
+
+Verification: `node design-system/scripts/verify.mjs` green; `node design-system/scripts/test-fab-rework.mjs` 34/34; all 5 sibling structural tests still green; `cd web && npm test` 152/152 passing; `npm run build` clean. iOS test suite runs in CI (no Mac locally).

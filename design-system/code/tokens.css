@@ -66,6 +66,9 @@
   --ease-out-soft: cubic-bezier(.16,1,.3,1);
   --ease-in-out: cubic-bezier(.65,0,.35,1);
   --grad-tween: 1100ms cubic-bezier(.65,0,.35,1);
+
+  /* shadow — C-26 Floating Action Button (T1 ink-fill, bug-23) */
+  --shadow-fab: 0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 html, body {
