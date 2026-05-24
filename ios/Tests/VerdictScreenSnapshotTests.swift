@@ -102,7 +102,49 @@ final class VerdictScreenSnapshotTests: XCTestCase {
         XCTAssertFalse(snap.cutsExpanded,    "cuts drawer collapsed by default per S05 §Modes")
         XCTAssertEqual(snap.eyebrowCopy, "Tonight, the verdict is")
         XCTAssertEqual(snap.primaryCtaLabel, "I'm in")
-        XCTAssertEqual(snap.secondaryLabel, "Start over")
+        // bug-22 — `Start over` tertiary slot removed; the Home verb
+        // now lives in the top-leading chrome row. CTA dock secondary
+        // is empty until the user commits (where the countdown lands).
+        XCTAssertEqual(snap.secondaryLabel, "")
+    }
+
+    // MARK: - bug-22 · Home chrome row
+
+    func testDefaultModeShowsHomeChrome() {
+        // bug-22 — top-leading text verb `Home` lives on the chrome
+        // row above the eyebrow on every iOS-reachable mode. The
+        // ModeSnapshot surfaces a render-gate flag so the snapshot
+        // suite can lock the contract without depending on view-
+        // internals.
+        let snap = VerdictScreen(
+            verdict: .fixture(),
+            mode: .default
+        ).modeSnapshot
+        XCTAssertTrue(snap.showHomeChrome,
+            "default mode surfaces the Home chrome row per bug-22")
+    }
+
+    func testHomeChromeLabelIsLocked() {
+        // bug-22 spec resolves the verb as text-only "Home"; never an
+        // SF Symbol house glyph (the chrome-row idiom is text-only,
+        // mirroring quiz `Back`/`Exit`/`Leave`).
+        XCTAssertEqual(VerdictScreen.homeChromeLabel, "Home",
+            "Home chrome verb is text-only 'Home' per bug-22 grill outcome")
+    }
+
+    func testHomeChromeIsPureNavigationAndDoesNotAutoFireOnInit() {
+        // The Home tap is pure nav — pops to S00 Plan list, no session
+        // teardown, no membership mutation (the room is already closed
+        // at verdict per CONTEXT.md). Verify the closure is held but
+        // not auto-fired on init.
+        var homeCalls = 0
+        _ = VerdictScreen(
+            verdict: .fixture(),
+            mode: .default,
+            onHome: { homeCalls += 1 }
+        )
+        XCTAssertEqual(homeCalls, 0,
+            "init must not auto-fire the Home closure")
     }
 
     // MARK: - fixture contract

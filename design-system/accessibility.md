@@ -119,31 +119,33 @@ Per surface, the focus order ladders from top → bottom, with the primary CTA a
 6. Primary CTA
 
 ### Verdict (default / cuts / committed)
-1. Top-bar close (none — verdict is post-quiz; close exits to home)
+1. **Chrome row** (bug-22) — `Home` text verb, top-leading. Announced as `"Home, button"`; activates the pop to S00 Plan list. The chrome row reads first so VO users land on the navigation affordance before the choreographed reveal.
 2. Eyebrow → Hero → Meta → Time → Rule → Receipt 1..4 (this read order is the **five-second test**)
 3. Cuts drawer trigger
 4. Primary CTA (`I'm in` / `You're in`)
-5. Secondary (`Start over`)
+5. Committed-state status line (`"Window closes in 47s"`) — read as static text; no special handling. The `Start over` secondary the row previously carried was removed by bug-22; the Home verb in the chrome row replaces it.
 
 ### Verdict (`read-only` mode)
-1. Eyebrow (`"Tonight's verdict"`) → Hero → Meta → Time → Rule → Receipt 1..N (late-joiner not in list)
-2. Cuts drawer trigger (informational)
-3. Primary CTA (`"Start a new decision"`)
+1. (No chrome row — bug-22 omitted Home in this mode; the late-joiner has no Plan-list destination for someone else's Plan, and the Web invitee has no Plan list at all.)
+2. Eyebrow (`"Tonight's verdict"`) → Hero → Meta → Time → Rule → Receipt 1..N (late-joiner not in list)
+3. Cuts drawer trigger (informational)
+4. Primary CTA (`"Start a new decision"`)
    - Ratification path is announced by VO as **"Not available — this verdict is closed."**
 
 ### Verdict (`no-survivor` mode)
-1. Eyebrow (`"Tonight"`) → Hero (`"No spot fits"`) → Meta (surviving hard-needs) → **Rule chip (load-bearing message — first read priority)**
-2. Primary CTA (`"Widen radius"`) — initiator only; for invitees the focus skips to secondary
-3. Secondary (`"Start over"`)
+1. **Chrome row** (bug-22) — `Home` text verb, top-leading. Announced as `"Home, button"`. Tap pops to S00 Plan list; the Plan stays in `decided-active`.
+2. Eyebrow (`"Tonight"`) → Hero (`"No spot fits"`) → Meta (surviving hard-needs) → **Rule chip (load-bearing message — first read priority)**
+3. Primary CTA (`"Widen radius"`) — initiator only; for invitees the focus skips back to the chrome `Home` row (the only exit they have on this terminal).
    - When widen slider expands inline, VO focus moves to the slider with `aria-label="Widen walk radius"`; the CTA label updates to `"Re-run · {N} mi"` and is announced on focus return.
 
 ### Verdict (`solo` mode)
-1. Eyebrow (`"Tonight, the verdict is"`) → Hero → Meta → Time badge (audience `"You"`) → Rule chip
-2. Cuts drawer trigger (informational; same affordance as `default`)
-3. Primary CTA (`"I'm in"` / `"You're in"` once committed — no N-of-M denominator)
-4. Auth Upgrade Chip (`"Save this taste profile"`) — replaces the `default` mode's group-save affordance. Hidden when the user is already linked.
-5. Reroll tertiary
-6. `"Start over"` secondary (or `"Window closes in 47s"` once committed)
+1. **Chrome row** (bug-22) — `Home` text verb, top-leading. Announced as `"Home, button"`. Tap pops to S00 Plan list.
+2. Eyebrow (`"Tonight, the verdict is"`) → Hero → Meta → Time badge (audience `"You"`) → Rule chip
+3. Cuts drawer trigger (informational; same affordance as `default`)
+4. Primary CTA (`"I'm in"` / `"You're in"` once committed — no N-of-M denominator)
+5. Auth Upgrade Chip (`"Save this taste profile"`) — replaces the `default` mode's group-save affordance. Hidden when the user is already linked.
+6. Reroll tertiary
+7. Committed-state status line (`"Window closes in 47s"` once committed) — empty pre-commit; the chrome `Home` verb is the only navigation affordance pre-commit.
    - Voice-receipt row is suppressed — VO focus skips from rule chip directly to cuts trigger / CTA. No `"voice not counted"` announcement; the row simply isn't part of the read order.
    - Time badge audience announces as `"Tonight at 7 PM, for you"` (singular form of the communal frame).
 
