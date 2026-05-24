@@ -283,7 +283,7 @@ Eight UI-specific issues captured from a dogfood pass over the post-tb-WF-9 buil
 Resolutions of note:
 - The user's `"Impeccable"` reference for bug-23 was resolved as the `impeccable:impeccable` skill loaded in this session (not a Refero / Figma reference). The skill ran inline against C-26 and recommended a token + structural rework — see bug-23 §Grill outcome for the chosen treatment.
 - bug-22 (verdict Start-over → Home) and bug-26 (cuts-drawer removal) are interlocked: bug-22 makes Home pure navigation; bug-26 removes the friction-free change-of-mind path. Together they leave the reroll path (with its 3-burn, stated-reason friction) as the only re-decide channel.
-- bug-24 introduces a new component primitive `C-2N · Action Sheet` (native-iOS-shaped, content-height detent, native grabber) that supplements `C-16 Bottom Sheet` rather than replacing it; C-16 stays in place for rich modal editors (reroll, location picker).
+- bug-24 introduces a new component primitive `C-27 · Action Sheet` (native-iOS-shaped, content-height detent, native grabber) that supplements `C-16 Bottom Sheet` rather than replacing it; C-16 stays in place for rich modal editors (reroll, location picker). (Grilled as `C-2N` placeholder; assigned C-27 at edit time as the next sequential slot after C-25 / C-26.)
 - bug-28 was reframed during the grill from a pure copy-fix to a spec amendment — the solo audience subtitle is dropped entirely, not relabeled to `"YOU"`.
 
 | # | Title | Status | Type | GitHub | Blocked by |
@@ -291,7 +291,7 @@ Resolutions of note:
 | bug-21 | [[issues/bug-21-plan-list-action-dot-hitbox-too-small\|Plan list ⋯ trigger hitbox too small — taps open the verdict by accident]] | done (bug) — PR #229 | AFK | [#221](https://github.com/samfarls55/gettoit/issues/221) | — |
 | bug-22 | [[issues/bug-22-verdict-start-over-reposition-as-home\|Verdict "Start over" → text "Home" in top-leading chrome row]] | done (spec-gap) — PR #230 | AFK | [#222](https://github.com/samfarls55/gettoit/issues/222) | — |
 | bug-23 | [[issues/bug-23-plan-list-fab-design-system-fit\|Plan list FAB rework — T1 ink-fill, new `shadow.fab` token]] | done (spec-gap) — PR #231 | AFK | [#223](https://github.com/samfarls55/gettoit/issues/223) | — |
-| bug-24 | [[issues/bug-24-bottom-sheet-ios-shape\|Split sheet primitive — keep C-16; add C-2N native-iOS Action Sheet]] | ready-for-agent (spec-gap) | AFK | [#224](https://github.com/samfarls55/gettoit/issues/224) | — |
+| bug-24 | [[issues/bug-24-bottom-sheet-ios-shape\|Split sheet primitive — keep C-16; add C-27 native-iOS Action Sheet]] | done (spec-gap) — PR #232 | AFK | [#224](https://github.com/samfarls55/gettoit/issues/224) | — |
 | bug-25 | [[issues/bug-25-quiz-progress-strip-layout-regression\|topBar trailing-spacer fix + Q1 chrome-row height-invariance audit]] | ready-for-agent (bug) | AFK | [#225](https://github.com/samfarls55/gettoit/issues/225) | — |
 | bug-26 | [[issues/bug-26-verdict-cuts-drawer-removal\|Full removal of the cuts drawer — collapse `cuts` mode into `default`]] | ready-for-agent (spec-gap) | AFK | [#226](https://github.com/samfarls55/gettoit/issues/226) | — |
 | bug-27 | [[issues/bug-27-reroll-broken\|Reroll broken end-to-end — deferred to a `/diagnose` session]] | needs-info | — | [#227](https://github.com/samfarls55/gettoit/issues/227) | `/diagnose` against a TestFlight build |

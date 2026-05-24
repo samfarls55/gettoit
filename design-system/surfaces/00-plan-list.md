@@ -26,12 +26,13 @@ Locked outcomes are in [[../../gti-vault/50_product/workflow-overhaul-plan-list|
 
 ## Components used
 
-`GradientSurface` (initiator stop) · `GTIMark` · `Eyebrow` · `PlanCard` (new, this surface) · `PlanSectionHeader` (new, this surface) · `C-25 ActionDotMenu` (new) · `C-26 FloatingActionButton` (new) · `PillCTA` white (empty-state hero) · C-16-style confirm bottom sheet (composed inline; reuses the existing reroll sheet primitive language).
+`GradientSurface` (initiator stop) · `GTIMark` · `Eyebrow` · `PlanCard` (new, this surface) · `PlanSectionHeader` (new, this surface) · `C-25 ActionDotMenu` · `C-26 FloatingActionButton` · `PillCTA` white (empty-state hero) · **`C-27 ActionSheet` (consumer)** — backs both the disambig sheet and the delete-confirm sheet (added 2026-05-24 for bug-24, replaces the inline C-16-language compositions that previously composed these sheets).
 
-Two new component primitives ship with this surface — both spec'd in `components.md` and exported from `code/components.jsx`:
+Three component primitives back this surface — all spec'd in `components.md` and exported from `code/components.jsx`:
 
 - **C-25 Action Dot Menu** — the trailing `⋯` glyph + popover menu. Reusable elsewhere (e.g. Verdict overflow, future plan-detail surfaces).
-- **C-26 Floating Action Button** — bottom-right glass + sun-glyph circular button. Single visual primitive; the disambig sheet it opens is built inline from existing C-16 + C-05 ghost primitives.
+- **C-26 Floating Action Button** — bottom-right glass + sun-glyph circular button.
+- **C-27 Action Sheet** — the native-iOS action-sheet container that hosts both the **disambig sheet** (Solo / Group) and the **delete-confirm sheet**. Added 2026-05-24 for bug-24 — these sheets previously inlined the C-16 modal-editor language, which produced a non-native shape with dead vertical space; C-27 supplies the native rounded-top + grabber + content-height container. C-16 itself is unchanged (S07 reroll, C-23 LocationPicker continue to inherit it).
 
 ## Gradient choice — initiator
 
@@ -157,21 +158,38 @@ When all three sections are empty (first-launch user, or all Plans deleted), the
 
 ### Disambig sheet
 
-Built inline from C-16 sheet primitive + two stacked C-05 `ghost` pills. No new component — the sheet is single-surface, identical visual register to the reroll sheet.
+C-27 ActionSheet consumer (composed inline from the C-27 container + two stacked C-05 `ghost` pills). Previously inlined the C-16 modal-editor language; bug-24 (2026-05-24) split off C-27 for the native-iOS action-sheet register and migrated this sheet over.
 
 | Element | Spec |
 |---|---|
-| Backdrop | `rgba(0,0,0,0.32)` over the host surface (Plan list), tap-to-dismiss |
-| Sheet | inset 12 from edges, bottom 12; `rgba(20,20,30,0.92)` + 24px backdrop blur; radius `var(--r-sheet)` (26); `1px white 0.10` border; `shadow-sheet` |
-| Handle | 38×4 white 0.22 pill, top-centered, margin-bottom 18 — matches C-16 |
-| Eyebrow | `eyebrow` token, white 0.6, label `"Start a plan"`, bottom-margin 6 |
+| Container | C-27 ActionSheet — full-width, rounded-top-only, content-height (no `.medium` fallback), native iOS grabber via `.presentationDragIndicator(.visible)` on iOS / equivalent web JSX |
+| Inside background | `rgba(20,20,30,0.92)` dark-glass register (carried through via `.presentationBackground` so the native container paints in Sunset Pop colors); 24px backdrop blur on web |
+| Eyebrow | `eyebrow` token, white 0.6, label `"Start a plan"`, bottom-margin 6, top-margin 20 (clears the native grabber) |
 | Headline | Inter 900 / 26 / line 0.95, `letterSpacing: -0.02em`, white, UPPERCASE, label `"Who's coming?"`, bottom-margin 18 |
 | Solo pill | `PillCTA fill="ghost"`, label `"Solo"`, bottom-margin 10 |
 | Group pill | `PillCTA fill="ghost"`, label `"Group"` |
-| Dismiss | swipe-down OR tap-scrim. **No Cancel button.** |
-| Open motion | `gti-fade-up` 380ms `var(--ease-out-soft)` (matches C-16) |
+| Dismiss | swipe-down on the native grabber (iOS) or backdrop tap (web). **No Cancel button.** |
+| Open motion | native iOS sheet motion (system-owned); web `gti-fade-up` 280ms `var(--ease-out)` |
+| Content height | ~240pt iOS detent (handle + eyebrow + headline + two 60pt pills + breathing); iOS pins this so the sheet does not snap to `.medium` and stretch upward into empty space |
 
 Tapping Solo or Group navigates to [[01-setup|S01 Setup]] with the corresponding `groupContext` pre-set. Setup renders 5 controls in solo (no `Who's coming` row) or 6 controls in group (with `Who's coming` chips reduced to `Two of us / A group`); the `Just me` chip is removed because the disambig already captured it. Setup's primary CTA copy follows the locked sg-WF-1 rule (solo → `Start the quiz`, group → `Drop the invite link`).
+
+### Delete confirm sheet
+
+C-27 ActionSheet consumer (composed inline from the C-27 container + the locked copy table above + a C-05 `PillCTA fill="white"` primary + an eyebrow-token dismiss row). Added 2026-05-24 for bug-24 — previously inlined the C-16 modal-editor language alongside the disambig.
+
+| Element | Spec |
+|---|---|
+| Container | C-27 ActionSheet (same shape as the disambig) — full-width, rounded-top-only, content-height per variant, native iOS grabber |
+| Inside background | `rgba(20,20,30,0.92)` dark-glass register, matched to the disambig |
+| Title | Inter 900 / 26 / line 0.95, `letterSpacing: -0.02em`, white, UPPERCASE, top-margin 20 (clears the native grabber), bottom-margin 10. Variant-specific per the §"Confirm sheet copy (LOCKED)" table above. |
+| Body | Inter 500 / 14 / line 1.45, white 0.78, `text-wrap: balance`, max-width 320, bottom-margin 22 |
+| Primary pill | `PillCTA fill="white"` — **never** sun, **never** any red token. Variant-specific label per the locked copy table. |
+| Dismiss | eyebrow-token label (Inter 700 / 11 / tracking 0.18em UPPERCASE) in white 0.6, 44pt-tall hit row below the primary pill. Variant-specific copy — `KEEP` for delete variants, `STAY` for leave |
+| Open motion | native iOS sheet motion (system-owned); web `gti-fade-up` 280ms `var(--ease-out)` |
+| Content height | ~240pt iOS detent for the 1-line `historyDelete` body, ~280pt for the 2-line `pendingDelete` / `decidedActiveDelete` / `joinedLeave` bodies |
+
+The destructive weight is carried by the copy and the sheet's visual register (dark glass, no celebration motion), not by a colored button — the HARD RULE no-red contract from `components.md §C-25` continues to govern.
 
 ## Ordering within sections (locked Q7)
 

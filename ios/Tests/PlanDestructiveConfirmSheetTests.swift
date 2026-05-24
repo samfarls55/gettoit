@@ -189,6 +189,52 @@ final class PlanDestructiveConfirmSheetTests: XCTestCase {
         XCTAssertEqual(dismissed, 1)
     }
 
+    // MARK: - bug-24 — native-iOS C-27 ActionSheet shape
+
+    /// bug-24 — the destructive confirm sheet adopts the C-27 native-
+    /// iOS Action Sheet shape: native grabber visible, NO custom 38×4
+    /// handle pill. Pins the spec-level contract from
+    /// `surfaces/00-plan-list.md §"Delete confirm sheet"` (added) +
+    /// `components.md §C-27`.
+    func testUsesNativeGrabber() {
+        XCTAssertTrue(PlanDestructiveConfirmSheet.Shape.usesNativeGrabber,
+                      "C-27 ActionSheet must use the native iOS grabber, not a custom handle")
+    }
+
+    /// bug-24 — the custom 38×4 white-0.22 handle pill is removed.
+    /// The native grabber is the only top affordance. C-16 reroll +
+    /// LocationPicker keep their custom handle; only the C-27 Action
+    /// Sheet variant drops it.
+    func testNoCustomHandlePill() {
+        XCTAssertFalse(PlanDestructiveConfirmSheet.Shape.rendersCustomHandle,
+                       "C-27 ActionSheet must NOT render a custom handle pill")
+    }
+
+    /// bug-24 — exactly ONE detent per variant (content-height). No
+    /// `.medium` fallback. Each variant declares its own intrinsic
+    /// content height (1-line vs 2-line bodies produce different
+    /// heights).
+    func testUsesSingleContentHeightDetent() {
+        for variant in PlanDestructiveConfirmSheet.Variant.allCases {
+            XCTAssertEqual(PlanDestructiveConfirmSheet.Shape.detentCount(for: variant), 1,
+                           "C-27 ActionSheet must use a single content-height detent for \(variant)")
+            XCTAssertTrue(PlanDestructiveConfirmSheet.Shape.detentSizesToContent(for: variant),
+                          "the sole detent must be content-height for \(variant)")
+        }
+    }
+
+    /// bug-24 — content height is modest. Each variant fits under
+    /// 360pt (handle + title + body + 60pt pill + dismiss).
+    func testContentHeightDetentIsModest() {
+        for variant in PlanDestructiveConfirmSheet.Variant.allCases {
+            let h = PlanDestructiveConfirmSheet.Shape.contentHeight(for: variant)
+            XCTAssertLessThan(h, 360,
+                              "confirm sheet content fits under 360pt for \(variant)")
+            XCTAssertGreaterThan(h, 200,
+                                 "confirm sheet content height must leave room for the body + 60pt pill + dismiss for \(variant)")
+        }
+    }
+
     // MARK: - render harness
 
     @discardableResult

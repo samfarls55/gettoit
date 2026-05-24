@@ -268,6 +268,8 @@ Stagger order: declared in receipt order, 80ms between each, beginning at choreo
 
 Reroll sheet is the system's friction surface. Slides up from below the verdict.
 
+**C-16 vs C-27 (added 2026-05-24 for bug-24):** C-16 is the system's **modal-editor** sheet — rich content, persistent presence, bespoke dark-glass container, custom 38×4 handle, edge-inset (not full-width). It backs the S07 reroll surface and the [[#C-23 · LocationPicker|C-23 LocationPicker]] sheet (which inherits C-16's container verbatim). For **action-sheet** intent — short binary or single-confirm choice with content-height sizing and the native iOS register — reach for `C-27 · Action Sheet` instead. The two primitives are deliberate counterparts (modal-editor vs action-sheet, per iOS HIG's distinction); do not mix them.
+
 | Element | Spec |
 |---|---|
 | Backdrop | `rgba(0,0,0,0.32)` over the original verdict (verdict stays visible behind, dimmed) |
@@ -819,3 +821,87 @@ struct FloatingActionButton: View {
 - **Surfaces with a CTADock-anchored primary action.** S01 Setup, the quiz screens, the verdict — these surfaces already own a bottom-anchored CTA via `CTADock`. A FAB on top of that competes for attention.
 - **Sheets / presented modal surfaces.** A FAB on a sheet reads as a system control; modal actions belong in the sheet's own action row.
 - **Multi-action create flows.** The FAB is a single tap target — use it when one action covers ≥80% of intent. For multi-action surfaces (e.g. a "compose" button that fans into 4 verbs), reach for a different primitive.
+
+---
+
+## C-27 · Action Sheet
+
+The native-iOS Action Sheet primitive — short binary or single-confirm sheets that rise from the bottom of the screen with the system's rounded-top + grabber affordance + content-height sizing. Backs the S00 Plan list disambig sheet (Solo / Group) and the destructive confirm sheet (Delete plan / Leave plan).
+
+Added 2026-05-24 for bug-24.
+
+### Why distinct from C-16
+
+iOS HIG distinguishes two sheet idioms:
+
+- **Sheet** (modal editor) — rich content, persistent presence, bespoke chrome (Apple's Mail compose, Maps' detail card). The system's [[#C-16 · Bottom Sheet — Reroll|C-16]] backs this register; C-23 LocationPicker inherits it.
+- **Action sheet** (binary or single-confirm) — short, content-height, native rounded-top + grabber, system safe-area treatment. The user expects iOS-native shape, not a bespoke container.
+
+Before bug-24 the design system had only C-16, and the S00 disambig + delete-confirm sheets were composed inline from C-16's language even though their intent (binary action) calls for the action-sheet register. The result was a half-screen sheet (the bespoke container's `.medium` fallback detent) with a lot of empty vertical space and a non-native shape. C-27 introduces the action-sheet primitive as a counterpart to C-16 — the two coexist; reach for the right one per intent. C-16 is unchanged.
+
+### Visual spec — container (outer geometry)
+
+| Element | Spec |
+|---|---|
+| Shape | full-width, rounded-top-only (native iOS rounded corners), bottom flush with screen edge, no edge insets |
+| Sizing | content-height — sheet sizes to its content (SwiftUI: `.presentationDetents([.height(N)])` with `N` = intrinsic content height); single detent, **no** `.medium` / `.large` fallback |
+| Grabber | native iOS grabber via `.presentationDragIndicator(.visible)` (the system 36×4 capsule sits above the sheet content); no custom handle pill |
+| Safe area | sheet honors the system's bottom safe-area inset; content padding accounts for the home indicator |
+| Open / dismiss motion | native iOS sheet motion (system-owned); no bespoke `gti-fade-up` |
+
+### Visual spec — inside (Sunset Pop register)
+
+The container is native; the inside renders the **dark-glass register** so the C-27 reads as visually continuous with the C-16 sheets, the LocationPicker sheet, and the menu popovers — one system, two container shapes.
+
+| Element | Spec |
+|---|---|
+| Background fill | `rgba(20,20,30,0.92)` (matches C-16 `rgba(20,20,30,0.92)`) — applied via SwiftUI's `.presentationBackground` so the native container paints the dark-glass tint instead of the system default |
+| Content padding | top 20pt to clear the native grabber, horizontal 22pt, bottom 18pt (above safe-area inset) |
+| Type | inside, Sunset Pop tokens apply normally (eyebrow / heading / body / cta) |
+| State color | sun-yellow only — no red, no green. Destructive items use the `PillCTA fill="white"` register per the same no-red rule that governs C-25 |
+
+### Behavior
+
+- **Open** via the host surface's `.sheet(isPresented: ...)` (SwiftUI) or `<dialog open ...>` (web).
+- **Dismiss** is swipe-down only (the native grabber affords it) — host surfaces compose their own dismiss verb inside the sheet content if needed (e.g. the C-27 destructive confirm carries an eyebrow-token `KEEP` / `STAY` dismiss below the primary pill).
+- **Multiple stacked actions** are stacked vertically inside the sheet — never side-by-side. The disambig sheet stacks two ghost pills (Solo / Group); the destructive confirm stacks a white primary pill + dismiss eyebrow.
+
+### Customization (props)
+
+The C-27 primitive accepts:
+- `contentHeight: CGFloat` — the intrinsic sheet height. Host computes this from its content (handle is system-owned, no need to allocate space for it).
+- `accessibilityIdentifier: String` — top-level dialog identifier.
+
+The visual register (dark-glass fill, native grabber, content-height detent) is locked. Hosts compose freely inside.
+
+### When NOT to use
+
+- **Rich modal editors** with typeahead, multi-row input, or multi-step content — use C-16 (or C-23 LocationPicker if location-typed). C-27's content-height shape would force the keyboard to overlap the input.
+- **Surfaces that need a backdrop tap-to-dismiss over a peek of the underlying screen** — the C-16 inset-12 + 0.32 backdrop is the right register. C-27's full-width native container does not paint a backdrop the host owns.
+- **Anything that needs to be re-sizable mid-presentation** (a sheet whose content height changes with state). The single content-height detent is locked; resizing would re-trigger the system's snap animation each time.
+
+### SwiftUI primitive
+
+```swift
+// Host attaches C-27 via SwiftUI's standard .sheet modifier.
+// The view body owns its content; the modifiers below pin the C-27
+// shape contract (native grabber, content-height detent, dark-glass
+// background register).
+struct DisambigSheet: View {
+  var body: some View {
+    VStack(spacing: 0) {
+      // ... eyebrow + headline + pills ...
+    }
+    .background(GTIColor.ink2.opacity(0.94))           // dark-glass inside
+    .presentationDetents([.height(contentHeight)])     // content-height, no .medium
+    .presentationDragIndicator(.visible)               // native grabber
+    .presentationBackground(GTIColor.ink2.opacity(0.94)) // paint the native container
+  }
+}
+```
+
+The iOS port pins the shape contract as `enum Shape` static constants on the host sheet view (`PlanDisambigSheet.Shape.usesNativeGrabber`, `Shape.detentCount`, etc.) so tests can assert the C-27 register without walking the SwiftUI view tree. See `ios/Sources/App/PlanDisambigSheet.swift` and `ios/Sources/App/PlanDestructiveConfirmSheet.swift`.
+
+### Web JSX primitive
+
+`ActionSheet` lives in `code/components.jsx`. It models the same shape — full-width, rounded-top-only, content-height container; ARIA `role="dialog"` + `aria-modal="true"`; backdrop click-to-dismiss; honors `prefers-reduced-motion` for the open animation. Web cannot literally use SwiftUI's `presentationDetents`, but the JSX shape mirrors the iOS contract so future web consumers can compose against the same primitive.
