@@ -57,6 +57,53 @@ final class ActionDotMenuTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(ActionDotMenu.itemRowMinHeight, 44)
     }
 
+    // MARK: - bug-21 — trigger hit area clears HIG 44
+
+    /// bug-21 — the trigger's effective tap area is a separate, HIG-
+    /// compliant 44pt square that surrounds the 36pt visible glyph.
+    /// The visual diameter from C-25 stays locked at 36; the hit
+    /// diameter is a non-visual companion constant.
+    func testTriggerHitDiameterClearsHIG() {
+        XCTAssertGreaterThanOrEqual(ActionDotMenu.triggerHitDiameter, 44,
+                                    "trigger hit area must clear HIG 44pt minimum")
+    }
+
+    /// bug-21 — the C-25 visual diameter stays 36, the hit diameter
+    /// stays 44, and the hit diameter is strictly larger than the
+    /// visual diameter. Pins the "visual stays 36, hit grows to 44"
+    /// fix contract at the type level so a future refactor cannot
+    /// silently collapse the hit area back into the visual one.
+    func testTriggerHitDiameterStrictlyExceedsVisualDiameter() {
+        XCTAssertGreaterThan(ActionDotMenu.triggerHitDiameter,
+                             ActionDotMenu.triggerDiameter,
+                             "hit diameter (44) must strictly exceed visual diameter (36)")
+    }
+
+    /// bug-21 — the trigger's natural SwiftUI size matches the hit
+    /// diameter (44), not the visual diameter (36). This is the
+    /// load-bearing fact that makes a tap in the 36–44pt corona land
+    /// on the menu trigger instead of falling through to the host card
+    /// row. We measure via `UIHostingController.sizeThatFits` against
+    /// an unbounded proposed size so the SwiftUI layout reports the
+    /// trigger's intrinsic size with no parent constraints.
+    func testTriggerRendersAtHitDiameter() {
+        let view = ActionDotMenu.Trigger(
+            isOpen: false,
+            onToggle: {},
+            accessibilityLabel: "More actions"
+        )
+        let host = UIHostingController(rootView: view)
+        let unbounded = CGSize(
+            width: UIView.layoutFittingCompressedSize.width,
+            height: UIView.layoutFittingCompressedSize.height
+        )
+        let natural = host.sizeThatFits(in: unbounded)
+        XCTAssertEqual(natural.width, ActionDotMenu.triggerHitDiameter, accuracy: 0.5,
+                       "trigger natural width must equal HIG 44pt hit diameter")
+        XCTAssertEqual(natural.height, ActionDotMenu.triggerHitDiameter, accuracy: 0.5,
+                       "trigger natural height must equal HIG 44pt hit diameter")
+    }
+
     // MARK: - item construction
 
     /// A plain item carries label + onSelect. The destructive flag
