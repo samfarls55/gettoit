@@ -88,6 +88,18 @@ A user participating in a Plan's quiz round. Two disjoint subtypes, distinguishe
 The Plan creator is always an Account member — Plan creation is iOS-only post-v1.1. A Plan's joiners may be any mix of Account members (joined via iOS deep-link, with the Plan appearing on their list) and Web invitees (joined via the iMessage link in a browser, no list).
 _Avoid_: guest (collides with "Anonymous session"), user / participant (acceptable colloquially but underspecified about which subtype — say "Account member" or "Web invitee" when the distinction matters).
 
+### Sheet primitives (UI dogfood, 2026-05-24)
+
+**Modal sheet**:
+A sheet hosting a rich editor surface — multi-row content, persistent open state, the user can scroll inside it. Carries the bespoke Sunset Pop sheet container: `rgba(20,20,30,0.92)` dark glass, inset 12 from edges, bottom 12, custom 38×4 handle, no native iOS grabber. Used for the reroll surface (C-16) and the C-23 LocationPicker sheet. The container is intentionally **non-native** — its visual register binds the sheet to the system's other dark-glass surfaces and is correct for modal-editor intent.
+_Avoid_: bottom sheet (ambiguous — collides with `Action sheet`), reroll sheet (one specific consumer, not the primitive), dark-glass sheet (visual-property name; the *role* is what's load-bearing).
+
+**Action sheet**:
+A sheet hosting a short choice — typically 1-3 affordances and a cancel, content-height, no scrolling inside. Carries the **native iOS shape** via SwiftUI `.sheet` + `.presentationDetents([.height(contentHeight)])` + `.presentationDragIndicator(.visible)` — rounded-top, full-width, system safe-area, native grabber. Inside the container, the Sunset Pop dark-glass register is preserved for visual continuity. Used for the S00 Plan list disambig (Solo / Group) sheet and the per-card delete-confirm sheet. Primitive: `C-2N` (assigned at the bug-24 spec edit; see [[gti-vault/15_issues/v1.1/issues/bug-24-bottom-sheet-ios-shape|bug-24]]).
+_Avoid_: confirm sheet (only one of two consumers is a confirm; the disambig sheet is a 2-row picker), bottom action sheet (redundant — the action-sheet idiom is bottom-anchored on iOS by construction), alert sheet (collides with iOS HIG alert, a distinct primitive).
+
+The distinction matters because the bespoke modal-sheet container intentionally feels non-native — that is correct for the rich-editor role but **wrong** for the short-choice role, where users expect the iOS-HIG native shape. Grilling bug-24 resolved the two roles into two separate primitives instead of collapsing them.
+
 ### Candidate pool (v1.1, 2026-05-19)
 
 **Candidate pool**:
@@ -109,6 +121,7 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 - The **Q5 preference probe** draws its three cards from the **Candidate pool**; the verdict engine ranks the same **Candidate pool**. They are one set — the **Candidate-pool floor** is what guarantees they cannot diverge.
 - The **Candidate-pool floor** is a fetch-time (Stage 1) venue-*class* hard filter, applied alongside geo / radius / price / meal-time. It is orthogonal to cuisine, which is a Stage-2 soft scoring axis in the verdict engine and never strict-filters the fetch.
 - A **Plan** is the durable owner; a **Room** is the ephemeral container for one quiz round. A Plan owns at most one active Room (the in-flight round). Launching a `pending` Plan mints a new Room. On verdict, the Room closes and the Plan transitions to `decided-active`. A reroll re-runs the verdict on that **same** Room in place — it does not mint a new Room (the 3-burn cap is per-Room). Once the Plan transitions to `decided-expired`, no new Rooms may be minted against it. Plan name, status, params, and the stamped verdict survive Room lifecycle; the Room's `votes` / `options` rows do not.
+- A **Modal sheet** and an **Action sheet** are distinct primitives, not visual variants. They differ in *role* (rich editor vs short choice), in container shape (bespoke dark-glass vs native-iOS), and in HIG semantics. C-16 (reroll) and C-23 LocationPicker are Modal sheets. The S00 disambig (Solo / Group) and delete-confirm sheets are Action sheets. A future surface that needs to host a richer single-choice picker (e.g. a long list) belongs in the Modal sheet family, not the Action sheet family — the choice is editor-vs-choice, not list-length.
 
 ## Example dialogue
 
