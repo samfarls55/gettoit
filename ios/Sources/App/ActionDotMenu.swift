@@ -37,12 +37,31 @@ public enum ActionDotMenu {
 
     // MARK: - locked visual constants
 
-    /// 36×36 trigger button per the C-25 visual spec. Locked at the
-    /// type level so a host can't accidentally render a 28 or 44pt
-    /// trigger by mistake. The visible button is 36pt; the surrounding
-    /// card row's 14pt vertical padding pads the tap target to clear
-    /// HIG 44.
+    /// 36×36 trigger button per the C-25 visual spec. This is the
+    /// **visible glyph footprint**, not the tap target — bug-21
+    /// flipped the tap target into its own `triggerHitDiameter` (44pt)
+    /// so the visible glyph stays 36 while the hit area clears HIG.
+    /// Locked at the type level so a host can't accidentally render a
+    /// 28 or 44pt visible glyph by mistake.
     public static let triggerDiameter: CGFloat = 36
+
+    /// bug-21 — 44×44 trigger **tap target** that surrounds the 36pt
+    /// visible glyph. Pre-fix the trigger's rendered SwiftUI frame was
+    /// 36pt — below the HIG 44pt minimum AND nested inside the
+    /// PlanCard row's much larger tap target, so tap-misses fell
+    /// through to the row and opened the verdict screen by accident.
+    /// The fix is two-part:
+    ///
+    ///   1. The Trigger now renders at `triggerHitDiameter` (44),
+    ///      with the visible glyph centered inside via the
+    ///      `triggerDiameter`-sized background circle. `contentShape`
+    ///      paints the full 44pt as the Button's tap area.
+    ///   2. The Button's hit area is consumed by SwiftUI's Button
+    ///      gesture recognizer before the outer card row's Button
+    ///      sees the tap (inner Button wins precedence in a ZStack).
+    ///
+    /// C-25's locked **visual** diameter (36) is preserved.
+    public static let triggerHitDiameter: CGFloat = 44
 
     /// Trigger glyph — `⋯` per the surface spec. Locked here so a
     /// future "Three-dot" / "More" / SF-Symbol swap can't sneak past
@@ -121,24 +140,39 @@ public enum ActionDotMenu {
 
         public var body: some View {
             Button(action: onToggle) {
-                Text(ActionDotMenu.triggerGlyph)
-                    .font(.system(size: ActionDotMenu.triggerGlyphSize, weight: .black))
-                    .foregroundStyle(
-                        isOpen
-                            ? GTIColor.TextOnGradient.primary
-                            : GTIColor.TextOnGradient.tertiary
-                    )
-                    .frame(
-                        width: ActionDotMenu.triggerDiameter,
-                        height: ActionDotMenu.triggerDiameter
-                    )
-                    .background(
-                        Circle()
-                            .fill(isOpen
-                                  ? GTIColor.Glass.fillSoft
-                                  : Color.clear)
-                    )
-                    .animation(.easeOut(duration: 0.14), value: isOpen)
+                // bug-21 — the visible 36pt glyph is centered inside a
+                // 44pt hit area. The outer `.frame` defines the
+                // button's tap footprint (HIG 44); the inner `.frame`
+                // sizes the visible disc per C-25's locked 36pt visual
+                // spec. `contentShape(Rectangle())` paints the full
+                // 44pt as the hit-test surface so a tap in the 36–44pt
+                // corona lands on the trigger instead of falling
+                // through to the surrounding card row's tap target.
+                ZStack {
+                    Text(ActionDotMenu.triggerGlyph)
+                        .font(.system(size: ActionDotMenu.triggerGlyphSize, weight: .black))
+                        .foregroundStyle(
+                            isOpen
+                                ? GTIColor.TextOnGradient.primary
+                                : GTIColor.TextOnGradient.tertiary
+                        )
+                        .frame(
+                            width: ActionDotMenu.triggerDiameter,
+                            height: ActionDotMenu.triggerDiameter
+                        )
+                        .background(
+                            Circle()
+                                .fill(isOpen
+                                      ? GTIColor.Glass.fillSoft
+                                      : Color.clear)
+                        )
+                        .animation(.easeOut(duration: 0.14), value: isOpen)
+                }
+                .frame(
+                    width: ActionDotMenu.triggerHitDiameter,
+                    height: ActionDotMenu.triggerHitDiameter
+                )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(accessibilityLabelText)
