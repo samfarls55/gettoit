@@ -1,11 +1,12 @@
 ---
 issue: bug-21
 title: Plan list per-card ⋯ trigger hitbox too small — taps frequently land on the card body and open the verdict
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 221
 created: 2026-05-24
 grilled: 2026-05-24
+closed: 2026-05-24
 ---
 
 # bug-21 — Plan list per-card `⋯` trigger hitbox too small
@@ -59,3 +60,17 @@ Apply both fixes — HIG floor and nested-target precedence are separate defects
 
 - C-25 visual diameter or position changes.
 - Other `ActionDotMenu` consumers (this fix is localized to the trigger primitive and may benefit any future consumer for free).
+
+## Comments
+
+### 2026-05-24 — closed (PR #229)
+
+Fixed in [PR #229](https://github.com/samfarls55/gettoit/pull/229) (merged 2026-05-24).
+
+- `ActionDotMenu.triggerDiameter` (36) stays the C-25 **visible** lock; a new `ActionDotMenu.triggerHitDiameter` (44) is the load-bearing tap target. Pair-of-constants approach pins both halves of the contract.
+- `ActionDotMenu.Trigger` body now renders the visible glyph inside a `ZStack { ... }.frame(44).contentShape(Rectangle())`. The 44pt frame is the Button's actual tap footprint; `contentShape` paints it as the hit-test surface so taps in the 36–44pt corona land on the trigger instead of the card row.
+- No `simultaneousGesture` / `highPriorityGesture` wiring needed — SwiftUI already gives the inner sibling Button precedence over the outer card-row Button in the ZStack overlay arrangement. The corona-fall-through happened because the inner Button's frame was only 36pt; widening to 44pt is sufficient on its own.
+- No design-system spec change. The C-25 spec table reads "Tap target: 36×36 visible button inside a 44pt-tall host row" — the visible value stays 36pt. The "44pt host row" promise was unrealized on iOS because the row's vertical padding pads the card visual, not a tap-eating zone. iOS-port-only fix.
+- Three new tests pin the contract: `testTriggerHitDiameterClearsHIG`, `testTriggerHitDiameterStrictlyExceedsVisualDiameter`, and `testTriggerRendersAtHitDiameter` (uses `UIHostingController.sizeThatFits` so a future regression that collapses the hit area back to 36pt fails CI).
+
+Pending: on-device verification on the next TestFlight build.

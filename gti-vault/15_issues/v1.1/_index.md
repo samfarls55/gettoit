@@ -288,7 +288,7 @@ Resolutions of note:
 
 | # | Title | Status | Type | GitHub | Blocked by |
 |---|---|---|---|---|---|
-| bug-21 | [[issues/bug-21-plan-list-action-dot-hitbox-too-small\|Plan list ⋯ trigger hitbox too small — taps open the verdict by accident]] | ready-for-agent (bug) | AFK | [#221](https://github.com/samfarls55/gettoit/issues/221) | — |
+| bug-21 | [[issues/bug-21-plan-list-action-dot-hitbox-too-small\|Plan list ⋯ trigger hitbox too small — taps open the verdict by accident]] | done (bug) — PR #229 | AFK | [#221](https://github.com/samfarls55/gettoit/issues/221) | — |
 | bug-22 | [[issues/bug-22-verdict-start-over-reposition-as-home\|Verdict "Start over" → text "Home" in top-leading chrome row]] | ready-for-agent (spec-gap) | AFK | [#222](https://github.com/samfarls55/gettoit/issues/222) | — |
 | bug-23 | [[issues/bug-23-plan-list-fab-design-system-fit\|Plan list FAB rework — T1 ink-fill, new `shadow.fab` token]] | ready-for-agent (spec-gap) | AFK | [#223](https://github.com/samfarls55/gettoit/issues/223) | — |
 | bug-24 | [[issues/bug-24-bottom-sheet-ios-shape\|Split sheet primitive — keep C-16; add C-2N native-iOS Action Sheet]] | ready-for-agent (spec-gap) | AFK | [#224](https://github.com/samfarls55/gettoit/issues/224) | — |
