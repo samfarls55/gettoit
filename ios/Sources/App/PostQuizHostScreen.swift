@@ -19,9 +19,9 @@
 // Lifecycle: the verdict poll is driven by `.task`, which SwiftUI
 // cancels when the view leaves the hierarchy — so the poll loop
 // unwinds on teardown with no leaked timer / task. Ending the session
-// (the `×` on resolving, "Start over" on the verdict) calls
-// `onEndSession`, which routes the caller back to S00 Landing — now
-// the correct destination, not a dead-end.
+// (the `×` on resolving, the chrome-row `Home` verb on the verdict —
+// see bug-22) calls `onEndSession`, which routes the caller back to
+// S00 Plan list — now the correct destination, not a dead-end.
 //
 // Tokens: GTIGradient / GTIColor / GTIFont / GTISpacing. Per repo
 // CLAUDE.md — no inline hex / px / easing literals.
@@ -65,7 +65,13 @@ public struct PostQuizHostScreen: View {
                     verdict: view.verdict,
                     mode: view.mode,
                     isInitiator: host.context.isInitiator,
-                    onStartOver: onEndSession
+                    // bug-22 — the chrome-row `Home` verb pops to S00
+                    // Plan list with the just-decided Plan visible in
+                    // the Decided section. `onEndSession` already
+                    // performs that fallback through the precedence
+                    // chain in `RootView` (clears `postQuizHost` →
+                    // chain falls through to PlanListScreen).
+                    onHome: onEndSession
                 )
             case .failed:
                 failedSurface

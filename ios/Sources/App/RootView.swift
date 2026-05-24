@@ -415,14 +415,20 @@ public struct RootView: View {
                         // with the reroll affordance visible (the
                         // `.default` mode + `isInitiator=true` render
                         // the tertiary "Reroll" button per S05).
-                        // `onAdvance` returns the user to the Plan list
-                        // — the Setup re-invite path is the late-joiner
-                        // deep-link branch only.
+                        // bug-22 — the chrome-row `Home` verb (top-
+                        // leading on every iOS-reachable mode) pops
+                        // back to the Plan list with the same
+                        // teardown semantics the legacy `onAdvance`
+                        // path used (clear the context, fall back
+                        // through the precedence chain to S00).
                         VerdictScreen(
                             verdict: context.payload.verdict,
                             mode: .default,
                             isInitiator: true,
                             onAdvance: {
+                                createdDecidedVerdict = nil
+                            },
+                            onHome: {
                                 createdDecidedVerdict = nil
                             }
                         )

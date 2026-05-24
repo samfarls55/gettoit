@@ -126,8 +126,21 @@ final class VerdictScreenSoloTests: XCTestCase {
         ).modeSnapshot
         XCTAssertEqual(snap.primaryCtaLabel, "I'm in",
             "solo primary CTA reads 'I'm in' — same voluntary register as default")
-        XCTAssertEqual(snap.secondaryLabel, "Start over",
-            "solo secondary remains 'Start over' (tertiary register)")
+        // bug-22 — `Start over` tertiary removed; Home verb lives in
+        // the top-leading chrome row instead. Dock secondary is empty
+        // pre-commit (countdown lands here once the user taps "I'm in").
+        XCTAssertEqual(snap.secondaryLabel, "",
+            "solo secondary slot empty pre-commit — Home is in the chrome row per bug-22")
+    }
+
+    func testSoloModeShowsHomeChrome() {
+        // bug-22 — Home chrome row applies to every iOS-reachable mode.
+        let snap = VerdictScreen(
+            verdict: VerdictScreen.Verdict.soloFixture(),
+            mode: .solo
+        ).modeSnapshot
+        XCTAssertTrue(snap.showHomeChrome,
+            "solo mode surfaces the Home chrome row per bug-22")
     }
 
     func testSoloSurfacesSaveTasteProfileAffordance() {

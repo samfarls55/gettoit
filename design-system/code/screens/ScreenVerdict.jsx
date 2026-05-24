@@ -17,10 +17,19 @@ const VERDICT_CHOREO = {
 // The variant is also addressable explicitly via `mode='solo'`. Either
 // path produces the same suppressed-receipt-row + save-taste-profile
 // render. See `surfaces/05-verdict.md` §"solo".
+//
+// bug-22 — the `Home` chrome row (top-leading text verb) renders on
+// every iOS-reachable mode (`default` / `committed` / `solo` /
+// `no-survivor`). Suppressed on `read-only` because the late-joiner
+// has no Plan-list destination for someone else's Plan. Pure
+// navigation — the tap pops the caller back to S00 Plan list with no
+// session teardown, no membership mutation. Spec: `surfaces/05-verdict.md`
+// §"Verdict chrome (Home)".
 function ScreenVerdict({
   mode = 'default',
   isInitiator = true,
   onAdvance,
+  onHome,
   members = [
     { name: 'you'  },
     { name: 'alex' },
@@ -88,7 +97,15 @@ function ScreenVerdict({
   // back to itself. The group-default still surfaces the row.
   const showReceipts = !isNoSurvivor && !isSolo;
   const showCutsDrawer = !isNoSurvivor;
-  const showStartOverSecondary = !isReadOnly; // suppressed in read-only
+  // bug-22 — `Home` chrome row surfaces on every iOS-reachable mode
+  // except `read-only`. Web `read-only` invitees have no Plan-list
+  // destination per the Web invitee definition in CONTEXT.md, and the
+  // iOS `read-only` mode (deep-link late-joiner) is reached only for a
+  // Plan that does not belong to the late-joiner, so a Home verb has
+  // no honest target there either. The retired `Start over` tertiary
+  // is removed in every mode — the affordance moves into the chrome
+  // row, never duplicated.
+  const showHomeChrome = !isReadOnly;
   // Solo replaces the group-save affordance with the C-22 save-taste-
   // profile chip. The chip surfaces under the primary CTA when the user
   // is anonymous; the host hides it for already-linked users.
@@ -98,6 +115,45 @@ function ScreenVerdict({
     <GradientSurface stop="verdict">
       <div className="gti-canvas">
         <div className="content">
+
+          {/* bug-22 — Home chrome row. Top-leading text verb sitting
+              above the eyebrow, mirroring the `Back` slot in the quiz
+              chrome (surfaces/03-quiz.md §"Quiz chrome (Back + Exit)").
+              Same eyebrow-token treatment (Inter 700 / 11 / 0.18em /
+              UPPERCASE / white 0.78), pure text label, 44pt min hit
+              row. Pure navigation — no confirm alert, no session
+              teardown. Top-trailing slot is intentionally absent
+              (S05 has no `Exit` counterpart; the verdict is not
+              exitable, and the Plan persists by design).
+              Suppressed on `read-only`. */}
+          {showHomeChrome && (
+            <div
+              role="navigation"
+              aria-label="Verdict chrome"
+              style={{
+                position: 'relative', zIndex: 3,
+                display: 'flex', alignItems: 'center',
+                padding: '0 22px',
+                minHeight: 44,
+              }}
+            >
+              <button
+                onClick={onHome}
+                aria-label="Home"
+                style={{
+                  appearance: 'none', background: 'transparent', border: 0, cursor: 'pointer',
+                  minHeight: 44, minWidth: 44,
+                  padding: '12px 4px',
+                  fontFamily: 'var(--ff-body)',
+                  fontSize: 'var(--fz-eyebrow)', fontWeight: 700,
+                  letterSpacing: 'var(--tr-eyebrow)', textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.78)',
+                  lineHeight: 1,
+                  textAlign: 'left',
+                }}
+              >Home</button>
+            </div>
+          )}
 
           {/* eyebrow */}
           <div style={{ padding: '0 22px', textAlign: 'center', ...anim(VERDICT_CHOREO.eyebrow, 500) }}>
@@ -284,27 +340,19 @@ function ScreenVerdict({
               )}
             </div>
 
-            {/* secondary — suppressed in read-only */}
-            {showStartOverSecondary && (
-              isNoSurvivor ? (
-                <button onClick={onAdvance} style={{
-                  appearance: 'none', border: 0, background: 'transparent',
-                  color: 'rgba(255,255,255,0.85)',
-                  fontFamily: 'var(--ff-body)', fontWeight: 800, fontSize: 12,
-                  letterSpacing: 0.16, textTransform: 'uppercase',
-                  cursor: 'pointer', padding: 12, marginTop: -6,
-                }}>Start over</button>
-              ) : (
-                <button onClick={onAdvance} style={{
-                  appearance: 'none', border: 0, background: 'transparent',
-                  color: 'rgba(255,255,255,0.65)',
-                  fontFamily: 'var(--ff-body)', fontWeight: 700, fontSize: 11,
-                  letterSpacing: 0.16, textTransform: 'uppercase',
-                  cursor: 'pointer', padding: 6, marginTop: -6,
-                }}>
-                  {committed ? 'Window closes in 47s' : 'Start over'}
-                </button>
-              )
+            {/* bug-22 — the `Start over` tertiary slot has been removed
+                from every mode. The Home verb moved into the top-leading
+                chrome row above the eyebrow; the affordance is never
+                duplicated in the CTA dock.
+                Committed mode keeps its countdown line in the dock
+                because that copy reads as a status, not a verb. */}
+            {!isReadOnly && !isNoSurvivor && committed && (
+              <div style={{
+                color: 'rgba(255,255,255,0.65)',
+                fontFamily: 'var(--ff-body)', fontWeight: 700, fontSize: 11,
+                letterSpacing: 0.16, textTransform: 'uppercase',
+                padding: 6, marginTop: -6,
+              }}>Window closes in 47s</div>
             )}
 
             {/* TB-13 — solo mode replaces the group-save affordance with

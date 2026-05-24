@@ -101,6 +101,20 @@ final class VerdictScreenReadOnlyTests: XCTestCase {
             "read-only suppresses the 'Start over' secondary — the re-invite CTA is the only path")
     }
 
+    func testReadOnlyDoesNotShowHomeChrome() {
+        // bug-22 — Home chrome is suppressed on read-only because the
+        // iOS read-only path is reached only via a deep link to a
+        // late-joined Plan; the late-joiner has no Plan list context
+        // for that Plan (it isn't theirs). Per the grill outcome's
+        // "Modes affected" table the read-only mode is unaffected.
+        let snap = VerdictScreen(
+            verdict: VerdictScreen.Verdict.fixture(),
+            mode: .readOnly
+        ).modeSnapshot
+        XCTAssertFalse(snap.showHomeChrome,
+            "read-only suppresses Home — late-joiner has no Plan-list destination for this Plan")
+    }
+
     func testReadOnlySuppressesPreCheckInLine() {
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.fixture(),

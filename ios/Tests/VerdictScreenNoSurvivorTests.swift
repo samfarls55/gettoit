@@ -80,8 +80,23 @@ final class VerdictScreenNoSurvivorTests: XCTestCase {
         ).modeSnapshot
         XCTAssertEqual(snap.primaryCtaLabel, "Widen radius",
             "no-survivor primary CTA is the verb-first 'Widen radius'")
-        XCTAssertEqual(snap.secondaryLabel, "Start over",
-            "no-survivor secondary ghost is 'Start over'")
+        // bug-22 — `Start over` ghost removed from the CTA dock; the
+        // Home verb now lives on the top-leading chrome row. Non-
+        // initiators see no dock affordance at all (Home is their
+        // only exit, and a verdict is not "exitable" beyond that).
+        XCTAssertEqual(snap.secondaryLabel, "",
+            "no-survivor dock secondary empty post-bug-22 — Home replaces 'Start over'")
+    }
+
+    func testNoSurvivorModeShowsHomeChrome() {
+        // bug-22 — Home chrome row applies to every iOS-reachable mode
+        // including the no-survivor terminal.
+        let snap = VerdictScreen(
+            verdict: VerdictScreen.Verdict.noSurvivorFixture(),
+            mode: .noSurvivor
+        ).modeSnapshot
+        XCTAssertTrue(snap.showHomeChrome,
+            "no-survivor mode surfaces the Home chrome row per bug-22")
     }
 
     // MARK: - hero stacking — "NO SPOT / FITS"

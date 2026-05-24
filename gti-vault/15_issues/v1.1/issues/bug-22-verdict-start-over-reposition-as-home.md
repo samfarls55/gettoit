@@ -1,11 +1,12 @@
 ---
 issue: bug-22
 title: Verdict screen "Start over" should be repositioned and reframed as a "Home" affordance
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 222
 created: 2026-05-24
 grilled: 2026-05-24
+done: 2026-05-24
 ---
 
 # bug-22 — Verdict screen "Start over" → repositioned "Home" affordance
@@ -75,3 +76,12 @@ User dogfood, 2026-05-24.
 - Manual iOS walk: verdict → tap `Home` → land on Plan list with the just-decided Plan visible in the Decided section.
 - Manual iOS walk in `no-survivor` and `solo` modes — Home present and works.
 - Tap Plan card → returns to verdict (Plan was not torn down).
+
+## Comments
+
+- 2026-05-24 — AFK execution complete. Spec edits, JSX, iOS port, accessibility, and CHANGELOG all landed in a single PR (#TBD). Decisions:
+  - Reused the existing `onEndSession` plumbing in `PostQuizHostScreen` / `RootView` for the Home callback — the post-quiz host's teardown already lands on S00 Plan list via the precedence-chain fallback in `RootView`. No new navigation routing was needed.
+  - Wired `onHome` on the `createdDecidedVerdict` branch in `RootView` (Plan list → Decided-active tap → VerdictScreen) so the Home verb works there too. The read-only branches (`createdHistoryVerdict`, `joinedReadOnly`, `readOnlyView`) do not need the wiring — the spec suppresses Home on read-only.
+  - Removed the now-dead `noSurvivorSecondary` view + `onStartOver` callback parameter. Renamed to `onHome` rather than keeping a deprecated `onStartOver` shim — there were no external consumers (all call sites use named parameters with the default closure).
+  - `ModeSnapshot` gained a `showHomeChrome` flag so the snapshot suite can assert the render gate without touching view internals.
+  - The committed-mode `"Window closes in 47s"` status line was retained in the CTA dock — it reads as status, not a verb, so the bug-22 "Start over removed" rule doesn't apply.

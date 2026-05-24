@@ -190,9 +190,16 @@ public struct VerdictScreen: View {
     /// `compute-verdict` re-invocation. Defaults to no-op so existing
     /// `.default` call sites compile through.
     private let onWidenRadius: (Int) -> Void
-    /// Fires when the user taps the no-survivor secondary "Start over"
-    /// ghost button. Defaults to no-op.
-    private let onStartOver: () -> Void
+    /// bug-22 — fires when the user taps the top-leading `Home` text
+    /// verb in the new verdict chrome row. Pure navigation — pops to
+    /// S00 Plan list. No session teardown, no membership mutation
+    /// (the room is already closed at verdict per `CONTEXT.md` →
+    /// *Plan / Room lifecycle*). The host wires this to the same
+    /// destination the retired `onStartOver` reached (the post-quiz
+    /// host's `onEndSession` already lands on S00 Plan list via the
+    /// precedence-chain fallback in `RootView`). Defaults to no-op.
+    /// See `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
+    private let onHome: () -> Void
     /// TB-08 — correctability window in seconds. Defaults to 30 per
     /// `rooms.correctability_window_seconds`. The view drives a 1-Hz
     /// countdown from this value once the user commits.
@@ -221,7 +228,7 @@ public struct VerdictScreen: View {
         onAdvance: @escaping () -> Void = {},
         onRatify: @escaping () -> Void = {},
         onWidenRadius: @escaping (Int) -> Void = { _ in },
-        onStartOver: @escaping () -> Void = {},
+        onHome: @escaping () -> Void = {},
         onReroll: @escaping () -> Void = {}
     ) {
         self.verdict = verdict
@@ -235,7 +242,7 @@ public struct VerdictScreen: View {
         self.onAdvance = onAdvance
         self.onRatify = onRatify
         self.onWidenRadius = onWidenRadius
-        self.onStartOver = onStartOver
+        self.onHome = onHome
         self.onReroll = onReroll
         self._widenRadiusMiles = State(
             initialValue: VerdictScreen.widenRadiusInitialMiles(
@@ -259,9 +266,21 @@ public struct VerdictScreen: View {
                 .accessibilityIdentifier("verdict.gradient")
 
             VStack(spacing: 0) {
+                // bug-22 — Home chrome row. Top-leading text verb
+                // mirroring the QuizChrome `Back` slot. Suppressed in
+                // `.readOnly` (the deep-link late-joiner has no Plan-
+                // list destination for someone else's Plan). See
+                // `design-system/surfaces/05-verdict.md` §"Verdict
+                // chrome (Home)".
+                if modeSnapshot.showHomeChrome {
+                    homeChromeRow
+                        .padding(.top, GTISpacing.step3)
+                        .padding(.horizontal, GTISpacing.step5)
+                }
+
                 // Eyebrow
                 eyebrow
-                    .padding(.top, GTISpacing.step10)
+                    .padding(.top, modeSnapshot.showHomeChrome ? GTISpacing.step4 : GTISpacing.step10)
                     .padding(.horizontal, GTISpacing.step6)
 
                 // Hero — stacked one word per line, uppercase
@@ -350,6 +369,37 @@ public struct VerdictScreen: View {
             .offset(y: revealStep >= 1 ? 0 : 8)
             .frame(maxWidth: .infinity)
             .accessibilityIdentifier("verdict.eyebrow")
+    }
+
+    /// bug-22 — top-leading `Home` text verb. Same eyebrow-token
+    /// treatment + 44pt hit row as the QuizChrome `Back` slot. Pure
+    /// navigation — no confirm alert, no session teardown. Top-trailing
+    /// slot is intentionally empty (S05 has no `Exit` counterpart;
+    /// the verdict is not exitable, and the Plan persists by design).
+    /// See `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
+    @ViewBuilder
+    private var homeChromeRow: some View {
+        HStack(alignment: .center) {
+            Button(action: onHome) {
+                Text(VerdictScreen.homeChromeLabel.uppercased())
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("verdict.chrome.home")
+            .accessibilityLabel(VerdictScreen.homeChromeLabel)
+            Spacer()
+            // Trailing slot empty — S05 has no `Exit` counterpart. The
+            // 44pt-square reserved frame preserves vertical rhythm on
+            // surfaces that might later acquire a trailing affordance.
+            Color.clear
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 44)
     }
 
     @ViewBuilder
@@ -549,19 +599,23 @@ public struct VerdictScreen: View {
     private var ctaDock: some View {
         VStack(spacing: 14) {
             if mode == .noSurvivor {
+                // bug-22 — the no-survivor ghost `"Start over"` was the
+                // non-initiator's only exit; it's now replaced by the
+                // chrome-row `Home` verb above the eyebrow. The dock
+                // surfaces just the initiator-only `Widen radius` CTA.
                 noSurvivorPrimary
-                noSurvivorSecondary
             } else if mode == .solo {
                 soloCTADock
             } else if mode == .readOnly {
                 // TB-11 — read-only late-joiner CTA. Re-invite the
                 // caller to a fresh round as the new initiator;
-                // ratification + reroll + "Start over" secondary are
+                // ratification + reroll + chrome `Home` (bug-22) are
                 // ALL suppressed in this branch (they imply the
-                // late-joiner can still influence the closed
-                // verdict). The pre-permission line is also dropped
-                // because there's no "I'm in" tap to chase with the
-                // native push prompt.
+                // late-joiner can still influence the closed verdict
+                // OR has a Plan-list destination for someone else's
+                // Plan, neither of which is true). The pre-permission
+                // line is also dropped because there's no "I'm in"
+                // tap to chase with the native push prompt.
                 //
                 // VO contract (locked in `design-system/accessibility.md`
                 // §"Verdict (`read-only` mode)"): the absent
@@ -598,7 +652,10 @@ public struct VerdictScreen: View {
                 rerollTertiary
                 preCheckInLine
             } else {
-                // Default mode — "I'm in" white pill.
+                // Default mode — "I'm in" white pill. bug-22 removed
+                // the `"Start over"` tertiary that previously sat under
+                // the primary; the Home verb now lives in the chrome
+                // row above the eyebrow (see `homeChromeRow`).
                 Button(action: handleImInTap) {
                     Text("I'M IN")
                         .font(.system(size: GTIFont.Size.cta, weight: .black))
@@ -612,14 +669,6 @@ public struct VerdictScreen: View {
                 }
                 .accessibilityIdentifier("verdict.cta.primary")
 
-                Button(action: onAdvance) {
-                    Text("START OVER")
-                        .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                        .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
-                        .padding(GTISpacing.step1)
-                }
-                .accessibilityIdentifier("verdict.cta.secondary")
                 rerollTertiary
                 preCheckInLine
             }
@@ -715,7 +764,9 @@ public struct VerdictScreen: View {
 
     /// No-survivor primary CTA — sun-filled "Widen radius" (or
     /// "Re-run · N.N mi" once the slider is open). Initiator-only;
-    /// invitees see the secondary "Start over" only.
+    /// non-initiators see the chrome-row `Home` verb as their only
+    /// exit (bug-22 — the legacy `"Start over"` ghost secondary was
+    /// removed).
     @ViewBuilder
     private var noSurvivorPrimary: some View {
         if isInitiator {
@@ -743,8 +794,10 @@ public struct VerdictScreen: View {
     /// TB-13 — solo CTA dock. Renders the same warm primary as
     /// `default` ("I'm in" → committed "You're in"), the reroll tertiary,
     /// the C-22 save-taste-profile chip in place of the group save
-    /// affordance, the pre-permission line, and the quiet "Start over"
-    /// secondary. The chip's surfaced state comes from the host's
+    /// affordance, and the pre-permission line. bug-22 removed the
+    /// quiet "Start over" secondary that previously sat below the
+    /// primary; the Home verb now lives on the chrome row above the
+    /// eyebrow. The chip's surfaced state comes from the host's
     /// `AuthPromptStore`; this view renders a default-idle placeholder
     /// chip so the surface still demos in the design-system preview.
     @ViewBuilder
@@ -774,14 +827,6 @@ public struct VerdictScreen: View {
             }
             .accessibilityIdentifier("verdict.cta.primary")
 
-            Button(action: onAdvance) {
-                Text("START OVER")
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.65))
-                    .padding(GTISpacing.step1)
-            }
-            .accessibilityIdentifier("verdict.cta.secondary")
             rerollTertiary
             soloSaveTasteProfileChip
             preCheckInLine
@@ -799,23 +844,6 @@ public struct VerdictScreen: View {
         AuthUpgradeChip(state: .defaultIdle)
             .padding(.top, GTISpacing.step1)
             .accessibilityIdentifier("verdict.solo.saveTasteProfile")
-    }
-
-    /// No-survivor secondary — ghost "Start over" returning to S01.
-    /// Slightly louder than the default mode's "Start over" tertiary
-    /// (12pt vs 11pt body weight 800) because in no-survivor it's
-    /// the only path for non-initiators.
-    @ViewBuilder
-    private var noSurvivorSecondary: some View {
-        Button(action: onStartOver) {
-            Text("START OVER")
-                .font(.system(size: 12, weight: .heavy))
-                .tracking(GTIFont.TrackingEm.eyebrow * 12)
-                .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.85))
-                .frame(maxWidth: .infinity)
-                .padding(GTISpacing.step3)
-        }
-        .accessibilityIdentifier("verdict.cta.secondary")
     }
 
     private var noSurvivorPrimaryLabel: String {
@@ -937,6 +965,13 @@ public struct VerdictScreen: View {
         /// render gate; the actual chip state is sourced from the host's
         /// `AuthPromptStore` (hidden when the user is already linked).
         public let showSaveTasteProfileChip: Bool
+        /// bug-22 — render gate for the top-leading `Home` chrome row.
+        /// Rendered on every iOS-reachable mode (`default` / `committed`
+        /// / `solo` / `no-survivor`); suppressed in `.readOnly` because
+        /// the deep-link late-joiner has no Plan-list destination for
+        /// someone else's Plan. See `design-system/surfaces/05-verdict.md`
+        /// §"Verdict chrome (Home)".
+        public let showHomeChrome: Bool
     }
 
     /// Mode-shaped flags surfaced for the snapshot tests. Mirrors the
@@ -973,15 +1008,18 @@ public struct VerdictScreen: View {
             primaryLabel = "I'm in"
         }
 
+        // bug-22 — the dock secondary now only carries the committed
+        // status line (`"Window closes in 47s"`). The retired
+        // `"Start over"` tertiary was lifted into the chrome row as
+        // the `Home` verb; pre-commit there is no dock secondary at
+        // all on default / solo / no-survivor.
         let secondary: String
-        if isReadOnly {
-            secondary = ""
-        } else if isCommitted {
+        if isCommitted && !isReadOnly && !isNoSurvivor {
             secondary = VerdictScreen.windowCountdownCopy(
                 seconds: windowSecondsRemaining
             )
         } else {
-            secondary = "Start over"
+            secondary = ""
         }
 
         // Pre-permission line is suppressed in read-only + no-survivor
@@ -993,6 +1031,11 @@ public struct VerdictScreen: View {
         // group modes never surface this chip on S05 (it lives on S04
         // for those flows per TB-12).
         let saveChip = isSolo && !isReadOnly && !isNoSurvivor
+
+        // bug-22 — Home chrome row renders on every iOS-reachable mode
+        // except `.readOnly`. See `design-system/surfaces/05-verdict.md`
+        // §"Verdict chrome (Home)".
+        let homeChrome = !isReadOnly
 
         return ModeSnapshot(
             showTimeBadge: !isNoSurvivor,
@@ -1007,7 +1050,8 @@ public struct VerdictScreen: View {
             widenSliderOpen: widenSliderOpen,
             isCommittedFlavor: isCommitted,
             preCheckInLine: preLine,
-            showSaveTasteProfileChip: saveChip
+            showSaveTasteProfileChip: saveChip,
+            showHomeChrome: homeChrome
         )
     }
 
@@ -1017,6 +1061,14 @@ public struct VerdictScreen: View {
     /// NEVER paraphrase to "Enable notifications" / "Allow alerts" —
     /// the wording is voluntary register, the prompt is the call.
     public static let preCheckInCopy = "We'll check in tomorrow — see if you went."
+
+    /// bug-22 — text-only verb on the top-leading chrome slot. Resolved
+    /// by the spec grill (2026-05-24) over alternatives (`Done`,
+    /// SF Symbol house, icon+label). The Sunset Pop chrome-row idiom is
+    /// text-only — matches the `QuizChrome` `Back` / `Exit` / `Leave`
+    /// pattern. NEVER paraphrase. See
+    /// `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
+    public static let homeChromeLabel = "Home"
 
     /// TB-11 — VO announcement for the suppressed ratification path in
     /// `.readOnly` mode. Locked by
