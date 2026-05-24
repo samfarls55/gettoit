@@ -742,23 +742,32 @@ struct ActionDotMenuTrigger: View {
 
 ## C-26 · Floating Action Button
 
-The bottom-right circular create button on S00 Plan list, and the canonical Sunset Pop FAB primitive for any future surface needing a single persistent create affordance. Glass body, sun-yellow glyph, ~56pt diameter, light shadow. Sits anchored 18 off the trailing + bottom edges of the host surface.
+The bottom-right circular create button on S00 Plan list, and the canonical Sunset Pop FAB primitive for any future surface needing a single persistent create affordance. Ink-2 body, sun-yellow glyph, sun-tinted halo, ~56pt diameter. Sits anchored 18 off the trailing + bottom edges of the host surface.
 
-Added 2026-05-20 for sg-WF-4 (#157).
+Added 2026-05-20 for sg-WF-4 (#157). Visual register reworked 2026-05-24 for bug-23 (T1 ink-fill, new `shadow.fab` token) after an impeccable grill flagged the original glass body as the design system's only glassmorphic primary create affordance — see "Why ink-fill" below.
 
 ### Why a custom FAB vs. a chrome `+` glyph or a bottom dock pill
 
 - **Founder preference for the FAB-unfold aesthetic** locked in the sg-WF-4 grill (2026-05-20, Q5). The list surface owns its vertical real estate end-to-end; a chrome `+` competes with the surface header for attention, and a bottom dock pill eats a 60pt-tall row the section list itself should own.
-- **Glass + sun glyph composes with the gradient.** The FAB sits on the `initiator` gradient stop (Plan list's gradient); a sun-yellow disc would over-saturate against the warm wash. Glass body with a sun glyph lets the gradient breathe through the button while the glyph carries the brand color.
+
+### Why ink-fill (T1) over glass or sun-fill
+
+Reworked 2026-05-24 (bug-23) after an `impeccable:impeccable` grill against the live build flagged three drifts in the original glass register:
+
+1. The FAB was the carrier of the surface's primary create affordance — it cannot be a glass primitive. `impeccable` treats glassmorphism as a rare flourish, not the default; the original `rgba(255,255,255,0.18)` + 14px blur on the home page's create button broke that absolute ban.
+2. The original `0 8px 24px rgba(0,0,0,0.18)` shadow was the only generic-dark shadow on any major elevated primitive — every other elevated piece (`shadow.cta-sun`, `shadow.time-badge`, `shadow.chip-selected`) carries an `rgba(255,210,63,*)` sun tint. The FAB was the lone drift from the system's elevation language.
+3. The `+` Inter 900 glyph on glass read as a typeset plus, not a brand sun. The glyph itself is functional; the disc had no opportunity to push the brand register.
+
+T1 ink-fill — `--ink-2` body, no border, `--shadow-fab` sun-tinted halo, unchanged `+` Inter 900 / `--sun` glyph — fixes all three. Sun-fill (T3 in the grill) was rejected because the FAB sits on the `initiator` gradient whose bottom stop `g4` is `#FFD23F` (= `--sun`) — a 56pt sun puck would melt into the gradient's bright bottom band. Polished glass (T2) was kept as the fallback if T1 surfaces a regression in user testing, but is not the shipped register.
 
 ### Visual spec
 
 | Element | Spec |
 |---|---|
 | Container | 56×56, `position: absolute`, `bottom: 18`, `right: 18`, `z-index: 5` |
-| Background | `rgba(255,255,255,0.18)` + `backdrop-filter: blur(14px) saturate(160%)` |
-| Border | `0.75px solid rgba(255,255,255,0.32)` |
-| Shadow | `inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.18)` |
+| Background | `var(--ink-2)` — deep but warmer than pure ink |
+| Border | `none` — glass stroke removed in the T1 rework |
+| Shadow | `var(--shadow-fab)` — `0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08)` |
 | Radius | 999 (full circle) |
 | Glyph | `+` Inter 900 / 28, `var(--sun)`, vertically centered |
 | Pressed | `transform: scale(0.96)`, 140ms `var(--ease-out)` |
@@ -796,9 +805,8 @@ struct FloatingActionButton: View {
         .font(.system(size: 28, weight: .black))
         .foregroundColor(GTIColor.sun)
         .frame(width: 56, height: 56)
-        .background(.ultraThinMaterial, in: Circle())
-        .overlay(Circle().stroke(.white.opacity(0.32), lineWidth: 0.75))
-        .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 8)
+        .background(GTIColor.ink2, in: Circle())
+        .gtiShadow(GTIShadow.fab)
     }
     .accessibilityLabel("Start a new plan")
     // anchor to the host surface's safeAreaInset(.bottom) + .trailing

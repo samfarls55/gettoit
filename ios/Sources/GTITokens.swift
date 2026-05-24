@@ -238,3 +238,74 @@ public enum GTITexture {
     public static let grainTilePx: CGFloat = 280
     public static let grainBlend = "overlay"
 }
+
+/// Drop-shadow primitives. The outer drop layer of each `tokens.json` shadow recipe
+/// is exposed here as a `Recipe` value the iOS port applies via `.shadow(color:radius:x:y:)`.
+/// Multi-stop CSS recipes (inset highlights, second / third stop) are not lifted —
+/// SwiftUI's shadow modifier renders one drop layer, and the inset / spread layers are
+/// best rendered via a separate overlay if the host needs them.
+public enum GTIShadow {
+    public struct Recipe: Sendable, Equatable {
+        public let color: Color
+        public let radius: CGFloat
+        public let x: CGFloat
+        public let y: CGFloat
+        public init(color: Color, radius: CGFloat, x: CGFloat = 0, y: CGFloat = 0) {
+            self.color = color
+            self.radius = radius
+            self.x = x
+            self.y = y
+        }
+    }
+
+    /// Outer drop of `tokens.json` `shadow.cta-white` recipe — applied via `.gtiShadow(...)`.
+    public static let ctaWhite = Recipe(
+        color: Color(gtiHex: 0x000000, opacity: 0.18),
+        radius: 32,
+        x: 0,
+        y: 12
+    )
+    /// Outer drop of `tokens.json` `shadow.cta-sun` recipe — applied via `.gtiShadow(...)`.
+    public static let ctaSun = Recipe(
+        color: Color(gtiHex: 0xFFD23F, opacity: 0.4),
+        radius: 32,
+        x: 0,
+        y: 12
+    )
+    /// Outer drop of `tokens.json` `shadow.time-badge` recipe — applied via `.gtiShadow(...)`.
+    public static let timeBadge = Recipe(
+        color: Color(gtiHex: 0xFFD23F, opacity: 0.36),
+        radius: 38,
+        x: 0,
+        y: 18
+    )
+    /// Outer drop of `tokens.json` `shadow.chip-selected` recipe — applied via `.gtiShadow(...)`.
+    public static let chipSelected = Recipe(
+        color: Color(gtiHex: 0xFFD23F, opacity: 0.35),
+        radius: 22,
+        x: 0,
+        y: 8
+    )
+    /// Outer drop of `tokens.json` `shadow.sheet` recipe — applied via `.gtiShadow(...)`.
+    public static let sheet = Recipe(
+        color: Color(gtiHex: 0x000000, opacity: 0.5),
+        radius: 60,
+        x: 0,
+        y: -20
+    )
+    /// Outer drop of `tokens.json` `shadow.fab` recipe — applied via `.gtiShadow(...)`.
+    public static let fab = Recipe(
+        color: Color(gtiHex: 0xFFD23F, opacity: 0.32),
+        radius: 32,
+        x: 0,
+        y: 12
+    )
+}
+
+public extension View {
+    /// Apply a `GTIShadow.Recipe` as a SwiftUI drop shadow. Wraps the standard
+    /// `.shadow(color:radius:x:y:)` modifier so call sites pin the recipe by name.
+    func gtiShadow(_ recipe: GTIShadow.Recipe) -> some View {
+        self.shadow(color: recipe.color, radius: recipe.radius, x: recipe.x, y: recipe.y)
+    }
+}

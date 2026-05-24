@@ -111,6 +111,9 @@ function renderCss(t) {
   --ease-out-soft: ${m.easing['out-soft']};
   --ease-in-out: ${m.easing['in-out']};
   --grad-tween: ${tween};
+
+  /* shadow — C-26 Floating Action Button (T1 ink-fill, bug-23) */
+  --shadow-fab: ${t.shadow.fab};
 }
 
 html, body {

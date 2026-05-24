@@ -237,7 +237,118 @@ function renderSwift(t) {
   lines.push('}');
   lines.push('');
 
+  // ── GTIShadow ───────────────────────────────────────────────
+  // Drop-shadow primitives. SwiftUI's `.shadow(color:radius:x:y:)` modifier
+  // does not natively render multi-stop CSS shadows (e.g. the inset
+  // highlight layer on `shadow.fab`); only the outer drop layer of each
+  // multi-stop recipe is lifted into Swift here. iOS hosts that want the
+  // inset highlight render it via a separate overlay (a sub-1px white
+  // sheen rarely reads on a small disc, and the FAB ports without it).
+  lines.push('/// Drop-shadow primitives. The outer drop layer of each `tokens.json` shadow recipe');
+  lines.push('/// is exposed here as a `Recipe` value the iOS port applies via `.shadow(color:radius:x:y:)`.');
+  lines.push('/// Multi-stop CSS recipes (inset highlights, second / third stop) are not lifted —');
+  lines.push('/// SwiftUI\'s shadow modifier renders one drop layer, and the inset / spread layers are');
+  lines.push('/// best rendered via a separate overlay if the host needs them.');
+  lines.push('public enum GTIShadow {');
+  lines.push('    public struct Recipe: Sendable, Equatable {');
+  lines.push('        public let color: Color');
+  lines.push('        public let radius: CGFloat');
+  lines.push('        public let x: CGFloat');
+  lines.push('        public let y: CGFloat');
+  lines.push('        public init(color: Color, radius: CGFloat, x: CGFloat = 0, y: CGFloat = 0) {');
+  lines.push('            self.color = color');
+  lines.push('            self.radius = radius');
+  lines.push('            self.x = x');
+  lines.push('            self.y = y');
+  lines.push('        }');
+  lines.push('    }');
+  lines.push('');
+  for (const k of Object.keys(t.shadow)) {
+    if (k.startsWith('_')) continue;            // skip _notes
+    const recipe = parseShadowOuterDrop(t.shadow[k]);
+    if (!recipe) continue;                       // skip recipes we cannot lift cleanly
+    lines.push(`    /// Outer drop of \`tokens.json\` \`shadow.${k}\` recipe — applied via \`.gtiShadow(...)\`.`);
+    lines.push(`    public static let ${camel(k)} = Recipe(`);
+    lines.push(`        color: ${recipe.color},`);
+    lines.push(`        radius: ${recipe.radius},`);
+    lines.push(`        x: ${recipe.x},`);
+    lines.push(`        y: ${recipe.y}`);
+    lines.push('    )');
+  }
+  lines.push('}');
+  lines.push('');
+  lines.push('public extension View {');
+  lines.push('    /// Apply a `GTIShadow.Recipe` as a SwiftUI drop shadow. Wraps the standard');
+  lines.push('    /// `.shadow(color:radius:x:y:)` modifier so call sites pin the recipe by name.');
+  lines.push('    func gtiShadow(_ recipe: GTIShadow.Recipe) -> some View {');
+  lines.push('        self.shadow(color: recipe.color, radius: recipe.radius, x: recipe.x, y: recipe.y)');
+  lines.push('    }');
+  lines.push('}');
+  lines.push('');
+
   return lines.join('\n');
+}
+
+// Parse the outer drop layer of a CSS box-shadow recipe.
+//   Input:  "0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08)"
+//   Output: { color, radius, x, y, doc }
+//
+// Skips:
+//   * recipes whose first stop is an inset (no usable drop layer)
+//   * recipes with no rgba()/hex color
+// Returns null if the recipe cannot be parsed cleanly.
+function parseShadowOuterDrop(recipe) {
+  // Trim the CSS into the first comma-separated stop, respecting parens.
+  const firstStop = splitTopLevelComma(recipe)[0]?.trim() ?? '';
+  if (/^inset\b/i.test(firstStop)) return null;
+  // Expected shape: `<x> <y> <blur> [spread] <color>` — we lift x / y / blur and color.
+  // Allow optional spread for completeness (we currently emit no spread token, but
+  // the parser tolerates one) — the spread component is dropped on the Swift side.
+  const m = firstStop.match(
+    /^(-?\d+(?:\.\d+)?)(?:px)?\s+(-?\d+(?:\.\d+)?)(?:px)?\s+(-?\d+(?:\.\d+)?)(?:px)?(?:\s+(-?\d+(?:\.\d+)?)(?:px)?)?\s+(.+)$/
+  );
+  if (!m) return null;
+  const [, xStr, yStr, blurStr, /* spread */, colorStr] = m;
+  const x = parseFloat(xStr);
+  const y = parseFloat(yStr);
+  const radius = parseFloat(blurStr);
+  const color = swiftColorFromCss(colorStr.trim());
+  if (!color) return null;
+  return { color, radius, x, y };
+}
+
+function splitTopLevelComma(s) {
+  const out = [];
+  let depth = 0, start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth--;
+    else if (c === ',' && depth === 0) {
+      out.push(s.slice(start, i));
+      start = i + 1;
+    }
+  }
+  out.push(s.slice(start));
+  return out;
+}
+
+function swiftColorFromCss(s) {
+  // rgba(r,g,b,a) — preserved at the alpha; rounded to nearest 0xRRGGBB.
+  const rgba = s.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)$/i);
+  if (rgba) {
+    const r = parseInt(rgba[1], 10);
+    const g = parseInt(rgba[2], 10);
+    const b = parseInt(rgba[3], 10);
+    const a = rgba[4] != null ? parseFloat(rgba[4]) : 1;
+    const hex = `0x${[r, g, b].map(n => n.toString(16).toUpperCase().padStart(2, '0')).join('')}`;
+    if (a === 1) return `Color(gtiHex: ${hex})`;
+    return `Color(gtiHex: ${hex}, opacity: ${a})`;
+  }
+  // #RRGGBB hex
+  const hexm = s.match(/^#([0-9A-Fa-f]{6})$/);
+  if (hexm) return `Color(gtiHex: 0x${hexm[1].toUpperCase()})`;
+  return null;
 }
 
 // ─── helpers ──────────────────────────────────────────────────

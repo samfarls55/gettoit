@@ -171,6 +171,7 @@ Gradients resist drop shadows. Use elevation **only on white or sun-yellow surfa
 | `shadow-chip-selected` | `0 8px 22px rgba(255,210,63,0.35), 0 0 0 4px rgba(255,210,63,0.18), inset 0 1px 0 rgba(255,255,255,0.5)` |
 | `shadow-receipt-glass` | `inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 10px rgba(0,0,0,0.08)` |
 | `shadow-sheet` | `0 -20px 60px rgba(0,0,0,0.5)` |
+| `shadow-fab` | `0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08)` |
 
 **Glass uses inset highlights, not drop shadows.** That's how iOS does material and it reads correctly on gradients.
 

@@ -1170,10 +1170,18 @@ function ActionDotMenu({ items, onDismiss }) {
 // ────────────────────────────────────────────────────────────
 // Floating Action Button (C-26) — bottom-right circular create button.
 //
-// Sunset Pop primitive — glass body, sun-yellow `+` glyph, ~56pt
-// diameter, light shadow. Sits fixed at 18 off the bottom + trailing
-// edges of the surface. Single tap target; no labels, no states beyond
+// Sunset Pop primitive — ink-2 body, sun-yellow `+` glyph, sun-tinted
+// halo, 56pt diameter. Sits fixed at 18 off the bottom + trailing edges
+// of the surface. Single tap target; no labels, no states beyond
 // `pressed`. The host owns navigation — the FAB just emits `onClick`.
+//
+// T1 ink-fill register (bug-23, 2026-05-24) — replaces the original
+// glass + black-0.18 shadow combo that read as templated and broke
+// `impeccable`'s `Glassmorphism as default` absolute ban. The sun-tinted
+// `--shadow-fab` halo lands the FAB inside the same elevation language
+// the rest of the system uses (`cta-sun`, `time-badge`, `chip-selected`
+// all carry `rgba(255,210,63,*)` tints). See `components.md §C-26
+// → "Why ink-fill"` for the full rationale.
 // ────────────────────────────────────────────────────────────
 function FloatingActionButton({
   onClick = () => {},
@@ -1192,12 +1200,9 @@ function FloatingActionButton({
         bottom, right,
         width: 56, height: 56,
         borderRadius: 999,
-        background: 'rgba(255,255,255,0.18)',
-        backdropFilter: 'blur(14px) saturate(160%)',
-        WebkitBackdropFilter: 'blur(14px) saturate(160%)',
-        border: '0.75px solid rgba(255,255,255,0.32)',
-        boxShadow:
-          'inset 0 1px 0 rgba(255,255,255,0.25), 0 8px 24px rgba(0,0,0,0.18)',
+        background: 'var(--ink-2)',
+        border: 'none',
+        boxShadow: 'var(--shadow-fab)',
         color: 'var(--sun)',
         fontFamily: 'var(--ff-body)', fontWeight: 900, fontSize: 28,
         lineHeight: 1,
