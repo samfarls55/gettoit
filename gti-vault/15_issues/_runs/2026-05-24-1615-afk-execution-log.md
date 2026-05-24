@@ -29,7 +29,7 @@ Concurrency cap: 2 (default).
 | bug-21 | #221 | merged | afk/bug-21 | [#229](https://github.com/samfarls55/gettoit/pull/229) | C-25 Action Dot hit area expanded to HIG 44pt; merged `fddf598` |
 | bug-22 | #222 | merged | afk/bug-22 | [#230](https://github.com/samfarls55/gettoit/pull/230) | Start over -> Home in top-leading chrome row; merged `cdf018e` |
 | bug-23 | #223 | merged | afk/bug-23 | [#231](https://github.com/samfarls55/gettoit/pull/231) | C-26 FAB T1 ink-fill rework + `GTIShadow.fab` token; merged `d0e7dd6` |
-| bug-24 | #224 | building | afk/bug-24 | — | Bottom-sheet iOS shape |
+| bug-24 | #224 | pr-open | afk/bug-24 | [#232](https://github.com/samfarls55/gettoit/pull/232) | New C-27 ActionSheet primitive + S00 migration. First subagent ended early w/o merging; resume subagent dispatched to rebase + retrigger CI |
 | bug-25 | #225 | building | afk/bug-25 | — | Quiz progress strip layout regression |
 | bug-26 | #226 | queued | afk/bug-26 | — | Remove verdict "See what got cut" drawer |
 | bug-28 | #228 | queued | afk/bug-28 | — | Solo verdict time-badge subtitle copy |
@@ -40,3 +40,4 @@ Concurrency cap: 2 (default).
 - 16:27 — bug-21 MERGED via PR #229 (`fddf598`). #221 closed, vault `status: done`, `v1.1/_index.md` row updated, remote branch deleted. Slot freed; spawned bug-23.
 - 16:39 — bug-22 MERGED via PR #230 (`cdf018e`). Slot freed; spawned bug-24. Spec amendment lands with PR: S05 `Start over` -> `Home` repositioned to top-leading chrome row; `accessibility.md` VO read order updated.
 - 16:58 — bug-23 MERGED via PR #231 (`d0e7dd6`). Slot freed; spawned bug-25. Spec changes: C-26 FAB rework (T1 ink-fill), new `GTIShadow.fab` token + `.gtiShadow(_:)` extension, CHANGELOG marked BREAKING (FAB visual treatment changes).
+- 17:14 — bug-24 subagent ended early. PR #232 opened with full work (new C-27 ActionSheet primitive, S00 disambig + delete-confirm migrated), but the subagent did not merge: PR is `CONFLICTING` against main (bug-22 + bug-23 landed after the branch was cut) and the `ci.yml` workflow never triggered on the PR (only Vercel reported). Dispatched resume subagent in fresh worktree to rebase against `origin/main`, force-push to retrigger CI, then merge. Slot stays at 2 (bug-25 + bug-24-resume).
