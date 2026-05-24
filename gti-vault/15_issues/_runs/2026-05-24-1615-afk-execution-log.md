@@ -26,9 +26,9 @@ Concurrency cap: 2 (default).
 
 | Issue | GitHub | State | Branch | PR | Notes |
 |---|---|---|---|---|---|
-| bug-21 | #221 | queued | afk/bug-21 | — | Plan list per-card `⋯` hitbox |
-| bug-22 | #222 | queued | afk/bug-22 | — | Verdict `Start over` -> Home affordance |
-| bug-23 | #223 | queued | afk/bug-23 | — | Plan list `+` FAB rework |
+| bug-21 | #221 | merged | afk/bug-21 | [#229](https://github.com/samfarls55/gettoit/pull/229) | C-25 Action Dot hit area expanded to HIG 44pt; merged `fddf598` |
+| bug-22 | #222 | building | afk/bug-22 | — | Verdict `Start over` -> Home affordance |
+| bug-23 | #223 | building | afk/bug-23 | — | Plan list `+` FAB rework |
 | bug-24 | #224 | queued | afk/bug-24 | — | Bottom-sheet iOS shape |
 | bug-25 | #225 | queued | afk/bug-25 | — | Quiz progress strip layout regression |
 | bug-26 | #226 | queued | afk/bug-26 | — | Remove verdict "See what got cut" drawer |
@@ -36,3 +36,5 @@ Concurrency cap: 2 (default).
 
 ## Event log
 - 16:15 — Run opened. Preflight green. Patched missing `type: AFK` frontmatter on bug-21..28 vault files so `ready-issues.mjs` scopes them in. Wave 1 = [bug-21, bug-22, bug-23, bug-24, bug-25, bug-26, bug-28]. bug-27 skipped (`status:needs-info`).
+- 16:16 — Spawned wave-1 batch-1: bug-21, bug-22.
+- 16:27 — bug-21 MERGED via PR #229 (`fddf598`). #221 closed, vault `status: done`, `v1.1/_index.md` row updated, remote branch deleted. Slot freed; spawned bug-23.
