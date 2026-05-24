@@ -2,6 +2,7 @@
 issue: bug-24
 title: Bottom sheets (new-plan disambig, delete confirm) are not iOS-shaped and create dead vertical space
 status: ready-for-agent
+type: AFK
 github_issue: 224
 created: 2026-05-24
 grilled: 2026-05-24

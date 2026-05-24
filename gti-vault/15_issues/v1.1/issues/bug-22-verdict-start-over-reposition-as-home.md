@@ -2,6 +2,7 @@
 issue: bug-22
 title: Verdict screen "Start over" should be repositioned and reframed as a "Home" affordance
 status: ready-for-agent
+type: AFK
 github_issue: 222
 created: 2026-05-24
 grilled: 2026-05-24

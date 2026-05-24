@@ -16,3 +16,4 @@ Live + archived progress logs from `/execute-issues` runs. One file per run, nam
 | 2026-05-22-1404 | done | [[2026-05-22-1404-afk-execution-log]] — v1.1 bug batch (bug-16/18/19), concurrency 3, 3/3 merged, 0 escalated |
 | 2026-05-22-1436 | done | [[2026-05-22-1436-afk-execution-log]] — web-01 §C verdict batch (bug-17, sg-WF-9), 2/2 merged, 0 escalated (bug-17 ios CI hung 80m — infra flake, recovered via resume subagent) |
 | 2026-05-22-1708 | done | [[2026-05-22-1708-afk-execution-log]] — v1.1 bug-20 (web verdict §C live-update re-fetch on reroll), 1/1 merged, 0 escalated |
+| 2026-05-24-1615 | running | [[2026-05-24-1615-afk-execution-log]] — v1.1 UI dogfood batch (bug-21..26, bug-28), 7 ready |

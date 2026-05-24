@@ -2,6 +2,7 @@
 issue: bug-23
 title: Plan list "+" FAB does not fit the Sunset Pop visual register — rework against Impeccable reference
 status: ready-for-agent
+type: AFK
 github_issue: 223
 created: 2026-05-24
 grilled: 2026-05-24

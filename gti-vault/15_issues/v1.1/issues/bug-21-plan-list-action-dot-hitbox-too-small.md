@@ -2,6 +2,7 @@
 issue: bug-21
 title: Plan list per-card ⋯ trigger hitbox too small — taps frequently land on the card body and open the verdict
 status: ready-for-agent
+type: AFK
 github_issue: 221
 created: 2026-05-24
 grilled: 2026-05-24

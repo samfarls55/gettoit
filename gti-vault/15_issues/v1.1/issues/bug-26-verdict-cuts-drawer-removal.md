@@ -2,6 +2,7 @@
 issue: bug-26
 title: Remove the "See what got cut" drawer from the verdict screen — unnecessary surface area
 status: ready-for-agent
+type: AFK
 github_issue: 226
 created: 2026-05-24
 grilled: 2026-05-24

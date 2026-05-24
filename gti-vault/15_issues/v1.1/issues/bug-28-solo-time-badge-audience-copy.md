@@ -2,6 +2,7 @@
 issue: bug-28
 title: Solo verdict screen drops the audience subtitle entirely; group keeps "ALL N OF YOU"
 status: ready-for-agent
+type: AFK
 github_issue: 228
 created: 2026-05-24
 grilled: 2026-05-24

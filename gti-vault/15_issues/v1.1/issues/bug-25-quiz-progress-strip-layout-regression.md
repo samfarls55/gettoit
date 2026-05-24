@@ -2,6 +2,7 @@
 issue: bug-25
 title: Quiz progress strip layout regression after tb-WF-2 chrome — Q1 pushed down, Q2–Q5 skewed right
 status: ready-for-agent
+type: AFK
 github_issue: 225
 created: 2026-05-24
 grilled: 2026-05-24

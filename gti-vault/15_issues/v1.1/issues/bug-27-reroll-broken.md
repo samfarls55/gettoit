@@ -2,6 +2,7 @@
 issue: bug-27
 title: Reroll is broken end-to-end — not just a UI bug
 status: needs-info
+type: AFK
 github_issue: 227
 created: 2026-05-24
 grilled: 2026-05-24
