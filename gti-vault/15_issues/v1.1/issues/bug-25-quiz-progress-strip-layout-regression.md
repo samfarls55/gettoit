@@ -1,11 +1,12 @@
 ---
 issue: bug-25
 title: Quiz progress strip layout regression after tb-WF-2 chrome — Q1 pushed down, Q2–Q5 skewed right
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 225
 created: 2026-05-24
 grilled: 2026-05-24
+closed: 2026-05-25
 ---
 
 # bug-25 — Quiz progress strip layout regression
@@ -72,3 +73,18 @@ User dogfood after the tb-WF-2 quiz-chrome ship, 2026-05-24.
 - Any change to the chrome-row spec itself (the chrome row's tb-WF-2 design is correct; only its iOS layout interaction is wrong).
 - Any change to the 5-segment progress strip spec or behavior.
 - Any change to the `surfaces/03-quiz.md` doc — the spec is the contract; the port is what drifted.
+
+## Comments
+
+### 2026-05-25 — AFK run closed
+
+Both fixes shipped in [PR #233](https://github.com/samfarls55/gettoit/pull/233):
+
+- **Q1 pushdown** — `QuizChromeView` Q1 spacer is now `Color.clear.frame(width: 44, height: 44)` (fixed, not `minWidth/minHeight`). `Color.clear` has no intrinsic size, so the pre-fix `minHeight: 44` was a floor only — under any taller proposal the spacer expanded vertically and ballooned the chrome row. A fixed 44x44 frame keeps the chrome row's height identical with and without Back.
+- **Q2-Q5 right-skew** — `QuizScreen.topBar` now reserves a symmetric trailing 32x32 spacer mirroring the leading one. The 5-segment progress strip centres naturally inside the parent's `.padding(.horizontal, step5)`.
+
+Tests in `QuizScreenLayoutTests.swift` pin both invariants:
+- `testChromeRowHeightIsStableAcrossCanBack` + `testChromeRowHeightIsBoundedOnQ1` measure chrome intrinsic height via `UIHostingController.sizeThatFits(in:)` (same pattern as `ActionDotMenuTests.testTriggerRendersAtHitDiameter`).
+- `testTopBarHasSymmetricSpacersForCentering` is a source-level structural assertion — SwiftUI accessibility identifiers don't surface reliably into `UIView.subviews` for runtime layout introspection, and the iOS test target intentionally avoids pixel-snapshot tooling.
+
+All CI lanes green including `ios (xcodebuild test)`. Squash-merged + branch deleted.
