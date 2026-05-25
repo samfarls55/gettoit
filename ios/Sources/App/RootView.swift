@@ -365,14 +365,24 @@ public struct RootView: View {
                             userID: userID,
                             locationCoordinator: coordinators.locationCoordinator,
                             editingPlan: context.editingPlan,
+                            // bug-29 — wire the share-sheet dismiss
+                            // closure's `invite_shared` emit through
+                            // the documented SupabaseTelemetrySink.
+                            telemetry: TelemetryWriter(
+                                sink: SupabaseTelemetrySink(client: coordinators.client)
+                            ),
                             onLaunched: { roomID, _ in
                                 // Primary CTA — the Plan was minted +
                                 // the Room was minted linked to it.
                                 // Hand the session off to the existing
                                 // invite / quiz path. `invitedShared`
                                 // mirrors the live group context — solo
-                                // skips Waiting, group runs the share-
-                                // sheet flow via `pendingSetupShare`.
+                                // skips Waiting; group / duo modes
+                                // present the iOS share sheet on
+                                // SetupScreen (bug-29 re-port) and
+                                // fire this callback from the sheet's
+                                // dismiss closure so the initiator
+                                // lands on Waiting only after sharing.
                                 self.setupContext = nil
                                 let invitedShared = context.groupMode == .group
                                 startQuiz(
