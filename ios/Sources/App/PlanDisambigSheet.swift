@@ -1,20 +1,24 @@
-// GetToIt — PlanDisambigSheet (tb-WF-6, workflow-overhaul).
+// GetToIt — PlanDisambigSheet (tb-WF-6 → bug-24, workflow-overhaul).
 //
 // The disambig sheet that opens from both the empty-state hero pill
 // and the C-26 FAB on S00 Plan list. Two stacked C-05 `ghost` pills:
 // `Solo` (top) / `Group` (below). No Cancel button — relies on
-// swipe-down + tap-scrim dismissal.
+// swipe-down dismissal (the native iOS grabber is the only top
+// affordance).
 //
-// Composed inline from the C-16 sheet language (dark glass, radius 26,
-// 38×4 handle) per the surface spec — single-use, single-surface, so
-// it lives next to PlanListScreen rather than in a shared component
-// module. The Swift type exists so the host can present it via
-// SwiftUI's standard `.sheet` modifier and so tests can pin the
-// locked copy + outcome contract.
+// bug-24 (2026-05-24): adopts the new C-27 · Action Sheet primitive
+// — native iOS shape, native grabber, content-height detent (no
+// `.medium` fallback). The previous C-16-language inline composition
+// (custom 38×4 handle pill, `[.height(N), .medium]` detents) is
+// retired here; C-16 itself is unchanged and continues to back the
+// rich modal-editor sheets (S07 reroll, C-23 LocationPicker). The
+// inner content keeps the dark-glass register for visual continuity
+// with the rest of Sunset Pop.
 //
 // Spec: `design-system/surfaces/00-plan-list.md §"Disambig sheet"` +
-// JSX reference `design-system/code/screens/ScreenPlanList.jsx`
-// (`DisambigSheet` inline component).
+// `design-system/components.md §C-27` + JSX reference in
+// `design-system/code/screens/ScreenPlanList.jsx` (`DisambigSheet`
+// inline composition over the C-27 ActionSheet primitive).
 //
 // All visual values come from `GTITokens.swift` per repo CLAUDE.md —
 // no inline hex / px / easing.
@@ -87,72 +91,78 @@ public struct PlanDisambigSheet: View {
     // MARK: - body
 
     public var body: some View {
-        ZStack {
-            // Dark-tinted sheet background — visual port of the JSX's
-            // `rgba(20,20,30,0.92)`. ink2-at-0.94 carries the same
-            // dark-glass register the LocationPickerSheet uses, so the
-            // disambig + location + reroll sheets all read as one
-            // surface idiom.
-            GTIColor.ink2.opacity(0.94)
-                .ignoresSafeArea()
+        // bug-24 — C-27 ActionSheet shape: the dark-glass register
+        // sits INSIDE a native iOS sheet. SwiftUI's `.sheet` modifier
+        // owns the outer geometry — rounded-top, full-width, native
+        // grabber, safe-area inset. We supply only the inside:
+        // background fill + the column of content.
+        VStack(spacing: 0) {
+            Text(Self.eyebrowLabel.uppercased())
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, GTISpacing.step5 + 2) // 22pt — matches JSX `22px 22px 18px`
+                .padding(.top, GTISpacing.step5)             // 20pt — clears the native grabber
+                .padding(.bottom, GTISpacing.step2 - 2)      // 6pt
+                .accessibilityIdentifier("planList.disambig.eyebrow")
 
-            VStack(spacing: 0) {
-                handle
-                    .padding(.bottom, GTISpacing.step5 - 2) // 18pt — matches C-16
-
-                Text(Self.eyebrowLabel.uppercased())
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, GTISpacing.step5 + 2) // 22pt — matches JSX `22px 22px 18px`
-                    .padding(.bottom, GTISpacing.step2 - 2)    // 6pt
-                    .accessibilityIdentifier("planList.disambig.eyebrow")
-
-                Text(Self.headlineLabel)
-                    .font(.system(size: GTIFont.Size.heading, weight: .black))
-                    .tracking(GTIFont.TrackingEm.heading * GTIFont.Size.heading)
-                    .textCase(.uppercase)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, GTISpacing.step5 + 2) // 22pt
-                    .padding(.bottom, GTISpacing.step5 - 2)     // 18pt
-                    .accessibilityIdentifier("planList.disambig.headline")
-
-                VStack(spacing: GTISpacing.step3 - 2) { // 10pt between pills, per spec
-                    ghostPill(
-                        label: Self.soloLabel,
-                        accessibilityID: "planList.disambig.solo",
-                        onTap: { pick(.solo) }
-                    )
-                    ghostPill(
-                        label: Self.groupLabel,
-                        accessibilityID: "planList.disambig.group",
-                        onTap: { pick(.group) }
-                    )
-                }
+            Text(Self.headlineLabel)
+                .font(.system(size: GTIFont.Size.heading, weight: .black))
+                .tracking(GTIFont.TrackingEm.heading * GTIFont.Size.heading)
+                .textCase(.uppercase)
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, GTISpacing.step5 + 2) // 22pt
                 .padding(.bottom, GTISpacing.step5 - 2)     // 18pt
+                .accessibilityIdentifier("planList.disambig.headline")
+
+            VStack(spacing: GTISpacing.step3 - 2) { // 10pt between pills, per spec
+                ghostPill(
+                    label: Self.soloLabel,
+                    accessibilityID: "planList.disambig.solo",
+                    onTap: { pick(.solo) }
+                )
+                ghostPill(
+                    label: Self.groupLabel,
+                    accessibilityID: "planList.disambig.group",
+                    onTap: { pick(.group) }
+                )
             }
-            .padding(.top, GTISpacing.step3)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.horizontal, GTISpacing.step5 + 2) // 22pt
+            .padding(.bottom, GTISpacing.step5 - 2)     // 18pt
         }
-        .presentationDetents([.height(disambigDetentHeight), .medium])
-        .presentationCornerRadius(GTIRadii.sheet)
-        .presentationDragIndicator(.hidden) // we render our own handle
+        .frame(maxWidth: .infinity, alignment: .top)
+        // bug-24 — single content-height detent (no `.medium`). The
+        // `.medium` snap was the source of the "lots of empty vertical
+        // space" the user reported. Content-height pins the sheet to
+        // its intrinsic height so the disambig content sits flush with
+        // the bottom edge of the chrome it produced.
+        .presentationDetents([.height(Self.Shape.contentHeight)])
+        // bug-24 — native iOS grabber (the 36×4 system handle). The
+        // C-16 modal-editor sheets (reroll, LocationPicker) keep the
+        // bespoke 38×4 handle; only the C-27 Action Sheet adopts the
+        // native grabber.
+        .presentationDragIndicator(.visible)
+        // bug-24 — dark-glass register painted directly onto the
+        // native sheet container. `.presentationBackground` keeps
+        // the rounded-top + grabber + safe-area treatment from the
+        // system while letting Sunset Pop own the fill, so the
+        // disambig + reroll + LocationPicker all read as the same
+        // visual register. We omit `.presentationCornerRadius` —
+        // the native default matches the iOS HIG rounded-top.
+        .presentationBackground(GTIColor.ink2.opacity(0.94))
         .accessibilityIdentifier("planList.disambig.sheet")
     }
 
     // MARK: - bits
 
-    /// 38×4 white-0.22 handle pill — matches the C-16 sheet primitive.
-    private var handle: some View {
-        Capsule()
-            .fill(Color.white.opacity(0.22))
-            .frame(width: 38, height: 4)
-            .accessibilityHidden(true)
-    }
+    // bug-24 — the previous custom 38×4 white-0.22 handle pill was
+    // removed. The native iOS grabber from
+    // `.presentationDragIndicator(.visible)` carries the affordance
+    // for the C-27 Action Sheet shape. C-16 (reroll, LocationPicker)
+    // keeps its bespoke handle.
 
     /// C-05 ghost pill — transparent fill, 1.5pt white-0.5 stroke,
     /// 60pt tall, radius 999. Matches the existing ghost-pill register
@@ -187,19 +197,45 @@ public struct PlanDisambigSheet: View {
         onPick(choice)
     }
 
-    // MARK: - detent
+    // MARK: - C-27 ActionSheet shape contract
 
-    /// The sheet's intrinsic content height — handle + padding +
-    /// eyebrow + headline + two pills + bottom padding. Pinned so
-    /// SwiftUI's `.sheet` presents at the right size on first open
-    /// without snapping to `.medium` and showing a half-empty card.
-    /// Approximate; the user can drag up to `.medium` if they want.
-    private var disambigDetentHeight: CGFloat {
-        // 12 top + 4 handle + 18 + 11 eyebrow + 6 + ~28 headline + 18
-        // + 60 + 10 + 60 + 18 = ~245pt. Round to 260 for a small
-        // breathing buffer; iOS will accommodate up to `.medium` on
-        // user drag.
-        260
+    /// bug-24 — locked shape contract for the C-27 Action Sheet
+    /// variant. These constants pin the native-iOS shape at the type
+    /// level so a future regression cannot silently re-introduce the
+    /// custom handle or the `.medium` fallback detent. Tests read
+    /// these directly; the view body uses `Shape.contentHeight`.
+    public enum Shape {
+        /// True — the C-27 Action Sheet uses the native iOS grabber
+        /// (`.presentationDragIndicator(.visible)`), not a bespoke
+        /// handle pill. C-16 (reroll, LocationPicker) renders its
+        /// own 38×4 handle and is unaffected.
+        public static let usesNativeGrabber: Bool = true
+
+        /// False — no custom handle pill at the top of the sheet.
+        /// The native grabber is the only top affordance.
+        public static let rendersCustomHandle: Bool = false
+
+        /// The sheet declares exactly one detent (content-height) —
+        /// no `.medium` / `.large` fallback. The previous
+        /// `[.height(N), .medium]` configuration was the source of
+        /// the "lots of empty vertical space" bug-24 surfaced; the
+        /// `.medium` snap created a half-screen mismatch with the
+        /// modest content of the disambig.
+        public static let detentCount: Int = 1
+
+        /// The sole detent is `.height(contentHeight)`, not
+        /// `.medium` / `.large`.
+        public static let detentSizesToContent: Bool = true
+
+        /// The sheet's intrinsic content height — eyebrow + headline
+        /// + two 60pt-tall pills + breathing. Pinned so SwiftUI's
+        /// `.sheet` presents at exactly this height; the native iOS
+        /// grabber sits above and adds ~12pt of system chrome on top.
+        ///
+        /// Estimated: 20 top + 11 eyebrow + 6 + ~28 headline + 18 +
+        /// 60 pill + 10 + 60 pill + 18 bottom = ~231pt. Rounded to
+        /// 240 for a small breathing buffer.
+        public static let contentHeight: CGFloat = 240
     }
 }
 

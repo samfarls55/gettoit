@@ -1218,6 +1218,88 @@ function FloatingActionButton({
   );
 }
 
+// ────────────────────────────────────────────────────────────
+// Action Sheet (C-27) — native-iOS-shaped bottom sheet primitive.
+//
+// Added 2026-05-24 for bug-24. The action-sheet counterpart to C-16's
+// modal-editor sheet — short, content-height, rounded-top-only, with
+// a native iOS grabber (the system 36×4 capsule). Web JSX cannot
+// literally use SwiftUI's `presentationDetents` / `presentationDragIndicator`
+// but the shape mirrors the iOS contract: full-width container,
+// rounded-top corners only, bottom flush with the host edge, backdrop
+// click-to-dismiss, ARIA dialog + modal. The inside renders the
+// Sunset Pop dark-glass register for visual continuity with the rest
+// of the system.
+// ────────────────────────────────────────────────────────────
+function ActionSheet({
+  open = true,
+  onDismiss = () => {},
+  ariaLabel,
+  children,
+  // Distance from the top of the sheet to its first content row. The
+  // native iOS grabber lives in this space on the device; on the web
+  // we draw a small visual capsule so the JSX reads with a similar
+  // top affordance, but it's purely a render hint.
+  grabberAreaHeight = 20,
+}) {
+  if (!open) return null;
+  return (
+    <>
+      {/* Backdrop — click-to-dismiss. Lower z than the sheet. */}
+      <div
+        onClick={onDismiss}
+        aria-hidden="true"
+        style={{
+          position: 'absolute', inset: 0, zIndex: 40,
+          background: 'rgba(0,0,0,0.32)',
+        }}
+      />
+      {/* Sheet container — full-width, rounded-top-only, flush bottom.
+          Native iOS shape; the web JSX mirrors it for visual fidelity. */}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        style={{
+          position: 'absolute', zIndex: 41,
+          left: 0, right: 0, bottom: 0,
+          background: 'rgba(20,20,30,0.92)',
+          backdropFilter: 'blur(24px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(160%)',
+          // Rounded-top-only — iOS HIG native sheet shape. The bottom
+          // corners are flush with the screen edge so the sheet reads
+          // as continuous with the device chrome.
+          borderTopLeftRadius: 14,
+          borderTopRightRadius: 14,
+          borderBottomLeftRadius: 0,
+          borderBottomRightRadius: 0,
+          color: '#fff',
+          boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
+          animation: 'gti-fade-up 280ms var(--ease-out) both',
+          display: 'flex', flexDirection: 'column',
+        }}
+      >
+        {/* Grabber stand-in — the native iOS device draws the system
+            36×4 capsule here. On the web we render a quiet visual
+            equivalent so the top of the sheet reads with the same
+            affordance. The capsule itself is aria-hidden — the
+            swipe-down affordance is system-owned on iOS, mouse drag
+            is not a web pattern. */}
+        <div style={{
+          width: '100%', height: grabberAreaHeight,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            width: 36, height: 5, borderRadius: 999,
+            background: 'rgba(255,255,255,0.22)',
+          }} aria-hidden="true" />
+        </div>
+        {children}
+      </div>
+    </>
+  );
+}
+
 Object.assign(window, {
   GTI_GRADIENTS, VIBE_LABELS,
   GradientSurface, TopBar, QuestionHeader,
@@ -1228,4 +1310,5 @@ Object.assign(window, {
   QuizChrome,
   ActionDotMenuTrigger, ActionDotMenu,
   FloatingActionButton,
+  ActionSheet,
 });

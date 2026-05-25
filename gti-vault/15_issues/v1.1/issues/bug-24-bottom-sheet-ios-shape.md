@@ -1,11 +1,12 @@
 ---
 issue: bug-24
 title: Bottom sheets (new-plan disambig, delete confirm) are not iOS-shaped and create dead vertical space
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 224
 created: 2026-05-24
 grilled: 2026-05-24
+closed: 2026-05-24
 ---
 
 # bug-24 — Bottom-sheet shape + sizing mismatch
@@ -93,3 +94,7 @@ Rejected shapes (recorded so the trade-off is not relitigated): (A) full native 
 ### Adjacency flagged, not filed
 
 If C-2N's introduction surfaces a use case for a second consumer (e.g. a future single-choice action sheet on a different surface), file the consumer separately. The point primitive landing here is enough; do not stretch the spec on speculation.
+
+## Comments
+
+- **2026-05-24 (AFK close):** Shipped as PR #225 (`afk/bug-24`). The new primitive landed as **C-27 · Action Sheet** (next sequential slot after C-25 / C-26). Spec: `design-system/components.md §C-27` + C-16 intro disambiguation; web JSX: `design-system/code/components.jsx` `ActionSheet` export; surface update: `design-system/surfaces/00-plan-list.md` §Components used + §"Disambig sheet" (revised) + new §"Delete confirm sheet" subsection. iOS port: `ios/Sources/App/PlanDisambigSheet.swift` + `ios/Sources/App/PlanDestructiveConfirmSheet.swift` drop the custom 38×4 handle pill and the `[.height(N), .medium]` detents in favor of `.presentationDragIndicator(.visible)` + a single `.presentationDetents([.height(contentHeight)])` + `.presentationBackground(GTIColor.ink2.opacity(0.94))` to keep the dark-glass register inside the native container. Each sheet exposes a public `enum Shape` with static constants (`usesNativeGrabber`, `detentCount`, `contentHeight`) tests pin so a future regression cannot silently re-introduce the `.medium` snap or a custom handle. CHANGELOG entry is purely additive (not BREAKING — C-16 unchanged).
