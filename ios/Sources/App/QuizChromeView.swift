@@ -151,8 +151,16 @@ public struct QuizChromeView: View {
                 .accessibilityIdentifier("quiz.chrome.back")
                 .accessibilityLabel("Back to previous question")
             } else {
+                // bug-25 — the Q1 spacer MUST be fixed-size, not
+                // `minWidth/minHeight`. `Color.clear` has no intrinsic
+                // size, so `minHeight: 44` lets it expand vertically
+                // under any taller proposal — which made the chrome
+                // row balloon on Q1 and shoved the progress strip
+                // toward the middle of the screen. A fixed 44x44 frame
+                // pins the spacer to the trailing label's bounding
+                // box.
                 Color.clear
-                    .frame(minWidth: 44, minHeight: 44)
+                    .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
             }
 
