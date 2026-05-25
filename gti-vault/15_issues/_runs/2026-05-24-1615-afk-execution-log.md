@@ -1,6 +1,6 @@
 ---
 run: 2026-05-24-1615
-status: running
+status: done
 ---
 
 # AFK Execution Run — 2026-05-24-1615
@@ -31,7 +31,7 @@ Concurrency cap: 2 (default).
 | bug-23 | #223 | merged | afk/bug-23 | [#231](https://github.com/samfarls55/gettoit/pull/231) | C-26 FAB T1 ink-fill rework + `GTIShadow.fab` token; merged `d0e7dd6` |
 | bug-24 | #224 | merged | afk/bug-24 | [#232](https://github.com/samfarls55/gettoit/pull/232) | New C-27 ActionSheet primitive + S00 migration; resume subagent rebased + merged `b18f34b` |
 | bug-25 | #225 | merged | afk/bug-25 | [#233](https://github.com/samfarls55/gettoit/pull/233) | Symmetric topBar spacers + bounded Q1 chrome spacer; merged `bd7a455` |
-| bug-26 | #226 | building | afk/bug-26 | — | Remove verdict "See what got cut" drawer |
+| bug-26 | #226 | merged | afk/bug-26 | [#235](https://github.com/samfarls55/gettoit/pull/235) | Removed C-13 cuts drawer + .cuts mode (data field kept for receipts); merged `291ef3a` |
 | bug-28 | #228 | merged | afk/bug-28 | [#234](https://github.com/samfarls55/gettoit/pull/234) | Drop solo time-badge audience subtitle (`audience: ""` collapses VStack); merged `d389895` |
 
 ## Event log
@@ -44,3 +44,25 @@ Concurrency cap: 2 (default).
 - 17:22 — bug-24 MERGED via PR #232 (`b18f34b`). Resume subagent rebased against main (kept both bug-23 + bug-24 rows on `_index.md`), force-push retriggered CI automatically (no poke needed), all lanes green. bug-25 also visible as merged on main as PR #233 (`bd7a455`) — subagent notification still pending. Spawned bug-26 to fill the slot.
 - 17:23 — bug-25 notification confirmed (PR #233 `bd7a455`): symmetric 32pt trailing topBar spacer + fixed Color.clear 44pt leading-slot spacer when canBack==false; tested via UIHostingController.sizeThatFits. Slot freed; spawned bug-28 (last queued).
 - 17:36 — bug-28 MERGED via PR #234 (`d389895`). Solo time-badge audience subtitle suppressed by setting `audience: ""` and guarding the renderer Text. Stale `"All one of you"` literal in a snapshot test corrected to `"All four of you"` (test used `.default` mode). Slot freed. Wave 1 remaining: bug-26 only.
+- 18:02 — bug-26 MERGED via PR #235 (`291ef3a`). C-13 cuts drawer + `.cuts` mode fully removed (intentional Swift source break); `cuts` data field kept on `Verdict` for receipts/analytics. C-13 slot retired in place rather than renumbered to preserve every existing `C-NN` citation across surfaces/accessibility/ports.
+- 18:02 — Re-ran `ready-issues.mjs`: `ready=1, waiting=0, excluded=0, outOfScope=108`. Sole ready is bug-27 (`status:needs-info`) — stays skipped per skill rules. Wave drained; no follow-on wave. Run complete.
+
+## Close-out
+
+- **Completed (7):**
+  - bug-21 — [PR #229](https://github.com/samfarls55/gettoit/pull/229), `fddf598`. C-25 ActionDotMenu trigger hit area expanded to HIG 44pt via ZStack frame; visible glyph stays 36pt.
+  - bug-22 — [PR #230](https://github.com/samfarls55/gettoit/pull/230), `cdf018e`. S05 `Start over` → `Home` repositioned to top-leading chrome row; `onStartOver` → `onHome` rename; VO read order updated.
+  - bug-23 — [PR #231](https://github.com/samfarls55/gettoit/pull/231), `d0e7dd6`. C-26 FAB T1 ink-fill rework; new `GTIShadow.fab` token + `.gtiShadow(_:)` SwiftUI extension; CHANGELOG marked BREAKING.
+  - bug-24 — [PR #232](https://github.com/samfarls55/gettoit/pull/232), `b18f34b`. New C-27 ActionSheet primitive (sibling to C-16); S00 disambig + delete-confirm migrated to native iOS shape; resume subagent needed (see below).
+  - bug-25 — [PR #233](https://github.com/samfarls55/gettoit/pull/233), `bd7a455`. Quiz topBar symmetric 32pt trailing spacer + bounded Q1 chrome 44pt leading-slot spacer; pinned by source-structural + UIHostingController size tests.
+  - bug-26 — [PR #235](https://github.com/samfarls55/gettoit/pull/235), `291ef3a`. C-13 cuts drawer + `.cuts` verdict mode removed (data field retained); C-13 slot left as retirement marker rather than renumbering.
+  - bug-28 — [PR #234](https://github.com/samfarls55/gettoit/pull/234), `d389895`. Solo time-badge audience subtitle suppressed by `audience: ""` + renderer guard; renderer collapses VStack to one child; stale snapshot literal corrected.
+- **Skipped (needs-info / unparseable):** bug-27 — `status: needs-info` (reroll broken end-to-end; needs reporter repro before AFK can act).
+- **Escalated / failed:** none. (bug-24 had a mid-flight handoff — first subagent ended at PR-open without merging due to a missed `ci.yml` `pull_request` trigger; resume subagent rebased + force-pushed, CI fired automatically, merged cleanly. Not counted as escalated.)
+- **Stranded (waiting on unmerged blocker):** none.
+
+Result: 7/7 ready merged, 0 escalated. 1 mid-flight resume (bug-24). bug-27 deferred on `needs-info`.
+
+Spec amendments that landed this run (all in `design-system/CHANGELOG.md`): S05 chrome row + `Home` affordance (bug-22), C-26 FAB T1 ink-fill + `GTIShadow.fab` (bug-23, BREAKING), new C-27 ActionSheet primitive (bug-24), C-13 cuts drawer retired (bug-26), solo time-badge audience suppression (bug-28).
+
+Subagent ergonomics note: 1 of 7 subagents (bug-24) ended before reaching `gh pr merge`. The "finish the job" reminder added to the bug-26 + bug-28 briefs appears to have prevented the same drop-out on those two — both ran end-to-end including the watch + merge step. Consider promoting that wording into `SUBAGENT-BRIEF.md` as a permanent step-7 emphasis.
