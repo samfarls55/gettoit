@@ -1,12 +1,14 @@
 ---
 issue: bug-27
 title: Reroll feature unplumbed — S05 tertiary CTA is dead, S07 sheet never presented
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 227
 created: 2026-05-24
 grilled: 2026-05-24
 diagnosed: 2026-05-25
+done: 2026-05-25
+pr: 237
 ---
 
 # bug-27 — Reroll feature unplumbed
@@ -107,3 +109,17 @@ CI notes (re: `[[feedback_pr_merge_no_ci_gate]]`): no branch protection. Confirm
 ## Surfaced by
 
 User dogfood, 2026-05-24. Diagnosed via prod telemetry + iOS source grep, 2026-05-25.
+
+## Comments
+
+### 2026-05-25 — AFK execution closed (PR #237)
+
+Landed the fix in [PR #237](https://github.com/samfarls55/gettoit/pull/237).
+
+- New `VerdictRerollHost` SwiftUI view owns the `RerollStore` + the S07 `.sheet` presentation. Both live `VerdictScreen` sites (`RootView.createdDecidedVerdict` + `PostQuizHostScreen.verdictSurface`) now mount it instead of the bare screen.
+- Architectural fix landed: `VerdictScreen.onReroll` no longer defaults to `{}`. The three `.readOnly` call sites pass `onReroll: { }` explicitly. The compiler now catches the next bug-27-class wire-up miss at the next added call site.
+- `PostQuizHostScreen` gained an optional `client: SupabaseClient?` so the verdict phase can wire the host with real reroll plumbing. When nil (snapshot tests), the verdict phase falls back to a bare `VerdictScreen` with explicit `onReroll: { }`.
+- Test seam: `RerollSheetState` is an `@Observable` with `present()` / `dismiss()` + a `private(set)` `isShowingSheet` flag. `VerdictRerollHostTests` asserts `present()` flips the flag — the load-bearing bug-27 contract.
+- Skipped per spec (no clean seam): end-to-end button-tap simulation on the SwiftUI surface. Flagged for `/improve-codebase-architecture` — current iOS test target has no ViewInspector / XCUITest dep.
+- Manual verification queued for next TestFlight build (no local Mac).
+

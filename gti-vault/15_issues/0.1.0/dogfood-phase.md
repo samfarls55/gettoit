@@ -165,7 +165,7 @@ The 2026-05-21-1812 AFK execution run surfaced three adjacencies its subagents f
 
 ## UI dogfood batch (2026-05-24)
 
-Eight UI-specific issues from a post-tb-WF-9 dogfood pass. `/grill-with-docs` classified seven of eight as `ready-for-agent` (AFK); `bug-27` deferred to a `/diagnose` session at `needs-info`.
+Eight UI-specific issues from a post-tb-WF-9 dogfood pass. `/grill-with-docs` classified seven of eight as `ready-for-agent` (AFK); `bug-27` initially deferred to a `/diagnose` session at `needs-info` (2026-05-25 follow-up reclassified it AFK-ready after the diagnosis pinned the root cause as "reroll feature unplumbed at the two live VerdictScreen sites" — see PR #237).
 
 | # | Title | Status | Type | GitHub | Blocked by |
 |---|---|---|---|---|---|
@@ -175,7 +175,7 @@ Eight UI-specific issues from a post-tb-WF-9 dogfood pass. `/grill-with-docs` cl
 | bug-24 | [[issues/bug-24-bottom-sheet-ios-shape\|Split sheet primitive — keep C-16; add C-27 native-iOS Action Sheet]] | done (spec-gap) — PR #232 | AFK | [#224](https://github.com/samfarls55/gettoit/issues/224) | — |
 | bug-25 | [[issues/bug-25-quiz-progress-strip-layout-regression\|topBar trailing-spacer fix + Q1 chrome-row height-invariance audit]] | done (bug) — PR #233 | AFK | [#225](https://github.com/samfarls55/gettoit/issues/225) | — |
 | bug-26 | [[issues/bug-26-verdict-cuts-drawer-removal\|Full removal of the cuts drawer — collapse `cuts` mode into `default`]] | done (spec-gap) — PR #235 | AFK | [#226](https://github.com/samfarls55/gettoit/issues/226) | — |
-| bug-27 | [[issues/bug-27-reroll-broken\|Reroll broken end-to-end — deferred to a `/diagnose` session]] | needs-info | — | [#227](https://github.com/samfarls55/gettoit/issues/227) | `/diagnose` against a TestFlight build |
+| bug-27 | [[issues/bug-27-reroll-broken\|Reroll feature unplumbed — S05 tertiary CTA is dead, S07 sheet never presented]] | done (bug) — PR #237 | AFK | [#227](https://github.com/samfarls55/gettoit/issues/227) | — |
 | bug-28 | [[issues/bug-28-solo-time-badge-audience-copy\|Drop solo audience subtitle entirely]] | done (spec-gap) | AFK | [#228](https://github.com/samfarls55/gettoit/issues/228) | — |
 
 ## Cross-references
