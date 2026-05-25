@@ -9,7 +9,7 @@ jsx:
 # S05 · Verdict (the hero)
 
 > **Code:** [`../code/screens/ScreenVerdict.jsx`](../code/screens/ScreenVerdict.jsx)
-> Six modes: `default` · `cuts` · `committed` · `read-only` · `no-survivor` · `solo`.
+> Five modes: `default` · `committed` · `read-only` · `no-survivor` · `solo`.
 
 The screen this whole product exists to deliver. One verdict, where + when + who, with the rule that produced it and the receipts that prove it came from the inputs.
 
@@ -62,7 +62,7 @@ The **loser** is the rate-limiting reader. They must see, within 5 seconds:
 
 All five land within the choreo's 1.4s reveal. If you add a 6th element, something has to leave.
 
-The test applies in full to `default`, `cuts`, `committed`. It applies in **limited form** to `read-only` (steps 1–3 only — there is no ratification or reroll path for a late-joiner). It does **not apply** to `no-survivor` — there is no verdict to ratify; the rule chip becomes the load-bearing message. In `solo` the test collapses to steps 1, 2, 4, 5 — there's a single voice, so step 3 ("their voice was counted") is implicit and the voice-receipt row is suppressed; the rule chip + I'm in + reroll still land within the same 1.4s reveal.
+The test applies in full to `default` and `committed`. It applies in **limited form** to `read-only` (steps 1–3 only — there is no ratification or reroll path for a late-joiner). It does **not apply** to `no-survivor` — there is no verdict to ratify; the rule chip becomes the load-bearing message. In `solo` the test collapses to steps 1, 2, 4, 5 — there's a single voice, so step 3 ("their voice was counted") is implicit and the voice-receipt row is suppressed; the rule chip + I'm in + reroll still land within the same 1.4s reveal.
 
 ## Choreographed reveal (canon)
 
@@ -86,12 +86,11 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 
 | Mode | Visible state |
 |---|---|
-| `default` | Home chrome row above the eyebrow. Cuts collapsed. CTA reads `"I'm in"`, white fill. CTA dock secondary slot empty pre-commit. |
-| `cuts` | Cuts drawer expanded with 3 line-through rows + reasons. Home chrome row above the eyebrow (same as `default`). |
+| `default` | Home chrome row above the eyebrow. CTA reads `"I'm in"`, white fill. CTA dock secondary slot empty pre-commit. |
 | `committed` | Home chrome row above the eyebrow. CTA flipped to `"You're in · 3 of 4"`, **sun fill** with ink check prefix. Below: `"Window closes in 47s"` (status, not a verb). |
-| `read-only` | Late-joiner mode. **No chrome row** (Home omitted — see §"Verdict chrome (Home)"). Eyebrow `"Tonight's verdict"` (past-tense-implicit). Hero + meta + time badge + rule chip + voice receipts (late-joiner not in receipts — they didn't contribute). Suppressed: ratification CTA, reroll affordance. Primary CTA is `"Start a new decision"` (white pill). Cuts drawer remains available (informational, not actionable). |
+| `read-only` | Late-joiner mode. **No chrome row** (Home omitted — see §"Verdict chrome (Home)"). Eyebrow `"Tonight's verdict"` (past-tense-implicit). Hero + meta + time badge + rule chip + voice receipts (late-joiner not in receipts — they didn't contribute). Suppressed: ratification CTA, reroll affordance. Primary CTA is `"Start a new decision"` (white pill). |
 | `no-survivor` | Terminal — engine exited with no candidates after soft-pref relax. Home chrome row above the eyebrow. Eyebrow `"Tonight"`. Hero `"NO SPOT / FITS"` (one word per line). Meta line names the hard-need vetoes that survived (`"Vegan options · $$ cap · 15 min walk"`). No time badge. Rule chip is the load-bearing message in aggregate-rule register. Suppressed: voice receipts, ratification CTA, reroll. Primary CTA `"Widen radius"` (sun-fill, initiator-only); non-initiators see the chrome `Home` as their only exit. |
-| `solo` | Single-member room. Triggered when `members.length === 1` AND the initiator did not share an invite (the share sheet never opened). Home chrome row above the eyebrow. Eyebrow `"Tonight, the verdict is"` (same definite article as `default` — the singular voice still produced a verdict). Hero + meta + time badge + rule chip + `I'm in` CTA + reroll tertiary all present. **Suppressed:** voice-receipt row (one voice doesn't need to be receipted back to itself). **Replaced:** the `default` mode's save-group affordance is replaced with the **save-taste-profile** affordance (the C-22 Auth Upgrade Chip from TB-12, copy `"Save this taste profile"`). The chip surfaces under the primary CTA in `default-idle` state for anonymous users; suppressed for already-linked users. Cuts drawer remains available (informational). Time badge renders the timestamp only — no audience subtitle. The communal frame self-cancels with `N = 1`; the solo voter already knows it's them. |
+| `solo` | Single-member room. Triggered when `members.length === 1` AND the initiator did not share an invite (the share sheet never opened). Home chrome row above the eyebrow. Eyebrow `"Tonight, the verdict is"` (same definite article as `default` — the singular voice still produced a verdict). Hero + meta + time badge + rule chip + `I'm in` CTA + reroll tertiary all present. **Suppressed:** voice-receipt row (one voice doesn't need to be receipted back to itself). **Replaced:** the `default` mode's save-group affordance is replaced with the **save-taste-profile** affordance (the C-22 Auth Upgrade Chip from TB-12, copy `"Save this taste profile"`). The chip surfaces under the primary CTA in `default-idle` state for anonymous users; suppressed for already-linked users. Time badge renders the timestamp only — no audience subtitle. The communal frame self-cancels with `N = 1`; the solo voter already knows it's them. |
 
 ## What this surface defends against
 
@@ -121,7 +120,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 - **`"You're in · 3 of 4"`** — N-of-M, no percentage.
 - **`"Start a new decision"`** (read-only) — voluntary, framed as a new round (not "re-do" or "join late"). The late-joiner becomes the initiator of the next session.
 - **`"Widen radius"`** (no-survivor) — verb-first, action-shaped. NOT `"Try again"` (implies user error).
-- **Pre-permission line** (`default` / `cuts` / `committed`) — `"We'll check in tomorrow — see if you went."` Voluntary warm-friend register. NEVER paraphrased to `"Enable notifications"`, `"Allow alerts"`, `"Turn on push"` or any system-register phrasing. The line surfaces under the CTA dock; the user's first `"I'm in"` tap fires the native iOS push permission prompt once per session (PRD user story 38–40). Suppressed in `read-only` (no ratification path) and `no-survivor` (no verdict to check in on).
+- **Pre-permission line** (`default` / `committed`) — `"We'll check in tomorrow — see if you went."` Voluntary warm-friend register. NEVER paraphrased to `"Enable notifications"`, `"Allow alerts"`, `"Turn on push"` or any system-register phrasing. The line surfaces under the CTA dock; the user's first `"I'm in"` tap fires the native iOS push permission prompt once per session (PRD user story 38–40). Suppressed in `read-only` (no ratification path) and `no-survivor` (no verdict to check in on).
 
 ## Mode-specific behavior
 
@@ -131,8 +130,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 - Triggered when a user taps the invite link **after** `rooms.verdict_committed_at` is non-null.
 - Voice-receipt row shows only members who answered before commit. The late-joiner's chip does not appear.
 - Primary CTA `"Start a new decision"` returns the user to S01 as the new initiator. Defaults are pre-populated from the prior room's `timer_minutes` + `radius_meters` (saves a tap; they're likely planning a similar outing).
-- Cuts drawer is available (informational). The "See what got cut →" trigger remains; reading the elimination chain is part of understanding what they missed.
-- VO order: eyebrow → hero → meta → time badge → rule chip → receipts (in order) → cuts trigger → re-invite CTA. Ratification path is announced as "Not available — this verdict is closed."
+- VO order: eyebrow → hero → meta → time badge → rule chip → receipts (in order) → re-invite CTA. Ratification path is announced as "Not available — this verdict is closed."
 
 ### `solo`
 
@@ -161,6 +159,6 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 
 - **Verdict matches a veto.** Shouldn't be possible (EBA culls first), but defensively the surface would show a `"Filter clash"` banner above the hero and offer reroll directly.
 - **Tie at regret stage.** Rule sentence becomes `"Pico's and Ren Soba tied; Pico's was closer for {majority}."` Distance becomes the second-order tiebreaker.
-- **Only 1 candidate survives.** Eyebrow shifts to `"Only one made it tonight"`. Cuts drawer auto-opens. Otherwise identical to `default`.
+- **Only 1 candidate survives.** Eyebrow shifts to `"Only one made it tonight"`. Otherwise identical to `default`.
 - **`no-survivor` after widen.** If the user widens the radius and the engine still returns no survivors, the surface re-renders in `no-survivor` mode with the updated meta line. The slider is available again with a fresh `+1.0 mi` suggestion. There's no hard ceiling on widens, but each one re-shows the rule chip — friction by repetition.
 - **Late-joiner during widen-loop.** If a member who is not the room's initiator opens the room while the initiator is on `no-survivor`, they see the same `no-survivor` mode but without the `"Widen radius"` CTA (initiator-only action). They see the chrome-row `Home` verb only — Home pops them back to their Plan list.

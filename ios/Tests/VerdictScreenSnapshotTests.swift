@@ -38,7 +38,10 @@ final class VerdictScreenSnapshotTests: XCTestCase {
     func testDefaultModeRendersWithEmptyReceiptsAndCuts() {
         // Defensive — a verdict with zero receipts or zero cuts should
         // still materialise without crashing (e.g. an early-trigger
-        // room where no member has answered yet).
+        // room where no member has answered yet). The `cuts` array
+        // stays on the value type (bug-26 kept the data field — the
+        // engine still writes `option_cuts` rows — but the surface
+        // never renders them).
         let empty = VerdictScreen.Verdict(
             placeName: "Solo Spot",
             metaLine: "American · $ · 5 min walk",
@@ -117,8 +120,6 @@ final class VerdictScreenSnapshotTests: XCTestCase {
         let snap = VerdictScreen(verdict: verdict, mode: .default).modeSnapshot
         XCTAssertTrue(snap.showTimeBadge,    "default mode renders the time badge")
         XCTAssertTrue(snap.showReceipts,     "default mode renders voice receipts")
-        XCTAssertTrue(snap.showCutsDrawer,   "default mode renders the cuts trigger")
-        XCTAssertFalse(snap.cutsExpanded,    "cuts drawer collapsed by default per S05 §Modes")
         XCTAssertEqual(snap.eyebrowCopy, "Tonight, the verdict is")
         XCTAssertEqual(snap.primaryCtaLabel, "I'm in")
         // bug-22 — `Start over` tertiary slot removed; the Home verb

@@ -15,10 +15,18 @@
 //     load-bearing message, primary CTA `"Widen radius"` opens an
 //     inline range slider (1–10 mi, current+1.0 mi default), commit
 //     fires `onWidenRadius(meters:)`. Suppressed: time badge, voice
-//     receipts, cuts drawer.
-//   * `.cuts`, `.committed`, `.readOnly` — wired through the same
-//     `mode` parameter; TB-08 / TB-11 will land the full
-//     implementations.
+//     receipts.
+//   * `.committed`, `.readOnly` — wired through the same `mode`
+//     parameter; TB-08 / TB-11 land the full implementations.
+//   * `.solo` — TB-13 single-member surface; see `Mode.solo` doc.
+//
+// bug-26 (2026-05-24) — the `.cuts` mode and its expanded "See what
+// got cut" drawer were retired in full. The drawer offered a friction-
+// free change-of-mind path that re-litigated the verdict without paying
+// the reroll's 3-burn / stated-reason friction; reroll is now the only
+// re-decide channel. The `Verdict.cuts` data field stays on the value
+// type because the engine still writes `option_cuts` rows for receipts
+// / analytics use, but the surface never renders them.
 //
 // What the view does NOT do:
 //   * Compute anything from `votes`. The engine in
@@ -38,7 +46,6 @@ import SwiftUI
 public struct VerdictScreen: View {
     public enum Mode: String, Sendable {
         case `default`
-        case cuts
         case committed
         case readOnly
         case noSurvivor
@@ -149,7 +156,6 @@ public struct VerdictScreen: View {
 
     @State private var revealStep: Int = 0
     @State private var receiptIndexShown: Int = -1
-    @State private var cutsExpanded: Bool = false
     @State private var widenSliderOpen: Bool = false
     @State private var widenRadiusMiles: Double = 3.0
     /// TB-08 — local commit flag. Flipped by the "I'm in" tap, drives
@@ -310,13 +316,6 @@ public struct VerdictScreen: View {
                 if modeSnapshot.showReceipts {
                     receiptsRow
                         .padding(.top, GTISpacing.step6)
-                        .padding(.horizontal, GTISpacing.step6)
-                }
-
-                // Cuts drawer
-                if modeSnapshot.showCutsDrawer {
-                    cutsDrawer
-                        .padding(.top, GTISpacing.step5)
                         .padding(.horizontal, GTISpacing.step6)
                 }
 
@@ -550,58 +549,6 @@ public struct VerdictScreen: View {
         .opacity(receiptOpacity(index: index))
         .scaleEffect(receiptScale(index: index))
         .offset(y: receiptOffsetY(index: index))
-    }
-
-    @ViewBuilder
-    private var cutsDrawer: some View {
-        if cutsExpanded {
-            VStack(alignment: .leading, spacing: GTISpacing.step2) {
-                HStack {
-                    Text("WHAT GOT CUT")
-                        .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                        .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.7))
-                    Spacer()
-                    Button(action: { withAnimation { cutsExpanded = false } }) {
-                        Text("HIDE")
-                            .font(.system(size: 10, weight: .heavy))
-                            .tracking(GTIFont.TrackingEm.eyebrow * 10)
-                            .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.7))
-                    }
-                    .accessibilityIdentifier("verdict.cuts.hide")
-                }
-                ForEach(verdict.cuts) { cut in
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(cut.name)
-                            .font(.system(size: GTIFont.Size.sm, weight: .heavy))
-                            .foregroundStyle(GTIColor.TextOnGradient.primary)
-                            .strikethrough(true, color: GTIColor.TextOnGradient.primary.opacity(0.6))
-                        Spacer()
-                        Text(cut.reason)
-                            .font(.system(size: GTIFont.Size.eyebrow, weight: .semibold))
-                            .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.7))
-                    }
-                    .padding(.horizontal, GTISpacing.step3)
-                    .padding(.vertical, GTISpacing.step2)
-                    .background(
-                        Color.black.opacity(0.18),
-                        in: RoundedRectangle(cornerRadius: 10)
-                    )
-                }
-            }
-            .accessibilityIdentifier("verdict.cuts.expanded")
-        } else {
-            Button(action: { withAnimation { cutsExpanded = true } }) {
-                Text("SEE WHAT GOT CUT →")
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .heavy))
-                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.85))
-                    .frame(maxWidth: .infinity)
-                    .padding(GTISpacing.step2)
-            }
-            .opacity(revealStep >= 6 ? 1 : 0)
-            .accessibilityIdentifier("verdict.cuts.trigger")
-        }
     }
 
     @ViewBuilder
@@ -954,8 +901,6 @@ public struct VerdictScreen: View {
     public struct ModeSnapshot {
         public let showTimeBadge: Bool
         public let showReceipts: Bool
-        public let showCutsDrawer: Bool
-        public let cutsExpanded: Bool
         public let eyebrowCopy: String
         public let primaryCtaLabel: String
         public let secondaryLabel: String
@@ -984,8 +929,7 @@ public struct VerdictScreen: View {
     }
 
     /// Mode-shaped flags surfaced for the snapshot tests. Mirrors the
-    /// flat flags at the top of `ScreenVerdict.jsx`'s body. Reads
-    /// `cutsExpanded` state when the JSX would also be in `.cuts` mode.
+    /// flat flags at the top of `ScreenVerdict.jsx`'s body.
     public var modeSnapshot: ModeSnapshot {
         let isReadOnly   = mode == .readOnly
         let isNoSurvivor = mode == .noSurvivor
@@ -1051,8 +995,6 @@ public struct VerdictScreen: View {
             // Solo suppresses receipts — one voice doesn't need to be
             // receipted back to itself. Otherwise the row surfaces.
             showReceipts: !isNoSurvivor && !isSolo,
-            showCutsDrawer: !isNoSurvivor,
-            cutsExpanded: cutsExpanded || mode == .cuts,
             eyebrowCopy: eyebrow,
             primaryCtaLabel: primaryLabel,
             secondaryLabel: secondary,

@@ -85,8 +85,6 @@ iOS HIG minimum: **44×44pt**. We hit this almost everywhere — exceptions are 
 | Avatar dot (C-07) | 36 / 48 | ⚠ 36 is below 44 — wrap in 44×44 hit area, add `accessibilityLabel` |
 | Vibe stop (C-08) | 12 visual / 44 hit | ⚠ visual is small, hit area must be padded — bar segment full row 44 tall |
 | Time badge (C-09) | non-tappable | n/a |
-| Cuts drawer trigger | width 100%, padding 8 — ~32 height | ⚠ pad to 44 |
-| Cuts row | padding `8 12` — ~36 height | ⚠ non-tappable (display only) so OK |
 | Regret rating button (C-15) | flex / **height 40** | ⚠ **below 44.** Fix in SwiftUI: `.frame(minHeight: 44)`. |
 | Reroll reason tile (C-16) | padding 14 — ~64 height | ✅ |
 | Check-in tap row (C-18) | padding `16 22` — ~62 height | ✅ |
@@ -102,7 +100,6 @@ iOS HIG minimum: **44×44pt**. We hit this almost everywhere — exceptions are 
 **Fixes for the SwiftUI port:**
 1. **Regret rating row** — bump min-height to 44. Reduces vertical density slightly; acceptable trade.
 2. **Vibe stops** — pad the tap target vertically beyond the 12px visual bar so the user can tap the whole row.
-3. **Cuts drawer "See what got cut →" trigger** — bump to 44 min height.
 
 ---
 
@@ -118,18 +115,16 @@ Per surface, the focus order ladders from top → bottom, with the primary CTA a
 5. Each chip / picker / control in source order
 6. Primary CTA
 
-### Verdict (default / cuts / committed)
+### Verdict (default / committed)
 1. **Chrome row** (bug-22) — `Home` text verb, top-leading. Announced as `"Home, button"`; activates the pop to S00 Plan list. The chrome row reads first so VO users land on the navigation affordance before the choreographed reveal.
 2. Eyebrow → Hero → Meta → Time → Rule → Receipt 1..4 (this read order is the **five-second test**)
-3. Cuts drawer trigger
-4. Primary CTA (`I'm in` / `You're in`)
-5. Committed-state status line (`"Window closes in 47s"`) — read as static text; no special handling. The `Start over` secondary the row previously carried was removed by bug-22; the Home verb in the chrome row replaces it.
+3. Primary CTA (`I'm in` / `You're in`)
+4. Committed-state status line (`"Window closes in 47s"`) — read as static text; no special handling. The `Start over` secondary the row previously carried was removed by bug-22; the Home verb in the chrome row replaces it.
 
 ### Verdict (`read-only` mode)
 1. (No chrome row — bug-22 omitted Home in this mode; the late-joiner has no Plan-list destination for someone else's Plan, and the Web invitee has no Plan list at all.)
 2. Eyebrow (`"Tonight's verdict"`) → Hero → Meta → Time → Rule → Receipt 1..N (late-joiner not in list)
-3. Cuts drawer trigger (informational)
-4. Primary CTA (`"Start a new decision"`)
+3. Primary CTA (`"Start a new decision"`)
    - Ratification path is announced by VO as **"Not available — this verdict is closed."**
 
 ### Verdict (`no-survivor` mode)
@@ -141,12 +136,11 @@ Per surface, the focus order ladders from top → bottom, with the primary CTA a
 ### Verdict (`solo` mode)
 1. **Chrome row** (bug-22) — `Home` text verb, top-leading. Announced as `"Home, button"`. Tap pops to S00 Plan list.
 2. Eyebrow (`"Tonight, the verdict is"`) → Hero → Meta → Time badge (timestamp only — audience subtitle omitted per bug-28) → Rule chip
-3. Cuts drawer trigger (informational; same affordance as `default`)
-4. Primary CTA (`"I'm in"` / `"You're in"` once committed — no N-of-M denominator)
-5. Auth Upgrade Chip (`"Save this taste profile"`) — replaces the `default` mode's group-save affordance. Hidden when the user is already linked.
-6. Reroll tertiary
-7. Committed-state status line (`"Window closes in 47s"` once committed) — empty pre-commit; the chrome `Home` verb is the only navigation affordance pre-commit.
-   - Voice-receipt row is suppressed — VO focus skips from rule chip directly to cuts trigger / CTA. No `"voice not counted"` announcement; the row simply isn't part of the read order.
+3. Primary CTA (`"I'm in"` / `"You're in"` once committed — no N-of-M denominator)
+4. Auth Upgrade Chip (`"Save this taste profile"`) — replaces the `default` mode's group-save affordance. Hidden when the user is already linked.
+5. Reroll tertiary
+6. Committed-state status line (`"Window closes in 47s"` once committed) — empty pre-commit; the chrome `Home` verb is the only navigation affordance pre-commit.
+   - Voice-receipt row is suppressed — VO focus skips from rule chip directly to the primary CTA. No `"voice not counted"` announcement; the row simply isn't part of the read order.
    - Time badge announces as `"Tonight at 7 PM"` (bug-28). The audience subtitle is omitted on solo, so VO has nothing to announce after the timestamp — the communal `"for all N of you"` clause is the group-mode contract; solo has no equivalent.
 
 ### Reroll sheet
@@ -180,15 +174,11 @@ Per-component:
 | Time badge | Group: `"Tonight at 7 PM, for all four of you"`. Solo (bug-28): `"Tonight at 7 PM"` — the audience clause is dropped when the visible subtitle is suppressed. |
 | Rule sentence | (read as static text; no special handling) |
 | Receipt chip | `"{name}: {action}"` |
-| Cuts trigger | `"See what got cut. Double tap to expand."` |
 | Timer chip (S01) | `"{N} minute timer"` `state: aria-pressed` (selected/not) |
 | Range slider (C-21) | `aria-label` = control name (e.g. `"Walk radius"`); `aria-valuetext` = live label (`"2.0 miles"`) |
-| Cuts row | `"{name}, cut: {reason}"` |
 | I'm in (default) | `"I'm in. Double tap to commit to this verdict."` |
 | I'm in (committed) | `"You're in. 3 of 4 committed."` |
 | Locked plate | `"Verdict locked at 6:48 PM. Re-opening requires a reroll. {n} of 3 rerolls remain."` |
-
-**Cuts drawer rule:** when the drawer expands, post `.announcement` with `"3 places were cut. Ren Soba, over budget cap. Café Lou, shellfish veto. Halal Cart, outside walk range."`.
 
 ---
 
@@ -249,7 +239,6 @@ Run on the current prototype:
 - ✅ All display copy passes contrast except the bottom 20% of bright gradients, which is design-positioned outside content range.
 - ⚠ Regret rating buttons need a +4pt height bump in SwiftUI.
 - ⚠ Vibe stop visual is 12px — pad tap target.
-- ⚠ Cuts drawer trigger is a 32-tall row — pad to 44.
 - ✅ All CTAs are well above 44.
 - ✅ Color blindness paths intact (single accent).
 - ✅ Reduced motion fallbacks specified.

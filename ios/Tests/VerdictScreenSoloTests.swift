@@ -19,7 +19,8 @@
 //   * Save-group affordance REPLACED with the C-22 save-taste-profile
 //     chip (TB-12, copy `"Save this taste profile"`). The chip
 //     surfaces under the primary CTA for anonymous users.
-//   * Cuts drawer remains available (informational).
+//   * bug-26 (2026-05-24) — the cuts drawer was retired from every
+//     mode; solo no longer surfaces it.
 //   * Solo-path detection: `SoloPath.shouldSkipWaiting(memberCount:invitedShared:)`
 //     skips S04 when memberCount == 1 AND invitedShared == false.
 //
@@ -96,7 +97,7 @@ final class VerdictScreenSoloTests: XCTestCase {
 
     // MARK: - mode-flag contract
 
-    func testSoloModeKeepsTimeBadgeAndCutsButSuppressesReceipts() {
+    func testSoloModeKeepsTimeBadgeButSuppressesReceipts() {
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.soloFixture(),
             mode: .solo
@@ -106,8 +107,6 @@ final class VerdictScreenSoloTests: XCTestCase {
             "solo keeps the time badge — there's still a when/where")
         XCTAssertFalse(snap.showReceipts,
             "solo suppresses the voice-receipt row — one voice doesn't need to be receipted to itself")
-        XCTAssertTrue(snap.showCutsDrawer,
-            "solo keeps the cuts drawer — informational; same affordance as default")
     }
 
     func testSoloEyebrowMatchesDefault() {
@@ -159,10 +158,10 @@ final class VerdictScreenSoloTests: XCTestCase {
     }
 
     func testNonSoloModesDoNotSurfaceTheSaveTasteProfileChip() {
-        // Default, cuts, committed, no-survivor, read-only — none
-        // surface the C-22 chip on S05 (it lives on S04 for those flows
-        // per TB-12).
-        for mode: VerdictScreen.Mode in [.default, .cuts, .committed, .noSurvivor, .readOnly] {
+        // Default, committed, no-survivor, read-only — none surface
+        // the C-22 chip on S05 (it lives on S04 for those flows per
+        // TB-12). The `.cuts` mode was retired by bug-26.
+        for mode: VerdictScreen.Mode in [.default, .committed, .noSurvivor, .readOnly] {
             let verdict: VerdictScreen.Verdict =
                 (mode == .noSurvivor) ? .noSurvivorFixture() : .fixture()
             let snap = VerdictScreen(verdict: verdict, mode: mode).modeSnapshot

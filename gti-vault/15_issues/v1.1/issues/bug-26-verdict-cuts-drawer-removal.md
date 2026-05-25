@@ -1,7 +1,7 @@
 ---
 issue: bug-26
 title: Remove the "See what got cut" drawer from the verdict screen — unnecessary surface area
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 226
 created: 2026-05-24
@@ -83,3 +83,7 @@ This motivation is load-bearing because it interacts with bug-22 (the verdict `H
 ### Adjacency flagged, not filed
 
 If the verdict screen's vertical rhythm reads off after the trigger is removed (e.g. the rule-sentence card now floats), audit the §motion timeline (`VERDICT_CHOREO`) — the cuts trigger had its own staggered reveal step that may have anchored the timing of the next element down. Out of scope for this issue; file as a follow-up if it actually surfaces.
+
+## Comments
+
+- **2026-05-24, AFK execution complete.** Spec + JSX + iOS port + accessibility + motion all carry the deletion; bug-26 grill outcome matched verbatim. Web side already conforms (bug-17 already retired the §C cuts row). `Verdict.cuts` value-type field retained — the engine still writes `option_cuts` rows for receipts / analytics; the surface simply no longer reads them. `design-system/scripts/test-bug-26.mjs` added as the structural gate (32 assertions). Sibling structural tests (`test-bug-24`, `test-fab-rework`, `test-plan-list`, `test-plan-setup`, `test-quiz-chrome`, `test-verdict-no-survivor`, `test-account-claim`) all still pass; `design-system/scripts/verify.mjs` green. Adjacency above did not surface in code review — the JSX/SwiftUI removal is clean (the entire conditional view is deleted, not just the inner button; no dangling spacer).
