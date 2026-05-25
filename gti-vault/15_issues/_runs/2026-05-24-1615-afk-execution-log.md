@@ -32,7 +32,7 @@ Concurrency cap: 2 (default).
 | bug-24 | #224 | merged | afk/bug-24 | [#232](https://github.com/samfarls55/gettoit/pull/232) | New C-27 ActionSheet primitive + S00 migration; resume subagent rebased + merged `b18f34b` |
 | bug-25 | #225 | merged | afk/bug-25 | [#233](https://github.com/samfarls55/gettoit/pull/233) | Symmetric topBar spacers + bounded Q1 chrome spacer; merged `bd7a455` |
 | bug-26 | #226 | building | afk/bug-26 | — | Remove verdict "See what got cut" drawer |
-| bug-28 | #228 | queued | afk/bug-28 | — | Solo verdict time-badge subtitle copy |
+| bug-28 | #228 | merged | afk/bug-28 | [#234](https://github.com/samfarls55/gettoit/pull/234) | Drop solo time-badge audience subtitle (`audience: ""` collapses VStack); merged `d389895` |
 
 ## Event log
 - 16:15 — Run opened. Preflight green. Patched missing `type: AFK` frontmatter on bug-21..28 vault files so `ready-issues.mjs` scopes them in. Wave 1 = [bug-21, bug-22, bug-23, bug-24, bug-25, bug-26, bug-28]. bug-27 skipped (`status:needs-info`).
@@ -42,3 +42,5 @@ Concurrency cap: 2 (default).
 - 16:58 — bug-23 MERGED via PR #231 (`d0e7dd6`). Slot freed; spawned bug-25. Spec changes: C-26 FAB rework (T1 ink-fill), new `GTIShadow.fab` token + `.gtiShadow(_:)` extension, CHANGELOG marked BREAKING (FAB visual treatment changes).
 - 17:14 — bug-24 subagent ended early. PR #232 opened with full work (new C-27 ActionSheet primitive, S00 disambig + delete-confirm migrated), but the subagent did not merge: PR is `CONFLICTING` against main (bug-22 + bug-23 landed after the branch was cut) and the `ci.yml` workflow never triggered on the PR (only Vercel reported). Dispatched resume subagent in fresh worktree to rebase against `origin/main`, force-push to retrigger CI, then merge. Slot stays at 2 (bug-25 + bug-24-resume).
 - 17:22 — bug-24 MERGED via PR #232 (`b18f34b`). Resume subagent rebased against main (kept both bug-23 + bug-24 rows on `_index.md`), force-push retriggered CI automatically (no poke needed), all lanes green. bug-25 also visible as merged on main as PR #233 (`bd7a455`) — subagent notification still pending. Spawned bug-26 to fill the slot.
+- 17:23 — bug-25 notification confirmed (PR #233 `bd7a455`): symmetric 32pt trailing topBar spacer + fixed Color.clear 44pt leading-slot spacer when canBack==false; tested via UIHostingController.sizeThatFits. Slot freed; spawned bug-28 (last queued).
+- 17:36 — bug-28 MERGED via PR #234 (`d389895`). Solo time-badge audience subtitle suppressed by setting `audience: ""` and guarding the renderer Text. Stale `"All one of you"` literal in a snapshot test corrected to `"All four of you"` (test used `.default` mode). Slot freed. Wave 1 remaining: bug-26 only.
