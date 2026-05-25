@@ -165,9 +165,17 @@ public struct QuizScreen: View {
         // tb-WF-2 — the C-02 TopBar's `×` is suppressed in the quiz
         // context. The QuizChrome row above owns the Exit/Leave verb
         // now; the spec's "no icons" rule applies (`surfaces/03-quiz.md`
-        // §"Quiz skeleton"). The leading slot collapses to a 32pt-wide
-        // spacer so the 5-segment progress strip stays at the same
-        // horizontal position it sat at when the `×` rendered.
+        // §"Quiz skeleton").
+        //
+        // bug-25 — the pre-fix layout reserved a 32pt-wide leading
+        // spacer (where the C-02 `×` used to sit) with NO trailing
+        // counterpart. The 5-segment progress strip therefore sat
+        // 32pt right-of-centre on every quiz question. The fix
+        // mirrors the leading reservation with a 32pt trailing spacer
+        // so the strip centres naturally inside the parent's
+        // `.padding(.horizontal, step5)` insets. Both spacers are
+        // `accessibilityHidden` so the strip is the only addressable
+        // element in this row.
         HStack(alignment: .center, spacing: GTISpacing.step4) {
             Color.clear
                 .frame(width: 32, height: 32)
@@ -191,6 +199,10 @@ public struct QuizScreen: View {
                 }
             }
             .accessibilityIdentifier("quiz.progress")
+
+            Color.clear
+                .frame(width: 32, height: 32)
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, GTISpacing.step5)
     }
