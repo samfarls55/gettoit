@@ -126,9 +126,17 @@ Supabase mints the JWT client_secret internally; you don't manage that token.
 
 No `gh secret` entries needed — Supabase holds these credentials, not CI.
 
-### Rotation
+### Rotation + expiry
 
-Same yearly cadence as #1. Generate new → update Supabase → revoke old.
+Supabase-minted SiwA OAuth `client_secret` JWT is bound to a **6-month expiry** (Apple's max for client secrets). Web sign-in silently 401s after expiry; native iOS sign-in keeps working (it does not traverse this code path).
+
+Current `.p8` wired 2026-05-12 — first client_secret expires **2026-11-12**. Regenerate **before 2026-10-22** (3-week buffer):
+
+1. Generate fresh `.p8` per "Generate the key" above (revoke old in Apple Developer Console only after the swap).
+2. Update Supabase Dashboard → Auth → Providers → Apple: paste new `.p8`, update Key ID.
+3. Smoke-test web Apple sign-in end-to-end before revoking the old key.
+
+Same yearly cadence as #1 for the underlying `.p8` itself; the 6-month client_secret expiry is the binding deadline.
 
 ## Key 3 — APNs auth key
 

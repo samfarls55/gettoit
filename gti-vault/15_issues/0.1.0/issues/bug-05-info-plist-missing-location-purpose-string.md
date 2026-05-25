@@ -1,7 +1,7 @@
 ---
 issue: bug-05
 title: Info.plist missing NSLocationWhenInUseUsageDescription — ITMS-90683 on build 125
-github_issue: null
+github_issue: null  # exception: ITMS warning fixed in-branch same day before any agent dispatch — no GH mirror filed; documented here per vault audit 2026-05-25
 status: fixed-in-branch
 type: AFK
 created: 2026-05-14

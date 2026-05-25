@@ -14,7 +14,7 @@ Two issue groups:
 - **Tracer-bullet build slices** (`tb-NN-*`) — vertical slices that cut through every layer (schema → Edge → iOS / web → tests) and are demoable end-to-end. Picked up by an AFK agent in dependency order. Some are HITL (external accounts, legal, recruitment).
 - **Design-system spec-gap issues** (`NN-*`) — surface-level changes to the locked `design-system/` spec that the PRD requires. Each is consumed by exactly one tracer bullet (cross-referenced via `implements_spec_gap` in the tracer bullet's frontmatter).
 
-Tracer-bullet issues have `status: ready-for-agent`. **All 5 design-system spec-gap issues (`01`–`05`) landed 2026-05-12** — see `design-system/CHANGELOG.md`. Tracer bullets that depend on them (TB-03, TB-07, TB-09, TB-11, TB-05) are now unblocked on the spec side.
+All 5 design-system spec-gap issues (`01`–`05`) landed 2026-05-12; all tracer bullets (TB-00 → TB-17) shipped 2026-05-12 → 2026-05-14 (TB-17 deferred — see table). See `design-system/CHANGELOG.md`.
 
 ## Tracer-bullet build slices
 
