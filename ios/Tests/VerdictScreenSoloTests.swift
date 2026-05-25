@@ -13,7 +13,9 @@
 //     tertiary all PRESENT.
 //   * Voice-receipt row SUPPRESSED — one voice doesn't need to be
 //     receipted back to itself.
-//   * Time badge audience reads `"You"` (not `"All N of you"`).
+//   * Time badge audience subtitle is OMITTED (bug-28) — the badge
+//     renders the timestamp alone. Was `"You"` pre-bug-28; the grill
+//     dropped the subtitle entirely.
 //   * Save-group affordance REPLACED with the C-22 save-taste-profile
 //     chip (TB-12, copy `"Save this taste profile"`). The chip
 //     surfaces under the primary CTA for anonymous users.
@@ -203,9 +205,13 @@ final class VerdictScreenSoloTests: XCTestCase {
             "solo fixture rule_text must not reference voice counts (`wanted`): \(fixture.ruleText)")
     }
 
-    func testSoloFixtureTimeBadgeAudienceIsYou() {
+    func testSoloFixtureTimeBadgeAudienceIsOmitted() {
+        // bug-28 — solo audience subtitle is OMITTED. The communal frame
+        // self-cancels with N = 1; an empty string signals the VStack to
+        // render only the timestamp. The earlier `"You"` contract was
+        // amended by the 2026-05-24 grill.
         let fixture = VerdictScreen.Verdict.soloFixture()
-        XCTAssertEqual(fixture.timeBadge.audience, "You",
-            "solo time badge reads 'You' (singular) — communal frame doesn't apply")
+        XCTAssertEqual(fixture.timeBadge.audience, "",
+            "solo time badge audience is omitted — empty string drops the subtitle row")
     }
 }

@@ -37,17 +37,36 @@ final class VerdictScreenSnapshotTests: XCTestCase {
 
     func testDefaultModeRendersWithEmptyReceiptsAndCuts() {
         // Defensive — a verdict with zero receipts or zero cuts should
-        // still materialise without crashing (e.g. solo-flow surface or
-        // an early-trigger room where no member has answered yet).
+        // still materialise without crashing (e.g. an early-trigger
+        // room where no member has answered yet).
         let empty = VerdictScreen.Verdict(
             placeName: "Solo Spot",
             metaLine: "American · $ · 5 min walk",
-            timeBadge: VerdictScreen.TimeBadge(time: "7:00 PM", audience: "All one of you"),
+            timeBadge: VerdictScreen.TimeBadge(time: "7:00 PM", audience: "All four of you"),
             ruleText: "Solo Spot was the only candidate that fit every constraint.",
             receipts: [],
             cuts: []
         )
         render(VerdictScreen(verdict: empty, mode: .default))
+    }
+
+    // MARK: - bug-28 · audience subtitle suppression
+
+    func testTimeBadgeRendersWithoutCrashingWhenAudienceIsEmpty() {
+        // bug-28 — solo mode (and any caller that opts in) signals
+        // "suppress the audience subtitle" by passing an empty audience
+        // string. The renderer must materialise the time badge as a
+        // single line (the timestamp only) without crashing — no empty
+        // `Text("")` placeholder, the VStack collapses to one child.
+        let verdict = VerdictScreen.Verdict(
+            placeName: "Pico's Taqueria",
+            metaLine: "Mexican · $$ · 8 min walk",
+            timeBadge: VerdictScreen.TimeBadge(time: "7:00 PM", audience: ""),
+            ruleText: "Pico's was the only candidate that fit every constraint.",
+            receipts: [],
+            cuts: []
+        )
+        render(VerdictScreen(verdict: verdict, mode: .solo))
     }
 
     // MARK: - choreography timings (locked, ms-exact)

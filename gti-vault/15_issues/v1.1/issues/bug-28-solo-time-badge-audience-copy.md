@@ -1,7 +1,7 @@
 ---
 issue: bug-28
 title: Solo verdict screen drops the audience subtitle entirely; group keeps "ALL N OF YOU"
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 228
 created: 2026-05-24
@@ -83,3 +83,7 @@ The user's framing: *"We don't need to say what is already understood."*
 - Any change to the time-badge typography, shadow, or position. The visual treatment is locked; only the audience subtitle's presence in solo changes.
 - Any change to the group-mode audience copy.
 - Any change to verdict modes outside `solo` and `default` (the `no-survivor` mode already suppresses the time badge entirely, per the existing spec).
+
+## Comments
+
+- 2026-05-24 — AFK execution complete. Spec amended (`design-system/surfaces/05-verdict.md` §Modes / §"Copy register" / §solo, `design-system/accessibility.md` §"Verdict (solo mode)" + §"VoiceOver labels", `design-system/CHANGELOG.md`). JSX (`design-system/code/screens/ScreenVerdict.jsx`) drops the subtitle entirely on solo. iOS port: `VerdictStore.audienceCopy(forMemberCount:)` returns `""` for `n == 1`; `VerdictScreen.timeBadge` renders the subtitle `Text` only when audience is non-empty; `ScreenFixtures.soloFixture()` updated. Test suite updated: `VerdictStoreTests.testAudienceCopyForSolo` now asserts empty string; `VerdictScreenSoloTests.testSoloFixtureTimeBadgeAudienceIsOmitted` (renamed from `…IsYou`); new `VerdictScreenSnapshotTests.testTimeBadgeRendersWithoutCrashingWhenAudienceIsEmpty` covers the renderer's empty-subtitle path. `node design-system/scripts/verify.mjs` green.

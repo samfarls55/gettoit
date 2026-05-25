@@ -54,15 +54,18 @@ extension VerdictScreen.Verdict {
     /// snapshot tests. Empty receipts list (the surface suppresses the
     /// row anyway), empty cuts (the engine still produces them for a
     /// multi-candidate solo run, but the fixture keeps the minimal
-    /// shape). Time-badge audience is `"You"` (singular). Rule text
-    /// names the rule that produced the verdict — no `"N of M"` framing.
+    /// shape). bug-28 — time-badge audience is the empty string so the
+    /// renderer drops the subtitle row entirely (communal `"All N of
+    /// you"` frame doesn't apply to a single voice; `"You"` only
+    /// restates what the solo voter already knows). Rule text names the
+    /// rule that produced the verdict — no `"N of M"` framing.
     /// `// placeholder: marketing-branding pass` applies to the strings.
     static func soloFixture() -> VerdictScreen.Verdict {
         // placeholder: marketing-branding pass
         VerdictScreen.Verdict(
             placeName: "Pico's Taqueria",
             metaLine: "Mexican · $$ · 8 min walk",
-            timeBadge: VerdictScreen.TimeBadge(time: "7:00 PM", audience: "You"),
+            timeBadge: VerdictScreen.TimeBadge(time: "7:00 PM", audience: ""),
             ruleText: "Pico's was the only candidate that fit every constraint.",
             receipts: [],
             cuts: []

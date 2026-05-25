@@ -24,9 +24,11 @@
 //
 // Time-badge wall clock: the time badge audience copy is
 // `"All N of you"` (PRD user story 31 + S05 §"Copy register"), where
-// N is the member count. For TB-06 we don't yet have a stable wall-
-// clock "when" for the meet-up — the JSX prints `7:00 PM` as a
-// placeholder. The store surfaces the same placeholder until the
+// N is the member count. bug-28 — in solo (`N == 1`) the audience
+// subtitle is omitted entirely (empty string); the communal frame
+// doesn't apply to a single voice. For TB-06 we don't yet have a
+// stable wall-clock "when" for the meet-up — the JSX prints `7:00 PM`
+// as a placeholder. The store surfaces the same placeholder until the
 // scheduling work (post-v1 candidate) lands.
 
 import Foundation
@@ -261,11 +263,14 @@ public final class VerdictStore {
 
     /// Build the audience copy on the time badge. PRD user story 31 +
     /// S05 §"Copy register" — `"ALL N OF YOU"` for the communal frame.
-    /// TB-13 — for the solo case (`n == 1`) the audience reads bare
-    /// `"You"`. The communal frame doesn't apply to a single voice;
-    /// `"All one of you"` would be wrong-pitched.
+    /// bug-28 — for the solo case (`n == 1`) the audience subtitle is
+    /// OMITTED entirely. The communal frame self-cancels with N = 1, and
+    /// the earlier `"You"` relabel (TB-13) only restates what the solo
+    /// voter already knows. Empty string signals the renderer to drop
+    /// the subtitle row; the time badge renders the timestamp alone.
+    /// See `design-system/surfaces/05-verdict.md` §"solo" (post-bug-28).
     public static func audienceCopy(forMemberCount n: Int) -> String {
-        if n == 1 { return "You" }
+        if n == 1 { return "" }
         let word = numberWord(n)
         return "All \(word) of you"
     }
