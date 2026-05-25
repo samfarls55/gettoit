@@ -5,7 +5,7 @@ purpose: TB-14 — Next-day check-in (S08), CheckinScheduler pg_cron, telemetry 
 
 # Check-in + telemetry — TB-14
 
-The metric loop that makes the v1 thesis observable. 12–24 hours after a verdict, every room member with a registered APNs push token receives a single push notification asking `"Did you go?"`. Tapping it opens S08 (`We went` / `We skipped` / `I'd rather not say`). The skip path opens a reason chip row. Responses land in `check_ins`; SQL views compute the north-star metric and two secondary metrics.
+The metric loop that makes the 0.1.0 thesis observable. 12–24 hours after a verdict, every room member with a registered APNs push token receives a single push notification asking `"Did you go?"`. Tapping it opens S08 (`We went` / `We skipped` / `I'd rather not say`). The skip path opens a reason chip row. Responses land in `check_ins`; SQL views compute the north-star metric and two secondary metrics.
 
 > The third option commits `outcome='snoozed'` — a metric-excluded, **terminal** write (`check_ins` PK is `(room_id, user_id)`; the first row wins). Despite the machine token's name it is not a deferral: bug-16 (fork B) re-labelled the option from `Ask me later` to `I'd rather not say` because the system has no re-prompt path. See [[bug-16-checkin-snooze-terminal-row]].
 
@@ -76,7 +76,7 @@ Idempotent: re-runs against an already-marked dispatch are no-ops via the `check
 
 ## SQL view shapes
 
-Each view returns a single row. Cheap to compute; no materialized-view machinery needed at v1 scale.
+Each view returns a single row. Cheap to compute; no materialized-view machinery needed at 0.1.0 scale.
 
 ### `metric_follow_through_pct`
 
@@ -106,7 +106,7 @@ Columns: `invites_shared`, `invitees_joined`, `invitees_voted`, `join_rate`, `vo
 
 ## Web-fallback gap (accepted)
 
-Users on the Next.js web fallback (TB-15) receive NO check-in push. The fallback has no APNs channel and adding push to the web client would mean a Service Worker + a separate VAPID key pair + a separate fanout path — well outside v1 scope.
+Users on the Next.js web fallback (TB-15) receive NO check-in push. The fallback has no APNs channel and adding push to the web client would mean a Service Worker + a separate VAPID key pair + a separate fanout path — well outside 0.1.0 scope.
 
 The scheduler still writes a `checkin_dispatches` row for users with no `push_tokens` row, so the exactly-once invariant holds. The APNsSender call no-ops on empty `push_tokens`. The metric counts users who can respond — web-fallback users simply won't appear in `check_ins`.
 
@@ -136,7 +136,7 @@ The writer exposes one dedicated method per event_type so callers can never typo
 
 ## Adjacencies flagged (not fixed)
 
-- **TelemetryWriter call-site landings.** Per the v1 PRD §"TelemetryWriter," the writer is consumed by every existing surface. Each call-site is a one-line addition. Lands alongside the surface it instruments — strict scope on this ticket keeps the blast radius small. Issues to file: per-surface telemetry instrumentation (S01 room_created, S02 invite_shared + member_joined, S03–S07 quiz_completed at submit, S05 ratified / rerolled).
+- **TelemetryWriter call-site landings.** Per the 0.1.0 PRD §"TelemetryWriter," the writer is consumed by every existing surface. Each call-site is a one-line addition. Lands alongside the surface it instruments — strict scope on this ticket keeps the blast radius small. Issues to file: per-surface telemetry instrumentation (S01 room_created, S02 invite_shared + member_joined, S03–S07 quiz_completed at submit, S05 ratified / rerolled).
 - **Edge Function `kind=checkin` deep-link routing.** The scheduler emits `payload.kind = "checkin"` so the iOS PushCoordinator's notification-response handler can route a check-in tap directly to S08 with the verdict + room ids pre-filled. Routing lands alongside the iOS deep-link surface (post-TB-14).
 - **`checkin_dispatches.delivered_at + success + status_code + apns_id`.** The scheduler writes the row pre-send but doesn't currently patch it post-send with the APNs result. Adding the patch requires either (a) making the cron worker await the `net.http_post` response (loses fire-and-forget semantics), (b) a second cron worker that reconciles via a future APNs delivery log, or (c) the APNsSender Edge Function calling back into Postgres post-send. Option (c) is the cleanest; track as a follow-up for the audit story.
 - **`metric_time_to_verdict_p50` event source.** The view pairs `room_created` and `verdict_ready` events. Both currently must be emitted client-side (TelemetryWriter), which means the metric is only accurate for clients that successfully wrote both. Server-side emission (in `compute-verdict` Edge Function) for `verdict_ready` is a one-line addition that should land alongside the per-surface call-site work above.
@@ -144,9 +144,9 @@ The writer exposes one dedicated method per event_type so callers can never typo
 
 ## Related
 
-- [[../10_prds/v1-prd|v1 PRD]] §"User stories 65-70" + §"TelemetryWriter" + §"CheckinScheduler"
+- [[../10_prds/0.1.0-prd|0.1.0 PRD]] §"User stories 65-70" + §"TelemetryWriter" + §"CheckinScheduler"
 - [[adr/0005-telemetry-supabase-event-store|ADR 0005]] — telemetry as Supabase tables + SQL views
 - [[waiting-fire-trigger|waiting-fire-trigger.md]] — the canonical pg_cron + pg_net dispatcher pattern that TB-14 mirrors
 - [[ratification-push-hardclose|ratification-push-hardclose.md]] §"Adjacencies" — TB-08's note that per-trigger APNs fanout wiring lands in TB-14
 - [[../../design-system/surfaces/08-checkin|S08 spec]] — locked surface spec
-- [[../15_issues/v1/issues/tb-14-checkin-telemetry|TB-14 ticket]]
+- [[../15_issues/0.1.0/issues/tb-14-checkin-telemetry|TB-14 ticket]]

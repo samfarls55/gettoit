@@ -26,7 +26,7 @@ Lock 1 needs to filter to restaurants that **offer** vegan options, not restaura
 
 ## Risk if used naively
 
-If we filter Q1 vegan as `categories includes Vegan Restaurant`, we will exclude every omnivore restaurant that serves a vegan entrée — the dominant case. Group with one vegan member would see a candidate pool too narrow to produce a verdict, triggering [[../../../15_issues/v1/issues/04-s05-no-survivor-terminal|no-survivor mode]] much more often than design intends.
+If we filter Q1 vegan as `categories includes Vegan Restaurant`, we will exclude every omnivore restaurant that serves a vegan entrée — the dominant case. Group with one vegan member would see a candidate pool too narrow to produce a verdict, triggering [[../../../15_issues/0.1.0/issues/04-s05-no-survivor-terminal|no-survivor mode]] much more often than design intends.
 
 ## Verification needed
 

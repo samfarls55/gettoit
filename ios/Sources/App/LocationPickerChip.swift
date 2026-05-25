@@ -1,4 +1,4 @@
-// GetToIt — C-23 LocationPickerChip (TB-03 v1.1).
+// GetToIt — C-23 LocationPickerChip (TB-03 quiz redesign).
 //
 // Persistent chip-style readout of the current location. Tap opens
 // the LocationPickerSheet for editing. Visual port of

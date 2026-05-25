@@ -1,7 +1,7 @@
-// GetToIt — SessionParameters (TB-05 v1.1).
+// GetToIt — SessionParameters (TB-05 quiz redesign).
 //
-// The *parameters* bucket of the v1.1 three-bucket input model (see
-// `gti-vault/10_prds/v1.1-quiz-redesign-prd.md` §"Three-bucket model"
+// The *parameters* bucket of the quiz-redesign three-bucket input model (see
+// `gti-vault/10_prds/0.1.0-quiz-redesign-prd.md` §"Three-bucket model"
 // and module (K)). Parameters are the session settings that are
 // CONSISTENT ACROSS EVERY PARTICIPANT — the initiator sets them once
 // on the pre-quiz S01b surface, they persist on the `rooms` record,
@@ -15,7 +15,7 @@
 //   * transport mode  — walk / drive; sets the default search radius.
 //
 // The remaining two PRD parameters are NOT in this type, by design:
-//   * geography — already captured + persisted via the v1.1
+//   * geography — already captured + persisted via the quiz-redesign
 //                 C-23 LocationPicker on S01 (`rooms.location_*`),
 //                 reused per the issue ("location already exists …
 //                 reuse it"). The S01b surface shows it read-only.

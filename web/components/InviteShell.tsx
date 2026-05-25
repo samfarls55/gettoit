@@ -316,7 +316,7 @@ export function InviteShell({ roomId }: { roomId: string }) {
 
   // phase.kind === "quiz" — §A first-landing or §B resume both land
   // here. `SessionRoom` is handed the resume progress and the leave
-  // callback; tb-WF-10 swapped its quiz to the v1.1 web quiz, so the
+  // callback; tb-WF-10 swapped its quiz to the redesigned web quiz, so the
   // shell does not care which quiz renders, only that it handed off a
   // member + a room + the resume state.
   return (

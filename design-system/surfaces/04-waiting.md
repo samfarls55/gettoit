@@ -37,7 +37,7 @@ The verdict computes the moment **either** condition holds:
 1. **All participants have submitted Q5** — the canonical "everyone's in" path (auto-fire on quorum-completion). The room auto-fires the moment the last outstanding member's Q5 ratings land, OR
 2. The **initiator** taps the `"Decide now"` CTA on this surface. Fires the verdict for whoever has answered so far.
 
-These are the two — and only two — verdict triggers v1.1 ships. There is **no session timer** and no shot-clock countdown; the v1 PRD's `timer_minutes` / `deadline_at` / cron-auto-fire mechanism was retired by the v1.1 quiz redesign PRD (US34, US35, §line 115). The canonical definition lives in [[../../CONTEXT|CONTEXT.md]] → `Verdict trigger`.
+These are the two — and only two — verdict triggers 0.1.0 ships. There is **no session timer** and no shot-clock countdown; the 0.1.0 PRD's `timer_minutes` / `deadline_at` / cron-auto-fire mechanism was retired by the 0.1.0 quiz redesign PRD (US34, US35, §line 115). The canonical definition lives in [[../../CONTEXT|CONTEXT.md]] → `Verdict trigger`.
 
 **Minimum quorum is one member** — the initiator alone, in the edge case where nobody else responds. There is no minimum-answers gate on the "Decide now" CTA; the initiator can fire a single-member verdict if they choose.
 
@@ -52,7 +52,7 @@ These are the two — and only two — verdict triggers v1.1 ships. There is **n
 | Confirmation | none — the cost is on the initiator's own tap; a confirm step would undermine the speed promise |
 | Position | below the avatar row, above the Nudge CTA in the dock |
 
-The CTA's label may be renamed in a future copy pass (the v1.1 PRD allows for it); the underlying initiator-closes-voting action is the canonical mechanism regardless of label.
+The CTA's label may be renamed in a future copy pass (the 0.1.0 PRD allows for it); the underlying initiator-closes-voting action is the canonical mechanism regardless of label.
 
 ## Behavior
 
@@ -76,11 +76,11 @@ This is the surface where the Sign-in-with-Apple upgrade lives. Per [[../gti-vau
 | On tap → dismiss | Write `user_preferences.auth_prompt_dismissed_at = now()`. Chip vanishes for 30 days. The avatar row + headline carry the surface alone. |
 | On tap → cancel/error | No state change. Chip returns to the `default` state; user can retry or dismiss. |
 
-The chip exists for the post-quiz upgrade moment ADR 0007 ratified — the user has just demonstrated effort (5 quiz answers); the affordance to save it converts at this moment but pre-quiz prompts default-deny. The chip is intentionally the **only** persistent identity surface in v1; reinstall = new anonymous identity unless the user took this tap.
+The chip exists for the post-quiz upgrade moment ADR 0007 ratified — the user has just demonstrated effort (5 quiz answers); the affordance to save it converts at this moment but pre-quiz prompts default-deny. The chip is intentionally the **only** persistent identity surface in 0.1.0; reinstall = new anonymous identity unless the user took this tap.
 
 ### "Download the app" CTA (web fallback, anonymous-only)
 
-Added in v1.1 (sg-03). The web fallback ([[02-invite|S02 web]]) carries anonymous voters who answered the quiz in the browser. Once they reach S04, they have demonstrated effort but have no path to persistent identity — C-22 is hidden on web per ADR 0007 (no Sign in with Apple in browser). The "Download the app" CTA replaces it.
+Added in 0.1.0 (sg-03). The web fallback ([[02-invite|S02 web]]) carries anonymous voters who answered the quiz in the browser. Once they reach S04, they have demonstrated effort but have no path to persistent identity — C-22 is hidden on web per ADR 0007 (no Sign in with Apple in browser). The "Download the app" CTA replaces it.
 
 | Property | Value |
 |---|---|
@@ -96,8 +96,8 @@ Added in v1.1 (sg-03). The web fallback ([[02-invite|S02 web]]) carries anonymou
 
 | Render context | C-22 chip | "Download the app" CTA |
 |---|---|---|
-| iOS, anonymous (legacy v1 install pre-S00a, or post-delete fresh anon) | renders `default` | hidden |
-| iOS, Apple-linked (post-S00a, the v1.1 norm) | hidden | hidden |
+| iOS, anonymous (legacy install pre-S00a, or post-delete fresh anon) | renders `default` | hidden |
+| iOS, Apple-linked (post-S00a, the post-redesign norm) | hidden | hidden |
 | Web fallback, anonymous (the canonical web path) | hidden (per ADR 0007 — no SiwA on web) | renders |
 | Web fallback, Apple-linked (returning user) | hidden | hidden |
 
@@ -106,12 +106,12 @@ Exactly one of the two affordances ever renders in a given context; the dock nev
 #### Behavior
 
 - Tap writes a telemetry event (`waiting_download_cta_tapped` per [[../../gti-vault/60_engineering/adr/0005-telemetry-supabase-event-store|ADR 0005]] event-store conventions) before opening the store URL — gives us conversion measurement.
-- On a subsequent iOS install the user hits [[00a-signin|S00a]] like any other first launch. Their web-fallback room state does NOT auto-rehydrate into the new install — per ADR 0007 §"Negative / accepted tradeoffs", web-to-iOS identity merge is a future feature, not v1.1 scope. The CTA copy ("Then your votes save with you") promises only forward-going behavior, not retroactive merge.
+- On a subsequent iOS install the user hits [[00a-signin|S00a]] like any other first launch. Their web-fallback room state does NOT auto-rehydrate into the new install — per ADR 0007 §"Negative / accepted tradeoffs", web-to-iOS identity merge is a future feature, not 0.1.0 scope. The CTA copy ("Then your votes save with you") promises only forward-going behavior, not retroactive merge.
 - The pill does not change label or state — there is no countdown to couple to. If the room fires while the user is mid-install, they re-open the link to find the verdict (the deep link routes them to the verdict surface as a late-joiner per [[05-verdict|S05 §read-only]]).
 
 ## Edge cases
 
 - **Single-member quorum (initiator alone).** If nobody else responds and the initiator taps `"Decide now"`, the verdict computes for the initiator's answers only. The verdict surface renders normally; non-answerers do not appear (there were none).
 - **Partial quorum (initiator + some, not all).** Verdict computes for the subset that answered. Non-answerers appear in `pending` style on the verdict screen as a non-shaming "didn't answer" tag.
-- **Empty candidate pool.** When the union of every member's Foursquare / MapKit fetch yields no usable candidates, the engine exits `method = 'no_survivor'` and the verdict surface renders its `no-survivor` terminal — see [[05-verdict|S05 §no-survivor]]. This is the only path to a no-survivor outcome in v1.1; the prior timer-expiry no-quorum terminal is retired (v1.1 has no timer to expire). Handled engine-side in [[../../gti-vault/15_issues/v1.1/issues/bug-13-empty-pool-no-survivor|bug-13]] / paired tracer-bullet.
+- **Empty candidate pool.** When the union of every member's Foursquare / MapKit fetch yields no usable candidates, the engine exits `method = 'no_survivor'` and the verdict surface renders its `no-survivor` terminal — see [[05-verdict|S05 §no-survivor]]. This is the only path to a no-survivor outcome in 0.1.0; the prior timer-expiry no-quorum terminal is retired (0.1.0 has no timer to expire). Handled engine-side in [[../../gti-vault/15_issues/0.1.0/issues/bug-13-empty-pool-no-survivor|bug-13]] / paired tracer-bullet.
 - **Late answerer submits during verdict computation.** Their answer is honored if it lands before the engine commits the verdict (race-free via DB transaction). After commit, they fall into the late-joiner read-only path (see [[05-verdict|S05]] §read-only).

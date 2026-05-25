@@ -6,7 +6,7 @@ description: >
   member whose preference loses. Source: gti-vault/50_product/research-brief.md
   Priority 3.
 context:
-  product: GetToIt (group decision-paralysis killer, food vertical v1)
+  product: GetToIt (group decision-paralysis killer, food vertical 0.1.0)
   use_case: 2-6 friends, mid-stakes social decision (where to eat tonight), single committed verdict
   north_star: verdicts followed-through (whole group commits and shows up, not just majority agreement)
   decision_to_lock: verdict-explanation copy framework, ratification UX, tiebreaker fairness rule

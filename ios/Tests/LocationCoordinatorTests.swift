@@ -1,4 +1,4 @@
-// GetToIt — LocationCoordinator pure-logic tests (TB-03 v1.1).
+// GetToIt — LocationCoordinator pure-logic tests (TB-03 quiz redesign).
 //
 // These cover the C-23 LocationPicker state machine that does NOT
 // require driving the real CoreLocation stack:
@@ -98,7 +98,7 @@ final class LocationCoordinatorTests: XCTestCase {
             "the new commit replaces the old entry rather than appending a duplicate")
     }
 
-    /// The recents list caps at 5 — anything older falls off. v1.1
+    /// The recents list caps at 5 — anything older falls off. The quiz redesign
     /// keeps the cap in-memory only; a follow-up may persist to
     /// `UserDefaults`.
     func testRecentsCapAtFive() {

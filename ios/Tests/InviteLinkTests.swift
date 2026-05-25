@@ -72,7 +72,7 @@ final class InviteLinkTests: XCTestCase {
     }
 
     func testParseAllowsAMissingInviteToken() throws {
-        // The token is optional in v1 — the AASA claim is on the room id
+        // The token is optional in the original shape — the AASA claim is on the room id
         // path. Future revisions may make the token mandatory; today a
         // missing token is parsed with an empty string so the join flow
         // can still proceed.

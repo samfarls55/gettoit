@@ -22,7 +22,7 @@
 // the same RPC the engine uses (`fire_verdict` doesn't help — it
 // only flips open → firing). The cleanest way to drive a fixture
 // into "closed" state for the routing test is to mutate the row
-// directly through a SECURITY DEFINER helper — but the v1 migration
+// directly through a SECURITY DEFINER helper — but the original migration
 // set doesn't expose one. Instead we (a) close-route via the path
 // the engine produces, where viable, OR (b) drive a `locked` fixture
 // by calling the `fire_verdict` RPC then waiting for the auto-fire

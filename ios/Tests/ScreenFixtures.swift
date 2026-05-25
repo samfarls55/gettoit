@@ -1,4 +1,4 @@
-// GetToIt — ScreenFixtures (bug-11 v1.1).
+// GetToIt — ScreenFixtures (bug-11 quiz redesign).
 //
 // Test-target fixture factories for the verdict / check-in / locked
 // display-model value types. Lives in `Tests/`, NOT in the app target,

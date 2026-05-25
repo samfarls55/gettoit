@@ -20,7 +20,7 @@ A per-member Foursquare fetch is **N+1 parallel calls** ([[../adr/0002-places-da
 - **N per-cuisine calls** — each scoped server-side to a cuisine category id (`CUISINE_CATEGORY_MAP`). Every cuisine category is a child of Foursquare's `Restaurant` category.
 - **1 general call** — `cuisine` absent, so `buildFoursquareQuery` set **no `fsq_category_ids` at all**. It returned *any* venue type within radius: parks, gyms, hotels, retail, grocery stores.
 
-The Q5 preference probe draws its three factorial cards from the unioned pool; the verdict engine ranks the running union of every member's same raw fetch (`unionMemberFetches`, [[../../15_issues/v1.1/issues/tb-21-persist-fetch-server-union|TB-21]]). Both therefore inherited the general call's un-floored breadth — non-restaurant venues could surface as a Q5 card or win a verdict.
+The Q5 preference probe draws its three factorial cards from the unioned pool; the verdict engine ranks the running union of every member's same raw fetch (`unionMemberFetches`, [[../../15_issues/0.1.0/issues/tb-21-persist-fetch-server-union|TB-21]]). Both therefore inherited the general call's un-floored breadth — non-restaurant venues could surface as a Q5 card or win a verdict.
 
 An undocumented working session found the root cause: the per-cuisine calls were restaurant-floored (implicitly, by being cuisine-scoped) while the general call was not, and **no named, shared definition of "which venue types are eligible" existed**. Two code paths each decided independently, so they diverged.
 
@@ -56,7 +56,7 @@ Both the Q5 candidate pool and the verdict candidate set derive from this single
 
 1. **Single source of truth.** The bug existed because there was no named, shared floor — just two code paths. A named spec is what stops the divergence from recurring; future eligibility criteria join the same spec.
 2. **Stage separation.** The floor is a venue-*class* hard filter — Stage 1, fetch-time, alongside geo / radius / `max_price` / `open_at`. Cuisine stays a Stage-2 soft scoring axis in the verdict engine and never strict-filters the fetch.
-3. **Reconciles with [[../../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §5.** §5 says the general call "stays un-category-scoped." That was precise to *cuisine* — keeping the general call cuisine-broad preserves the Q5 factorial's cuisine-drop card. The floor is orthogonal: a venue-class filter, not a cuisine filter. Every cuisine is a `Restaurant` child, so the cuisine-drop card is unaffected. No contradiction — the apparent one is why this ADR exists.
+3. **Reconciles with [[../../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]] §5.** §5 says the general call "stays un-category-scoped." That was precise to *cuisine* — keeping the general call cuisine-broad preserves the Q5 factorial's cuisine-drop card. The floor is orthogonal: a venue-class filter, not a cuisine filter. Every cuisine is a `Restaurant` child, so the cuisine-drop card is unaffected. No contradiction — the apparent one is why this ADR exists.
 4. **Server-side taxonomy.** The Edge Function owns Foursquare category ids already (`CUISINE_CATEGORY_MAP`). A taxonomy change is an Edge deploy, not an App Store release.
 
 ## Considered options
@@ -75,7 +75,7 @@ Both the Q5 candidate pool and the verdict candidate set derive from this single
 
 ### Negative / accepted tradeoffs
 
-- The floor excludes cafes, bakeries, dessert shops, ice-cream parlors, breweries / wineries, gastropubs, and juice bars — venues some groups might want. Accepted: GetToIt v1.1 decides where to eat a meal.
+- The floor excludes cafes, bakeries, dessert shops, ice-cream parlors, breweries / wineries, gastropubs, and juice bars — venues some groups might want. Accepted: GetToIt 0.1.0 decides where to eat a meal.
 - MapKit degraded mode approximates the floor with `.restaurant` only. The `Sports Bar` carve-out is inexpressible in MapKit's POI taxonomy and is dropped in fallback mode.
 
 ## Open items
@@ -106,7 +106,7 @@ Built by tb-25 (2026-05-19):
 - `supabase/functions/_shared/foursquare.ts` — `CANDIDATE_POOL_FLOOR_CATEGORY_IDS` exported constant (the eight live-probed ids) plus the seed-when-empty rule in `buildFoursquareQuery`: after assembling `categoryIds`, the floor is seeded iff the set is empty. `fsq_category_ids` is now always emitted non-empty.
 - `ios/Sources/App/MapKitPlacesFallback.swift` — POI filter tightened from `[.restaurant, .cafe, .foodMarket]` to `[.restaurant]`.
 
-## Amendment 2026-05-19 — Shape-time primary-class gate ([[../../15_issues/v1.1/issues/bug-15-pool-floor-allows-multicategory-bars|bug-15]])
+## Amendment 2026-05-19 — Shape-time primary-class gate ([[../../15_issues/0.1.0/issues/bug-15-pool-floor-allows-multicategory-bars|bug-15]])
 
 ### Context
 
@@ -160,5 +160,5 @@ Built by bug-15 (2026-05-19):
 
 - [[0002-places-data-foursquare-mapkit|ADR 0002]] — Foursquare primary / MapKit fallback.
 - [[0010-generic-jsonb-votes-schema|ADR 0010]], [[0011-worst-off-protecting-verdict-engine|ADR 0011]] — the verdict engine that ranks the candidate pool.
-- [[../../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §5 — the real-time decision function (amended by this ADR).
-- [[../../15_issues/v1.1/issues/tb-21-persist-fetch-server-union|TB-21]] — the server-side fetch union.
+- [[../../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]] §5 — the real-time decision function (amended by this ADR).
+- [[../../15_issues/0.1.0/issues/tb-21-persist-fetch-server-union|TB-21]] — the server-side fetch union.

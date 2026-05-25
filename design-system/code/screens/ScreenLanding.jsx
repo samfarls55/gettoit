@@ -3,7 +3,7 @@
 // and Account Settings (routes to S09). No fields, no controls — the
 // surface is a router, not a destination. Visual / brand polish deferred
 // to the pre-public-launch milestone (see surfaces/00-landing.md
-// §"v1.1 scope"); the skeleton ships now so routing + tap targets are real.
+// §"0.1.0 scope"); the skeleton ships now so routing + tap targets are real.
 
 function ScreenLanding({ onStartDecision, onAccountSettings }) {
   return (

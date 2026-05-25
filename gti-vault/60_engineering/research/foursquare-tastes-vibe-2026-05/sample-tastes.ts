@@ -19,7 +19,7 @@ const API_VERSION = "2025-06-17";
 const BASE_URL = "https://places-api.foursquare.com";
 
 // Representative venue pool. Foursquare `tastes` is a property of food /
-// drink venues; the v1.1 quiz only ever feeds eat-out venues to the
+// drink venues; the 0.1.0 quiz only ever feeds eat-out venues to the
 // classifier, so the pool is restaurants + bars + cafes across a spread
 // of US metros (dense + mid-size) to avoid a single-city folksonomy bias.
 const METROS: ReadonlyArray<{ name: string; ll: string }> = [

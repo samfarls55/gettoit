@@ -70,7 +70,7 @@ Used in Q1 cuisine craving (multi, capped), Q3 reputation picker (single), Q5 ro
 
 **Multi-select rule (check-in why):** the meta option `"Nothing tonight"` is mutually exclusive — selecting it clears all others; selecting any other clears it.
 
-**Capped multi-select rule (Q1 cuisine craving):** Q1 is multi-select with a hard cap of **3** picks plus a mutually-exclusive **"No preference"** chip. Once 3 cuisines are selected, every unselected cuisine chip renders in the `disabled` state (dimmed); a selected chip always stays tappable so it can be deselected to free a slot. Selecting "No preference" clears every cuisine; selecting any cuisine clears "No preference". "No preference" never counts toward the 3-cap. (v1.1 quiz redesign — Q1; `surfaces/03-quiz.md` §Q1.)
+**Capped multi-select rule (Q1 cuisine craving):** Q1 is multi-select with a hard cap of **3** picks plus a mutually-exclusive **"No preference"** chip. Once 3 cuisines are selected, every unselected cuisine chip renders in the `disabled` state (dimmed); a selected chip always stays tappable so it can be deselected to free a slot. Selecting "No preference" clears every cuisine; selecting any cuisine clears "No preference". "No preference" never counts toward the 3-cap. (0.1.0 quiz redesign — Q1; `surfaces/03-quiz.md` §Q1.)
 
 **SwiftUI:**
 ```swift
@@ -149,8 +149,8 @@ Used in waiting state and (optionally) receipts. Initial letter on colored disk.
 
 ## C-08 · Vibe Energy Scale (Q4)
 
-The Q4 input — a 5-point cardinal energy scale. (The v1 name "Vibe Slider"
-was retired: Q4 was never a continuous slider, and the v1.1 quiz redesign
+The Q4 input — a 5-point cardinal energy scale. (The 0.1.0 name "Vibe Slider"
+was retired: Q4 was never a continuous slider, and the 0.1.0 quiz redesign
 fixes the question to a single axis — energy / loudness, not formality.)
 
 | Element | Spec |
@@ -167,7 +167,7 @@ fixes the question to a single axis — energy / loudness, not formality.)
 in `tokens.json`: `QUIET · CHILL · SOCIAL · LIVELY · ROWDY`. The scale runs
 low-energy → high-energy; index 0 is the quietest stop. Generated into
 `GTIVibeLabels.all` (`ios/Sources/GTITokens.swift`) by `gen-swift.mjs` — never
-hardcode the labels. (v1.1 quiz redesign — `gti-vault/50_product/v1.1-quiz-amendments` §2.)
+hardcode the labels. (0.1.0 quiz redesign — `gti-vault/50_product/0.1.0-quiz-amendments` §2.)
 
 **Why no real drag handle:** Q4 is **cardinal-scalar**, not interpolatable; tapping a stop is the canonical interaction. A drag handle would invite users to land between stops, which the preference math can't use.
 

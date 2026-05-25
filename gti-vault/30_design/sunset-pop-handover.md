@@ -1,13 +1,13 @@
 ---
 title: Sunset Pop — Design System Handover Brief
-description: Self-contained brief for a fresh Claude design session. Pulls "Sunset Pop" direction from the v1 prototype and asks for a full token + component system around it.
+description: Self-contained brief for a fresh Claude design session. Pulls "Sunset Pop" direction from the 0.1.0 prototype and asks for a full token + component system around it.
 type: handover-brief
 status: superseded
 created: 2026-05-12
 related:
-  - "[[v1-directions]]"
+  - "[[0.1.0-directions]]"
   - "[[frontend-design-brief]]"
-  - "[[v1-design-locks]]"
+  - "[[0.1.0-design-locks]]"
   - "[[verdict-screen-spec]]"
 ---
 
@@ -29,7 +29,7 @@ Screenshots (filenames are stable; expect them attached in the session):
 
 ## Brief
 
-You're designing a full design system for **GetToIt**, an iOS app that kills group decision paralysis in 60 seconds. The v1 vertical is **food**: a group decides where to eat by answering 5 quick questions on their own phones, then the app returns one verdict the group commits to.
+You're designing a full design system for **GetToIt**, an iOS app that kills group decision paralysis in 60 seconds. The 0.1.0 vertical is **food**: a group decides where to eat by answering 5 quick questions on their own phones, then the app returns one verdict the group commits to.
 
 The five attached screenshots show the locked aesthetic direction — codename **Sunset Pop**. It's loud, gradient-driven, display-typography forward. The job *of the app* is to end the conversation; the visual language is built to match that finality.
 

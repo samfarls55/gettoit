@@ -1,4 +1,4 @@
-// GetToIt — MemberFetchWriter (TB-21 v1.1).
+// GetToIt — MemberFetchWriter (TB-21 quiz redesign).
 //
 // Persists a member's full raw Foursquare candidate fetch into the
 // server-readable `member_fetches` table at quiz time.

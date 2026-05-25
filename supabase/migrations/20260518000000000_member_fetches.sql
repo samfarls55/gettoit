@@ -1,4 +1,4 @@
--- TB-21 (v1.1) — per-member raw candidate fetch persistence.
+-- TB-21 (quiz redesign) — per-member raw candidate fetch persistence.
 --
 -- Parent: bug-08 — the verdict candidate-pool integration was never
 -- wired. `options` had no writer anywhere, so it was empty across all
@@ -28,7 +28,7 @@
 --   * The fetch resolves on the Q4 -> Q5 transition, strictly before
 --     the Q5 vote is submitted. A separate table lets the two writes
 --     stay independent; a `votes` slot would force them to be one
---     atomic write or force a `votes` UPDATE (which the v1.1 RLS
+--     atomic write or force a `votes` UPDATE (which the redesign RLS
 --     contract forbids — see `20260513215000000_votes.sql`).
 --   * `payload` is kept opaque jsonb so the venue shape (the iOS
 --     `ShapedPlace` / Edge `ShapedPlace`) can evolve without a
@@ -67,7 +67,7 @@ create table if not exists public.member_fetches (
 );
 
 comment on table public.member_fetches is
-    'TB-21 (v1.1) — per-member raw Foursquare candidate fetch. payload is the jsonb array of every venue the member''s fetch returned (the full raw union, not the three Q5 factorial cards). Written by the iOS quiz coordinator at quiz time; read by the compute-verdict Edge Function, which unions every member''s fetch into the options table at verdict fire time.';
+    'TB-21 (quiz redesign) — per-member raw Foursquare candidate fetch. payload is the jsonb array of every venue the member''s fetch returned (the full raw union, not the three Q5 factorial cards). Written by the iOS quiz coordinator at quiz time; read by the compute-verdict Edge Function, which unions every member''s fetch into the options table at verdict fire time.';
 
 create index if not exists member_fetches_room_id_idx
     on public.member_fetches (room_id);

@@ -1,4 +1,4 @@
-// GetToIt — LocationCoordinator (TB-03 v1.1).
+// GetToIt — LocationCoordinator (TB-03 quiz redesign).
 //
 // Bridges the C-23 LocationPicker design-system primitive to the iOS
 // native location stack. Owns:
@@ -152,7 +152,7 @@ public final class LocationCoordinator: NSObject {
     /// Current typeahead suggestions. Updated as
     /// `MKLocalSearchCompleter` returns results.
     public private(set) var suggestions: [PlaceSuggestion] = []
-    /// Up-to-5 most recent committed picks. In-memory only for v1.1 —
+    /// Up-to-5 most recent committed picks. In-memory only for the quiz redesign —
     /// persistence to UserDefaults is a follow-up if it earns its place
     /// in the next dogfood pass.
     public private(set) var recents: [ResolvedPlace] = []

@@ -1,4 +1,4 @@
-// GetToIt — Q5 · no-results screen (TB-26 v1.1).
+// GetToIt — Q5 · no-results screen (TB-26 quiz redesign).
 //
 // The Q5 `no-results` mode — the iOS consumption of the sg-05
 // design-system spec (`design-system/surfaces/03-quiz.md` §Q5

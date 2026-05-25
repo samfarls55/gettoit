@@ -75,7 +75,7 @@ migration actively breaks CI for every subsequent PR.
 Supabase exposes persistent custom Postgres parameters through the
 **dashboard**: Project Settings → Database → *Custom Postgres config*
 (equivalently the Management API `PATCH
-/v1/projects/{ref}/config/database/postgres` `restart`-class config,
+/0.1.0/projects/{ref}/config/database/postgres` `restart`-class config,
 or a support-tier `ALTER` run as `supabase_admin`). The dashboard
 route runs the change as the platform superuser.
 

@@ -19,7 +19,7 @@ The product north-star is group-first viral flow: initiator shares an invite lin
 
 The web fallback must:
 
-- Render the same 5-question quiz (matches [[../../50_product/v1-design-locks|Lock 1]]).
+- Render the same 5-question quiz (matches [[../../50_product/0.1.0-design-locks|Lock 1]]).
 - Authenticate anonymously against Supabase from a browser.
 - Subscribe to Realtime channels for the room (votes, presence, verdict_ready).
 - Reuse `design-system/tokens.json` so brand/visual lockstep with iOS.
@@ -58,7 +58,7 @@ Token consumption: web build pulls `design-system/code/tokens.css` directly. Com
 
 - **Spec drift risk.** Two implementations of the same component. `verify.mjs` will need extension to scan `web/` for orphan hex / out-of-token usage, mirroring the design-system check.
 - **Hosting bill.** Vercel free tier carries beta but a hosting line item appears at scale.
-- **Push notifications absent on web.** Web fallback can't receive next-day check-in pushes (iOS-only flow). Web users miss check-in entirely in v1 — accepted, as check-in primarily drives north-star measurement for committed (iOS) users.
+- **Push notifications absent on web.** Web fallback can't receive next-day check-in pushes (iOS-only flow). Web users miss check-in entirely in 0.1.0 — accepted, as check-in primarily drives north-star measurement for committed (iOS) users.
 
 ## Re-evaluation triggers
 

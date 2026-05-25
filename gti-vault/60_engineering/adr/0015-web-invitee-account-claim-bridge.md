@@ -12,11 +12,11 @@ superseded_by: null
 ## Status
 
 Accepted — 2026-05-21. Decided in the `/grill-with-docs` session on
-[[../../15_issues/workflow-overhaul/issues/sg-wf-7-web-invitee-account-claim|sg-WF-7]]
+[[../../15_issues/0.1.0/issues/sg-wf-7-web-invitee-account-claim|sg-WF-7]]
 (#191). Sibling to the web invitee single-link grill
-([[../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]]
+([[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]]
 §Q8, which filed this gap). Full grilled outcomes:
-[[../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]].
+[[../../50_product/0.1.0-workflow-overhaul-web-invitee-account-claim|0.1.0-workflow-overhaul-web-invitee-account-claim]].
 
 ## Context
 
@@ -97,7 +97,7 @@ two edge functions mint (authed by the live web session) and redeem
    one.
 2. **It reuses `linkApple` untouched.** The bridge's only new work is
    transport. Once the anonymous session is in the keychain, the user
-   is indistinguishable from a pre-v1.1 legacy-carryover anonymous
+   is indistinguishable from a pre-S00a legacy-carryover anonymous
    install, which S00a already handles.
 3. **No new dependency, no privacy footgun.** No third-party SDK, no
    clipboard read (and its iOS paste banner), no capability token in a
@@ -170,7 +170,7 @@ two edge functions mint (authed by the live web session) and redeem
 - **Skip = stranded.** A user who signs in with Apple without claiming
   first permanently strands that web data; the only recovery is
   delete-and-reinstall (which returns them to a fresh S00a), within
-  the 30-day anonymous-identity TTL ([[0006-privacy-posture-v1|ADR 0006]]).
+  the 30-day anonymous-identity TTL ([[0006-privacy-posture-0.1.0|ADR 0006]]).
   This is not new harm — it is exactly today's ADR 0007 behavior
   ("web users can't claim — flagged").
 - **The recovery promise has a 30-day ceiling.** Beyond the anonymous
@@ -192,15 +192,15 @@ two edge functions mint (authed by the live web session) and redeem
 
 ## References
 
-- [[../../50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]]
+- [[../../50_product/0.1.0-workflow-overhaul-web-invitee-account-claim|0.1.0-workflow-overhaul-web-invitee-account-claim]]
   — the full grilled decision doc this ADR records.
-- [[../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]]
+- [[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]]
   §Q8 — the sibling grill that filed this gap.
 - [[0007-auth-anonymous-default-apple-upgrade|ADR 0007]] — the
   `linkApple` anonymous-upgrade model this bridge feeds into.
-- [[0006-privacy-posture-v1|ADR 0006]] — the 30-day anonymous-identity
+- [[0006-privacy-posture-0.1.0|ADR 0006]] — the 30-day anonymous-identity
   TTL that bounds the recovery promise.
-- [[../../15_issues/workflow-overhaul/issues/sg-wf-7-web-invitee-account-claim|sg-WF-7]]
+- [[../../15_issues/0.1.0/issues/sg-wf-7-web-invitee-account-claim|sg-WF-7]]
   (#191) — the issue this grill resolves.
 - [[../../CONTEXT|CONTEXT.md]] → Account claim, Claim code — canonical
   terms added by this grill.

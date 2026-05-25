@@ -4,8 +4,8 @@
 // supabase-js data adapter and the Deno.serve listener.
 //
 // References:
-//   * v1 PRD §"VerdictEngine" (gti-vault/10_prds/v1-prd.md)
-//   * TB-06 ticket (gti-vault/15_issues/v1/issues/tb-06-verdict-engine-clean-run.md)
+//   * Original PRD §"VerdictEngine" (gti-vault/10_prds/0.1.0-prd.md)
+//   * TB-06 ticket (gti-vault/15_issues/0.1.0/issues/tb-06-verdict-engine-clean-run.md)
 //   * Engine spec: supabase/functions/_shared/verdict-engine.ts
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.43.4";

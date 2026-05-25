@@ -1,4 +1,4 @@
-// PreferenceFunction — the per-member preference engine (TB-22 v1.1).
+// PreferenceFunction — the per-member preference engine (TB-22 quiz redesign).
 //
 // A faithful TypeScript port of the Swift `PreferenceFunction` module
 // (`ios/Sources/App/PreferenceFunction.swift`, TB-09 — PRD modules A + E).
@@ -20,7 +20,7 @@
 // closure is itself pure — a deterministic function of `member` and the
 // Q5 ratings it was built from.
 //
-// Design source — gti-vault/50_product/v1.1-quiz-amendments §3
+// Design source — gti-vault/50_product/0.1.0-quiz-amendments §3
 // ("Q5 — the preference probe"):
 //
 //   * Stated-weight initialization. The three axis weights seed at an

@@ -1,4 +1,4 @@
-// GetToIt web — mixed-platform vote-wire test (v1.1, tb-WF-10).
+// GetToIt web — mixed-platform vote-wire test (quiz redesign, tb-WF-10).
 //
 // Originally TB-15: "Integration tests for a mixed-platform room
 // (iOS + web members) where both contribute to a verdict." This test
@@ -10,8 +10,8 @@
 //   the shared `votes-wire.ts` contract (ADR 0014), so the row
 //   `compute-verdict` reads is platform-agnostic.
 //
-// tb-WF-10 brought the web quiz to v1.1: `buildVoteRow` now writes the
-// generic-slot envelope, not the retired v1 typed columns. The verdict
+// tb-WF-10 brought the web quiz to the redesign: `buildVoteRow` now writes the
+// generic-slot envelope, not the retired pre-redesign typed columns. The verdict
 // engine runs server-side in `compute-verdict`.
 //
 // bug-17 — the verdict READ path no longer mirrors iOS. The web
@@ -30,7 +30,7 @@ const ROOM_ID = "11111111-2222-3333-4444-555555555555";
 const WEB_USER = "aaaaaaaa-0000-0000-0000-000000000001";
 
 describe("mixed-platform room — web + iOS vote wire", () => {
-  // A web member submits their v1.1 vote. `buildVoteRow` wraps the
+  // A web member submits their redesigned-quiz vote. `buildVoteRow` wraps the
   // typed answers in the generic `{ meta, answer }` slot envelopes —
   // the SAME shape the iOS `QuizCoordinator.VoteRow` encoder emits, so
   // `compute-verdict` reads a platform-agnostic row.

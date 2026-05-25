@@ -1,4 +1,4 @@
-// GetToIt — AppTargetFixtureHygieneTests (bug-11 v1.1).
+// GetToIt — AppTargetFixtureHygieneTests (bug-11 quiz redesign).
 //
 // Guards the bug-11 acceptance criterion: no fictitious venue names
 // remain compiled into the shipped `GetToIt` app target. The verdict /

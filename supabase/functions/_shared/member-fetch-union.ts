@@ -27,7 +27,7 @@
 // prune, then satisficing floor); intersecting fetch sets would
 // front-run that narrowing and leave no empty-pool safety net (PRD
 // §"Design constraints", amendments §5). This mirrors the Swift
-// `RunningUnionPoolManager` the v1.1 design originally placed on the
+// `RunningUnionPoolManager` the quiz-redesign design originally placed on the
 // device — TB-21 moves the union server-side per the bug-08 Option 2
 // decision, so there is no cross-device coordination and iOS never
 // writes `options`.

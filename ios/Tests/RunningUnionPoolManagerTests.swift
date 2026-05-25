@@ -1,4 +1,4 @@
-// GetToIt — RunningUnionPoolManager tests (TB-10 v1.1, PRD module G).
+// GetToIt — RunningUnionPoolManager tests (TB-10 quiz redesign, PRD module G).
 //
 // The pool manager holds the group candidate pool as the running union
 // of every member's Foursquare fetch — never an intersection. As the

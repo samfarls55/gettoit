@@ -1,6 +1,6 @@
-// GetToIt — SessionParameters pure-logic tests (TB-05 v1.1).
+// GetToIt — SessionParameters pure-logic tests (TB-05 quiz redesign).
 //
-// Covers the *parameters* bucket of the v1.1 three-bucket input model
+// Covers the *parameters* bucket of the quiz-redesign three-bucket input model
 // (PRD module K). These tests need neither SwiftUI nor Supabase — they
 // pin the wire shape of `rooms.session_params` and the joiner-side
 // hydration contract:

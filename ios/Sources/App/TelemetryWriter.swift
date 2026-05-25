@@ -34,7 +34,7 @@
 //     `check_ins` (see `20260514000440000_metric_views.sql`).
 //   * Sync rows to a third-party analytics platform. Telemetry stays
 //     on-stack per ADR 0006 (privacy posture).
-//   * Buffer / batch. v1 throughput is well inside Supabase's per-row
+//   * Buffer / batch. Current throughput is well inside Supabase's per-row
 //     insert capacity; per-event POSTs are the simplest correct shape.
 //     If throughput becomes a problem, batching layers in cleanly
 //     behind the same `TelemetryEventSink` protocol.

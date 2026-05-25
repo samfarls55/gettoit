@@ -1,6 +1,6 @@
 ---
 title: Research Brief — Decision Simplification
-description: Open research questions blocking the v1 quiz design — frameworks, paralysis causes, group fairness. CLOSED 2026-05-08; deliverables linked below.
+description: Open research questions blocking the 0.1.0 quiz design — frameworks, paralysis causes, group fairness. CLOSED 2026-05-08; deliverables linked below.
 type: research-brief
 status: closed
 created: 2026-05-08
@@ -9,12 +9,12 @@ deliverables:
   - "[[framework-comparison]]"
   - "[[paralysis-cause-priority]]"
   - "[[verdict-screen-spec]]"
-  - "[[v1-design-locks]]"
+  - "[[0.1.0-design-locks]]"
 ---
 
 # Research Brief — Decision Simplification
 
-> **Status: closed 2026-05-08.** All three priorities completed and synthesized. The four "Outputs that update the v1 design" are locked in [[v1-design-locks]]. Cross-priority synthesis lives in [[framework-comparison]] (P1), [[paralysis-cause-priority]] (P2), and [[verdict-screen-spec]] (P3). Mechanical layer-1 reports in `01_raw/{decision-simplification-frameworks,paralysis-causes,group-fairness-procedural-justice}/report.md`. Original brief preserved below for archival reference.
+> **Status: closed 2026-05-08.** All three priorities completed and synthesized. The four "Outputs that update the 0.1.0 design" are locked in [[0.1.0-design-locks]]. Cross-priority synthesis lives in [[framework-comparison]] (P1), [[paralysis-cause-priority]] (P2), and [[verdict-screen-spec]] (P3). Mechanical layer-1 reports in `01_raw/{decision-simplification-frameworks,paralysis-causes,group-fairness-procedural-justice}/report.md`. Original brief preserved below for archival reference.
 
 The [[decision-model|quiz mechanic]] (exact question count, signal type, aggregation tiebreakers) is gated on this research. Goal: adapt existing decision science rather than invent from scratch.
 
@@ -67,7 +67,7 @@ Defer to A/B testing post-launch. 5 is a reasonable starting bet.
 - One-page synthesis per priority into [[01_raw/_index|01_raw]] first, then `compile` into this folder once organized.
 - Surface contradictions and unknowns explicitly — do not paper over them.
 
-## Outputs that update the v1 design
+## Outputs that update the 0.1.0 design
 
 When research closes:
 
@@ -80,4 +80,4 @@ When research closes:
 
 - [[north-star]]
 - [[decision-model]]
-- [[v1-scope]]
+- [[0.1.0-scope]]

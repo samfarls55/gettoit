@@ -1,6 +1,6 @@
 // GetToIt web — per-member Q5 candidate fetch (tb-WF-10).
 //
-// Brings the web fallback's Q5 to v1.1 parity. The pre-v1.1 web quiz
+// Brings the web fallback's Q5 to quiz-redesign parity. The pre-redesign web quiz
 // rendered a fixed `DUMMY_CANDIDATES` fixture; this module replaces it
 // with the real per-member Foursquare fetch + the strict-factorial Q5
 // probe, mirroring the iOS path:

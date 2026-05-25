@@ -19,7 +19,7 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 | ----------------- | ---------------------------------------------------------------- |
 | `AFK`             | Tracer-bullet build slice that can run without human interaction |
 | `HITL`            | Tracer-bullet build slice that requires a human in the loop       |
-| `v1`              | Scoped to the v1 PRD                                              |
+| `0.1.0`           | Scoped to the 0.1.0 pre-launch development cycle                  |
 | `tracer-bullet`   | A vertical-slice build issue (`tb-NN-*` in the vault)            |
 | `spec-gap`        | A design-system spec change required by the PRD                  |
 
@@ -46,7 +46,7 @@ When transitioning state, update the `status:` field in place and re-label the G
 Each issue carries labels matching its vault frontmatter:
 - One triage label (one of the 5 canonical roles)
 - One type label (`AFK` or `HITL`) for tracer bullets
-- One feature label (`v1` for now)
+- One feature label (`0.1.0` for now)
 - One artifact label (`tracer-bullet` or `spec-gap`)
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), set `status: ready-for-agent` in the vault frontmatter AND add the `ready-for-agent` label on the GitHub issue. The two must stay in sync.

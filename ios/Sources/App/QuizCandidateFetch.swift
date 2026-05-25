@@ -1,4 +1,4 @@
-// GetToIt — QuizCandidateFetch (TB-15 v1.1, factorial-wired TB-16 v1.1).
+// GetToIt — QuizCandidateFetch (TB-15 quiz redesign, factorial-wired TB-16 quiz redesign).
 //
 // The seam that fires the per-member Foursquare fetch when a member
 // completes Q1-Q4. Before TB-15 the live quiz still ran the bug-03
@@ -15,9 +15,9 @@
 // coordinator forwards the member's REAL Q1-Q4 answers so the fetch and
 // the downstream factorial reflect what the member actually picked.
 //
-// TB-16 (v1.1) — the factorial wiring. TB-15 shipped Q5 with a *flat*
+// TB-16 (quiz redesign) — the factorial wiring. TB-15 shipped Q5 with a *flat*
 // presentation: the raw fetched pool was shaped first-3 into the Q5
-// rows. TB-16 routes the pool through the v1.1 factorial probe instead:
+// rows. TB-16 routes the pool through the quiz-redesign factorial probe instead:
 //
 //   1. The unioned pool is classified into `Q5PoolVenue`s by
 //      `Q5VenueClassifier` — each venue gets its cuisine / reputation /
@@ -70,7 +70,7 @@ public struct QuizCandidateFetchResult: Equatable, Sendable {
     public let candidates: [QuizCandidate]
     public let source: Source
 
-    /// TB-21 (v1.1) — the member's **full raw Foursquare fetch**: every
+    /// TB-21 (quiz redesign) — the member's **full raw Foursquare fetch**: every
     /// venue the executor's N+1 calls unioned, NOT just the three Q5
     /// factorial cards. Before TB-21 this union was computed, used to
     /// pick the Q5 cards, and then discarded as a local variable — so
@@ -153,7 +153,7 @@ public protocol QuizCandidateFetch: Sendable {
 
 /// The production `QuizCandidateFetch`. Wraps the tb-07
 /// `FoursquareFetchExecutor`: plans + runs the N+1 answer-tailored
-/// calls, classifies the unioned pool, then routes it through the v1.1
+/// calls, classifies the unioned pool, then routes it through the quiz-redesign
 /// factorial probe.
 public struct FoursquareQuizCandidateFetch: QuizCandidateFetch {
     private let executor: FoursquareFetchExecutor

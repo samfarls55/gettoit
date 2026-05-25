@@ -1,10 +1,10 @@
-// GetToIt - QuizSessionAssembler (bug-03 v1.1, rewired TB-15 v1.1).
+// GetToIt - QuizSessionAssembler (bug-03 quiz redesign, rewired TB-15 quiz redesign).
 //
 // Pulls the "build the QuizCoordinator for a session" logic out of
 // `RootView.startQuiz` so the boundary tests can drive the real
 // wire-up without standing up the full SwiftUI host.
 //
-// TB-15 (v1.1) — the assembler no longer fetches candidates. Before
+// TB-15 (quiz redesign) — the assembler no longer fetches candidates. Before
 // TB-15 it ran the bug-03 tracer-bullet bridge: it called
 // `Q5CandidatesLoader.load` (one `PlacesService.fetchPlaces` with an
 // empty `PlacesFilters()`) here, BEFORE the member answered anything,
@@ -69,7 +69,7 @@ public enum QuizSessionAssembler {
     /// joiner path). When `coordinate` is nil the assembler wires a
     /// `NoResultsQuizCandidateFetch` so Q5 renders the no-results
     /// screen.
-    /// TB-21 (v1.1) — `memberFetchWriter` persists each member's full
+    /// TB-21 (quiz redesign) — `memberFetchWriter` persists each member's full
     /// raw Foursquare fetch into the server-readable `member_fetches`
     /// table when the per-member fetch resolves. The `compute-verdict`
     /// Edge Function unions every member's persisted fetch into
@@ -77,7 +77,7 @@ public enum QuizSessionAssembler {
     /// session has no coordinate, so there is no live fetch) the
     /// coordinator simply skips the persistence step.
     ///
-    /// bug-14 (v1.1) — `memberFetchFailureSink` surfaces a failed
+    /// bug-14 (quiz redesign) — `memberFetchFailureSink` surfaces a failed
     /// `member_fetches` write (the live path binds it to a telemetry
     /// emission). Optional — when nil the failure stays observable via
     /// `QuizCoordinator.lastMemberFetchPersist`.
@@ -118,7 +118,7 @@ public enum QuizSessionAssembler {
             candidateFetch = NoResultsQuizCandidateFetch()
             candidateSource = .noResults
         }
-        // TB-05 (v1.1) — the session parameters are carried onto the
+        // TB-05 (quiz redesign) — the session parameters are carried onto the
         // coordinator so every member's quiz (initiator or joiner)
         // runs against the same initiator-set bucket.
         let coordinator = QuizCoordinator(

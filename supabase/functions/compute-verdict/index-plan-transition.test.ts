@@ -17,7 +17,7 @@
 //     200 (best-effort, same pattern as markRoomVerdictReady).
 //
 // References:
-//   * gti-vault/15_issues/workflow-overhaul/issues/tb-wf-1-plans-table-schema.md
+//   * gti-vault/15_issues/0.1.0/issues/tb-wf-1-plans-table-schema.md
 //   * supabase/migrations/20260519000000000_workflow_overhaul_plans_table.sql
 //     (the function this handler is calling)
 

@@ -1,10 +1,10 @@
 // GetToIt — QuizCoordinator unit tests (TB-06 — Q1–Q4 rework).
 //
 // Pure-logic tests (no Supabase round-trip). Drives the coordinator
-// through the v1.1 question semantics and asserts the wire row shape +
+// through the quiz-redesign question semantics and asserts the wire row shape +
 // the idempotency / rapid-tap semantics.
 //
-// v1.1 question rework (PRD module J, part 1):
+// Quiz-redesign question rework (PRD module J, part 1):
 //   * Q1 — cuisine craving. Multi-select, capped at 3, with a
 //     mutually-exclusive "No preference" toggle.
 //   * Q2 — spend cap. A hard ceiling, unchanged 4-tier semantics.
@@ -345,7 +345,7 @@ final class QuizCoordinatorTests: XCTestCase {
 
     // MARK: - wire shape
 
-    /// TB-06 (v1.1) — the reworked quiz writes generic `{ meta, answer }`
+    /// TB-06 (quiz redesign) — the reworked quiz writes generic `{ meta, answer }`
     /// jsonb slots. Q1 carries the cuisine craving, Q3 the reputation
     /// chip; Q2 and Q4 keep their existing kinds (spend cap / vibe).
     /// `meta.question_kind` is the discriminator the verdict-engine
@@ -417,7 +417,7 @@ final class QuizCoordinatorTests: XCTestCase {
             "the pre-tb-23 per-venue score map is gone — only answer.ratings is written")
 
         // The old typed columns must NOT appear on the wire.
-        XCTAssertNil(json["q1_vetoes"], "typed columns are gone in the v1.1 jsonb schema")
+        XCTAssertNil(json["q1_vetoes"], "typed columns are gone in the quiz-redesign jsonb schema")
         XCTAssertNil(json["q2_budget"])
         XCTAssertNil(json["q3_walk_minutes"])
         XCTAssertNil(json["q4_vibe"])

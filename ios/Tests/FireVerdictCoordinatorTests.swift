@@ -1,7 +1,7 @@
 // GetToIt — FireVerdictCoordinator tests (tb-WF-3).
 //
 // Pure-logic tests with an injected invoker stub. No Supabase, no
-// timer (none exists in v1.1). Covers:
+// timer (none exists in the quiz redesign). Covers:
 //   * `tapDecideNow()` short-circuits for invitees (no RPC fired).
 //   * `tapDecideNow()` folds in-flight rapid taps into one call.
 //   * Outcomes from the RPC seam surface on `lastOutcome` for the

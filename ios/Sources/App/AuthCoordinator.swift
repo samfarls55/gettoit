@@ -1,6 +1,6 @@
 // GetToIt — AuthCoordinator.
 //
-// Wraps the two auth states v1 supports per ADR 0007:
+// Wraps the two auth states the pre-S00a era supports per ADR 0007:
 //   * `anonymous`     — the default. Created on first app launch via
 //                       `signInAnonymously()`. Persists across launches
 //                       via supabase-swift session storage.
@@ -84,7 +84,7 @@ public final class AuthCoordinator {
     /// the cached session is already Apple-linked (the user upgraded
     /// in a prior run), surface that as `.linkedApple` instead.
     ///
-    /// TB-02 v1.1: on iOS the launch path now routes through the S00a
+    /// TB-02 (quiz redesign): on iOS the launch path now routes through the S00a
     /// forced sign-in gate via `restoreSessionIfPresent` + the
     /// `SignInScreen` — `ensureSignedIn` is retained for callers (the
     /// web fallback's iOS-side join flow, integration tests) that
@@ -115,10 +115,10 @@ public final class AuthCoordinator {
         }
     }
 
-    /// TB-02 v1.1 — RootView's launch entry point. Restores a cached
+    /// TB-02 (quiz redesign) — RootView's launch entry point. Restores a cached
     /// supabase-swift session if one is present (Apple-linked from a
-    /// prior install, or anonymous from a v1 install that survived
-    /// the v1.1 upgrade), and otherwise leaves the coordinator in
+    /// prior install, or anonymous from a pre-S00a install that survived
+    /// the quiz-redesign upgrade), and otherwise leaves the coordinator in
     /// `.idle` so RootView can present the S00a sign-in gate.
     ///
     /// Unlike `ensureSignedIn`, this method NEVER calls
@@ -138,7 +138,7 @@ public final class AuthCoordinator {
         self.state = .idle
     }
 
-    /// TB-02 v1.1 — sign the device in with an Apple identity token.
+    /// TB-02 (quiz redesign) — sign the device in with an Apple identity token.
     /// Used by the S00a `SignInScreen` on fresh installs (and after a
     /// sign-out from S09 Settings) where there's no existing session
     /// to link to. Goes through `signInWithIdToken` rather than
@@ -401,7 +401,7 @@ public protocol SupabaseAuthLinker: Sendable {
         currentUserID: UUID
     ) async throws -> UUID
 
-    /// TB-02 v1.1 — perform the Supabase Apple-sign-in (no existing
+    /// TB-02 (quiz redesign) — perform the Supabase Apple-sign-in (no existing
     /// session). Returns the `user_id` minted by `signInWithIdToken`.
     /// Distinct from `linkApple` because there's nothing to link onto:
     /// the S00a gate fires when no session exists.

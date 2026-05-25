@@ -1,5 +1,5 @@
 // VenueClassifier — the `CandidateOption -> Q5VenueProfile` axis
-// classification (TB-23 v1.1, PRD module E live wiring, server side).
+// classification (TB-23 quiz redesign, PRD module E live wiring, server side).
 //
 // A faithful TypeScript port of the Swift `Q5VenueClassifier`
 // (`ios/Sources/App/Q5VenueClassifier.swift`, TB-16). The Swift app

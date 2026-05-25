@@ -8,14 +8,14 @@
 // verdicts + option_cuts. Running server-side is load-bearing: the
 // verdict must be byte-identical for every member.
 //
-// The TB-11 pipeline (PRD module B — "v1.1-quiz-redesign-prd") replaces
+// The TB-11 pipeline (PRD module B — "0.1.0-quiz-redesign-prd") replaces
 // the TB-06 EBA-with-relax-cascade entirely:
 //
 //   1. EBA prune — drop venues failing ANY member's hard vetoes:
 //      profile dietary / allergies / NEVERS, parameter geo / meal-time,
 //      Q2 spend cap. Hard vetoes never relax.
 //   2. Per-member scoring — each member's `prefFn` (built per
-//      v1.1-quiz-amendments §3 and cached by the running-union pool
+//      0.1.0-quiz-amendments §3 and cached by the running-union pool
 //      manager, TB-10) scores every surviving venue 1..5.
 //   3. Satisficing floor — keep only venues every member scores at or
 //      above the acceptability threshold T (cohort-zero default 3).
@@ -23,7 +23,7 @@
 //      highest MINIMUM member score. This protects the worst-off member
 //      rather than averaging the group: a polarizing higher-sum pick
 //      LOSES to a worst-off-protecting pick. This is the load-bearing
-//      anti-defection mechanic (v1.1-quiz-amendments §4, the Kim 2023
+//      anti-defection mechanic (0.1.0-quiz-amendments §4, the Kim 2023
 //      backfire avoidance).
 //   5. Final tiebreak — equal minimums break on the higher group sum,
 //      then on the injected random.
@@ -104,7 +104,7 @@ export interface HardVeto {
   token: string;
 }
 
-/** A per-member preference function. Built per v1.1-quiz-amendments §3
+/** A per-member preference function. Built per 0.1.0-quiz-amendments §3
  *  from the member's Q1..Q5 answers, cached by the running-union pool
  *  manager (TB-10), and injected here. Returns a 1..5 score on the same
  *  scale as the satisficing threshold T. */
@@ -160,7 +160,7 @@ export interface VerdictEngineInput {
   /** Acceptability threshold T — a venue must be scored at or above
    *  this by every member to clear the satisficing floor. Cohort-zero
    *  default 3 (a Q5 card rated 3 is the natural acceptability bar,
-   *  v1.1-quiz-amendments §4). Tunable post-cohort. */
+   *  0.1.0-quiz-amendments §4). Tunable post-cohort. */
   satisficing_threshold?: number;
   /** Initial room radius in meters. When supplied (with candidate
    *  `distance_meters`), the EBA prune gates on it and the empty-floor
@@ -241,7 +241,7 @@ export interface VerdictEngineOptions {
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// Tunables — cohort-zero defaults (v1.1-quiz-amendments §3 / §4)
+// Tunables — cohort-zero defaults (0.1.0-quiz-amendments §3 / §4)
 // ───────────────────────────────────────────────────────────────────────
 
 /** Acceptability threshold T. A Q5 card rated 3 is the natural

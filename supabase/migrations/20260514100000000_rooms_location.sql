@@ -1,4 +1,4 @@
--- TB-03 (v1.1) — add location columns to `rooms`.
+-- TB-03 (quiz redesign) — add location columns to `rooms`.
 --
 -- Owned by tb-03 per `design-system/surfaces/01-initiator.md` §
 -- "Persistent location selector — C-23 LocationPicker": the resolved

@@ -44,13 +44,13 @@ on the quiz surfaces (`onClose` left undefined). See §"Quiz chrome
 
 ---
 
-> **v1.1 quiz redesign.** The five questions below were reworked by the
-> v1.1 quiz redesign (`gti-vault/50_product/v1.1-quiz-amendments`,
-> `gti-vault/10_prds/v1.1-quiz-redesign-prd`). Dietary vetoes and walk-time
+> **0.1.0 quiz redesign.** The five questions below were reworked by the
+> 0.1.0 quiz redesign (`gti-vault/50_product/0.1.0-quiz-amendments`,
+> `gti-vault/10_prds/0.1.0-quiz-redesign-prd`). Dietary vetoes and walk-time
 > moved out of the quiz — vetoes into the per-account *profile*, walk-time
 > into the pre-quiz *parameters* surface — so the in-quiz questions are
 > now positive, decision-shaping signals. The JSX in `code/screens/`
-> (filenames `ScreenQ1Vetoes` / `ScreenQ3Distance`) still carry the v1
+> (filenames `ScreenQ1Vetoes` / `ScreenQ3Distance`) still carry the 0.1.0
 > sample content and have not been renamed; the markdown below is the
 > authoritative question spec.
 
@@ -95,7 +95,7 @@ Single-select C-04 chip picker. Gradient: `q3`.
 `No preference` — the neutral, non-pruning answer.
 
 Reputation is a **client-side-scored** axis derived from Foursquare venue
-metadata (rating count / value / venue age) — *not* a fetch filter. The v1
+metadata (rating count / value / venue age) — *not* a fetch filter. The 0.1.0
 query-chip technique (sending the chip as a Foursquare `query` keyword) was
 retired: the Q5 factorial needs reputation variety in every member's pool,
 so reputation cannot strict-filter the fetch.
@@ -128,7 +128,7 @@ excited does this make you?"). Q5 is a **preference probe**, not a
 tiebreaker — the ratings reveal how much each preference axis truly weighs.
 CTA flips to **sun-yellow `"Drop the verdict"`** — the only quiz screen that
 telegraphs the verdict is coming. The factorial card-generation logic and
-the real-candidate wiring are specified by the v1.1 PRD (module C) and built
+the real-candidate wiring are specified by the 0.1.0 PRD (module C) and built
 by issue **tb-08** — this surface section is the visual shell only.
 
 ### Modes
@@ -177,7 +177,7 @@ action-shaped sun-fill CTA, no fictitious filler.
 
 Every Qn surface carries two text-label affordances above the C-02
 TopBar: a `Back` link top-leading and an `Exit` / `Leave` link
-top-trailing. Locked by the workflow-overhaul plan §Q5 (`[[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]]`)
+top-trailing. Locked by the workflow-overhaul plan §Q5 (`[[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]]`)
 and the canonical verb semantics in `[[../../CONTEXT|CONTEXT.md]]` →
 *Plan back* / *Plan exit*. The `Delete` verb lives on the Plan list
 surface (sg-WF-4) and never appears here.
@@ -277,7 +277,7 @@ and the Settings delete alert).
 
 - **In-quiz back is allowed Q2–Q5.** `Back` steps one question backward
   with the prior answer preserved; see §"Quiz chrome (Back + Exit)"
-  above. Q1 has no Back affordance (no prior question). The v1 "no
+  above. Q1 has no Back affordance (no prior question). The 0.1.0 "no
   back arrow / friction is the feature" stance was retired by the
   workflow-overhaul plan §Q5 — preserving the prior answer prevents
   the preference-signal pollution that the friction model was

@@ -1,6 +1,6 @@
 // GetToIt — S09 · Settings.
 //
-// TB-16 — minimal account-management surface. v1 ships exactly one
+// TB-16 — minimal account-management surface. The original release ships exactly one
 // action: delete-my-data. Required by App Store guideline 5.1.1(v) +
 // per ADR 0006. Surface spec lives at
 // `design-system/surfaces/09-settings.md`; the JSX reference is

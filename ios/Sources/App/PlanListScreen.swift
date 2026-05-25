@@ -7,7 +7,7 @@
 //
 // Surface spec: `design-system/surfaces/00-plan-list.md`.
 // JSX reference: `design-system/code/screens/ScreenPlanList.jsx`.
-// Parent decisions doc: [[gti-vault/50_product/workflow-overhaul-plan-list]].
+// Parent decisions doc: [[gti-vault/50_product/0.1.0-workflow-overhaul-plan-list]].
 //
 // Slice history:
 //   * tb-WF-5: foundation Plan list shell + 1-line Pending cards +

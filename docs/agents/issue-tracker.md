@@ -26,7 +26,7 @@ When the vault file changes, the GitHub issue body should be re-synced (use `gh 
 2. Create a corresponding GitHub issue via `gh issue create --repo samfarls55/gettoit` with:
    - Title in the form `TB-NN: <vault title>` for tracer bullets, `spec-gap NN: <vault title>` for spec gaps, or `<feature slug> NN: <vault title>` for other features.
    - Body composed by prepending a `> **Canonical source:** [vault path](github blob URL)` line, then stripping the YAML frontmatter from the vault file and appending the rest.
-   - Labels matching `status:`, `type:`, the feature slug (e.g. `v1`), and the artifact kind (`tracer-bullet` / `spec-gap`).
+   - Labels matching `status:`, `type:`, the feature slug (e.g. `0.1.0`), and the artifact kind (`tracer-bullet` / `spec-gap`).
 3. Capture the returned issue number and add `github_issue: NN` to the vault file's frontmatter.
 4. Update both `gti-vault/15_issues/_index.md` and the feature's `_index.md`.
 

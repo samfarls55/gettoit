@@ -1,5 +1,5 @@
-// GetToIt - QuizSessionAssembler boundary tests (bug-03 v1.1,
-// rewired TB-15 v1.1).
+// GetToIt - QuizSessionAssembler boundary tests (bug-03 quiz redesign,
+// rewired TB-15 quiz redesign).
 //
 // TB-15 moved the per-member Foursquare fetch off the pre-quiz
 // assembler seam and onto the QuizCoordinator's step machine: the
@@ -32,7 +32,7 @@ final class QuizSessionAssemblerTests: XCTestCase {
     /// member-matching vibe (a keep-card candidate), the same cuisine at
     /// a deviating vibe (the vibe-drop candidate), and a non-craved
     /// cuisine at the matching vibe (the cuisine-drop candidate). The
-    /// unioned pool therefore has the cuisine + vibe spread the v1.1
+    /// unioned pool therefore has the cuisine + vibe spread the quiz-redesign
     /// `Q5FactorialCardGenerator` needs to select three one-axis-
     /// deviation cards. Reputation rides on the default `no_preference`
     /// Q3 answer, whose factorial rule is always-satisfied.

@@ -1,4 +1,4 @@
-// GetToIt — PreferenceFunction (TB-09 v1.1, PRD modules A + E).
+// GetToIt — PreferenceFunction (TB-09 quiz redesign, PRD modules A + E).
 //
 // The per-member preference engine. `PreferenceFunction.build` takes a
 // member's stated Q1–Q4 profile and their three Q5 factorial ratings
@@ -10,7 +10,7 @@
 // Q5 ratings it was built from. The verdict engine caches one `prefFn`
 // per member and re-applies it to every pool venue (PRD module G).
 //
-// Design source — gti-vault/50_product/v1.1-quiz-amendments §3
+// Design source — gti-vault/50_product/0.1.0-quiz-amendments §3
 // ("Q5 — the preference probe"):
 //
 //   * **Stated-weight initialization.** The three axis weights seed at

@@ -57,7 +57,7 @@ targets:
           UIApplicationSupportsMultipleScenes: false
         UIRequiredDeviceCapabilities:
           - armv7
-        # v1 is iPhone-only, portrait-only (see design-system/surfaces/).
+        # Pre-launch is iPhone-only, portrait-only (see design-system/surfaces/).
         # App Store Connect requires this key to be present for iOS apps.
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -78,7 +78,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.gettoit.GetToIt
-        # iPhone-only for v1. iPad scope is deliberately out per the v1 PRD.
+        # iPhone-only for pre-launch. iPad scope is deliberately out per the 0.1.0 PRD.
         TARGETED_DEVICE_FAMILY: "1"
         # Empty-string signing defaults below. xcodebuild Release archives
         # via the TestFlight CI lane override CODE_SIGNING_ALLOWED=YES on

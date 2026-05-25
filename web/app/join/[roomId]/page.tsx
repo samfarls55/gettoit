@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 // unfurlers see a card. The roomId is opaque so we don't leak
 // any session content into the unfurl preview.
 //
-// bug-02 (v1.1) — the og:image is a static placeholder PNG served
+// bug-02 (quiz redesign) — the og:image is a static placeholder PNG served
 // from `web/public/og/invite.png`. Two deliberate choices here:
 //   1. The path has NO query string. Apple iMessage's rich-link
 //      cache is strict and prefers a clean static URL; query

@@ -1,5 +1,5 @@
 // GetToIt - QuizCandidateFetch + coordinator step-machine wiring tests
-// (TB-15 v1.1).
+// (TB-15 quiz redesign).
 //
 // TB-15 wires the per-member Foursquare fetch onto the QuizCoordinator's
 // step machine: the fetch fires once, on the Q4 -> Q5 transition, with
@@ -327,7 +327,7 @@ final class QuizCandidateFetchTests: XCTestCase {
 // MARK: - TB-16: the pool -> factorial seam
 
 /// `FoursquareQuizCandidateFetch.selectFactorialCards` is the seam
-/// that classifies a unioned pool and runs the v1.1 factorial probe.
+/// that classifies a unioned pool and runs the quiz-redesign factorial probe.
 /// These tests drive it directly with a canned pool — the integration
 /// through the live `QuizSessionAssembler` to the proxy is covered in
 /// `QuizSessionAssemblerTests`.

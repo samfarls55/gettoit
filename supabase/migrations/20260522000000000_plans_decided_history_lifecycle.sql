@@ -49,7 +49,7 @@
 --         status='decided-expired', ordered by `expired_at DESC`.
 --
 -- References:
---   * gti-vault/15_issues/workflow-overhaul/issues/tb-wf-8-plan-list-decided-history.md
+--   * gti-vault/15_issues/0.1.0/issues/tb-wf-8-plan-list-decided-history.md
 --   * design-system/surfaces/00-plan-list.md (locked spec)
 --   * supabase/migrations/20260519000000000_workflow_overhaul_plans_table.sql
 --     (the tb-WF-1 baseline this migration extends)

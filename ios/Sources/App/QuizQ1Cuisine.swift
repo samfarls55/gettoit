@@ -2,7 +2,7 @@
 //
 // Multi-select cuisine chips, capped at 3 picks, with a mutually-
 // exclusive "No preference" chip. A soft scoring signal — dietary
-// vetoes moved to the profile in the v1.1 redesign. Spec:
+// vetoes moved to the profile in the quiz redesign. Spec:
 // `design-system/surfaces/03-quiz.md` §"Q1 — Cuisine craving" +
 // the C-04 Chip component (`design-system/components.md` §C-04).
 //

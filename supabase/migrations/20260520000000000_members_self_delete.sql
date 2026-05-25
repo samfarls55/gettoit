@@ -15,7 +15,7 @@
 -- Scope: the policy admits ONLY the caller's own membership row
 -- (`user_id = auth.uid()`). A user can never drop someone else's
 -- membership — that would let any room member kick anyone else out,
--- which is not a verb the v1 product carries (the `Plan delete` verb
+-- which is not a verb the original product carries (the `Plan delete` verb
 -- on sg-WF-4 is a separate initiator-only flow that deletes the
 -- entire Plan, not individual members).
 --

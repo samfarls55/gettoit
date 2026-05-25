@@ -5,11 +5,11 @@
 // sun-yellow `Drop the verdict` — telegraphs that the verdict is
 // landing (S03 §"Cross-quiz invariants").
 //
-// TB-08 (v1.1): Q5 is a preference *probe*, not a tiebreaker. The
+// TB-08 (quiz redesign): Q5 is a preference *probe*, not a tiebreaker. The
 // member rates three real, strict-factorial candidate venues 1–5 on
 // **excitement** ("How excited does this make you?") — the surface
-// spec (`design-system/surfaces/03-quiz.md` §Q5) and the v1.1 PRD
-// fixed the framing as excitement, replacing the v1 "regret" wording.
+// spec (`design-system/surfaces/03-quiz.md` §Q5) and the quiz-redesign PRD
+// fixed the framing as excitement, replacing the pre-redesign "regret" wording.
 // Card selection is the `Q5FactorialCardGenerator`; the real venues
 // reach this view as `coordinator.allCandidates`.
 

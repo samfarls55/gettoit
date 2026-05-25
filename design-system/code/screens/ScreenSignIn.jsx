@@ -2,7 +2,7 @@
 // First surface a fresh-install iOS user sees. A single Sign-in-with-Apple
 // affordance gates the rest of the app. No skip, no "continue as guest,"
 // no email fallback. Closes the iOS half of ADR 0007 ("anonymous default")
-// for v1.1 while leaving the web fallback anonymous-default intact.
+// for 0.1.0 while leaving the web fallback anonymous-default intact.
 //
 // Reuses the existing `initiator` gradient stop so the transition to S01
 // after sign-in is visually identity (no gradient tween). The pill is

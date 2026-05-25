@@ -31,9 +31,9 @@ Filter to restaurants where the allergen (shellfish, nuts, dairy, eggs) is **saf
 
 ## Implication for Q1 mechanic
 
-Lock 1 listed allergens (shellfish, nuts) as menu-compliance filters. **This is not achievable via Foursquare data in v1.** Three options:
+Lock 1 listed allergens (shellfish, nuts) as menu-compliance filters. **This is not achievable via Foursquare data in 0.1.0.** Three options:
 
-1. **Drop allergen filtering from Q1 in v1.** Surface a disclaimer copy when the user picks an allergen veto: `"We can't filter for allergen-safe kitchens — please confirm with the venue before going."` Honest, defers the safety decision to the user, doesn't pretend the filter is working. Recommended in [[report|report.md]].
+1. **Drop allergen filtering from Q1 in 0.1.0.** Surface a disclaimer copy when the user picks an allergen veto: `"We can't filter for allergen-safe kitchens — please confirm with the venue before going."` Honest, defers the safety decision to the user, doesn't pretend the filter is working. Recommended in [[report|report.md]].
 2. **User-reported corrections.** Verdict surface adds a feedback chip `"This place doesn't handle [allergen] safely"`; corrections feed back into the cache. Builds the dataset GetToIt would need but doesn't help the first user.
 3. **Bolt on a curated allergen layer** (no public dataset exists at the scale needed; would require user-contributed data over time).
 
@@ -44,4 +44,4 @@ None — the public schema is clear. The verification work is around what *langu
 ## Open questions
 
 - Will the FDA's allergen-disclosure regulations (US-side) force a structured allergen dataset to emerge in the next 18–24 months? Worth tracking.
-- Is there a community-driven allergen DB (analog of HappyCow for vegan) we could partner with for v1.1? Out of v1 scope.
+- Is there a community-driven allergen DB (analog of HappyCow for vegan) we could partner with for 0.1.0? Out of 0.1.0 scope.

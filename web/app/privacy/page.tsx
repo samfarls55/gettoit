@@ -3,7 +3,7 @@
 // Public legal page satisfying TB-16 acceptance criterion
 // "Privacy Policy hosted at gettoit.app/privacy" and the App Store
 // submission Privacy Policy URL requirement. Content matches the
-// posture defined in `gti-vault/60_engineering/adr/0006-privacy-posture-v1.md`
+// posture defined in `gti-vault/60_engineering/adr/0006-privacy-posture-0.1.0.md`
 // and must stay in lock-step with the Privacy Nutrition Labels filed
 // in App Store Connect.
 //

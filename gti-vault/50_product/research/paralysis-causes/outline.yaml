@@ -1,12 +1,12 @@
 topic: paralysis-causes
 description: >
   Identify the 1-2 dominant causes of decision paralysis for GetToIt's use
-  case (going-out, group, trivial-to-mid stakes, food vertical v1). Determines
+  case (going-out, group, trivial-to-mid stakes, food vertical 0.1.0). Determines
   what signal the 5-question quiz must primarily extract: constraints, mood,
   preferences, or veto signal. Source: gti-vault/50_product/research-brief.md
   Priority 2.
 context:
-  product: GetToIt (group decision-paralysis killer, food vertical v1)
+  product: GetToIt (group decision-paralysis killer, food vertical 0.1.0)
   use_case: going-out, group of 2-6, mid-stakes, often end-of-workday timing
   north_star: verdicts followed through (whole group commits, not just majority)
   decision_to_lock: which signal type the quiz extracts (constraints / mood / preferences / veto)

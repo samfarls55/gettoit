@@ -51,7 +51,7 @@ The shell uses the presence of a `members` row as the primary routing signal, an
 ## References
 
 - `design-system/surfaces/web-01-invitee-shell.md` §A / §B / §C / §D — the surface contract.
-- [[../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]] §Q5 / §Q6 — the locked re-click behavior.
-- [[0006-privacy-posture-v1|ADR 0006]] — the 30-day anonymous-user TTL whose sweep purges the `members` row.
+- [[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]] §Q5 / §Q6 — the locked re-click behavior.
+- [[0006-privacy-posture-0.1.0|ADR 0006]] — the 30-day anonymous-user TTL whose sweep purges the `members` row.
 - `supabase/migrations/20260513210000000_rooms_and_members.sql` — the `rooms_select_members` membership-gated SELECT policy.
-- [[../../15_issues/workflow-overhaul/issues/tb-wf-12-web-invitee-shell-reclick|tb-WF-12]] — the issue this ADR was written for.
+- [[../../15_issues/0.1.0/issues/tb-wf-12-web-invitee-shell-reclick|tb-WF-12]] — the issue this ADR was written for.

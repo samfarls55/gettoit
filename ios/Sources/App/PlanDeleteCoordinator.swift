@@ -23,7 +23,7 @@
 // first, the `rooms.plan_id` FK goes to NULL via `on delete set null`,
 // but the room's status is still 'firing' / 'open' — joiners stuck
 // mid-quiz would see no immediate signal that the session ended. The
-// existing v1 path (`MemberLeaveStore.leave`) uses the same pattern:
+// existing pre-redesign path (`MemberLeaveStore.leave`) uses the same pattern:
 // DELETE the membership row first, THEN flip the room. The Plan
 // delete inverts this because the Plan is the user-visible
 // destruction; the room flip is the side effect that propagates the

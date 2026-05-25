@@ -1,4 +1,4 @@
-// GetToIt — QuizCandidateFixtures (TB-26 v1.1).
+// GetToIt — QuizCandidateFixtures (TB-26 quiz redesign).
 //
 // Test-target Q5 candidate fixture. Lives in `Tests/`, NOT in the app
 // target, so the shipped app binary contains zero hardcoded fictitious

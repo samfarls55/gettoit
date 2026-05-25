@@ -29,7 +29,7 @@
 // doesn't apply to a single voice. For TB-06 we don't yet have a
 // stable wall-clock "when" for the meet-up — the JSX prints `7:00 PM`
 // as a placeholder. The store surfaces the same placeholder until the
-// scheduling work (post-v1 candidate) lands.
+// scheduling work (post-launch candidate) lands.
 
 import Foundation
 import Supabase
@@ -238,7 +238,7 @@ public final class VerdictStore {
     }
 
     private func fetchVotes(roomID: UUID) async throws -> [VoteRow] {
-        // TB-04 (v1.1) — `votes` stores answers in five generic jsonb
+        // TB-04 (quiz redesign) — `votes` stores answers in five generic jsonb
         // slots (`q1`..`q5`). `VoteRow`'s decoder unwraps the
         // `{ meta, answer }` envelopes back to the typed values.
         try await client
@@ -310,7 +310,7 @@ public final class VerdictStore {
         return "voted in"
     }
 
-    /// Anonymous users have no display name in v1 — surface a short
+    /// Anonymous users have no display name in the pre-redesign era — surface a short
     /// uuid prefix so receipts have something legible. TB-08 / TB-12
     /// will introduce a real `display_name` source.
     private func displayName(forUserID userID: UUID) -> String {
@@ -466,14 +466,14 @@ public final class VerdictStore {
 
     /// A `votes` row as read for the verdict screen.
     ///
-    /// TB-04 (v1.1): `votes` stores answers in five generic jsonb
+    /// TB-04 (quiz redesign): `votes` stores answers in five generic jsonb
     /// slots (`q1`..`q5`), each a `{ meta, answer }` envelope. The
     /// decoder unwraps the envelopes back to the typed values so the
     /// shaping helpers below stay unchanged. Decode-only — the verdict
     /// screen reads votes, never writes them. The typed `init` is kept
     /// for unit-test fixture construction.
     ///
-    /// TB-06 (v1.1 quiz rework): Q1 changed from a dietary-veto answer
+    /// TB-06 (quiz redesign): Q1 changed from a dietary-veto answer
     /// to a positive cuisine-craving answer (`{cuisines, no_preference}`)
     /// and Q3 from a walk-minutes threshold to a reputation chip
     /// (`{reputation}`). Dietary vetoes moved to the profile and
@@ -482,7 +482,7 @@ public final class VerdictStore {
     /// legacy and the new answer shapes — `q1Vetoes` / `q3WalkMinutes`
     /// stay on the struct (the verdict-screen receipt helpers still
     /// reference them) but resolve to the no-constraint default
-    /// (`[]` / `30`) when the slot carries the new v1.1 shape. The
+    /// (`[]` / `30`) when the slot carries the new quiz-redesign shape. The
     /// dietary/walk receipts simply do not fire from session votes
     /// once dietary/walk have moved buckets — the verdict-engine
     /// rewrite (tb-11) re-sources those receipts.
@@ -525,7 +525,7 @@ public final class VerdictStore {
         }
         private struct Slot<Answer: Decodable>: Decodable { let answer: Answer }
         /// Tolerant Q1 answer — accepts the legacy dietary-veto shape
-        /// (`vetoes` / `vetoes_extra`) AND the v1.1 cuisine-craving
+        /// (`vetoes` / `vetoes_extra`) AND the quiz-redesign cuisine-craving
         /// shape (`cuisines` / `no_preference`). Every field optional.
         private struct Q1Answer: Decodable {
             let vetoes: [String]?
@@ -540,7 +540,7 @@ public final class VerdictStore {
             }
         }
         /// Tolerant Q3 answer — accepts the legacy walk-minutes shape
-        /// (`minutes`) AND the v1.1 reputation shape (`reputation`).
+        /// (`minutes`) AND the quiz-redesign reputation shape (`reputation`).
         private struct Q3Answer: Decodable {
             let minutes: Int?
             let reputation: String?
@@ -565,7 +565,7 @@ public final class VerdictStore {
 
             let q1 = try c.decode(Slot<Q1Answer>.self, forKey: .q1).answer
             // Legacy dietary veto: a diet-reason reroll appends to
-            // `vetoes_extra`; the engine prunes on the union. New v1.1
+            // `vetoes_extra`; the engine prunes on the union. New quiz-redesign
             // quiz: no vetoes — dietary moved to the profile.
             q1Vetoes = (q1.vetoes ?? []) + (q1.vetoesExtra ?? [])
             q1Cuisines = q1.cuisines ?? []
@@ -574,7 +574,7 @@ public final class VerdictStore {
             q2Budget = try c.decode(Slot<TierAnswer>.self, forKey: .q2).answer.tier
 
             let q3 = try c.decode(Slot<Q3Answer>.self, forKey: .q3).answer
-            // Absent walk-minutes (v1.1 quiz dropped it) defaults to the
+            // Absent walk-minutes (quiz-redesign dropped it) defaults to the
             // open ceiling so the walk receipt never fires spuriously.
             q3WalkMinutes = q3.minutes ?? 30
             q3Reputation = q3.reputation

@@ -13,7 +13,7 @@
 //   * Path: `/join/{roomId}` — matches the AASA `components` array's
 //     `/join/*` glob.
 //
-//   * `inviteToken` is optional in v1. Future tracer bullets may make
+//   * `inviteToken` is optional in the original shape. Future tracer bullets may make
 //     it required; today the parser tolerates a missing token so a
 //     malformed share doesn't crash the join surface.
 //

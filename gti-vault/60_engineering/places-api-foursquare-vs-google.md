@@ -85,9 +85,9 @@ Notable differences:
   **Table B** types are return-only (cannot filter). Cuisine-level filtering is
   partial.
 
-Foursquare's taxonomy is finer-grained and fully filterable — relevant to the v1.1
+Foursquare's taxonomy is finer-grained and fully filterable — relevant to the 0.1.0
 quiz, where each answer compiles to a recipe of category/taste filters
-([[../10_prds/v1.1-quiz-redesign-prd|v1.1 quiz redesign]]). Google's filter set is
+([[../10_prds/0.1.0-quiz-redesign-prd|0.1.0 quiz redesign]]). Google's filter set is
 coarser and split A/B.
 
 ## 5. Pricing (2026)
@@ -187,4 +187,4 @@ coverage). A full switch to Google is not warranted.
 - [[foursquare-venue-closure-signal]] — the closure-signal investigation and MapKit fix
 - [[stack-patterns]] — places-proxy caching pattern
 - [[verdict-engine]] — consumer of venue attributes
-- [[../15_issues/v1.1/issues/research-01-foursquare-filter-surface|research-01]] — Foursquare filter-surface spike
+- [[../15_issues/0.1.0/issues/research-01-foursquare-filter-surface|research-01]] — Foursquare filter-surface spike

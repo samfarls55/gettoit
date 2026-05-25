@@ -1,9 +1,9 @@
-// GetToIt - Q5CandidatesLoader (bug-03 v1.1, narrowed TB-15 v1.1).
+// GetToIt - Q5CandidatesLoader (bug-03 quiz redesign, narrowed TB-15 quiz redesign).
 //
 // Q5 candidate *shaping* — turns a fetched `[ShapedPlace]` into the
 // `[QuizCandidate]` shape the Q5 surface (`QuizQ5Regret`) renders.
 //
-// TB-15 (v1.1) — this type used to ALSO own the bug-03 tracer-bullet
+// TB-15 (quiz redesign) — this type used to ALSO own the bug-03 tracer-bullet
 // fetch: `load(near:radiusMeters:)` called `PlacesService.fetchPlaces`
 // once, early, with an empty `PlacesFilters()`, before the member
 // answered any quiz question. That early empty-filter fetch is removed

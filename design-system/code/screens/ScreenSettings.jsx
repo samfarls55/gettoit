@@ -1,5 +1,5 @@
 // Surface 09 — Settings
-// The minimal account-management surface. v1 ships exactly one action:
+// The minimal account-management surface. 0.1.0 ships exactly one action:
 // delete the user's data (App Store 5.1.1(v) + ADR 0006). No toggles, no
 // rows of options, no profile editor — the empty space is the feature.
 // Reuses the registered `midnight` gradient so this surface visually

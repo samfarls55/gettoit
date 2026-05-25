@@ -3,22 +3,22 @@ title: Research-Report Handoff — Synthesize P1 + P2 + P3 into 50_product/
 description: Superseded 2026-05-08. Layer-1 reports and four layer-2 deliverables shipped.
 type: handoff
 status: superseded
-superseded_by: "[[50_product/v1-design-locks]]"
+superseded_by: "[[50_product/0.1.0-design-locks]]"
 created: 2026-05-08
 closed: 2026-05-08
 related:
   - "[[research-handoff-2026-05-08]]"
   - "[[50_product/research-brief]]"
-  - "[[50_product/v1-design-locks]]"
+  - "[[50_product/0.1.0-design-locks]]"
   - "[[50_product/framework-comparison]]"
   - "[[50_product/paralysis-cause-priority]]"
   - "[[50_product/verdict-screen-spec]]"
   - "[[50_product/decision-model]]"
   - "[[50_product/north-star]]"
-  - "[[50_product/v1-scope]]"
+  - "[[50_product/0.1.0-scope]]"
 ---
 
-> **Superseded 2026-05-08.** Layer-1 reports written to `01_raw/decision-simplification-frameworks/report.md`, `01_raw/paralysis-causes/report.md`, `01_raw/group-fairness-procedural-justice/report.md`. Layer-2 deliverables live in [[50_product/framework-comparison]], [[50_product/paralysis-cause-priority]], [[50_product/verdict-screen-spec]], and [[50_product/v1-design-locks]]. Body preserved for archival reference of the work plan that produced them.
+> **Superseded 2026-05-08.** Layer-1 reports written to `01_raw/decision-simplification-frameworks/report.md`, `01_raw/paralysis-causes/report.md`, `01_raw/group-fairness-procedural-justice/report.md`. Layer-2 deliverables live in [[50_product/framework-comparison]], [[50_product/paralysis-cause-priority]], [[50_product/verdict-screen-spec]], and [[50_product/0.1.0-design-locks]]. Body preserved for archival reference of the work plan that produced them.
 
 
 # Research-Report Handoff — 2026-05-08
@@ -27,7 +27,7 @@ You are picking this up in a fresh context window. Read this file end-to-end bef
 
 ## Project context (one paragraph)
 
-GetToIt is a group decision-paralysis killer. v1 ships food vertical only, no ML. Use case: 2–6 friends decide where to eat, often end-of-workday timing, mid-stakes social decision. Product runs a short (~5 question) parallel quiz per member and produces a single committed verdict the whole group commits to. North-star metric is verdicts followed-through (whole group shows up), not just majority agreement. The quiz mechanic — exact question count, signal type, aggregation tiebreaker, verdict-screen copy — is gated on the research described below.
+GetToIt is a group decision-paralysis killer. 0.1.0 ships food vertical only, no ML. Use case: 2–6 friends decide where to eat, often end-of-workday timing, mid-stakes social decision. Product runs a short (~5 question) parallel quiz per member and produces a single committed verdict the whole group commits to. North-star metric is verdicts followed-through (whole group shows up), not just majority agreement. The quiz mechanic — exact question count, signal type, aggregation tiebreaker, verdict-screen copy — is gated on the research described below.
 
 ## What is already done
 
@@ -69,7 +69,7 @@ These three reports are mechanical — every field, every item, no judgement. Th
 
 ### Layer 2 — Cross-priority synthesis (manual, judgment work)
 
-The `/research-brief` (`gti-vault/50_product/research-brief.md`) names four §"Outputs that update the v1 design" deliverables that lock when research closes:
+The `/research-brief` (`gti-vault/50_product/research-brief.md`) names four §"Outputs that update the 0.1.0 design" deliverables that lock when research closes:
 
 1. **Final quiz length** (likely 4–6).
 2. **Signal type** (one primary, others sub-signals or future-version).
@@ -85,7 +85,7 @@ Recommended layer-2 deliverables (write to `gti-vault/50_product/`):
 | `framework-comparison.md` | Cross-P1 comparison: which framework wins, why, and what the hybrid (EBA + Satisficing) looks like concretely. |
 | `paralysis-cause-priority.md` | Cross-P2: dominant causes, state-multiplier (Decision_Fatigue), how each cause maps to a quiz mechanic. |
 | `verdict-screen-spec.md` | Cross-P3: verdict-screen copy framework, ratification UX, distribution-rule choice, what loser-targeted copy looks like. |
-| `v1-design-locks.md` | The four research-brief deliverables, explicit and dated. Quiz length: N. Signal type: X. Tiebreaker: Y. Verdict-screen framework: Z. Each with citation back to the research that justifies it. |
+| `0.1.0-design-locks.md` | The four research-brief deliverables, explicit and dated. Quiz length: N. Signal type: X. Tiebreaker: Y. Verdict-screen framework: Z. Each with citation back to the research that justifies it. |
 
 Each layer-2 file should cite specific JSON outputs by path so the trail back to source is preserved.
 
@@ -105,7 +105,7 @@ These survived all three batches and the prior handoff already committed to them
 
 ## Open boundary conditions to flag in synthesis (do not gloss)
 
-- **Hierarchical → lateral extrapolation.** Most procedural-justice empirical base is hierarchical (police, courts, employers). Friend-group lateral context is extrapolation. Tyler, Voice, Leventhal flagged this. v1 should A/B test register (warm vs court-formal copy) post-launch.
+- **Hierarchical → lateral extrapolation.** Most procedural-justice empirical base is hierarchical (police, courts, employers). Friend-group lateral context is extrapolation. Tyler, Voice, Leventhal flagged this. 0.1.0 should A/B test register (warm vs court-formal copy) post-launch.
 - **Algorithm-as-decider.** Empirical work uses human authority figures. Whether the algorithm itself can carry the relational signal is the central untested assumption. Verdict-screen tone is the lever.
 - **Correctability vs hard close.** Real design tension. Resolution: friction-bearing quorum-redo. Synthesis must call this out, not bury it.
 - **Aggregate-rule vs personal-causal attribution boundary.** Literature does not resolve. Needs in-product test post-launch.
@@ -117,7 +117,7 @@ These survived all three batches and the prior handoff already committed to them
 - **Prior-state handoff (verdicts table per item):** `[[gti-vault/20_plan/research-handoff-2026-05-08]]`
 - **Skill spec:** `C:/development/GetToIt/.claude/skills/research-report/SKILL.md`
 - **Validator (use to re-verify any new JSON if you write any):** `C:/development/GetToIt/.claude/skills/research/validate_json.py`
-- **Other 50_product anchors:** `[[decision-model]]`, `[[north-star]]`, `[[v1-scope]]`
+- **Other 50_product anchors:** `[[decision-model]]`, `[[north-star]]`, `[[0.1.0-scope]]`
 
 ## Working-style reminders
 
@@ -137,7 +137,7 @@ These survived all three batches and the prior handoff already committed to them
 4. Draft the four layer-2 files in `50_product/`. Cite raw JSONs by path.
 5. Update `[[50_product/research-brief]]` status to `closed`.
 6. Update `[[50_product/_index]]` to list new files.
-7. Update `[[20_plan/_index]]` to mark this handoff superseded; link forward to whichever doc captures the v1 design state.
+7. Update `[[20_plan/_index]]` to mark this handoff superseded; link forward to whichever doc captures the 0.1.0 design state.
 8. Update or replace `[[research-handoff-2026-05-08]]` to reflect closed-research state.
 9. End-of-turn summary: list every file written/updated with path + one-line description.
 

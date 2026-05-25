@@ -15,7 +15,7 @@ Accepted — 2026-05-14.
 
 ## Context
 
-v1.1 introduces a location-permission flow (issue [[../../15_issues/v1.1/issues/sg-04-geo-permission-and-location-selector|sg-04]]) that needs:
+0.1.0 introduces a location-permission flow (issue [[../../15_issues/0.1.0/issues/sg-04-geo-permission-and-location-selector|sg-04]]) that needs:
 
 - A pre-prime permission card before iOS fires `CLLocationManager.requestWhenInUseAuthorization`.
 - A persistent location-selector UI element on the initiator surface that is always editable — auto-populates from GPS when permission is granted, requires manual selection when denied. Denying location must not break the app.
@@ -53,12 +53,12 @@ The original sg-04 issue body framed the alternative as "extend `MapKitPlacesFal
 
 ## Re-evaluation triggers
 
-- Location-picking does **not** appear on any surface beyond the initiator within the next two milestones (post-v1.1, pre-public-launch). At that point reconsider whether `C-23` should be retired and folded into a single-surface composition.
+- Location-picking does **not** appear on any surface beyond the initiator within the next two milestones (post-redesign, pre-public-launch). At that point reconsider whether `C-23` should be retired and folded into a single-surface composition.
 - Multi-geo handling lands and the picker needs to render per-room rather than per-user. May force a `C-23` re-spec.
 
 ## References
 
-- [[../../15_issues/v1.1/issues/sg-04-geo-permission-and-location-selector|sg-04 — Geo permission + location selector]]
-- [[../../15_issues/v1.1/issues/tb-03-geo-permission-and-location-selector-wire|tb-03 — Wire geo permission + location selector]] (depends on sg-04)
+- [[../../15_issues/0.1.0/issues/sg-04-geo-permission-and-location-selector|sg-04 — Geo permission + location selector]]
+- [[../../15_issues/0.1.0/issues/tb-03-geo-permission-and-location-selector-wire|tb-03 — Wire geo permission + location selector]] (depends on sg-04)
 - [[0002-places-data-foursquare-mapkit|ADR 0002 — Places data]] (`MapKitPlacesFallback` defined here)
 - [[../../../design-system/components.md|design-system/components.md]] — `C-23 LocationPicker` entry slot

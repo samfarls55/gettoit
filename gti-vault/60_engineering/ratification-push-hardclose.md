@@ -104,9 +104,9 @@ Both close paths land at the same end state (`status='locked', locked_at` set). 
 
 ## Related
 
-- [[../10_prds/v1-prd|v1 PRD]] §"User stories 36–40, 60–64" + §"PushCoordinator"
+- [[../10_prds/0.1.0-prd|0.1.0 PRD]] §"User stories 36–40, 60–64" + §"PushCoordinator"
 - [[apple-keys-setup|apple-keys-setup.md]] §"Key 3 — APNs auth key" (the `.p8` wiring TB-08 consumes)
 - [[stack-patterns|stack-patterns.md]] §"Push notifications"
 - [[../../design-system/surfaces/05-verdict|S05 spec]] §"Modes" + §"Copy register" (the locked pre-permission line)
 - [[../../design-system/surfaces/06-hard-close|S06 spec]] (full hard-close surface)
-- [[../15_issues/v1/issues/tb-08-ratification-push-hard-close|TB-08 ticket]]
+- [[../15_issues/0.1.0/issues/tb-08-ratification-push-hard-close|TB-08 ticket]]

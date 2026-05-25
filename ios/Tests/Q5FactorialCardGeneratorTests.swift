@@ -1,4 +1,4 @@
-// GetToIt — Q5FactorialCardGenerator pure unit tests (TB-08 v1.1).
+// GetToIt — Q5FactorialCardGenerator pure unit tests (TB-08 quiz redesign).
 //
 // The generator (PRD module C) is pure: it takes a member's stated
 // Q1–Q4 profile and their axis-profiled candidate pool, and emits the
@@ -9,7 +9,7 @@
 //   * no card is a 100% match;
 //   * the member-local cuisine selection (pool feasibility) is honored.
 //
-// Factorial spec source: gti-vault/50_product/v1.1-quiz-amendments §3.
+// Factorial spec source: gti-vault/50_product/0.1.0-quiz-amendments §3.
 
 import XCTest
 @testable import GetToIt

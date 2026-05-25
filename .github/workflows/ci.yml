@@ -102,7 +102,7 @@ jobs:
       - run: npm run build
 
   invite-link-canary:
-    # Live-plumbing regression guard for bug-01 (v1.1 — TestFlight 2026-05-14
+    # Live-plumbing regression guard for bug-01 (TestFlight 2026-05-14
     # invite-link 404). The bug was a Vercel framework-preset misconfig: AASA
     # in /public/ served while every Next.js route 404'd. Unit tests + the
     # local `next build` couldn't catch it because the failure was at the

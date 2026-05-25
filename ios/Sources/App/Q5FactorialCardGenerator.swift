@@ -1,10 +1,10 @@
-// GetToIt — Q5FactorialCardGenerator (TB-08 v1.1, PRD module C).
+// GetToIt — Q5FactorialCardGenerator (TB-08 quiz redesign, PRD module C).
 //
 // Pure card-selection logic, no I/O. Given one member's Q1–Q4 answers
 // and their fetched candidate pool, the generator picks the three
 // strict-factorial Q5 cards the preference probe rates.
 //
-// The factorial (v1.1-quiz-amendments §3 "Card generation"):
+// The factorial (0.1.0-quiz-amendments §3 "Card generation"):
 //
 //   * Three axes — cuisine, reputation, vibe.
 //   * Three cards — each card **drops exactly one distinct axis** and
@@ -26,7 +26,7 @@
 // Member-local cuisine selection. Q1 caps the member at three craved
 // cuisines, but the strict factorial supplies only two cuisine
 // keep-cards — so Q5 probes at most TWO of the member's cuisines
-// (v1.1-quiz-amendments §"Q1 multi-select and the cuisine cap"). Which
+// (0.1.0-quiz-amendments §"Q1 multi-select and the cuisine cap"). Which
 // two is a **member-local** rule: the two craved cuisines with the
 // best card-generation feasibility in *this member's* pool. Group state
 // — other members' votes, the running union — never influences card

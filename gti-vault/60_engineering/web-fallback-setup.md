@@ -7,7 +7,7 @@ related: tb-15, tb-WF-10, adr-0003, adr-0013, adr-0014
 
 # Web fallback — setup notes
 
-Working notes for the Next.js web fallback shipped in [[../15_issues/v1/issues/tb-15-web-fallback|TB-15]]. Cross-references [[adr/0003-web-fallback-nextjs-vercel|ADR 0003]] for the high-level decision; this file holds the operational tail.
+Working notes for the Next.js web fallback shipped in [[../15_issues/0.1.0/issues/tb-15-web-fallback|TB-15]]. Cross-references [[adr/0003-web-fallback-nextjs-vercel|ADR 0003]] for the high-level decision; this file holds the operational tail.
 
 ## Environment variables
 
@@ -65,9 +65,9 @@ Per [[adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] §"Web fallback v
 
 The web build pulls `design-system/code/tokens.css` directly via `app/layout.tsx`, so token mutations flow into the web surface without a code change.
 
-## v1.1 quiz port (tb-WF-10)
+## 0.1.0 quiz port (tb-WF-10)
 
-The web quiz was brought to v1.1 parity in tb-WF-10. Two implementation
+The web quiz was brought to 0.1.0 parity in tb-WF-10. Two implementation
 notes for future readers:
 
 - **The vote wire shape is the shared `votes-wire.ts` leaf module.** Per
@@ -96,7 +96,7 @@ notes for future readers:
 
 `web/` runs vitest as `npm test`:
 
-- `lib/quiz.test.ts` — v1.1 quiz state helpers (cuisine toggle + cap,
+- `lib/quiz.test.ts` — 0.1.0 quiz state helpers (cuisine toggle + cap,
   generic-slot wire-shape).
 - `lib/candidate-fetch.test.ts` — the N+1 fetch planner, the venue
   classifier, the strict-factorial card generator, and the end-to-end

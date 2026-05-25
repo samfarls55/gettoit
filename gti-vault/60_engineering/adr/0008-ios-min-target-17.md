@@ -40,7 +40,7 @@ The Xcode project hasn't been initialized yet. Min-deployment target gates Swift
 ### Negative / accepted tradeoffs
 
 - **~5% of devices excluded.** Accepted.
-- **iOS 18-only APIs unavailable.** Mesh gradients, predictive completion APIs — not v1 critical.
+- **iOS 18-only APIs unavailable.** Mesh gradients, predictive completion APIs — not 0.1.0 critical.
 
 ## Re-evaluation triggers
 

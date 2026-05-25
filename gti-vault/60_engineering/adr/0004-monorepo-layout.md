@@ -41,7 +41,7 @@ GetToIt/
 2. **Atomic spec changes.** A token change can update `design-system/` + `ios/` + `web/` in one PR. No publish-and-pin coordination.
 3. **One CI lane.** GitHub Actions runs `node design-system/scripts/verify.mjs`, iOS build, web build, web lint, and (later) Swift lint in one workflow. Drift gates run together.
 4. **Vault references stay relative.** `gti-vault/60_engineering/adr/*.md` links to `design-system/`, `ios/`, `web/` via relative paths without cross-repo URL fragility.
-5. **No package-publish overhead.** Solo dev + single consumer pair. pnpm workspaces or git submodules add tooling cost with no payoff at v1 scale.
+5. **No package-publish overhead.** Solo dev + single consumer pair. pnpm workspaces or git submodules add tooling cost with no payoff at 0.1.0 scale.
 
 ## Consequences
 

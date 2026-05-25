@@ -1,14 +1,14 @@
-// GetToIt — SignInScreen (S00a — forced first-launch Apple sign-in gate, TB-02 v1.1).
+// GetToIt — SignInScreen (S00a — forced first-launch Apple sign-in gate, TB-02 quiz redesign).
 //
 // SwiftUI port of `design-system/code/screens/ScreenSignIn.jsx`. The
 // first surface a fresh-install iOS user sees: a single Sign-in-with-
 // Apple affordance gates the rest of the app. No skip, no "continue as
 // guest," no email fallback — closes the iOS half of ADR 0007's
-// anonymous-default for v1.1.
+// anonymous-default for the quiz redesign.
 //
 // Render gate: `RootView` mounts this view iff
 // `AuthCoordinator.state` is `.idle` (fresh install, no cached
-// session) OR `.anonymous` (pre-v1.1 install with a v1 anonymous
+// session) OR `.anonymous` (pre-S00a install with a legacy anonymous
 // session still in Keychain — bug-06). A cached `.linkedApple`
 // session bypasses the surface entirely; both gate-eligible states
 // resolve to a Linked-Apple session by the time S00a dismisses.
@@ -341,9 +341,9 @@ public struct SignInScreen: View {
     ///   * error       — phase returns to .idle; non-blocking inline
     ///                   error line renders below the body sub copy.
     ///
-    /// bug-06 (v1.1) — the coordinator method depends on the starting
+    /// bug-06 (quiz redesign) — the coordinator method depends on the starting
     /// state, captured at tap time:
-    ///   * `.anonymous` — a legacy v1 anonymous session is in
+    ///   * `.anonymous` — a legacy pre-S00a anonymous session is in
     ///                    Keychain. Use `linkApple` so the Apple
     ///                    identity attaches to the existing `user_id`
     ///                    (rooms, votes, members, events all survive).

@@ -115,8 +115,8 @@ Tracked in subsequent tickets:
 
 ## Related
 
-- [[../10_prds/v1-prd|v1 PRD]] §"Group size, fire trigger, timer"
+- [[../10_prds/0.1.0-prd|0.1.0 PRD]] §"Group size, fire trigger, timer"
 - [[verdict-engine|verdict-engine.md]] — engine architecture + idempotency contract
 - [[stack-patterns|stack-patterns.md]] §"Realtime" + §"Deadline / quorum / verdict computation"
-- [[../15_issues/v1/issues/02-s04-decide-now-countdown|spec-gap 02]] — surface-level scope
-- [[../15_issues/v1/issues/tb-07-waiting-realtime-fire-trigger|TB-07 ticket]]
+- [[../15_issues/0.1.0/issues/02-s04-decide-now-countdown|spec-gap 02]] — surface-level scope
+- [[../15_issues/0.1.0/issues/tb-07-waiting-realtime-fire-trigger|TB-07 ticket]]

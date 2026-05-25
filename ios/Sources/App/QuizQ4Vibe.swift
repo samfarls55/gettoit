@@ -1,6 +1,6 @@
 // GetToIt — Q4 · Vibe energy (TB-04 surface, TB-06 vocabulary).
 //
-// Cardinal scalar on the v1.1 energy vocabulary `QUIET · CHILL ·
+// Cardinal scalar on the quiz-redesign energy vocabulary `QUIET · CHILL ·
 // SOCIAL · LIVELY · ROWDY` (`GTIVibeLabels.all`, generated from
 // `design-system/tokens.json`). One axis only — energy / loudness,
 // not formality. Big live word at 96pt — the system saying "yes,

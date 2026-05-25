@@ -1,15 +1,15 @@
 ---
 folder: 60_engineering/research/foursquare-tastes-vibe-2026-05
 purpose: Sample the live Foursquare `tastes` field and curate a direction-tagged vibe-token allowlist for the tb-18 Q4 vibe classifier
-prd: v1.1-quiz-redesign-prd
-issue: 15_issues/v1.1/issues/research-02-tastes-vibe-token-allowlist
+prd: 0.1.0-quiz-redesign-prd
+issue: 15_issues/0.1.0/issues/research-02-tastes-vibe-token-allowlist
 ---
 
 # foursquare-tastes-vibe-2026-05 — Research
 
-Research spike for the v1.1 quiz redesign's Q4 vibe axis. Samples the live Foursquare `tastes` field across a representative venue pool and curates the **vibe-token allowlist** that [[../../../15_issues/v1.1/issues/tb-18-q4-vibe-tastes-signal|tb-18]]'s `Q5VenueClassifier` consumes — a flat list of `tastes` tokens, each tagged `+1` (loud-leaning) or `-1` (quiet-leaning).
+Research spike for the 0.1.0 quiz redesign's Q4 vibe axis. Samples the live Foursquare `tastes` field across a representative venue pool and curates the **vibe-token allowlist** that [[../../../15_issues/0.1.0/issues/tb-18-q4-vibe-tastes-signal|tb-18]]'s `Q5VenueClassifier` consumes — a flat list of `tastes` tokens, each tagged `+1` (loud-leaning) or `-1` (quiet-leaning).
 
-**No application code shipped** — this is a documentation deliverable. It closes issue [[../../../15_issues/v1.1/issues/research-02-tastes-vibe-token-allowlist|research-02]].
+**No application code shipped** — this is a documentation deliverable. It closes issue [[../../../15_issues/0.1.0/issues/research-02-tastes-vibe-token-allowlist|research-02]].
 
 ## Contents
 

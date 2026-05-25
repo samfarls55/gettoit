@@ -1,6 +1,6 @@
 ---
 title: Paralysis-Cause Priority — P2 Synthesis
-description: Cross-cause synthesis of decision-paralysis drivers; ranks causes for v1 defuse, separates state-multipliers from causes, maps each to a quiz mechanic
+description: Cross-cause synthesis of decision-paralysis drivers; ranks causes for 0.1.0 defuse, separates state-multipliers from causes, maps each to a quiz mechanic
 type: synthesis
 status: closed
 created: 2026-05-08
@@ -9,7 +9,7 @@ related:
   - "[[decision-model]]"
   - "[[framework-comparison]]"
   - "[[verdict-screen-spec]]"
-  - "[[v1-design-locks]]"
+  - "[[0.1.0-design-locks]]"
 sources:
   - "01_raw/paralysis-causes/results/Misaligned_Preferences.json"
   - "01_raw/paralysis-causes/results/Social_Friction.json"
@@ -26,7 +26,7 @@ Cross-cause synthesis of the six paralysis drivers surveyed in P2. Closes the [[
 
 ## Verdict matrix
 
-| Cause | Role in v1 | Dominance | What the quiz must do |
+| Cause | Role in 0.1.0 | Dominance | What the quiz must do |
 |---|---|---|---|
 | Misaligned Preferences (Arrow / social choice) | **Primary defuse** | High | Parallel private input + cardinal preference intensity + score-based aggregation that mathematically evades Arrow (range/score voting). |
 | Social Friction (face-work / taste-imposition aversion) | **Primary defuse** | High | Anonymous parallel input + single aggregated verdict (no individual-vote reveal) + responsibility laundering through the algorithm. |
@@ -113,7 +113,7 @@ The four "primary defuse" causes do not pull in different directions. They conve
 ## What this synthesis closes
 
 - **Cause hierarchy is locked.** Four primary defuses (Misaligned Preferences, Social Friction, Fear of Regret, Choice Overload) + one architectural primary (Cognitive Load) + one state-multiplier (Decision Fatigue).
-- **Signal type the quiz extracts** falls out of this: constraints/vetoes (defeats overload + regret + fatigue) → cardinal preference intensity on one axis (defeats misalignment + arrow) → commitment lock (defeats regret + fatigue residual). See [[v1-design-locks]] for the exact lock.
+- **Signal type the quiz extracts** falls out of this: constraints/vetoes (defeats overload + regret + fatigue) → cardinal preference intensity on one axis (defeats misalignment + arrow) → commitment lock (defeats regret + fatigue residual). See [[0.1.0-design-locks]] for the exact lock.
 - **Decision Fatigue is not a feature target.** No "tired-mode" UI. The whole product respects the state by default.
 - **Cognitive Load is a constraint, not a target.** Every quiz design choice gets cost-checked against the 4-chunk ceiling.
 
@@ -121,4 +121,4 @@ The four "primary defuse" causes do not pull in different directions. They conve
 
 - **Group-level Decision Fatigue.** Genuine literature gap (`Decision_Fatigue.json` `known_limitations`). The construct's evidence base is individual; whether groups exhibit collective fatigue at the same threshold is not resolved. Don't claim more than the evidence supports in product copy.
 - **Choice-overload moderator zone.** Schwartz-style effect is contested at the broad level. GetToIt sits in the worst-case zone (large set, high attribute count, time pressure) so we are designing against a real-in-our-regime effect, not a universal one. Re-evaluate post-launch with cohort data.
-- **Pluralistic ignorance vs Social Friction overlap.** Some literature treats them as a single family (Frontiers 2023 century review per `Social_Friction.json`). Distinction does not change the v1 defuse but matters if we measure post-launch.
+- **Pluralistic ignorance vs Social Friction overlap.** Some literature treats them as a single family (Frontiers 2023 century review per `Social_Friction.json`). Distinction does not change the 0.1.0 defuse but matters if we measure post-launch.

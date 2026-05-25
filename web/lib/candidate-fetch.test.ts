@@ -1,6 +1,6 @@
 // GetToIt web — per-member candidate fetch tests (tb-WF-10).
 //
-// Pins the v1.1 Q5 candidate path: the N+1 fetch planner, the venue
+// Pins the redesigned Q5 candidate path: the N+1 fetch planner, the venue
 // classifier, the strict-factorial card generator, and the end-to-end
 // fetch. The factorial / classifier are faithful ports of the iOS
 // modules — these tests mirror `Q5FactorialCardGeneratorTests` /

@@ -1,10 +1,10 @@
-// VenueClassifier pure unit tests (TB-23 v1.1 — Swift→TS port).
+// VenueClassifier pure unit tests (TB-23 quiz redesign — Swift→TS port).
 //
 // The classifier turns a `CandidateOption` venue into its position on
 // the three Q5 preference axes (`Q5VenueProfile` — cuisine id,
 // reputation bucket, vibe level). It is a faithful TypeScript port of
 // the Swift `Q5VenueClassifier` (`ios/Sources/App/Q5VenueClassifier.swift`,
-// TB-16 v1.1). The verdict path runs server-side (bug-08 Option 2 fork),
+// TB-16 quiz redesign). The verdict path runs server-side (bug-08 Option 2 fork),
 // so the classification has to live in TypeScript alongside the ported
 // preference function.
 //

@@ -11,7 +11,7 @@
 // rewording a prompt, swapping option copy — needed a migration, and
 // the verdict engine read those columns by hardcoded field name.
 //
-// The v1.1 quiz redesign (PRD module H) makes the quiz content
+// The quiz redesign (PRD module H) makes the quiz content
 // session-variable. So `votes` carries five GENERIC jsonb slots,
 // `q1`..`q5`. Each slot is a `{ meta, answer }` envelope:
 //
@@ -34,7 +34,7 @@
 // reputation, writing the new `cuisine_craving` and `reputation`
 // question kinds. TB-06 left `votes-schema.ts` untouched and flagged
 // that the verdict-engine rewrite (TB-11) must extend the kind taxonomy
-// before a verdict can fire over a v1.1-quiz vote. TB-11 does that here:
+// before a verdict can fire over a quiz-redesign vote. TB-11 does that here:
 // the kind set gains `cuisine_craving` and `reputation`, and the engine
 // `MemberVote` shape moves to the worst-off-protecting pipeline's
 // inputs — `hard_vetoes` + a per-candidate `scores` map.
@@ -148,7 +148,7 @@ function unionChips(base: string[], extra: string[]): string[] {
 }
 
 /** Read a per-candidate `scores` map from a `regret`-kind answer
- *  payload. The v1.1 Q5 probe writes `answer.scores` as
+ *  payload. The quiz-redesign Q5 probe writes `answer.scores` as
  *  `{ <venue_id>: <1..5 rating> }` — the member's cached per-candidate
  *  score, which the verdict engine reads directly. */
 function readScores(raw: unknown): Record<string, number> {
@@ -184,7 +184,7 @@ const KIND_READERS: Readonly<Record<QuestionKind, KindReader>> = Object.freeze({
   cuisine_craving: (_answer) => ({}),
   // Soft preference — same.
   reputation: (_answer) => ({}),
-  // Legacy Q3 — retired from the v1.1 quiz (walk-minutes moved to the
+  // Legacy Q3 — retired from the redesigned quiz (walk-minutes moved to the
   // parameters bucket). Kept so a legacy vote row maps without a throw;
   // contributes nothing.
   walk_minutes: (_answer) => ({}),
@@ -308,7 +308,7 @@ export function mapVotesRowToMemberVote(row: VotesRow): MemberVote {
 // column name is never inspected. A `null` slot falls back to the
 // soft-default "no preference" answer for its axis.
 //
-// The `regret` slot's `answer` carries the canonical v1.1 probe shape:
+// The `regret` slot's `answer` carries the canonical quiz-redesign probe shape:
 //
 //     answer.ratings: [{ droppedAxis, score }, ...]
 //
@@ -341,7 +341,7 @@ const NO_PREFERENCE_MEMBER: Q5MemberProfile = Object.freeze({
 const Q5_AXES: ReadonlySet<string> = new Set(["cuisine", "reputation", "vibe"]);
 
 /** Read the three Q5 card ratings from a `regret`-kind answer payload.
- *  The canonical v1.1 shape is `answer.ratings: [{ droppedAxis, score
+ *  The canonical quiz-redesign shape is `answer.ratings: [{ droppedAxis, score
  *  }]`. Entries with an unknown axis or a non-numeric score are
  *  dropped — a malformed entry must never corrupt the prefFn build. */
 function readQ5Ratings(raw: unknown): Q5Rating[] {

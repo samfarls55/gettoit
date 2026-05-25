@@ -14,7 +14,7 @@ jsx:
 
 The new app entry surface. Replaces [[00-landing|S00 Landing]] as the post-sign-in landing on iOS. A sectioned list of the user's Plans, in Reminders-app spirit, with a floating create affordance and per-card three-dot menus for the destructive actions.
 
-Locked outcomes are in [[../../gti-vault/50_product/workflow-overhaul-plan-list|workflow-overhaul-plan-list]] (decisions doc) and inlined under [[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-4-plan-list-surface|sg-WF-4]] (#157). This file is the design-system contract; the iOS port is the paired tracer-bullet **tb-WF-5** (#174) and follow-ups tb-WF-6/7/8/9.
+Locked outcomes are in [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]] (decisions doc) and inlined under [[../../gti-vault/15_issues/0.1.0/issues/sg-wf-4-plan-list-surface|sg-WF-4]] (#157). This file is the design-system contract; the iOS port is the paired tracer-bullet **tb-WF-5** (#174) and follow-ups tb-WF-6/7/8/9.
 
 ## What this surface defends against
 
@@ -249,11 +249,11 @@ The Joined-card resume-from-state contract matches the Web invitee model from CO
 7. **Tap the FAB (or empty-state hero pill):** opens the disambig sheet. Tap Solo or Group → navigate to S01 Setup with the corresponding `groupContext`.
 8. **History header tap:** toggles section expand/collapse. Default expanded on first viewing; collapsed-or-expanded state persists per-session.
 
-## v1 (workflow-overhaul) scope
+## 0.1.0 (workflow-overhaul) scope
 
 - **Exactly three sections.** No `Drafts`, no `Templates`, no `Shared with me` (Joined cards live inline in their status section, marked by the chip). Adding a fourth section is a spec change.
 - **No thumbnails on cards.** Verdict-place thumbnails (Foursquare / MapKit photo) were considered and rejected (expensive fetch per list render; not load-bearing for at-a-glance recall). Deferred — re-open if testing surfaces a real signal.
-- **No search.** v1 lists are bounded (<20 Plans for the foreseeable founder dogfood); add search when the list breaks the one-screen scroll for a real user.
+- **No search.** 0.1.0 lists are bounded (<20 Plans for the foreseeable founder dogfood); add search when the list breaks the one-screen scroll for a real user.
 - **No multi-select / bulk-delete.** Single-card delete via the menu is sufficient at this scale.
 - **No drag-to-reorder.** Ordering is mechanical per the locked sort keys; manual ordering would invite "why isn't this at the top" friction without a clear win.
 - **No swipe-to-delete fallback.** Sunset Pop forbids red (the iOS-native swipe-to-delete trailing reveal); the C-25 menu is the single delete affordance.
@@ -270,7 +270,7 @@ The Joined-card resume-from-state contract matches the Web invitee model from CO
 
 ## Adjacencies
 
-- **[[01-setup|S01 Setup]]** — downstream of every create / edit flow on this surface. The disambig sheet's choice (Solo / Group) determines Setup's render mode (5 controls / 6 controls). The Setup amendment (5-control solo, 6-control group with `Two of us / A group` chips) is captured in [[../../gti-vault/15_issues/workflow-overhaul/issues/tb-wf-4-wire-plan-setup-surface|tb-WF-4]] and re-spec'd inline in `01-setup.md` when tb-WF-4 lands.
+- **[[01-setup|S01 Setup]]** — downstream of every create / edit flow on this surface. The disambig sheet's choice (Solo / Group) determines Setup's render mode (5 controls / 6 controls). The Setup amendment (5-control solo, 6-control group with `Two of us / A group` chips) is captured in [[../../gti-vault/15_issues/0.1.0/issues/tb-wf-4-wire-plan-setup-surface|tb-WF-4]] and re-spec'd inline in `01-setup.md` when tb-WF-4 lands.
 - **[[03-quiz|S03 Quiz]]** — downstream of Joined-card tap (when the joiner hasn't finished the quiz). The resume-from-state contract reads per-joiner quiz progress.
 - **[[04-waiting|S04 Waiting]]** — downstream of Joined-card tap (when the joiner finished the quiz but the verdict hasn't fired).
 - **[[05-verdict|S05 Verdict]]** — downstream of Created-card tap (Decided / History) and Joined-card tap (Decided / History).
@@ -278,8 +278,8 @@ The Joined-card resume-from-state contract matches the Web invitee model from CO
 
 ## Out of scope (deferred)
 
-- **Reroll-window deadline mechanism** — sibling HITL issue [[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-6-reroll-window-deadline|sg-WF-6]]. The Decided section's section transition (→ History) needs a defined deadline; until that grills, the JSX treats `expired_at` as the host-supplied signal.
-- **Web invitee surface design** — sibling HITL issue [[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-5-web-invitee-flow|sg-WF-5]]. The Joined-card behavior on this surface assumes the joiner is on iOS; the Web fallback has its own surface tree.
+- **Reroll-window deadline mechanism** — sibling HITL issue [[../../gti-vault/15_issues/0.1.0/issues/sg-wf-6-reroll-window-deadline|sg-WF-6]]. The Decided section's section transition (→ History) needs a defined deadline; until that grills, the JSX treats `expired_at` as the host-supplied signal.
+- **Web invitee surface design** — sibling HITL issue [[../../gti-vault/15_issues/0.1.0/issues/sg-wf-5-web-invitee-flow|sg-WF-5]]. The Joined-card behavior on this surface assumes the joiner is on iOS; the Web fallback has its own surface tree.
 - **Push notification semantics** — "Plan moved to Decided" / "reroll window closing" / "verdict ready" notifications for joiners and initiators. Parent-grill followup; not resolved here.
 - **Reroll-window-closing visual hint on Decided cards** (e.g. small time-remaining chip when window has <6h left). Deferred — first ship the section structure, layer this in once we observe whether users miss rerolls.
 - **Section header sticky-on-scroll behavior** — light polish, deferred. The current spec is non-sticky; the headers scroll away with their cards. Flip to sticky if the populated state grows past ~6 cards per section.

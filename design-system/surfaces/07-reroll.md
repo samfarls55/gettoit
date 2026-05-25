@@ -48,7 +48,7 @@ These are **mechanical** — the system actually applies them. The reason isn't 
 
 - **3rd (last) reroll.** Stamp changes to `"1 LEFT"`. CTA: `"Reroll · last one"`. Extra body line: `"After this, tonight is committed."`
 - **No rerolls left.** This surface is not reachable — surface 06's footer reads "No rerolls left" instead.
-- **Group veto of reroll** (v2 mechanic). v1 ships with initiator-only reroll.
+- **Group veto of reroll** (v2 mechanic). 0.1.0 ships with initiator-only reroll.
 
 ## Amendment — reroll window (workflow-overhaul, sg-WF-6)
 

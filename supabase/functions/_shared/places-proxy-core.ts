@@ -56,7 +56,7 @@ export interface ProxyDeps {
   /** Time-source override for deterministic tests. */
   now?: () => Date;
   /** Hot-zone TTL — applied when the cached row has the
-   *  `hot_zone: true` flag. v1 marks every zone hot until the
+   *  `hot_zone: true` flag. Currently marks every zone hot until the
    *  zone-detection heuristic lands; see follow-up note in TB-05. */
   hotZoneTtlMs?: number;
   /** Cold-zone TTL — applied when `hot_zone: false`. */
@@ -159,7 +159,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
 }
 
 function ttlForRow(_row: CacheRow, deps: ProxyDeps): number {
-  // v1 ships with a single TTL band. Hot/cold detection is a follow-up
+  // The original release ships with a single TTL band. Hot/cold detection is a follow-up
   // (see Adjacencies on the TB-05 ticket). When the heuristic lands,
   // store the band on the row and switch here.
   return deps.hotZoneTtlMs ?? DEFAULT_HOT_TTL_MS;

@@ -1,7 +1,7 @@
 -- TB-07 — fire_verdict(room_id) RPC.
 --
 -- The initiator's "Decide now" tap on S04 Waiting calls this RPC. It
--- enforces the v1 minimum-quorum rule and flips `rooms.status` to
+-- enforces the original minimum-quorum rule and flips `rooms.status` to
 -- `firing` if the rule passes. The downstream verdict computation
 -- (the actual EBA engine + `verdicts` / `option_cuts` writes) lives
 -- in the Edge Function `compute-verdict`; this RPC is intentionally
@@ -26,7 +26,7 @@
 -- The RPC is SECURITY DEFINER so it can run the votes count + the
 -- rooms UPDATE without the caller needing direct write permission
 -- on `rooms.status`. Without DEFINER the UPDATE would need a wider
--- UPDATE policy on `rooms` than the v1 schema admits (the iOS client
+-- UPDATE policy on `rooms` than the original schema admits (the iOS client
 -- never writes `rooms.status` directly).
 --
 -- Idempotency:

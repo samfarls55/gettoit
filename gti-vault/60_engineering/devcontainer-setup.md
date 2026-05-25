@@ -1,12 +1,12 @@
 ---
 title: Devcontainer setup for AFK agent
-description: Step-by-step setup for the Claude Code container so it can build, test, and ship the v1 issue set end-to-end without a Mac.
+description: Step-by-step setup for the Claude Code container so it can build, test, and ship the 0.1.0 issue set end-to-end without a Mac.
 type: runbook
 status: active
 created: 2026-05-13
 related:
-  - "[[../15_issues/v1/issues/tb-00-external-accounts]]"
-  - "[[../15_issues/v1/issues/tb-01-walking-skeleton]]"
+  - "[[../15_issues/0.1.0/issues/tb-00-external-accounts]]"
+  - "[[../15_issues/0.1.0/issues/tb-01-walking-skeleton]]"
   - "[[adr/0001-ios-tech-stack-supabase]]"
   - "[[adr/0008-ios-min-target-17]]"
 ---
@@ -15,7 +15,7 @@ related:
 
 ## What this is
 
-Step-by-step rebuild instructions for the Claude Code devcontainer so an agent can execute the v1 tracer-bullet issues without a Mac. The container handles all code editing, web/edge testing, and CI orchestration; iOS builds happen on free `macos-latest` GitHub Actions runners (only possible because the repo is public).
+Step-by-step rebuild instructions for the Claude Code devcontainer so an agent can execute the 0.1.0 tracer-bullet issues without a Mac. The container handles all code editing, web/edge testing, and CI orchestration; iOS builds happen on free `macos-latest` GitHub Actions runners (only possible because the repo is public).
 
 ## Premise
 
@@ -26,7 +26,7 @@ Step-by-step rebuild instructions for the Claude Code devcontainer so an agent c
 
 ## Pre-reqs (do these before rebuilding)
 
-1. **TB-00 complete.** See [[../15_issues/v1/issues/tb-00-external-accounts]]. Specifically:
+1. **TB-00 complete.** See [[../15_issues/0.1.0/issues/tb-00-external-accounts]]. Specifically:
    - Apple Developer account approved, Bundle ID reserved
    - **App Store Connect API key generated** (Users and Access → Integrations → App Store Connect API). Save the Key ID, Issuer ID, and `.p8` file
    - Foursquare API key generated
@@ -212,7 +212,7 @@ If any step fails, fix before unleashing the agent. The first failure compounds.
 
 ## Step 7 — Unleash agent on TB-01
 
-Start the agent on [[../15_issues/v1/issues/tb-01-walking-skeleton]]. Expected flow:
+Start the agent on [[../15_issues/0.1.0/issues/tb-01-walking-skeleton]]. Expected flow:
 
 1. Agent scaffolds `ios/`, `web/`, `supabase/`, `docs/`, writes `gen-swift.mjs`, writes `.github/workflows/ci.yml`.
 2. Agent runs `node design-system/scripts/verify.mjs` locally — passes.
@@ -225,7 +225,7 @@ Start the agent on [[../15_issues/v1/issues/tb-01-walking-skeleton]]. Expected f
 ## Realistic caveats
 
 - **CI iteration is 3–5x slower than local Xcode.** A 30-second SwiftUI tweak becomes a 5-minute round-trip. Acceptable for tracer-bullet vertical slices. Painful for pixel-level choreography (TB-08 verdict screen). Mitigation: snapshot tests on simulator with artifacts uploaded — you eyeball PR artifact PNGs to approve visual changes.
-- **`xcodebuild` toolchain choice matters.** Pin a specific Xcode version in CI (`maxim-lobanov/setup-xcode@v1` with `xcode-version: '15.4'`). Floating versions cause CI to break on Xcode releases.
+- **`xcodebuild` toolchain choice matters.** Pin a specific Xcode version in CI (`maxim-lobanov/setup-xcode@0.1.0` with `xcode-version: '15.4'`). Floating versions cause CI to break on Xcode releases.
 - **Free macOS minutes are unlimited but slow.** Each job ~5–10 min cold. If you push 20 PRs in a day, expect to wait. Public repos don't have a minute cap but jobs queue.
 - **Supabase local development typically uses Docker.** Running Docker-in-Docker inside this devcontainer is messy. Skip it — use the hosted Supabase project for everything. `supabase functions serve` for local edge function dev works without Docker.
 - **TestFlight build needs at least one manual review** in App Store Connect before external testers see it. The upload is automated; the "submit for review" tap is one click on the web UI.

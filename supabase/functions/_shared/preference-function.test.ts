@@ -1,4 +1,4 @@
-// PreferenceFunction pure unit tests (TB-22 v1.1 — Swift→TS port).
+// PreferenceFunction pure unit tests (TB-22 quiz redesign — Swift→TS port).
 //
 // The preference engine (PRD modules A `buildPreferenceFunction` + E
 // axis scorers) is pure: it takes a member's stated Q1–Q4 profile and
@@ -14,7 +14,7 @@
 // exactly on every vector"). The exact expected numbers were computed
 // from the Swift module's arithmetic by hand and pinned here.
 //
-// Design source: gti-vault/50_product/v1.1-quiz-amendments §3.
+// Design source: gti-vault/50_product/0.1.0-quiz-amendments §3.
 
 import {
   assert,

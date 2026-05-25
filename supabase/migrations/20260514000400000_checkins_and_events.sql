@@ -1,6 +1,6 @@
 -- TB-14 — check_ins + events schema.
 --
--- The two telemetry tables backing the v1 north-star metric and the
+-- The two telemetry tables backing the original north-star metric and the
 -- secondary metrics. Schema sketch from
 -- `gti-vault/60_engineering/adr/0005-telemetry-supabase-event-store.md`:
 --

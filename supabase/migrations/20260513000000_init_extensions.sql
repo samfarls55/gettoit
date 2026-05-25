@@ -1,6 +1,6 @@
 -- TB-01 walking-skeleton baseline migration.
 --
--- v1 needs three Postgres extensions enabled before any feature
+-- The original release needs three Postgres extensions enabled before any feature
 -- migration can land:
 --   * postgis  — radius / point queries against the `places` cache
 --               (ADR 0002).

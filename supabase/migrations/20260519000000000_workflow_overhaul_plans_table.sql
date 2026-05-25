@@ -14,9 +14,9 @@
 -- (decided-active → decided-expired) is sg-WF-6.
 --
 -- References:
---   * gti-vault/50_product/workflow-overhaul-plan-setup.md — locked
+--   * gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup.md — locked
 --     decision doc (eleven grilled outcomes).
---   * gti-vault/15_issues/workflow-overhaul/issues/tb-wf-1-plans-table-schema.md
+--   * gti-vault/15_issues/0.1.0/issues/tb-wf-1-plans-table-schema.md
 --   * gti-vault/60_engineering/adr/0010-generic-jsonb-votes-schema.md
 --     — precedent for `session_params` jsonb shape.
 --
@@ -42,7 +42,7 @@ create table public.plans (
     -- disables submit on empty input, but the DB owns the contract).
     name          text not null check (char_length(name) between 1 and 40),
 
-    -- v1 is food-only per the locked decision; the CHECK constraint
+    -- The original is food-only per the locked decision; the CHECK constraint
     -- exists so future categories (drinks / movie / activity) land
     -- as new enum values via a follow-up migration, not as a quiet
     -- text-field free-for-all.
@@ -86,7 +86,7 @@ create table public.plans (
     -- the workflow-overhaul lock — the new Setup screen replaces the
     -- walk/drive binary with a distance-only slider whose default
     -- sits at 1.0 mi (walk-vs-drive implicit below/above that).
-    -- See workflow-overhaul-plan-setup.md §"Distance-only slider".
+    -- See 0.1.0-workflow-overhaul-plan-setup.md §"Distance-only slider".
     distance_meters int not null default 1609,
 
     -- The lifecycle state machine.

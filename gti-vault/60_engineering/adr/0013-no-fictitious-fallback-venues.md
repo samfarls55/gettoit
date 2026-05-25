@@ -17,7 +17,7 @@ Accepted — 2026-05-19. Implemented by tb-26 (2026-05-19) — see Implementatio
 
 Q5 is the per-member preference probe: the member rates three real,
 strict-factorial candidate venues 1–5 on excitement
-([[../../15_issues/v1.1/issues/tb-08-q5-real-candidate-wiring|the v1.1 PRD module C]]).
+([[../../15_issues/0.1.0/issues/tb-08-q5-real-candidate-wiring|the 0.1.0 PRD module C]]).
 The three cards come from the per-member Foursquare fetch — N+1 calls,
 classified into axis profiles, then run through
 `Q5FactorialCardGenerator`, which returns exactly three one-axis-deviation
@@ -46,9 +46,9 @@ shipped fiction.
 **The app never surfaces a fictitious venue.** `QuizDummyCandidates` is
 deleted from the iOS app target. In its place Q5 gains a **`no-results`
 mode** — specced in the design system by
-[[../../15_issues/v1.1/issues/sg-05-q5-no-results-mode|sg-05]] and
+[[../../15_issues/0.1.0/issues/sg-05-q5-no-results-mode|sg-05]] and
 consumed by iOS in
-[[../../15_issues/v1.1/issues/tb-26-remove-fictitious-fallback-venues|tb-26]].
+[[../../15_issues/0.1.0/issues/tb-26-remove-fictitious-fallback-venues|tb-26]].
 
 When the per-member fetch produces no factorial-usable pool — any of the
 four paths above — Q5 renders a centered headline + body block plus a
@@ -87,7 +87,7 @@ their fetch. This is intentional:
   shape that `compute-verdict`'s per-member re-weight reads.
 - Removing the dummy changes only what Q5 **displays**. Those real
   venues still persist to `member_fetches` via `rawFetch` and still feed
-  the verdict candidate pool ([[../../15_issues/v1.1/issues/tb-21-persist-fetch-server-union|TB-21]]).
+  the verdict candidate pool ([[../../15_issues/0.1.0/issues/tb-21-persist-fetch-server-union|TB-21]]).
   A verdict winner may be a venue shown to no member at Q5.
 
 ## Why
@@ -177,15 +177,15 @@ Built by tb-26 (2026-05-19):
 
 ## References
 
-- [[../../15_issues/v1.1/issues/sg-05-q5-no-results-mode|sg-05]] — the
+- [[../../15_issues/0.1.0/issues/sg-05-q5-no-results-mode|sg-05]] — the
   Q5 `no-results` mode design-system surface spec.
-- [[../../15_issues/v1.1/issues/tb-26-remove-fictitious-fallback-venues|TB-26]]
+- [[../../15_issues/0.1.0/issues/tb-26-remove-fictitious-fallback-venues|TB-26]]
   — the iOS consumption of sg-05; this ADR records its decision.
 - [[0010-generic-jsonb-votes-schema|ADR 0010]] — the generic `votes`
   jsonb schema whose Q5 reader tolerates an empty ratings array.
 - [[0011-worst-off-protecting-verdict-engine|ADR 0011]] — the verdict
   engine; its `no-survivor` mode is the structural precedent for the Q5
   `no-results` mode.
-- [[../../15_issues/v1.1/issues/tb-21-persist-fetch-server-union|TB-21]]
+- [[../../15_issues/0.1.0/issues/tb-21-persist-fetch-server-union|TB-21]]
   — the `member_fetches` / `rawFetch` path that keeps the verdict
   candidate pool unaffected by the dummy removal.

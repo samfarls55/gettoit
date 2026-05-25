@@ -1,6 +1,6 @@
 ---
 title: Framework Comparison — P1 Synthesis
-description: Cross-framework synthesis of decision-simplification frameworks; locks the v1 engine as an EBA + Satisficing hybrid and assigns sub-signal roles to the rest
+description: Cross-framework synthesis of decision-simplification frameworks; locks the 0.1.0 engine as an EBA + Satisficing hybrid and assigns sub-signal roles to the rest
 type: synthesis
 status: closed
 created: 2026-05-08
@@ -9,7 +9,7 @@ related:
   - "[[decision-model]]"
   - "[[paralysis-cause-priority]]"
   - "[[verdict-screen-spec]]"
-  - "[[v1-design-locks]]"
+  - "[[0.1.0-design-locks]]"
 sources:
   - "01_raw/decision-simplification-frameworks/results/Elimination_by_Aspects.json"
   - "01_raw/decision-simplification-frameworks/results/Satisficing.json"
@@ -26,7 +26,7 @@ Cross-framework synthesis of the six decision-simplification frameworks surveyed
 
 ## Verdict matrix
 
-| Framework | Role in v1 | Why |
+| Framework | Role in 0.1.0 | Why |
 |---|---|---|
 | Elimination by Aspects (Tversky 1972) | **Primary engine — pruning stage** | Sequential attribute-veto filter is the closest structural match to a 5-question quiz. Group-aggregates via union of vetoes (intersection of survivor sets), which is mathematically trivial and intuitively fair. Single verdict by construction. Empirically validated on consumer choice from large assortments. Low implementation cost. |
 | Satisficing (Simon 1957) | **Primary engine — acceptance stage** | Threshold/veto per question with intersection-of-acceptable-sets aggregation. Produces a committed verdict the whole group has implicitly pre-accepted, directly serving follow-through. Quiz format is native ("max walk", "max price", "must have vegetarian"). |
@@ -59,7 +59,7 @@ Three real gaps the engine does not resolve on its own. Each is closed by a sub-
 
 Five members each contributing hard constraints can collapse the survivor set to zero. Pure EBA has no answer; Satisficing prescribes aspiration relaxation but leaves the rule unspecified.
 
-**Resolution.** Build a relax-veto fallback. If survivors = 0 after the elimination chain, surface the most-cited veto and ask for one volunteer to flex. If still empty, widen the geographic radius. If still empty, exit with no verdict (better than a fake one). This is real engineering, not free, and must be costed into v1.
+**Resolution.** Build a relax-veto fallback. If survivors = 0 after the elimination chain, surface the most-cited veto and ask for one volunteer to flex. If still empty, widen the geographic radius. If still empty, exit with no verdict (better than a fake one). This is real engineering, not free, and must be costed into 0.1.0.
 
 ### No native tiebreaker among survivors
 
@@ -69,13 +69,13 @@ If survivor set has more than one option after the chain, neither framework pres
 2. Order by neutral signal — distance or popularity.
 3. Order by a single soft preference aggregated across the group.
 
-Recommended starting bet: **regret-of-omission scalar** (Pre-mortem sub-signal) summed across members. This uses the intensity signal EBA's binary vetoes throw away and protects the loser whose anticipated regret is highest. Falls back to random if the regret signal is flat. See [[v1-design-locks]] for the locked tiebreaker.
+Recommended starting bet: **regret-of-omission scalar** (Pre-mortem sub-signal) summed across members. This uses the intensity signal EBA's binary vetoes throw away and protects the loser whose anticipated regret is highest. Falls back to random if the regret signal is flat. See [[0.1.0-design-locks]] for the locked tiebreaker.
 
 ### Strategic gaming of thresholds
 
 `Satisficing.json` `weaknesses_for_GetToIt`: members may state inflated thresholds to bias the outcome. EBA inherits the same risk on attribute importance.
 
-**Resolution.** Anonymize per-member inputs in the verdict-screen receipt (members see *that* a constraint cut an option, not *who* set it) — this aligns with the [[verdict-screen-spec|aggregate-rule attribution]] rule from P3. Anti-collusion is out of v1 scope; flag as monitor-only.
+**Resolution.** Anonymize per-member inputs in the verdict-screen receipt (members see *that* a constraint cut an option, not *who* set it) — this aligns with the [[verdict-screen-spec|aggregate-rule attribution]] rule from P3. Anti-collusion is out of 0.1.0 scope; flag as monitor-only.
 
 ## Why WRAP loses as engine
 
@@ -98,16 +98,16 @@ Trait moderates how aggressively the engine prunes and how firmly the verdict lo
 - **Group with ≥1 maximizer** → tighter survivor caps (≤2 finalists), harder ratification copy ("no take-backs"), reroll cap reduced.
 - **All-satisficer group** → more relaxed defaults, friendlier reroll affordance.
 
-Cost: one onboarding screen with 2–6 Likert items (Nenkov short-form), stored on the user. Data instrumented from day one even if the moderator effect is wired in v1.1.
+Cost: one onboarding screen with 2–6 Likert items (Nenkov short-form), stored on the user. Data instrumented from day one even if the moderator effect is wired in 0.1.0.
 
 ## Pre-mortem — earned slots in the quiz
 
-Two specific items survive into v1 candidate quiz designs:
+Two specific items survive into 0.1.0 candidate quiz designs:
 
 1. **Regret-of-omission slider** — one item per surviving option (post-pruning), used as the satisficing tiebreaker scalar. Captures intensity EBA's binary vetoes drop.
 2. **Pre-mortem-lite multi-select** — "what could go wrong with this pick?" with vertical-specific options (loud, slow, expensive surprise, dietary risk). Acts as a final soft-veto channel before ratification, and feeds the reroll taxonomy if the verdict is rejected.
 
-These are conditional slots — earned only if v1 quiz length budget allows after the EBA elimination chain claims its 3–4 questions. See [[v1-design-locks]] for the final allocation.
+These are conditional slots — earned only if 0.1.0 quiz length budget allows after the EBA elimination chain claims its 3–4 questions. See [[0.1.0-design-locks]] for the final allocation.
 
 ## What this synthesis closes
 
@@ -116,9 +116,9 @@ These are conditional slots — earned only if v1 quiz length budget allows afte
 - **Sub-signal roster:** Maximizer trait (onboarding moderator), regret-of-omission (tiebreaker scalar), pre-mortem-lite (final soft-veto), nudge defaults (verdict-screen UX).
 - **Rejected as engine, retained as tactics:** WRAP, Nudge.
 
-Tiebreaker rule, exact quiz length, and signal type lock in [[v1-design-locks]]. Verdict-screen copy framework locks in [[verdict-screen-spec]] (P3-driven, references this doc for the rule the screen names).
+Tiebreaker rule, exact quiz length, and signal type lock in [[0.1.0-design-locks]]. Verdict-screen copy framework locks in [[verdict-screen-spec]] (P3-driven, references this doc for the rule the screen names).
 
-## Open questions deferred past v1
+## Open questions deferred past 0.1.0
 
 - Whether anti-collusion / strategic-threshold detection is needed at the scale we ship at. Monitor only.
 - Empty-survivor-set relaxation UX. Engineering ticket, not a research question.

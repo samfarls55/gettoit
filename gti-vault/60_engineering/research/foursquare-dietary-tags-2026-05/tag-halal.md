@@ -25,7 +25,7 @@ Filter to restaurants that **offer** halal options. In practice for halal, the c
 
 ## Risk if used naively
 
-False-negative on omnivore venues that *do* serve halal but aren't categorized as such. For halal, this is a smaller real-world set than vegan — most halal-observant users prefer category-level certainty anyway. Acceptable in v1.
+False-negative on omnivore venues that *do* serve halal but aren't categorized as such. For halal, this is a smaller real-world set than vegan — most halal-observant users prefer category-level certainty anyway. Acceptable in 0.1.0.
 
 ## Verification needed
 

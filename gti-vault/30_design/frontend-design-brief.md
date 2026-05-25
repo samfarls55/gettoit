@@ -1,5 +1,5 @@
 ---
-title: Frontend Design Brief — GetToIt v1
+title: Frontend Design Brief — GetToIt 0.1.0
 description: One-page brief for kicking off frontend design exploration. Concept, key screens, voice, must-haves, anti-patterns.
 type: brief
 status: superseded
@@ -7,17 +7,17 @@ created: 2026-05-08
 related:
   - "[[50_product/north-star]]"
   - "[[50_product/decision-model]]"
-  - "[[50_product/v1-design-locks]]"
+  - "[[50_product/0.1.0-design-locks]]"
   - "[[50_product/verdict-screen-spec]]"
 ---
 
-# Frontend Design Brief — GetToIt v1
+# Frontend Design Brief — GetToIt 0.1.0
 
 > **Superseded — design exploration archived.** The design work this brief kicked off shipped as the `design-system/` package (Sunset Pop). Kept as a historical record of the kickoff brief.
 
 ## What it is
 
-**GetToIt** is a mobile-first app that kills group decision paralysis for trivial-to-mid going-out choices. v1 ships the **food vertical only**: a group decides where to eat in under 90 seconds.
+**GetToIt** is a mobile-first app that kills group decision paralysis for trivial-to-mid going-out choices. 0.1.0 ships the **food vertical only**: a group decides where to eat in under 90 seconds.
 
 The pitch in one line: *drop a link in the group chat, everyone answers 5 quick questions, app returns a single verdict everyone can live with.*
 
@@ -33,7 +33,7 @@ Friend groups, couples, small co-worker crews — 2–8 people, lateral relation
 
 ## The flow (7 surfaces to design)
 
-1. **Initiator landing** — pick vertical (food only in v1), start a decision, generate share link.
+1. **Initiator landing** — pick vertical (food only in 0.1.0), start a decision, generate share link.
 2. **Invite hand-off** — link unfurl in iMessage / WhatsApp / etc. Web fallback for non-installers.
 3. **Quiz** — 5 fixed questions, ~10s each. Q1–Q3 hard vetoes (diet, budget, logistics). Q4 cardinal vibe/cuisine axis. Q5 regret-of-omission tiebreaker. Mobile-native, one decision per screen.
 4. **Waiting / coordination state** — invitees still answering. Honest, calm, no anxiety.
@@ -93,5 +93,5 @@ Visual directions for: invite unfurl, quiz screens (with progress), waiting stat
 
 - [[50_product/north-star]] — problem, metric, moat.
 - [[50_product/decision-model]] — full end-to-end flow.
-- [[50_product/v1-design-locks]] — the four locked design decisions, with rationale.
+- [[50_product/0.1.0-design-locks]] — the four locked design decisions, with rationale.
 - [[50_product/verdict-screen-spec]] — verdict-screen synthesis (7 elements, 8 prescriptions).

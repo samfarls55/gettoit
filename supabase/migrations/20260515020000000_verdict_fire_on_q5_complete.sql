@@ -1,7 +1,7 @@
--- TB-13 (v1.1) — re-point verdict firing onto the Q5-complete signal.
+-- TB-13 (quiz redesign) — re-point verdict firing onto the Q5-complete signal.
 --
--- The v1.1 quiz redesign (PRD module H, user stories 33-36) retires
--- the v1 timer / shot-clock firing path entirely. v1 fired the
+-- The quiz redesign (PRD module H, user stories 33-36) retires
+-- the original timer / shot-clock firing path entirely. The original fired the
 -- VerdictEngine on three coupled mechanisms, all defined in
 -- `20260513224000000_verdict_fire_trigger_and_cron.sql`:
 --
@@ -14,7 +14,7 @@
 --   * The initiator's `fire_verdict` RPC, which also enforced the
 --     two-vote minimum quorum.
 --
--- v1.1 fires on exactly two signals — no timer, no shot clock, no
+-- The redesign fires on exactly two signals — no timer, no shot clock, no
 -- minimum quorum:
 --
 --   1. All participants completed Q5 — the verdict auto-fires the
@@ -47,12 +47,12 @@
 -- Down-migration: this migration supersedes the TB-07 trigger / RPC /
 -- cron. Reverting means re-applying `20260513224000000_*`.
 
--- ── 1. Drop the v1 timer cron ───────────────────────────────────────
+-- ── 1. Drop the original timer cron ─────────────────────────────────
 -- The per-minute `gettoit_verdict_auto_fire` job fired on deadline
--- expiry. v1.1 has no deadline, so the job has nothing to do — and
+-- expiry. The redesign has no deadline, so the job has nothing to do — and
 -- leaving it scheduled would mean it keeps scanning `rooms.status =
 -- 'open' AND deadline_at <= now()` and could expire a perfectly live
--- v1.1 room whose members simply haven't finished the quiz yet. We
+-- redesigned room whose members simply haven't finished the quiz yet. We
 -- unschedule it. The `cron_auto_fire_or_expire()` function itself is
 -- left defined but orphaned (no schedule references it); dropping the
 -- function is a no-op cleanup deferred to avoid a dependency surprise.
@@ -75,7 +75,7 @@ end $$;
 -- members have completed Q5 — the all-complete predicate compares
 -- this against `count(members)`. It joins `members` to `votes` so a
 -- stale votes row for a user who has left the room never counts (the
--- v1.1 firing predicate gates on current membership).
+-- redesign firing predicate gates on current membership).
 create or replace function public.count_q5_complete_members(p_room_id uuid)
 returns integer
 language sql
@@ -107,7 +107,7 @@ revoke all on function public.count_q5_complete_members(uuid) from public;
 -- ── 3. dispatch_compute_verdict — carry the fire method ─────────────
 -- The TB-07 `dispatch_compute_verdict(uuid)` posted only `{room_id}`
 -- to the compute-verdict Edge Function, so the durable `verdicts.method`
--- always fell back to `manual`. v1.1 fires on two distinct signals —
+-- always fell back to `manual`. The redesign fires on two distinct signals —
 -- all-complete auto-fire (`quorum`) and the initiator's close-voting
 -- control (`manual`) — and the durable verdict should reflect which.
 -- We add a 2-arg overload that forwards a `method` body field; the
@@ -157,13 +157,13 @@ end;
 $$;
 
 comment on function public.dispatch_compute_verdict(uuid, text) is
-    'TB-13 (v1.1) — fire-and-forget HTTP POST to the compute-verdict Edge Function, carrying a method field so the durable verdict reflects how it fired (quorum = all-complete auto-fire, manual = close-voting). Silent no-op when the app.* GUCs are missing.';
+    'TB-13 (quiz redesign) — fire-and-forget HTTP POST to the compute-verdict Edge Function, carrying a method field so the durable verdict reflects how it fired (quorum = all-complete auto-fire, manual = close-voting). Silent no-op when the app.* GUCs are missing.';
 
 revoke all on function public.dispatch_compute_verdict(uuid, text) from public;
 
 -- ── 4. fire_verdict RPC — initiator's "close voting" control ─────────
--- v1.1: the initiator presses "close voting" to produce the verdict
--- on demand. This RPC drops the v1 two-vote minimum quorum entirely —
+-- Quiz redesign: the initiator presses "close voting" to produce the verdict
+-- on demand. This RPC drops the original two-vote minimum quorum entirely —
 -- a solo session (initiator alone) resolves, and the initiator never
 -- waits on a straggler. Initiator-only is still enforced.
 create or replace function public.fire_verdict(p_room_id uuid)
@@ -201,7 +201,7 @@ begin
         return jsonb_build_object('status', 'already_firing', 'room_status', v_room.status);
     end if;
 
-    -- v1.1 — NO quorum check. The initiator's close-voting control
+    -- Quiz redesign — NO quorum check. The initiator's close-voting control
     -- fires the verdict whatever the participant progress; a solo
     -- session resolves with the initiator's vote alone, and a group
     -- session resolves without waiting on a straggler. The
@@ -231,18 +231,18 @@ end;
 $$;
 
 comment on function public.fire_verdict(uuid) is
-    'TB-13 (v1.1) close-voting RPC. Initiator-only. NO minimum quorum — a solo session resolves and the initiator never waits on a straggler. Flips rooms.status open→firing and dispatches the compute-verdict engine inline. Supersedes the TB-07 quorum-gated fire_verdict.';
+    'TB-13 (quiz redesign) close-voting RPC. Initiator-only. NO minimum quorum — a solo session resolves and the initiator never waits on a straggler. Flips rooms.status open→firing and dispatches the compute-verdict engine inline. Supersedes the TB-07 quorum-gated fire_verdict.';
 
 revoke all on function public.fire_verdict(uuid) from public;
 grant execute on function public.fire_verdict(uuid) to authenticated;
 
 -- ── 5. AFTER INSERT ON votes — all-participants-complete auto-fire ──
--- v1.1: the verdict auto-fires the moment EVERY current member has
+-- Quiz redesign: the verdict auto-fires the moment EVERY current member has
 -- completed Q5. The trigger fires after each votes INSERT (a quiz
 -- submit); it checks whether the room is now all-complete and, if so,
 -- flips status and dispatches the engine.
 --
--- This drops the v1 trigger's `deadline_at <= now()` time channel and
+-- This drops the original trigger's `deadline_at <= now()` time channel and
 -- its two-vote minimum quorum. The new gate is purely:
 --   count_q5_complete_members(room) = count(members of room)
 -- with a member-count >= 1 floor so an empty room never fires.
@@ -322,7 +322,7 @@ end;
 $$;
 
 comment on function public.votes_maybe_fire_verdict() is
-    'TB-13 (v1.1) AFTER INSERT ON votes trigger. Auto-fires the VerdictEngine the moment every CURRENT room member has completed Q5 (has a regret-kind votes slot). No timer / deadline channel and no minimum quorum — a solo room fires on the initiator''s own submit. Mirrors the decideFiring predicate in _shared/verdict-firing.ts.';
+    'TB-13 (quiz redesign) AFTER INSERT ON votes trigger. Auto-fires the VerdictEngine the moment every CURRENT room member has completed Q5 (has a regret-kind votes slot). No timer / deadline channel and no minimum quorum — a solo room fires on the initiator''s own submit. Mirrors the decideFiring predicate in _shared/verdict-firing.ts.';
 
 drop trigger if exists votes_maybe_fire_verdict on public.votes;
 create trigger votes_maybe_fire_verdict

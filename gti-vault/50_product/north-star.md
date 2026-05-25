@@ -54,5 +54,5 @@ Light, fun, fast. The decision becomes a 90-second ritual the group plays togeth
 ## Related
 
 - [[decision-model]] — how the mechanic works end-to-end
-- [[v1-scope]] — what ships first vs. deferred
+- [[0.1.0-scope]] — what ships first vs. deferred
 - [[research-brief]] — open questions blocking the mechanic design

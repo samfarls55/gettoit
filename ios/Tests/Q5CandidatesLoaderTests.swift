@@ -1,5 +1,5 @@
-// GetToIt - Q5CandidatesLoader shaping tests (bug-03 v1.1,
-// narrowed TB-15 v1.1).
+// GetToIt - Q5CandidatesLoader shaping tests (bug-03 quiz redesign,
+// narrowed TB-15 quiz redesign).
 //
 // TB-15 removed the bug-03 tracer-bullet fetch (`load(near:)` — one
 // early `PlacesService.fetchPlaces` with empty filters). What remains

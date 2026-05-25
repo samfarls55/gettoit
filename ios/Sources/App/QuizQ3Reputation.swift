@@ -2,8 +2,8 @@
 //
 // Single-select chip picker — Popular / Hidden gem / Classic / New /
 // No preference. A client-side-scored soft axis (the query-chip
-// fetch-filter technique was retired in the v1.1 redesign — see
-// `50_product/v1.1-quiz-amendments` §5). Spec:
+// fetch-filter technique was retired in the quiz redesign — see
+// `50_product/0.1.0-quiz-amendments` §5). Spec:
 // `design-system/surfaces/03-quiz.md` §"Q3 — Reputation" + the C-04
 // Chip component used in its single-select mode.
 //

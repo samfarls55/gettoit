@@ -1,4 +1,4 @@
-// GetToIt — C-23 LocationPickerSheet (TB-03 v1.1).
+// GetToIt — C-23 LocationPickerSheet (TB-03 quiz redesign).
 //
 // Bottom-sheet editor for the location chip. Visual port of
 // `LocationPickerSheet` in `design-system/code/components.jsx`.

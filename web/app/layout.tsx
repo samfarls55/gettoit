@@ -15,7 +15,7 @@ import "../../design-system/code/tokens.css";
 export const metadata: Metadata = {
   metadataBase: new URL("https://gettoit.app"),
   title: "GetToIt",
-  description: "Group decision-paralysis killer. Food vertical v1.",
+  description: "Group decision-paralysis killer. Food vertical 0.1.0.",
 };
 
 export default function RootLayout({

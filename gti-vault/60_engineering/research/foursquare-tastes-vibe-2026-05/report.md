@@ -1,7 +1,7 @@
 ---
 report: foursquare-tastes-vibe-2026-05
-prd: v1.1-quiz-redesign-prd
-issue: 15_issues/v1.1/issues/research-02-tastes-vibe-token-allowlist
+prd: 0.1.0-quiz-redesign-prd
+issue: 15_issues/0.1.0/issues/research-02-tastes-vibe-token-allowlist
 date: 2026-05-18
 status: final
 ---
@@ -10,9 +10,9 @@ status: final
 
 ## Purpose
 
-This is the research spike that issue [[../../../15_issues/v1.1/issues/research-02-tastes-vibe-token-allowlist|research-02]] calls for. It is a **research deliverable — no application code ships.**
+This is the research spike that issue [[../../../15_issues/0.1.0/issues/research-02-tastes-vibe-token-allowlist|research-02]] calls for. It is a **research deliverable — no application code ships.**
 
-The v1.1 quiz's Q4 vibe axis ([[../../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Redesign & Verdict Engine PRD]] module (E)) currently infers a venue's energy (Quiet -> Chill -> Social -> Lively -> Rowdy) from a category-archetype baseline table — "all steakhouses read as energy X." [[../../../15_issues/v1.1/issues/tb-18-q4-vibe-tastes-signal|tb-18]] upgrades that with a bounded nudge from the Foursquare `tastes` field. tb-18's `/grill-with-docs` session locked the *consumption* contract; this spike produces the *data* it consumes: a curated, direction-tagged allowlist of `tastes` tokens, derived from a live sample.
+The 0.1.0 quiz's Q4 vibe axis ([[../../../10_prds/0.1.0-quiz-redesign-prd|0.1.0 Quiz Redesign & Verdict Engine PRD]] module (E)) currently infers a venue's energy (Quiet -> Chill -> Social -> Lively -> Rowdy) from a category-archetype baseline table — "all steakhouses read as energy X." [[../../../15_issues/0.1.0/issues/tb-18-q4-vibe-tastes-signal|tb-18]] upgrades that with a bounded nudge from the Foursquare `tastes` field. tb-18's `/grill-with-docs` session locked the *consumption* contract; this spike produces the *data* it consumes: a curated, direction-tagged allowlist of `tastes` tokens, derived from a live sample.
 
 The output here is consumed by exactly one thing: tb-18's `Q5VenueClassifier`, which transcribes [section 4's allowlist](#4-the-curated-vibe-token-allowlist) into a classifier constant verbatim.
 
@@ -32,7 +32,7 @@ The sampler script — [`sample-tastes.ts`](sample-tastes.ts) — pulls the live
 Pool design — a representative spread, deliberately not single-city:
 
 - **8 US metros**: New York, Los Angeles, Chicago, Austin, Seattle, Nashville, Denver, Portland ME. Dense + mid-size, spread across regions, to dilute any one city's folksonomy bias.
-- **3 categories**: Restaurant, Bar, Cafe / Coffee Shop (Foursquare top-level taxonomy ids). These are the venue kinds the v1.1 quiz ever feeds the classifier, and they span the energy spectrum the Q4 axis cares about — quiet cafes through loud bars.
+- **3 categories**: Restaurant, Bar, Cafe / Coffee Shop (Foursquare top-level taxonomy ids). These are the venue kinds the 0.1.0 quiz ever feeds the classifier, and they span the energy spectrum the Q4 axis cares about — quiet cafes through loud bars.
 - 50 results per (metro x category) call = 24 calls, deduped by `fsq_place_id` (first sighting wins) -> **1090 unique venues**.
 
 `tastes` is already in the proxy's `fields` csv, so this sample added **no new API cost dimension** — it is the same field shape the proxy already pays for.
@@ -224,7 +224,7 @@ Direction-only tagging (no magnitude) means these borderline calls are low-stake
 
 ## 7. Nudge fire-rate — the real number behind 66.8% (research-03)
 
-> Added 2026-05-18 by issue [[../../../15_issues/v1.1/issues/research-03-vibe-nudge-hit-rate|research-03]]. Same canonical 2026-05-18 sample, no new Foursquare calls — a pure offline replay of the merged tb-18 classifier logic.
+> Added 2026-05-18 by issue [[../../../15_issues/0.1.0/issues/research-03-vibe-nudge-hit-rate|research-03]]. Same canonical 2026-05-18 sample, no new Foursquare calls — a pure offline replay of the merged tb-18 classifier logic.
 
 Section 3's **66.8% `tastes` coverage** is the *ceiling* on how often the tb-18 vibe nudge can fire, not the fire-rate. A venue inside that 66.8% still gets **no nudge** when (1) none of its `tastes` tokens are on the 30-token allowlist, or (2) its matched tokens net to zero — equal `+1`/`-1` tags cancel under the sign-of-sum rule. This section measures the **fire-rate**: the fraction of venues whose category-archetype baseline actually moves.
 

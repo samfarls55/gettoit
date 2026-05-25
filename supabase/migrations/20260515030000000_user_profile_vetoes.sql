@@ -1,4 +1,4 @@
--- TB-12 (v1.1) — per-account profile vetoes.
+-- TB-12 (quiz redesign) — per-account profile vetoes.
 --
 -- Migration version note: TB-12 and TB-13 were built in parallel and
 -- both initially claimed the `20260515020000000` prefix. TB-13 merged

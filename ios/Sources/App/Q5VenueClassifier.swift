@@ -1,4 +1,4 @@
-// GetToIt — Q5VenueClassifier (TB-16 v1.1, PRD module E live wiring).
+// GetToIt — Q5VenueClassifier (TB-16 quiz redesign, PRD module E live wiring).
 //
 // The `ShapedPlace -> Q5VenueProfile` axis classification that tb-09
 // deferred. tb-09 shipped the *scorers* — `Q5VenueProfile -> 1…5` —

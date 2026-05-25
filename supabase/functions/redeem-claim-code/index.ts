@@ -14,7 +14,7 @@
 //
 // References:
 //   * tb-WF-14 ticket
-//     (gti-vault/15_issues/workflow-overhaul/issues/tb-wf-14-claim-code-redeem.md)
+//     (gti-vault/15_issues/0.1.0/issues/tb-wf-14-claim-code-redeem.md)
 //   * ADR 0015
 //     (gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge.md)
 //

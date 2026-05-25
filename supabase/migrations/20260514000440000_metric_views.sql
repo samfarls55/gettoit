@@ -1,6 +1,6 @@
 -- TB-14 — north-star + secondary metric views.
 --
--- The SQL views that compute the v1 metrics from the durable
+-- The SQL views that compute the original metrics from the durable
 -- telemetry tables. Per ADR 0005 §"Decision" and TB-14 ticket:
 --
 --   * metric_follow_through_pct  — the north-star metric (PRD user
@@ -35,7 +35,7 @@
 -- Studio or a future Metabase dashboard).
 --
 -- The views materialize a single scalar value (or a tiny tuple). Cheap
--- to compute; no materialized-view machinery needed at v1 scale.
+-- to compute; no materialized-view machinery needed at pre-launch scale.
 
 -- ── metric_follow_through_pct ───────────────────────────────────────
 -- The north-star. Returns a single-row view with the numerator,

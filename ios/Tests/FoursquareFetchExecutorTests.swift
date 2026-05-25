@@ -1,4 +1,4 @@
-// GetToIt — FoursquareFetchExecutor boundary tests (TB-07 v1.1).
+// GetToIt — FoursquareFetchExecutor boundary tests (TB-07 quiz redesign).
 //
 // The executor (PRD module F) wraps the pure FoursquareFetchPlanner: it
 // takes the same per-member inputs, asks the planner for the N+1 call

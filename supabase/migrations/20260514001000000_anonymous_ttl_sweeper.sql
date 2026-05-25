@@ -1,6 +1,6 @@
 -- TB-16 — anonymous account 30-day TTL sweeper.
 --
--- Per [[ADR 0006]] (60_engineering/adr/0006-privacy-posture-v1.md):
+-- Per [[ADR 0006]] (60_engineering/adr/0006-privacy-posture-0.1.0.md):
 -- anonymous accounts are purged 30 days after their last activity.
 -- The function deletes matching rows from auth.users; the cascade FKs
 -- on every dependent public-schema table handle the rest (rooms they

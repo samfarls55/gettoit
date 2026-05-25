@@ -1,7 +1,7 @@
 // GetToIt — S04 timer-sweep regression tests (tb-WF-3).
 //
-// Locks the v1.1 invariant that S04 Waiting NEVER fires the verdict
-// from a client-side timer. The only two paths to a verdict in v1.1
+// Locks the quiz-redesign invariant that S04 Waiting NEVER fires the verdict
+// from a client-side timer. The only two paths to a verdict in the quiz redesign
 // are:
 //
 //   1. All participants have submitted Q5 — engine-side auto-fire
@@ -107,7 +107,7 @@ final class WaitingScreenTimerSweepRegressionTests: XCTestCase {
     }
 
     /// Invitee tap must short-circuit — only the initiator can fire.
-    /// Defends the v1.1 invariant that no non-initiator path reaches
+    /// Defends the quiz-redesign invariant that no non-initiator path reaches
     /// the fire seam.
     func testInviteeTapNeverReachesTheFireSeam() async {
         let counter = AsyncCounter()

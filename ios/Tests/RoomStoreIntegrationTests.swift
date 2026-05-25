@@ -190,7 +190,7 @@ final class RoomStoreIntegrationTests: XCTestCase {
         try? await client.auth.signOut()
     }
 
-    // MARK: - TB-05 (v1.1) — session parameters
+    // MARK: - TB-05 (quiz redesign) — session parameters
 
     /// The initiator's S01b parameter selections persist on the room
     /// via `updateSessionParameters` and read back unchanged through

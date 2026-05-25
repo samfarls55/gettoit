@@ -1,4 +1,4 @@
-// GetToIt — FoursquareFetchPlanner (TB-07 v1.1, PRD module D).
+// GetToIt — FoursquareFetchPlanner (TB-07 quiz redesign, PRD module D).
 //
 // Pure planning, no I/O. Given one member's Q1 cuisines + Q2 spend cap,
 // the shared SessionParameters, and the session geo / radius, the

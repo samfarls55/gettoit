@@ -15,7 +15,7 @@ Accepted — 2026-05-21. Outcome of the sg-WF-6 `/grill-with-docs` session. Impl
 
 ## Context
 
-A `decided-active` Plan owns a **reroll window** — the interval during which its verdict may be replaced in place. The *what* was locked in [[../../50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] §Q9: the window closes at `23:59:59` on the calendar day *after* the verdict fired, and the Plan transitions to `decided-expired` on whichever happens first — window close, third reroll burn, or check-in completed.
+A `decided-active` Plan owns a **reroll window** — the interval during which its verdict may be replaced in place. The *what* was locked in [[../../50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] §Q9: the window closes at `23:59:59` on the calendar day *after* the verdict fired, and the Plan transitions to `decided-expired` on whichever happens first — window close, third reroll burn, or check-in completed.
 
 Two earlier tracer-bullets built around this before the *how* was decided:
 
@@ -89,8 +89,8 @@ Scope of sg-WF-6 (AFK):
 
 ## References
 
-- [[../../50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] §Q9 — the locked reroll-window decision (the *what*).
-- [[../../15_issues/workflow-overhaul/issues/sg-wf-6-reroll-window-deadline|sg-WF-6]] — the implementation issue.
+- [[../../50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] §Q9 — the locked reroll-window decision (the *what*).
+- [[../../15_issues/0.1.0/issues/sg-wf-6-reroll-window-deadline|sg-WF-6]] — the implementation issue.
 - [[../../../CONTEXT|CONTEXT.md]] → Plan reroll window — the canonical glossary term.
 - `supabase/migrations/20260519000000000_workflow_overhaul_plans_table.sql` — tb-WF-1, the placeholder this ADR replaces.
 - `supabase/migrations/20260522000000000_plans_decided_history_lifecycle.sql` — tb-WF-8, the enforcement mechanism this ADR ratifies.

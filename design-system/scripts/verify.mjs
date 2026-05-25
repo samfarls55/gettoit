@@ -234,9 +234,9 @@ if (webInviteeDocs.length === 0) {
     // The doc must reference the decision doc for behavior and must
     // document the cross-browser / cleared-storage resume limitation
     // (decision doc §Q3) as an accepted constraint.
-    if (!text.includes('workflow-overhaul-web-invitee-flow')) {
+    if (!text.includes('0.1.0-workflow-overhaul-web-invitee-flow')) {
       failures.push(
-        `surfaces/${docName}: must reference the decision doc (workflow-overhaul-web-invitee-flow)`
+        `surfaces/${docName}: must reference the decision doc (0.1.0-workflow-overhaul-web-invitee-flow)`
       );
     }
     if (!/cross-browser/i.test(text) || !/cleared.?storage/i.test(text)) {

@@ -2,7 +2,7 @@
 // bug-23 — Plan list FAB rework (T1 ink-fill, new `shadow.fab` token).
 //
 // Structural test encoding the bug-23 grill-outcome acceptance criteria
-// (vault file `gti-vault/15_issues/v1.1/issues/bug-23-plan-list-fab-design-system-fit.md`).
+// (vault file `gti-vault/15_issues/0.1.0/issues/bug-23-plan-list-fab-design-system-fit.md`).
 // Mirrors `test-plan-list.mjs` from sg-WF-4 — the design system has no
 // behavioral test framework; `verify.mjs` covers drift, orphan-hex,
 // and surface↔jsx pairing, but cannot catch the T1 visual-register

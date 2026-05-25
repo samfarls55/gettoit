@@ -1,4 +1,4 @@
--- v1.1 (Q5 open_at fix) — add the search area's timezone to `rooms`.
+-- Quiz redesign (Q5 open_at fix) — add the search area's timezone to `rooms`.
 --
 -- Foursquare's `/places/search` `open_at` filter is interpreted in the
 -- venue's local time. The per-member fetch planner therefore has to

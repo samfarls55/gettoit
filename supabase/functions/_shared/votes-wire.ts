@@ -8,7 +8,7 @@
 // — used to be defined three separate times: in iOS Swift, in the web
 // fallback's `web/lib/quiz.ts`, and inside `votes-schema.ts`. The web
 // hand-mirror rotted a whole quiz generation behind (it still wrote the
-// retired v1 typed columns). ADR 0014 fixes that by extracting the wire
+// retired pre-redesign typed columns). ADR 0014 fixes that by extracting the wire
 // types + builder into this ONE module, imported directly by both the
 // edge functions (`votes-schema.ts`) and the web app.
 //
@@ -113,9 +113,9 @@ export interface LegacyTypedAnswers {
   q1_vetoes: string[];
   /** Q2 spend cap tier. */
   q2_budget: number;
-  /** Q1 (v1.1) craved cuisine tokens. Soft preference. */
+  /** Q1 (quiz redesign) craved cuisine tokens. Soft preference. */
   cuisines?: string[];
-  /** Q3 (v1.1) reputation chip. Soft preference. */
+  /** Q3 (quiz redesign) reputation chip. Soft preference. */
   reputation?: string;
   /** Q4 vibe energy index 0..4. Soft preference. */
   q4_vibe?: number;
@@ -136,11 +136,11 @@ export interface VotesSlotInsert {
 }
 
 /** Wrap typed quiz answers in the generic `{ meta, answer }` envelopes.
- *  Q1 carries the v1.1 `cuisine_craving` kind; Q3 carries `reputation`.
+ *  Q1 carries the quiz-redesign `cuisine_craving` kind; Q3 carries `reputation`.
  *  The `meta.prompt` strings are illustrative session copy — carried
  *  for audit, never read by the mapper.
  *
- *  The Q5 `regret` slot emits `answer.ratings` — the canonical v1.1
+ *  The Q5 `regret` slot emits `answer.ratings` — the canonical quiz-redesign
  *  factorial probe shape `[{ droppedAxis, score }]` that
  *  `mapVotesRowToPreferenceInputs` / `readQ5Ratings` consume. No
  *  parallel `answer.scores` map is emitted (tb-23 moved verdict scoring

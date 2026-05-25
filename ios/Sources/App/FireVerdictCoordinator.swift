@@ -6,7 +6,7 @@
 //
 // History: this file replaces the manual-fire half of the deleted
 // `TimerCoordinator` (TB-07). The countdown / deadline / cron-aware
-// half was retired by sg-WF-3 — v1.1 has no session timer; the only
+// half was retired by sg-WF-3 — the redesign has no session timer; the only
 // verdict triggers are (a) all-Q5-complete (engine-side auto-fire,
 // `rooms.fire_trigger = 'quorum'`) and (b) initiator-tap manual fire
 // here (`rooms.fire_trigger = 'manual'`). See `surfaces/04-waiting.md`
@@ -24,7 +24,7 @@
 //   * Subscribing to the verdict-ready broadcast. That lives in
 //     `WaitingStore.apply(event:)` — this coordinator is single-room
 //     and stateless beyond the fire-in-flight bit.
-//   * Any timing logic. The v1.1 spec retired the timer; no countdown,
+//   * Any timing logic. The quiz-redesign spec retired the timer; no countdown,
 //     no deadline, no cron. The "Decide now" CTA is always tappable
 //     for the initiator (minimum quorum is one member, which the
 //     initiator always satisfies).

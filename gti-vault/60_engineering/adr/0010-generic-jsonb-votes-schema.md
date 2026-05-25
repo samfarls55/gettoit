@@ -11,16 +11,16 @@ superseded_by: null
 
 ## Status
 
-Accepted — 2026-05-15. Implemented by issue [[../../15_issues/v1.1/issues/tb-04-votes-jsonb-schema|tb-04]].
+Accepted — 2026-05-15. Implemented by issue [[../../15_issues/0.1.0/issues/tb-04-votes-jsonb-schema|tb-04]].
 
 ## Context
 
-The v1 `votes` table carried one typed column per quiz question:
+The 0.1.0 `votes` table carried one typed column per quiz question:
 `q1_vetoes text[]`, `q2_budget int`, `q3_walk_minutes int`,
 `q4_vibe int`, `q5_regret jsonb`. The verdict engine read those columns
 by hardcoded field name.
 
-The v1.1 quiz redesign ([[../../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Redesign & Verdict Engine PRD]],
+The 0.1.0 quiz redesign ([[../../10_prds/0.1.0-quiz-redesign-prd|0.1.0 Quiz Redesign & Verdict Engine PRD]],
 module H) makes quiz content **session-variable**: questions can be
 reordered, reworded, have their option copy changed, and — in later
 slices — be swapped for scenario-composite questions. With typed
@@ -59,7 +59,7 @@ consumes its input through.**
    it lands in `q3` or `q4` — the mapping layer finds it by kind. This
    is what makes question reordering free.
 4. **Pre-launch, the recreate is cheap.** No real user data exists
-   (the v1 TestFlight dogfood produced nothing worth preserving), so
+   (the pre-redesign TestFlight dogfood produced nothing worth preserving), so
    `DROP TABLE ... CASCADE` + `CREATE` is cleaner than five
    `ALTER COLUMN`s and a no-op backfill.
 
@@ -67,14 +67,14 @@ consumes its input through.**
 
 - **Typed columns + migrate per change (Path A).** Rejected — couples
   the schema to a fixed quiz and makes every quiz-content slice carry
-  a migration. The whole point of the v1.1 redesign is fluid quiz
+  a migration. The whole point of the 0.1.0 redesign is fluid quiz
   content.
 - **One jsonb blob for all five answers.** Rejected — loses the
   per-slot CHECK constraints (a malformed answer would not fail fast at
   the DB layer) and the per-question structure that makes the mapping
   layer's dispatch legible.
 - **A separate `question_definitions` table the slots foreign-key
-  into.** Rejected for v1.1 — over-built for the current need. The
+  into.** Rejected for 0.1.0 — over-built for the current need. The
   per-session question metadata is small and self-contained; carrying
   it inline in the slot's `meta` avoids a join on every votes read and
   keeps a vote row a complete, self-describing record. Revisit if a
@@ -94,7 +94,7 @@ consumes its input through.**
 
 ### Negative / costs
 
-- Two SQL RPCs that landed after the v1 `votes` migration —
+- Two SQL RPCs that landed after the 0.1.0 `votes` migration —
   `apply_reroll` and `fetch_read_only_verdict` — read / wrote the typed
   columns and had to be re-cut for the jsonb shape. They now go through
   SQL-side mapping helpers (`votes_slot_of_kind`, `votes_min_int_answer`,

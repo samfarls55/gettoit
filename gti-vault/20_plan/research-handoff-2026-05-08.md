@@ -1,24 +1,24 @@
 ---
 title: Research Handoff — Decision Simplification (P1 + P2 + P3 complete)
-description: Superseded 2026-05-08. Decision-simplification research is closed; v1 design locks shipped to 50_product/.
+description: Superseded 2026-05-08. Decision-simplification research is closed; 0.1.0 design locks shipped to 50_product/.
 type: handoff
 status: superseded
-superseded_by: "[[50_product/v1-design-locks]]"
+superseded_by: "[[50_product/0.1.0-design-locks]]"
 created: 2026-05-08
 updated: 2026-05-08
 closed: 2026-05-08
 related:
   - "[[50_product/research-brief]]"
-  - "[[50_product/v1-design-locks]]"
+  - "[[50_product/0.1.0-design-locks]]"
   - "[[50_product/framework-comparison]]"
   - "[[50_product/paralysis-cause-priority]]"
   - "[[50_product/verdict-screen-spec]]"
   - "[[50_product/decision-model]]"
   - "[[50_product/north-star]]"
-  - "[[50_product/v1-scope]]"
+  - "[[50_product/0.1.0-scope]]"
 ---
 
-> **Superseded 2026-05-08.** Synthesis is closed. The four v1 design lock-ins live in [[50_product/v1-design-locks]]; cross-priority syntheses live in [[50_product/framework-comparison]], [[50_product/paralysis-cause-priority]], and [[50_product/verdict-screen-spec]]. Mechanical layer-1 reports remain at `01_raw/*/report.md`. The body below is preserved for archival reference of the pre-synthesis state.
+> **Superseded 2026-05-08.** Synthesis is closed. The four 0.1.0 design lock-ins live in [[50_product/0.1.0-design-locks]]; cross-priority syntheses live in [[50_product/framework-comparison]], [[50_product/paralysis-cause-priority]], and [[50_product/verdict-screen-spec]]. Mechanical layer-1 reports remain at `01_raw/*/report.md`. The body below is preserved for archival reference of the pre-synthesis state.
 
 
 # Research Handoff — 2026-05-08 (post-P3)
@@ -27,7 +27,7 @@ All three priorities in `[[50_product/research-brief]]` are complete. 19 raw res
 
 ## Project context (one paragraph)
 
-GetToIt is a group decision-paralysis killer. v1 ships food vertical only, no ML. Use case is 2–6 friends deciding where to eat / what to do, often end-of-workday timing, mid-stakes social decision. The product runs a short (~5 question) parallel quiz per member and produces a single committed verdict the whole group commits to. The north-star metric is verdicts followed-through (whole group shows up), not just majority agreement. The quiz mechanic — exact question count, signal type, aggregation tiebreaker, verdict-screen copy — is gated on the research described below.
+GetToIt is a group decision-paralysis killer. 0.1.0 ships food vertical only, no ML. Use case is 2–6 friends deciding where to eat / what to do, often end-of-workday timing, mid-stakes social decision. The product runs a short (~5 question) parallel quiz per member and produces a single committed verdict the whole group commits to. The north-star metric is verdicts followed-through (whole group shows up), not just majority agreement. The quiz mechanic — exact question count, signal type, aggregation tiebreaker, verdict-screen copy — is gated on the research described below.
 
 ## Status
 
@@ -49,7 +49,7 @@ GetToIt is a group decision-paralysis killer. v1 ships food vertical only, no ML
 | Choice_Architecture_Nudge | secondary / sub-signal | Verdict-screen UX layer. Effect contested (Mertens 2022 d=0.43 vs Maier/Hu post-2022 ~0). Defaults still robust. |
 | WRAP | secondary / sub-signal | Adapt premortem and 10/10/10 distance step as quiz items. Reject as engine — sequential reflective, no aggregation. |
 
-EBA + Satisficing hybrid is the working v1 engine: EBA-style attribute-veto pruning followed by Satisficing-style threshold acceptance.
+EBA + Satisficing hybrid is the working 0.1.0 engine: EBA-style attribute-veto pruning followed by Satisficing-style threshold acceptance.
 
 ## P2 outputs — `01_raw/paralysis-causes/`
 
@@ -75,7 +75,7 @@ EBA + Satisficing hybrid is the working v1 engine: EBA-style attribute-veto prun
 | Leventhal_Six_Rules | should-have | Checklist: consistency, bias-suppression, accuracy, correctability, representativeness, ethicality. Correctability tensions the "hard close / no re-open" P2 prescription — resolve via friction-bearing quorum-redo, not free re-open. |
 | Outcome_Favorability_Interaction | **must-have** | Brockner & Wiesenfeld 1996 meta-analysis (45 samples). Procedural justice matters MOST when outcome unfavorable — directly addresses the loser, the rate-limiting step in every n>1 group decision. Skitka & Mullen moral-mandate boundary: dietary/allergy constraints must be upstream hard filters, never preferences that can lose. |
 | Informational_Justice_Explanation | **must-have** | Shaw, Wild & Colquitt 2003 meta-analysis (54 samples) ~43% retaliation reduction. Colquitt 2013 ρ=−.29 with counterproductive behaviors. Default to **aggregate-rule attribution** ("budget constraint cut Sushi") over **personal-causal attribution** ("Alex said no") in friend-group register. EBA's elimination chain is structurally near-free explanation material. |
-| Public_Commitment_Ratification | **must-have** | Empirically supported v1 stack: pre-commit ratification + mutual-state visibility + hard close + if-then specification. Gollwitzer & Sheeran 2006 implementation-intention d≈0.65; Rogers/Milkman 2014 commitment device g≈0.68; Lewin housewives ~5× adoption vs lecture. Watch reactance — button must feel optional. |
+| Public_Commitment_Ratification | **must-have** | Empirically supported 0.1.0 stack: pre-commit ratification + mutual-state visibility + hard close + if-then specification. Gollwitzer & Sheeran 2006 implementation-intention d≈0.65; Rogers/Milkman 2014 commitment device g≈0.68; Lewin housewives ~5× adoption vs lecture. Watch reactance — button must feel optional. |
 | Distributive_Justice_Equity | **must-have** | NEED-then-EQUALITY hybrid. Hard-constraint vetoes (need rule) prune option space first; equality-balanced selection across sessions; **never EQUITY** (no win-counts, no "your turn" copy) — equity converts communal relationship to exchange relationship (Clark & Mills 1979) in friend-group solidarity context (Deutsch 1975). EBA's veto-first design natively implements need rule. |
 
 ## Convergent verdict-screen prescriptions (P3 cross-construct)
@@ -112,9 +112,9 @@ P1 + P2 already converged on:
 
 Reject: preference ranking (re-imports Arrow), open text (re-imports cognitive load).
 
-## Decisions still pending in v1 design (post-synthesis)
+## Decisions still pending in 0.1.0 design (post-synthesis)
 
-After `/research-report` synthesizes the 19 JSONs, these lock per research-brief §"Outputs that update the v1 design":
+After `/research-report` synthesizes the 19 JSONs, these lock per research-brief §"Outputs that update the 0.1.0 design":
 
 1. Final quiz length (likely 4–6).
 2. Signal type (one primary, others as sub-signals).
@@ -123,22 +123,22 @@ After `/research-report` synthesizes the 19 JSONs, these lock per research-brief
 
 ## Open issues / boundary conditions to flag in synthesis
 
-- **Friend-group lateral extrapolation.** Most procedural-justice literature is hierarchical (police, courts, employers). Tyler, Leventhal, Voice all flagged this in `ingroup_friend_specificity`. v1 should A/B test register (warm vs court-formal copy) post-launch.
-- **Correctability vs hard close** is a real design tension. Recommended resolution: quorum-redo (friction-bearing). Needs explicit sign-off in the v1 PRD.
+- **Friend-group lateral extrapolation.** Most procedural-justice literature is hierarchical (police, courts, employers). Tyler, Leventhal, Voice all flagged this in `ingroup_friend_specificity`. 0.1.0 should A/B test register (warm vs court-formal copy) post-launch.
+- **Correctability vs hard close** is a real design tension. Recommended resolution: quorum-redo (friction-bearing). Needs explicit sign-off in the 0.1.0 PRD.
 - **Algorithm-as-decider.** Most empirical voice / fairness work uses human authority figures. Whether the algorithm itself can carry the relational signal is the central untested assumption. Verdict-screen tone is the lever.
 - **Aggregate-rule vs personal-causal attribution** boundary the literature does not resolve — needs in-product test.
 - **Decision_Fatigue group-level effects** still genuinely under-studied (literature gap, not search gap — won't resolve without primary research).
 
 ## Recommended next move
 
-**`/research-report`** — synthesize all 19 JSONs (P1 + P2 + P3) into compiled markdown comparison docs in `50_product/`. Closes all three research-brief priorities. Compresses 19 JSON files into ~3 readable comparison docs + 1 synthesis verdict that pins the v1 quiz mechanic, signal type, tiebreaker, and verdict-screen copy framework.
+**`/research-report`** — synthesize all 19 JSONs (P1 + P2 + P3) into compiled markdown comparison docs in `50_product/`. Closes all three research-brief priorities. Compresses 19 JSON files into ~3 readable comparison docs + 1 synthesis verdict that pins the 0.1.0 quiz mechanic, signal type, tiebreaker, and verdict-screen copy framework.
 
 ## File pointers
 
 - `[[50_product/research-brief]]` — driving questions
 - `[[50_product/decision-model]]` — quiz mechanic the research feeds
 - `[[50_product/north-star]]` — follow-through metric
-- `[[50_product/v1-scope]]` — scope constraints
+- `[[50_product/0.1.0-scope]]` — scope constraints
 - `01_raw/decision-simplification-frameworks/` — P1 raw outputs (6 JSONs)
 - `01_raw/paralysis-causes/` — P2 raw outputs (6 JSONs, 3 re-run 2026-05-08)
 - `01_raw/group-fairness-procedural-justice/` — P3 raw outputs (7 JSONs, generated 2026-05-08)

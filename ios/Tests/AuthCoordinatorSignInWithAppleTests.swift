@@ -1,9 +1,9 @@
-// GetToIt — AuthCoordinator.signInWithApple unit tests (TB-02 v1.1).
+// GetToIt — AuthCoordinator.signInWithApple unit tests (TB-02 quiz redesign).
 //
 // Covers the state-machine contract of the forced-sign-in gate
 // (S00a) without requiring a real Apple identity token. The actual
 // network round-trip against Supabase is verified manually on
-// TestFlight per the v1.1 acceptance plan — CI can't mint a sandbox
+// TestFlight per the quiz-redesign acceptance plan — CI can't mint a sandbox
 // Apple idToken.
 //
 // Test seams:

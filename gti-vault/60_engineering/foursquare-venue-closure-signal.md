@@ -84,7 +84,7 @@ heuristics, all rejected as primary signals:
 
 No decision made — product call. Recorded for the follow-up:
 
-- **A — Accept the limitation.** No closure filter in v1.1; document as a
+- **A — Accept the limitation.** No closure filter in 0.1.0; document as a
   known data-quality gap. Lowest effort; Pastime-class misses persist.
 - **B — MapKit cross-check.** For each Foursquare candidate, look it up
   in MapKit (already the ADR 0002 fallback provider) and drop ones MapKit
@@ -161,5 +161,5 @@ curl -s "https://places-api.foursquare.com/places/58c4591c2e9fde0ad1ee0ec2?field
 - [[adr/0002-places-data-foursquare-mapkit|ADR 0002]] — Foursquare primary
   / MapKit fallback; records the v3 → places-api 410 migration.
 - [[research/foursquare-filter-surface-2026-05/_index|foursquare-filter-surface-2026-05/]]
-  — the v1.1 filter-surface spike; same API surface, did not cover
+  — the 0.1.0 filter-surface spike; same API surface, did not cover
   closure.

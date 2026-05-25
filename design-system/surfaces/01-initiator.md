@@ -10,9 +10,9 @@ jsx:
 
 # S01 · Initiator Landing
 
-> **SUPERSEDED (2026-05-19) — replaced by [[01-setup|S01 Plan setup]].** The workflow-overhaul phase collapsed this surface + [[01b-parameters|S01b Pre-quiz parameters]] into a single Plan setup screen ([[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] / #154). This file and `code/screens/ScreenInitiator.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-4** retires the consuming Swift code; do **not** build new features against this surface. The Plan-list-as-landing decision also retires the standalone "initiator landing" pattern — there is no longer an entry surface that asks the user to "Pick a vertical". See [[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] for the locked decisions.
+> **SUPERSEDED (2026-05-19) — replaced by [[01-setup|S01 Plan setup]].** The workflow-overhaul phase collapsed this surface + [[01b-parameters|S01b Pre-quiz parameters]] into a single Plan setup screen ([[../../gti-vault/15_issues/0.1.0/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] / #154). This file and `code/screens/ScreenInitiator.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-4** retires the consuming Swift code; do **not** build new features against this surface. The Plan-list-as-landing decision also retires the standalone "initiator landing" pattern — there is no longer an entry surface that asks the user to "Pick a vertical". See [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] for the locked decisions.
 
-> **Earlier note (2026-05-15) — partially superseded by v1.1 quiz redesign PRD.** The Timer chip group, the "How long" eyebrow, the `timer_minutes` column write, and any "Auto-fires" behavior described below were already RETIRED by US34 / US35 / §line 115 of the v1.1 PRD. The 2026-05-19 supersession above carries that retirement forward and additionally drops the radius slider, the vertical picker rows, and the SETTINGS footer link (subsumed by the new Setup surface + Plan list landing).
+> **Earlier note (2026-05-15) — partially superseded by 0.1.0 quiz redesign PRD.** The Timer chip group, the "How long" eyebrow, the `timer_minutes` column write, and any "Auto-fires" behavior described below were already RETIRED by US34 / US35 / §line 115 of the 0.1.0 PRD. The 2026-05-19 supersession above carries that retirement forward and additionally drops the radius slider, the vertical picker rows, and the SETTINGS footer link (subsumed by the new Setup surface + Plan list landing).
 
 > **Code:** [`../code/screens/ScreenInitiator.jsx`](../code/screens/ScreenInitiator.jsx)
 
@@ -30,7 +30,7 @@ The user picks a vertical and generates a share link for the group. One choice �
 
 ## Timer + radius controls (spec exception)
 
-The v1 PRD ([[../../gti-vault/10_prds/v1-prd|v1-prd.md]]) locks the verdict fire trigger to **initiator-set timer OR initiator manual "Decide now" tap** (see S04), and the candidate pool radius to **initiator-set slider**. Both controls live on this surface because the decision is made before the share-sheet step — the invitees never see them.
+The 0.1.0 PRD ([[../../gti-vault/10_prds/0.1.0-prd|0.1.0-prd.md]]) locks the verdict fire trigger to **initiator-set timer OR initiator manual "Decide now" tap** (see S04), and the candidate pool radius to **initiator-set slider**. Both controls live on this surface because the decision is made before the share-sheet step — the invitees never see them.
 
 ### Spec exception against "no optional fields"
 
@@ -111,7 +111,7 @@ The full visual + behavioral spec is in [[../components#c-23-locationpicker|`C-2
 
 ## Settings footer link (spec exception)
 
-A single mono-tag `"SETTINGS"` text button renders below the primary CTA in the `CTADock`. Tap routes the user to [[09-settings|S09 Settings]] — v1's account-management surface, which contains exactly one action (delete-my-data) per App Store guideline 5.1.1(v) + [[../../gti-vault/60_engineering/adr/0006-privacy-posture-v1|ADR 0006]].
+A single mono-tag `"SETTINGS"` text button renders below the primary CTA in the `CTADock`. Tap routes the user to [[09-settings|S09 Settings]] — 0.1.0's account-management surface, which contains exactly one action (delete-my-data) per App Store guideline 5.1.1(v) + [[../../gti-vault/60_engineering/adr/0006-privacy-posture-0.1.0|ADR 0006]].
 
 ### Spec exception against "no chrome above the headline"
 
@@ -143,7 +143,7 @@ The selection is invariant: no selected state, no disabled state. Tap navigates 
 - **`"Drop the invite link"`** — voluntary verb, casual register, conveys finality.
 - **`"SETTINGS"`** — mono-tag eyebrow treatment, deliberately understated. The destination matters more than the link to it.
 
-## v1 scope
+## 0.1.0 scope
 
 Only `food` is selectable. Drinks/Movie render visibly as future plans (opacity 0.55, disabled) so users know more is coming, but aren't interactive.
 

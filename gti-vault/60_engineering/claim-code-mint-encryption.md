@@ -95,5 +95,5 @@ merges.
   architecture; §Consequences specified "encrypted at rest."
 - [[verdict-dispatch-guc-superuser-blocker]] — the bug-09 GUC-superuser
   trap that argues against a database-held key.
-- [[../15_issues/workflow-overhaul/issues/tb-wf-13-claim-code-mint|tb-WF-13]]
+- [[../15_issues/0.1.0/issues/tb-wf-13-claim-code-mint|tb-WF-13]]
   — the issue this note records.

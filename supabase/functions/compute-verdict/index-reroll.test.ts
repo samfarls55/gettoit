@@ -292,7 +292,7 @@ Deno.test("compute-verdict reroll cost — budget_tier_override prunes candidate
 // dist-reroll — re-runs the engine and stamps the aggregate-rule prefix
 // ───────────────────────────────────────────────────────────────────────
 //
-// In the v1.1 worst-off-protecting engine (TB-11) walk-minutes is no
+// In the redesigned worst-off-protecting engine (TB-11) walk-minutes is no
 // longer a per-member cap — it left the quiz for the parameters bucket.
 // A `dist`-reason reroll therefore no longer prunes via a
 // `walk_minutes_override`; its effect is carried through the radius

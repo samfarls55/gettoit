@@ -1,4 +1,4 @@
-// votes-schema preference-inputs extractor tests (TB-23 v1.1).
+// votes-schema preference-inputs extractor tests (TB-23 quiz redesign).
 //
 // TB-23 moves the verdict's live scoring onto the ported preference
 // function: at fire time the handler builds each member's `prefFn` from
@@ -19,7 +19,7 @@
 //                       slot carries the probe ratings, NOT a
 //                       per-candidate score map.
 //
-// Design source: gti-vault/50_product/v1.1-quiz-amendments §3.
+// Design source: gti-vault/50_product/0.1.0-quiz-amendments §3.
 
 import {
   assertAlmostEquals,
@@ -92,10 +92,10 @@ function canonicalRow(overrides: Partial<VotesRow> = {}): VotesRow {
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// Happy path — a canonical v1.1 row maps to preference inputs.
+// Happy path — a canonical quiz-redesign row maps to preference inputs.
 // ───────────────────────────────────────────────────────────────────────
 
-Deno.test("maps a canonical v1.1 row to a Q5MemberProfile + ratings", () => {
+Deno.test("maps a canonical quiz-redesign row to a Q5MemberProfile + ratings", () => {
   const row = canonicalRow({
     q1: cuisineSlot(["mexican", "thai"]),
     q3: reputationSlot("hidden_gem"),

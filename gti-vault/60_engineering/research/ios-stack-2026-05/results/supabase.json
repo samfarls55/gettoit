@@ -10,7 +10,7 @@
 
   "optimistic_updates": "No built-in optimistic mutation framework. Solo dev pattern: update local SwiftUI @State immediately, fire Supabase write, reconcile on Realtime echo or rollback on error. Workable but DIY. Compare to Convex/InstantDB which automate this.",
 
-  "offline_handling": "Weakest dimension. Native client has no offline queue, no conflict resolution, no local cache. Three escape hatches: (1) pair with SwiftData and write a sync layer (Medium tutorials exist, ~1-2 weeks effort); (2) bolt on PowerSync (commercial, LWW conflict resolution out of the box, partner-listed integration); (3) WatermelonDB/RxDB (community plugins, JS-leaning). For 'vote on subway' v1 with 5-person groups, a thin SwiftData mirror with last-write-wins is adequate; full offline-first requires PowerSync.",
+  "offline_handling": "Weakest dimension. Native client has no offline queue, no conflict resolution, no local cache. Three escape hatches: (1) pair with SwiftData and write a sync layer (Medium tutorials exist, ~1-2 weeks effort); (2) bolt on PowerSync (commercial, LWW conflict resolution out of the box, partner-listed integration); (3) WatermelonDB/RxDB (community plugins, JS-leaning). For 'vote on subway' 0.1.0 with 5-person groups, a thin SwiftData mirror with last-write-wins is adequate; full offline-first requires PowerSync.",
 
   "auth_flow_friction": "Low. Native Sign in with Apple via Authentication Services framework + signInWithIdToken — one SDK call. signInAnonymously() works without any PII, can be linked to a real identity later. Magic links + deep linking documented for iOS. Custom URL scheme required in Info.plist for OAuth redirect.",
 
@@ -50,7 +50,7 @@
 
   "xcode_first_class": "Standard SwiftPM integration. No schema → Swift codegen tool (vs Firestore's @DocumentID — Supabase queries return generic [String: Any] or you write Codable structs by hand). Swift Macros for codegen would be community-built. Type-safety via PostgREST is decent but not as ergonomic as Convex's TS reactivity.",
 
-  "free_tier_ceiling": "Two free projects (pause after 1 week inactivity). Per project: 500 MB Postgres, 1 GB Storage, 50K MAU, unlimited API requests, 200 peak Realtime connections, 2M Realtime messages/mo, 256KB max message size, 5GB egress/mo. Realistic GetToIt v1 ceiling: ~1–2K DAU before Realtime connections or egress force Pro upgrade.",
+  "free_tier_ceiling": "Two free projects (pause after 1 week inactivity). Per project: 500 MB Postgres, 1 GB Storage, 50K MAU, unlimited API requests, 200 peak Realtime connections, 2M Realtime messages/mo, 256KB max message size, 5GB egress/mo. Realistic GetToIt 0.1.0 ceiling: ~1–2K DAU before Realtime connections or egress force Pro upgrade.",
 
   "cost_per_DAU_first_1k": "$0/mo if comfortable with free-tier project pause risk; $25/mo Pro plan to remove pause + raise ceilings (8GB DB, 100GB storage, 100K MAU, 500 peak connections, 5M Realtime messages, 250GB egress). At 1K DAU with food-app vote pattern, well inside Pro included quotas. Effective: ~$0.025/DAU/mo on Pro.",
 
@@ -118,7 +118,7 @@
 
   "funding_runway_signal": "Excellent. $5B valuation Oct 2025, $80M Series C + $200M Series D + $100M Series E ladder, $70M ARR up 250% YoY, seeking $10B valuation Apr 2026. No layoffs or product cuts on record. Investor base includes Accel, Peak XV, Craft, Coatue.",
 
-  "eol_history": "No products killed. Realtime v2 superseded v1 with migration path. Storage tier changes recent (3x cheaper cached egress, 10x upload size — May 2024 blog post). Track record is additive, not subtractive.",
+  "eol_history": "No products killed. Realtime v2 superseded 0.1.0 with migration path. Storage tier changes recent (3x cheaper cached egress, 10x upload size — May 2024 blog post). Track record is additive, not subtractive.",
 
   "self_host_escape_hatch": "Yes — docker-compose stack in supabase/supabase repo, ~30 min to stand up. All components OSS-licensed (Postgres, GoTrue/Auth, PostgREST, Realtime in Elixir, Storage in Node, Kong gateway). Production-parity with hosted. Reverse proxy (Caddy/Nginx) required for HTTPS.",
 

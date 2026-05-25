@@ -1,17 +1,17 @@
-// verdict-firing — the v1.1 fire-decision predicate (TB-13).
+// verdict-firing — the quiz-redesign fire-decision predicate (TB-13).
 //
 // Pure function. No network, no Supabase client, no clock. The SQL
 // trigger / RPC in `20260515*_verdict_fire_on_q5_complete.sql` mirrors
 // this predicate's logic at the database layer; this module is the
 // canonical, fixture-testable statement of WHEN a verdict fires, and
-// the regression guard for the v1.1 firing contract.
+// the regression guard for the quiz-redesign firing contract.
 //
 // Why this module exists
 // ──────────────────────
-// v1's firing path (`20260513224000000_verdict_fire_trigger_and_cron.sql`)
+// The pre-redesign firing path (`20260513224000000_verdict_fire_trigger_and_cron.sql`)
 // was timer-driven: a `rooms.deadline_at`, a per-minute `pg_cron` job
 // that fired on deadline expiry, and a minimum quorum of two votes.
-// The v1.1 quiz redesign (PRD module H, user stories 33-36) retires
+// The quiz redesign (PRD module H, user stories 33-36) retires
 // the timer entirely:
 //
 //   * No shot clock — a member is never rushed (user story 34). There
@@ -39,7 +39,7 @@
 // ───────────────────────────────────────────────────────────────────────
 
 /** The inputs the fire-decision predicate needs. By construction this
- *  shape carries NO time / deadline / timer field — the v1.1 quiz has
+ *  shape carries NO time / deadline / timer field — the redesigned quiz has
  *  no shot clock and the predicate must never be able to fire on
  *  elapsed time. */
 export interface FiringInput {

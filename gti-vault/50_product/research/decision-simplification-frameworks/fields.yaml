@@ -98,7 +98,7 @@ field_categories:
         detail_level: moderate
         required: true
       - name: implementation_complexity
-        description: Engineering and UX complexity to implement this framework in v1 (low / medium / high) with rationale
+        description: Engineering and UX complexity to implement this framework in 0.1.0 (low / medium / high) with rationale
         detail_level: moderate
         required: true
 

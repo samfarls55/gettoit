@@ -1,13 +1,13 @@
 ---
-title: App Store Connect Privacy Nutrition Labels — GetToIt v1
+title: App Store Connect Privacy Nutrition Labels — GetToIt 0.1.0
 status: living
 last-updated: 2026-05-14
 related: tb-16, adr-0006
 ---
 
-# ASC Privacy Nutrition Labels — GetToIt v1
+# ASC Privacy Nutrition Labels — GetToIt 0.1.0
 
-The complete answer set for the App Store Connect "App Privacy" form, derived line-by-line from the deployed Privacy Policy at `https://gettoit.app/privacy` and from [[adr/0006-privacy-posture-v1|ADR 0006]]. This file is the **source of truth** for what GetToIt declares to Apple. If the Privacy Policy or ADR changes, update both this file and the App Privacy form in ASC.
+The complete answer set for the App Store Connect "App Privacy" form, derived line-by-line from the deployed Privacy Policy at `https://gettoit.app/privacy` and from [[adr/0006-privacy-posture-0.1.0|ADR 0006]]. This file is the **source of truth** for what GetToIt declares to Apple. If the Privacy Policy or ADR changes, update both this file and the App Privacy form in ASC.
 
 Open `tb-16-privacy-legal-delete.md` -> "Acceptance criteria" -> this row is the last HITL gate before TB-16 closes:
 
@@ -43,10 +43,10 @@ These apply to **every** Data Type we declare:
 
 | Question | GetToIt answer | Why |
 |---|---|---|
-| Used for Tracking | **No** | Zero third-party ad SDKs, zero cross-app/cross-site identity linking, zero data-broker sharing. [[adr/0006-privacy-posture-v1|ADR 0006]] makes this explicit. |
+| Used for Tracking | **No** | Zero third-party ad SDKs, zero cross-app/cross-site identity linking, zero data-broker sharing. [[adr/0006-privacy-posture-0.1.0|ADR 0006]] makes this explicit. |
 | Third-Party Advertising purpose | **No** | Same — no ads. |
 | Developer's Advertising or Marketing purpose | **No** | No marketing email blasts, no retargeting, nothing. |
-| Product Personalization purpose | **No** | v1 has no profile-based personalization. Quiz answers reset per session per [[../50_product/questions-profile-vs-session-split|questions-profile-vs-session-split.md]]. |
+| Product Personalization purpose | **No** | 0.1.0 has no profile-based personalization. Quiz answers reset per session per [[../50_product/questions-profile-vs-session-split|questions-profile-vs-session-split.md]]. |
 
 The Purposes we **do** check (per Data Type below) are **App Functionality** (always) and sometimes **Analytics** (for cohort-level rollups described in PP §3).
 
@@ -115,7 +115,7 @@ If ASC questions this during review, the supporting language is in the deployed 
 | Customer Support | No (no in-app support form — email is out-of-band via support@gettoit.app) |
 | Other User Content | No |
 
-v1 has no free-text fields anywhere, so there is no user-generated content to declare.
+0.1.0 has no free-text fields anywhere, so there is no user-generated content to declare.
 
 ### 4.8 Browsing History
 
@@ -146,7 +146,7 @@ v1 has no free-text fields anywhere, so there is no user-generated content to de
 |---|---|
 | Purchase History | No |
 
-v1 has no in-app purchases, no subscription, no payment flow.
+0.1.0 has no in-app purchases, no subscription, no payment flow.
 
 ### 4.12 Usage Data
 
@@ -164,11 +164,11 @@ The Analytics rollups themselves survive account deletion because `events.user_i
 
 | Apple sub-type | We collect? |
 |---|---|
-| Crash Data | No (v1 ships without a third-party crash reporter; Apple's built-in `os_log` crash collection — visible to the operator via Xcode Organizer — does not count as "data collected from your app" per Apple's own guidance, since it's an OS feature) |
+| Crash Data | No (0.1.0 ships without a third-party crash reporter; Apple's built-in `os_log` crash collection — visible to the operator via Xcode Organizer — does not count as "data collected from your app" per Apple's own guidance, since it's an OS feature) |
 | Performance Data | No |
 | Other Diagnostic Data | No |
 
-If v1 later adds Sentry / Crashlytics / similar, this section grows. Today it is empty.
+If 0.1.0 later adds Sentry / Crashlytics / similar, this section grows. Today it is empty.
 
 ### 4.14 Other Data
 
@@ -209,13 +209,13 @@ Confirmed live as of 2026-05-14 — see TB-16 / TB-00 framework-preset addendum.
 
 ## 8. What this declaration does NOT cover
 
-- **No "Privacy Choices" entries** — v1 has no in-app consent dialogs beyond the standard iOS prompts (Location, Notifications). Apple does not ask us to declare those in App Privacy.
+- **No "Privacy Choices" entries** — 0.1.0 has no in-app consent dialogs beyond the standard iOS prompts (Location, Notifications). Apple does not ask us to declare those in App Privacy.
 - **No "Third-Party Partners" listing inside App Privacy** — App Privacy is about what *we* collect. Foursquare, Supabase, Vercel, and Apple are all disclosed in the deployed Privacy Policy §4, which Apple reviews via the URL above. ASC has no separate sub-form for subprocessors.
 - **No EU-specific declarations** — we are US-only per ADR 0006. If/when EU launch enters scope, this runbook expands.
 
 ## 9. Related
 
-- [[../15_issues/v1/issues/tb-16-privacy-legal-delete|TB-16]] — parent issue.
-- [[adr/0006-privacy-posture-v1|ADR 0006]] — the privacy posture this declaration encodes.
+- [[../15_issues/0.1.0/issues/tb-16-privacy-legal-delete|TB-16]] — parent issue.
+- [[adr/0006-privacy-posture-0.1.0|ADR 0006]] — the privacy posture this declaration encodes.
 - [[../../web/app/privacy/page.tsx|gettoit.app/privacy source]] — the policy the labels must match.
-- [[../15_issues/v1/issues/tb-17-testflight-cohort|TB-17]] — external TestFlight + cohort recruit, the next gate after TB-16 closes.
+- [[../15_issues/0.1.0/issues/tb-17-testflight-cohort|TB-17]] — external TestFlight + cohort recruit, the next gate after TB-16 closes.

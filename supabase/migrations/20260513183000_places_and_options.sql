@@ -39,7 +39,7 @@ create table if not exists public.places (
 );
 
 -- Cached_at index speeds the periodic TTL sweep (not yet implemented
--- — the v1 Edge Function checks freshness at read time; a later
+-- — the original Edge Function checks freshness at read time; a later
 -- pg_cron job will hard-delete rows older than 30 days).
 create index if not exists places_cached_at_idx
   on public.places (cached_at);

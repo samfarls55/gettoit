@@ -3,7 +3,7 @@
 //
 // The design-system has no behavioral test framework — `verify.mjs` covers
 // drift gates, orphan-hex, and surface↔jsx pairing. This script encodes
-// the bug-24 grill outcome (`gti-vault/15_issues/v1.1/issues/bug-24-bottom-sheet-ios-shape.md
+// the bug-24 grill outcome (`gti-vault/15_issues/0.1.0/issues/bug-24-bottom-sheet-ios-shape.md
 // §"Grill outcome (2026-05-24)"`) as structural assertions against the
 // spec doc, the JSX, and the surrounding bookkeeping. Mirrors
 // test-plan-list.mjs from sg-WF-4.

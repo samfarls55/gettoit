@@ -18,7 +18,7 @@
 //      Foursquare key + API surface being healthy — a concern *outside*
 //      "deploy + secrets". The 2026-05-16 post-merge run proved the
 //      deploy succeeded but Foursquare still returned zero rows; see
-//      `gti-vault/15_issues/v1.1/issues/tb-14-restore-placesproxy-foursquare-path.md`
+//      `gti-vault/15_issues/0.1.0/issues/tb-14-restore-placesproxy-foursquare-path.md`
 //      §Comments and the follow-up note. This tier logs a loud
 //      diagnostic but does not red the `main` lane over a fault the
 //      deploy fix cannot itself resolve.

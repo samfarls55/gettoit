@@ -6,8 +6,8 @@
 // flips to sun-yellow fill.
 //
 // The spend cap is a hard ceiling — the verdict never exceeds it
-// (PRD user story 15). Its 4-tier shape is unchanged from v1; the
-// v1.1 rework only re-labels the question "spend cap" and keeps the
+// (PRD user story 15). Its 4-tier shape is unchanged from the pre-redesign quiz; the
+// quiz-redesign rework only re-labels the question "spend cap" and keeps the
 // `budget_cap` wire kind.
 
 import SwiftUI

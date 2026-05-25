@@ -12,7 +12,7 @@ Supabase project (`rlnevdqebmzbxpntghzb`).
 **Verdict: the verdict path has never produced a row. Three compounding
 defects, two of them load-bearing.**
 
-> **Triaged 2026-05-18** into three issues — [[../15_issues/v1.1/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] (Defect A, GitHub #116), [[../15_issues/v1.1/issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]] (Defect B, #117), [[../15_issues/v1.1/issues/bug-10-verdict-poll-no-timeout|bug-10]] (Defect C, #118). This doc is the diagnosis record; the issues carry the fix.
+> **Triaged 2026-05-18** into three issues — [[../15_issues/0.1.0/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] (Defect A, GitHub #116), [[../15_issues/0.1.0/issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]] (Defect B, #117), [[../15_issues/0.1.0/issues/bug-10-verdict-poll-no-timeout|bug-10]] (Defect C, #118). This doc is the diagnosis record; the issues carry the fix.
 
 ## Symptom
 
@@ -69,7 +69,7 @@ inputs: empty `options`, and a 3-entry score map for a probe, not a pool.
 
 Net: even a perfectly-wired fire path cannot produce a meaningful verdict.
 **This is the load-bearing bug.** Full breakdown + the fix fork in
-[[../15_issues/v1.1/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]].
+[[../15_issues/0.1.0/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]].
 
 ## Defect B — verdict-fire dispatch silently no-ops
 
@@ -84,7 +84,7 @@ migration, no CI step. (The CI `edge-deploy` lane sets the Edge Function
 *runtime* env; the Postgres-level `app.*` GUCs are a separate thing set via
 `ALTER DATABASE … SET`.) So the engine is **never auto-invoked**.
 
-v1 masked this: the iOS client used to invoke `compute-verdict` directly
+0.1.0 masked this: the iOS client used to invoke `compute-verdict` directly
 (`client.functions.invoke`) as the live fire path — see `VerdictStore`
 header + [[waiting-fire-trigger]] §"Two fire paths". The tb-19 post-Q5
 router (`PostQuizHost` / `VerdictPoller`) is **poll-only** — it reads
@@ -127,7 +127,7 @@ land for a verdict to resolve; C is a robustness/UX fix.
 
 ## Fix directions
 
-**Defect A** ([[../15_issues/v1.1/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]]) —
+**Defect A** ([[../15_issues/0.1.0/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]]) —
 wire the union-pool + preference-scoring integration. Carries an unresolved
 architecture fork: run the union + scoring **iOS-side** (wire the existing
 Swift `RunningUnionPoolManager`, persist pool + scores to the DB) or
@@ -138,12 +138,12 @@ human decision, then decomposition via `/to-issues` — see bug-08.
 > `options`. The 3 cards are engineered to be imperfect; a verdict over them
 > is the degenerate outcome the running-union design exists to prevent.
 
-**Defect B** ([[../15_issues/v1.1/issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]]) —
+**Defect B** ([[../15_issues/0.1.0/issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]]) —
 set the GUCs on the live project (`ALTER DATABASE … SET app.supabase_url /
 app.service_role_key`); the service-role key must NOT go in a committed
 migration — set it in the dashboard or via a CI step from a secret, durably.
 
-**Defect C** ([[../15_issues/v1.1/issues/bug-10-verdict-poll-no-timeout|bug-10]]) —
+**Defect C** ([[../15_issues/0.1.0/issues/bug-10-verdict-poll-no-timeout|bug-10]]) —
 bound `VerdictPoller`; route to `.failed` on exhaustion.
 
 The stuck room `f8087f7c…` cannot be salvaged (no candidates ever existed for
@@ -164,7 +164,7 @@ union, not the three Q5 factorial cards). A dedicated table was chosen over a
 the `votes` row keeps the verdict-engine's `votes` read tight, (b) the fetch
 resolves on the Q4→Q5 transition, strictly before the Q5 vote — a separate
 table lets the two writes stay independent rather than forcing one atomic write
-or a `votes` UPDATE the v1.1 RLS contract forbids. RLS mirrors `votes`, except
+or a `votes` UPDATE the 0.1.0 RLS contract forbids. RLS mirrors `votes`, except
 `member_fetches` admits UPDATE (a re-run quiz overwrites the stale fetch — the
 union must reflect the member's latest fetch, not a stacked duplicate).
 
@@ -188,16 +188,16 @@ of the union.
 
 **Out of scope for tb-21.** Preference-correct scoring — the engine still
 scores members from the `votes.q5.answer.scores` probe ratings until
-[[../15_issues/v1.1/issues/tb-23-server-prefn-scoring|tb-23]] ports the
+[[../15_issues/0.1.0/issues/tb-23-server-prefn-scoring|tb-23]] ports the
 server-side prefFn. A verdict is now computable, but not yet preference-correct.
 Full *auto*-fire end-to-end also still needs Defect B (bug-09).
 
 ## Related
 
-- [[../15_issues/v1.1/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] /
-  [[../15_issues/v1.1/issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]] /
-  [[../15_issues/v1.1/issues/bug-10-verdict-poll-no-timeout|bug-10]] — the triaged fixes
-- [[../15_issues/v1.1/issues/tb-21-persist-fetch-server-union|tb-21]] — Defect A's load-bearing fix slice
+- [[../15_issues/0.1.0/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] /
+  [[../15_issues/0.1.0/issues/bug-09-verdict-fire-dispatch-guc-noop|bug-09]] /
+  [[../15_issues/0.1.0/issues/bug-10-verdict-poll-no-timeout|bug-10]] — the triaged fixes
+- [[../15_issues/0.1.0/issues/tb-21-persist-fetch-server-union|tb-21]] — Defect A's load-bearing fix slice
 - `supabase/migrations/20260518000000000_member_fetches.sql` — the per-member
   raw-fetch table tb-21 lands
 - `supabase/functions/_shared/member-fetch-union.ts` — the pure server-side union

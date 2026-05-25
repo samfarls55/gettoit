@@ -2,15 +2,15 @@
 //
 // Boots the AuthCoordinator + RoomStore + PlansStore + LateJoinerStore,
 // then routes between the surfaces below:
-//   * S00a SignInScreen — TB-02 (v1.1) forced first-launch sign-in
+//   * S00a SignInScreen — TB-02 (quiz redesign) forced first-launch sign-in
 //     gate. Rendered when `AuthCoordinator.state` is `.idle` (fresh
-//     install, no cached session) OR `.anonymous` (pre-v1.1 install
-//     with a v1 anonymous session still in Keychain — bug-06). Both
+//     install, no cached session) OR `.anonymous` (pre-S00a install
+//     with an anonymous session still in Keychain — bug-06). Both
 //     branches route the same surface; the tap handler in
 //     `SignInScreen` decides between `signInWithApple` (mint a fresh
 //     Linked-Apple session) and `linkApple` (upgrade the existing
 //     anonymous session, preserving `user_id`). Closes the iOS half
-//     of ADR 0007's anonymous-default for v1.1.
+//     of ADR 0007's anonymous-default for the quiz redesign.
 //   * S00 PlanListScreen — post-sign-in entry surface (tb-WF-5,
 //     workflow-overhaul). Every cold launch with an active auth
 //     session lands here. Empty state renders a hero pill that
@@ -134,7 +134,7 @@ public struct RootView: View {
     /// the resume path is a tap on the Plan list, not a fresh
     /// invite-link landing.
     @State private var joinedReadOnly: ReadOnlyContext?
-    /// TB-03 (v1.1) → tb-WF-5 → tb-WF-6 — set when the user picks a
+    /// TB-03 (quiz redesign) → tb-WF-5 → tb-WF-6 — set when the user picks a
     /// Solo/Group from the Plan list's disambig sheet AND iOS location
     /// permission is still `notDetermined`. While true, the host
     /// renders the S00b LocationPermissionScreen (pre-prime). On
@@ -170,16 +170,16 @@ public struct RootView: View {
                     .multilineTextAlignment(.center)
                     .padding(GTISpacing.step6)
             } else if let coordinators {
-                // TB-02 v1.1 — S00a forced sign-in gate. Sits ABOVE the
+                // TB-02 (quiz redesign) — S00a forced sign-in gate. Sits ABOVE the
                 // standard state precedence chain because a missing
-                // Apple identity blocks the iOS post-v1.1 invariant
+                // Apple identity blocks the iOS post-S00a invariant
                 // ("every iOS session on screen is Linked-Apple").
                 // Two starting states route here:
                 //   * .idle      — fresh install, no cached session.
                 //                  Tap mints a new Linked-Apple session
                 //                  via `signInWithApple`.
-                //   * .anonymous — bug-06: a pre-v1.1 install left a
-                //                  v1 anonymous session in Keychain.
+                //   * .anonymous — bug-06: a pre-S00a install left a
+                //                  legacy anonymous session in Keychain.
                 //                  Tap upgrades it via `linkApple`,
                 //                  preserving the existing `user_id`
                 //                  and every owned row (rooms, votes,
@@ -307,8 +307,8 @@ public struct RootView: View {
                     // (existing pending Plan, re-opens in `.edit`
                     // mode).
                     //
-                    // After TB-02 v1.1, the canonical iOS user is
-                    // `.linkedApple` (post-S00a). Legacy v1 installs
+                    // After TB-02 (quiz redesign), the canonical iOS user is
+                    // `.linkedApple` (post-S00a). Legacy pre-S00a installs
                     // that hadn't yet upgraded land as `.anonymous`
                     // until the user signs out / deletes and re-
                     // bootstraps through S00a. Both flavors route the
@@ -316,7 +316,7 @@ public struct RootView: View {
                     // S04 still consults `state.isAnonymous` to gate
                     // the C-22 upgrade prompt.
                     if showingLocationPermission {
-                        // TB-03 (v1.1) — S00b pre-prime sits between
+                        // TB-03 (quiz redesign) — S00b pre-prime sits between
                         // the Plan list and S01 on first launch.
                         // Either CTA clears the flag and flips into S01
                         // Setup; the primary CTA additionally fires
@@ -560,10 +560,10 @@ public struct RootView: View {
         }
     }
 
-    /// bug-06 (v1.1) — render gate for the S00a sign-in surface.
-    /// Returns `true` for any state where the iOS post-v1.1 invariant
+    /// bug-06 (quiz redesign) — render gate for the S00a sign-in surface.
+    /// Returns `true` for any state where the iOS post-S00a invariant
     /// is not yet satisfied: a fresh install with no session
-    /// (`.idle`) OR a pre-v1.1 install whose v1 anonymous session is
+    /// (`.idle`) OR a pre-S00a install whose anonymous session is
     /// still in Keychain (`.anonymous`). Both flavors converge on
     /// S00a; the tap handler in `SignInScreen` picks `signInWithApple`
     /// vs `linkApple` from the same state at tap time.
@@ -587,15 +587,15 @@ public struct RootView: View {
         let roomStore = RoomStore(client: client)
         let plansStore = PlansStore(client: client)
         let lateJoinerStore = LateJoinerStore(client: client)
-        // TB-03 (v1.1) — one LocationCoordinator per session. Built
+        // TB-03 (quiz redesign) — one LocationCoordinator per session. Built
         // here so S00b pre-prime and S01 chip both observe the same
         // CLLocationManager. The coordinator reads the live
         // authorization status on init, so by the time the S00 Plan
         // list mounts we already know whether to short-circuit the
         // pre-prime on subsequent launches.
         let locationCoordinator = LocationCoordinator()
-        // TB-02 v1.1 — restore cached session if any, otherwise leave
-        // `.idle` so the S00a sign-in gate renders. Replaces the v1
+        // TB-02 (quiz redesign) — restore cached session if any, otherwise leave
+        // `.idle` so the S00a sign-in gate renders. Replaces the pre-S00a
         // `ensureSignedIn` call which would have minted an anonymous
         // session on a fresh install.
         await auth.restoreSessionIfPresent()
@@ -1062,7 +1062,7 @@ public struct RootView: View {
             self.deepLink = nil
         } catch {
             // Surface the failure into the JoinScreen by toggling
-            // the deep link back through an error message. For v1
+            // the deep link back through an error message. For now
             // we just clear the deep link — the user can re-tap.
             self.deepLink = nil
         }
@@ -1081,7 +1081,7 @@ public struct RootView: View {
     /// once the post-Q5 router lands. Defaults to `true` for join-flow
     /// invitees — they wouldn't be here unless someone shared.
     ///
-    /// TB-15 (v1.1) — startQuiz builds the QuizCoordinator with the
+    /// TB-15 (quiz redesign) — startQuiz builds the QuizCoordinator with the
     /// session's resolved location and a live per-member Foursquare
     /// fetch. It does NOT fetch candidates here: before TB-15 the
     /// assembler ran the bug-03 bridge (`Q5CandidatesLoader` — one
@@ -1130,7 +1130,7 @@ public struct RootView: View {
                 // The search area's timezone — drives the venue-local
                 // `open_at` token in the per-member fetch planner.
                 timeZone: resolved?.timeZone ?? .current,
-                // TB-05 (v1.1) — hydrate the session parameters from
+                // TB-05 (quiz redesign) — hydrate the session parameters from
                 // the room. On the joiner path this is the initiator's
                 // S01b bucket read back off `rooms.session_params`, so
                 // the joiner's quiz runs against the same parameters
@@ -1354,7 +1354,7 @@ public struct RootView: View {
     /// (RLS deny on a stale routing) - the caller falls back to dummy
     /// candidates rather than block the user mid-flow.
     ///
-    /// TB-05 (v1.1) — also carries the room's `session_params` so the
+    /// TB-05 (quiz redesign) — also carries the room's `session_params` so the
     /// joiner path hydrates the initiator's parameters bucket off the
     /// same single room fetch (no extra round-trip). NULL column /
     /// unreadable room → `SessionParameters.default`.
@@ -1411,7 +1411,7 @@ public struct RootView: View {
         let plansStore: PlansStore
         let lateJoinerStore: LateJoinerStore
         let client: SupabaseClient
-        /// TB-03 (v1.1) — shared LocationCoordinator instance. The
+        /// TB-03 (quiz redesign) — shared LocationCoordinator instance. The
         /// S00b pre-prime CTA fires `requestPermission()` on this
         /// instance; the SetupScreen LocationPickerChip + LocationPickerSheet
         /// observe the same instance so the permission state and the

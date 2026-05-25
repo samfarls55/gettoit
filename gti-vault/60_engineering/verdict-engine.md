@@ -1,27 +1,27 @@
 ---
 folder: 60_engineering
-purpose: Server-authoritative VerdictEngine — v1.1 worst-off-protecting pipeline, edge cases, anonymization rules
+purpose: Server-authoritative VerdictEngine — 0.1.0 worst-off-protecting pipeline, edge cases, anonymization rules
 ---
 
-# VerdictEngine — v1.1 worst-off-protecting pipeline
+# VerdictEngine — 0.1.0 worst-off-protecting pipeline
 
 Server-authoritative engine that turns a room's `votes` + `options` into a single `verdicts` row plus `option_cuts` rows. The S05 surface reads the engine's output; the iOS client never recomputes a verdict.
 
-The current engine is the v1.1 rewrite shipped by [[../15_issues/v1.1/issues/tb-11-verdict-engine-rewrite|tb-11]] under [[adr/0011-worst-off-protecting-verdict-engine|ADR 0011]]. It **replaces** the v1 TB-06 engine (EBA prune + regret-of-omission sum tiebreaker) entirely — see §"What changed from v1" at the bottom.
+The current engine is the 0.1.0 rewrite shipped by [[../15_issues/0.1.0/issues/tb-11-verdict-engine-rewrite|tb-11]] under [[adr/0011-worst-off-protecting-verdict-engine|ADR 0011]]. It **replaces** the 0.1.0 TB-06 engine (EBA prune + regret-of-omission sum tiebreaker) entirely — see §"What changed from 0.1.0" at the bottom.
 
 ## Where the canonical code lives
 
 - **Engine logic** — `supabase/functions/_shared/verdict-engine.ts` (pure functions, `computeVerdict()`).
 - **Edge Function** — `supabase/functions/compute-verdict/` (`handler.ts` + `index.ts`, supabase-js adapter).
-- **Schema mapping layer** — `supabase/functions/_shared/votes-schema.ts` ([[../15_issues/v1.1/issues/tb-04-votes-jsonb-schema|tb-04]]). The engine reads quiz answers through this layer, never by hardcoded field name.
+- **Schema mapping layer** — `supabase/functions/_shared/votes-schema.ts` ([[../15_issues/0.1.0/issues/tb-04-votes-jsonb-schema|tb-04]]). The engine reads quiz answers through this layer, never by hardcoded field name.
 - **Firing predicate** — `supabase/functions/_shared/verdict-firing.ts` (`decideFiring()`).
-- **Schema** — `supabase/migrations/20260513220000000_verdicts_and_cuts.sql` (verdicts + cuts); `supabase/migrations/20260515020000000_verdict_fire_on_q5_complete.sql` (v1.1 firing trigger + RPC).
+- **Schema** — `supabase/migrations/20260513220000000_verdicts_and_cuts.sql` (verdicts + cuts); `supabase/migrations/20260515020000000_verdict_fire_on_q5_complete.sql` (0.1.0 firing trigger + RPC).
 - **iOS reader** — `ios/Sources/App/VerdictStore.swift` (read-only over PostgREST).
 - **iOS surface** — `ios/Sources/App/VerdictScreen.swift` (S05).
 
 ## Implementation choice — TypeScript Edge Function over PL/pgSQL
 
-The PRD ([[../10_prds/v1.1-quiz-redesign-prd|v1.1-quiz-redesign-prd]] module B) fixes only the interface and leaves the implementation choice to the engineer. The engine stays a TypeScript Edge Function for two reasons:
+The PRD ([[../10_prds/0.1.0-quiz-redesign-prd|0.1.0-quiz-redesign-prd]] module B) fixes only the interface and leaves the implementation choice to the engineer. The engine stays a TypeScript Edge Function for two reasons:
 
 1. **Rule-text formatting is verbose in SQL.** The engine emits aggregate-attribution strings; conditional join + capitalisation logic is cleaner in TS.
 2. **Fixture testability without a live Postgres.** Deno tests against the pure `computeVerdict()` exercise the whole pipeline with no database container. The Edge Function HTTP layer has its own handler tests with an in-memory data adapter.
@@ -55,7 +55,7 @@ If the EBA pass leaves zero survivors, the engine short-circuits straight to `no
 
 Each member scores every EBA survivor on a 1..5 scale, the same scale as the satisficing threshold T. The score comes from one of two sources:
 
-- **Injected `prefFn`** (the live path) — the per-member preference function built per [[../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §3 from the member's Q1–Q5 answers. Per the [[../15_issues/v1.1/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] Option 2 fork, the `prefFn` is built **server-side in `compute-verdict`** ([[../15_issues/v1.1/issues/tb-23-server-prefn-scoring|tb-23]]), not on-device: the handler classifies the unioned `options` pool with `_shared/venue-classifier.ts`, builds each member's `prefFn` from `_shared/preference-function.ts`, and injects it into the engine. The pre-fork on-device `RunningUnionPoolManager` ([[../15_issues/v1.1/issues/tb-10-running-union-pool-manager|tb-10]]) is superseded for the verdict path by this server-side build.
+- **Injected `prefFn`** (the live path) — the per-member preference function built per [[../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]] §3 from the member's Q1–Q5 answers. Per the [[../15_issues/0.1.0/issues/bug-08-verdict-pipeline-integration-unwired|bug-08]] Option 2 fork, the `prefFn` is built **server-side in `compute-verdict`** ([[../15_issues/0.1.0/issues/tb-23-server-prefn-scoring|tb-23]]), not on-device: the handler classifies the unioned `options` pool with `_shared/venue-classifier.ts`, builds each member's `prefFn` from `_shared/preference-function.ts`, and injects it into the engine. The pre-fork on-device `RunningUnionPoolManager` ([[../15_issues/0.1.0/issues/tb-10-running-union-pool-manager|tb-10]]) is superseded for the verdict path by this server-side build.
 - **Static `scores` map** (the test / replay path) — a per-candidate cached score, read only when `prefFn` is absent. A candidate id missing from the map falls back to `scores.__fallback`, then to the neutral threshold.
 
 For each candidate the engine records `minScore` (the maximin key) and `sumScore` (the final-tiebreak key).
@@ -73,7 +73,7 @@ When a cascade iteration leaves the floor empty, the engine relaxes in this cano
 1. **`threshold`** — lower T by 1, down to a floor of 1. Relaxing past 1 is meaningless on a 1..5 scale.
 2. **`radius_widen`** — once T bottoms out, widen the search radius by 805 m (0.5 mi) per step, up to `radius_meters_cap` (default 8047 m / 5 mi). The radius gate is only active when the caller supplied a `radius_meters` and candidates carry `distance_meters`; otherwise the caller pre-filtered the pool and the gate is a no-op.
 
-Hard-veto cuts (budget / dietary / generic veto) NEVER appear in the cascade — they are immune. The cascade trail is surfaced in `relax_chain_applied` for observability; the UI does not render it (silent relax, per the [[../50_product/v1-scope|v1-scope]] no-survivor rule).
+Hard-veto cuts (budget / dietary / generic veto) NEVER appear in the cascade — they are immune. The cascade trail is surfaced in `relax_chain_applied` for observability; the UI does not render it (silent relax, per the [[../50_product/0.1.0-scope|0.1.0-scope]] no-survivor rule).
 
 When the cascade is exhausted, the engine emits a `no_survivor` output:
 
@@ -112,13 +112,13 @@ Every dietary chip is treated as private. Consequences:
 
 ## Reroll handling
 
-The engine accepts a reroll slice on its input, populated by the `apply_reroll` RPC ([[../15_issues/v1/issues/tb-10-reroll|v1 tb-10]] reroll path, carried into v1.1):
+The engine accepts a reroll slice on its input, populated by the `apply_reroll` RPC ([[../15_issues/0.1.0/issues/tb-10-reroll|tb-10]] reroll path, carried into the redesign):
 
 - `excluded_option_ids` — option ids removed from the pool *before* pruning (`avail`-reason rerolls); they never reach the Cuts surface.
 - `reroll_reason` (`cost · dist · mood · diet · avail`) — drives the rule-text prefix and the `verdicts.reroll_reason` stamp.
 - `previous_winner_name` — the option the reroll replaced.
 
-A `dist`-reason reroll no longer prunes via a `walk_minutes` override: walk-minutes left the quiz for the parameters bucket in the v1.1 redesign, so a `dist` reroll's effect is carried through the radius gate and the re-fetched, re-scored candidate pool. `rooms.walk_minutes_override` is retained for schema stability but the engine no longer applies it.
+A `dist`-reason reroll no longer prunes via a `walk_minutes` override: walk-minutes left the quiz for the parameters bucket in the redesign, so a `dist` reroll's effect is carried through the radius gate and the re-fetched, re-scored candidate pool. `rooms.walk_minutes_override` is retained for schema stability but the engine no longer applies it.
 
 ## Edge Function — `compute-verdict`
 
@@ -132,12 +132,12 @@ POST body `{ room_id }`, with optional `method` and `radius_meters_override`. Th
 
 ## Firing — Q5-complete signal, no timer
 
-The v1.1 quiz has no shot clock ([[../10_prds/v1.1-quiz-redesign-prd|v1.1-quiz-redesign-prd]] module H). The verdict fires on exactly two signals, decided by the pure predicate `decideFiring()` in `verdict-firing.ts` (`FiringMethod = "quorum" | "manual"`):
+The redesigned quiz has no shot clock ([[../10_prds/0.1.0-quiz-redesign-prd|0.1.0-quiz-redesign-prd]] module H). The verdict fires on exactly two signals, decided by the pure predicate `decideFiring()` in `verdict-firing.ts` (`FiringMethod = "quorum" | "manual"`):
 
 - **All participants completed Q5** — the `AFTER INSERT ON votes` trigger auto-fires the moment every current room member has a `regret`-kind votes slot. No `deadline_at` channel, no minimum quorum.
-- **Initiator closed voting** — the `fire_verdict(room_id)` RPC, with the v1 two-vote quorum gate removed, produces the verdict on demand. A solo session (initiator alone) resolves; the initiator never waits on a straggler.
+- **Initiator closed voting** — the `fire_verdict(room_id)` RPC, with the 0.1.0 two-vote quorum gate removed, produces the verdict on demand. A solo session (initiator alone) resolves; the initiator never waits on a straggler.
 
-The SQL trigger / RPC in `20260515020000000_verdict_fire_on_q5_complete.sql` mirror the `decideFiring` predicate. The v1 per-minute `gettoit_verdict_auto_fire` timer cron is unscheduled — a timer cron would expire a live v1.1 room mid-quiz. `rooms.timer_minutes` / `rooms.deadline_at` are left in place as inert columns.
+The SQL trigger / RPC in `20260515020000000_verdict_fire_on_q5_complete.sql` mirror the `decideFiring` predicate. The 0.1.0 per-minute `gettoit_verdict_auto_fire` timer cron is unscheduled — a timer cron would expire a live 0.1.0 room mid-quiz. `rooms.timer_minutes` / `rooms.deadline_at` are left in place as inert columns.
 
 ## Edge cases the engine handles
 
@@ -154,22 +154,22 @@ The Edge Function checks `existingVerdict(room_id)` first. The `verdicts.room_id
 
 ## Tests
 
-- `verdict-engine.test.ts` — the pure-pipeline acceptance suite, including the pinned anti-defection case (a polarizing higher-sum pick loses to a worst-off-protecting one). The three v1-era files (`verdict-engine-relax/-reroll/-solo.test.ts`) were removed — they tested the deleted pipeline.
+- `verdict-engine.test.ts` — the pure-pipeline acceptance suite, including the pinned anti-defection case (a polarizing higher-sum pick loses to a worst-off-protecting one). The three 0.1.0-era files (`verdict-engine-relax/-reroll/-solo.test.ts`) were removed — they tested the deleted pipeline.
 - `compute-verdict/index.test.ts`, `index-no-survivor.test.ts`, `index-reroll.test.ts` — Edge Function handler tests against the in-memory adapter.
 
-## What changed from v1 (TB-06 → TB-11)
+## What changed from 0.1.0 (TB-06 → TB-11)
 
-The v1 engine ran EBA pruning followed by a **regret-of-omission sum** tiebreaker — the survivor with the highest summed Q5 regret across members won. ADR 0011 rejected that: a sum (utilitarian) aggregation lets a polarizing pick win even though one member quietly hates it — the exact post-decision defection GetToIt exists to prevent. Specifically:
+The 0.1.0 engine ran EBA pruning followed by a **regret-of-omission sum** tiebreaker — the survivor with the highest summed Q5 regret across members won. ADR 0011 rejected that: a sum (utilitarian) aggregation lets a polarizing pick win even though one member quietly hates it — the exact post-decision defection GetToIt exists to prevent. Specifically:
 
 - The Q5 regret-sum tiebreaker is gone; the maximin rule replaces it.
-- The v1 cuisine-veto / vibe-floor soft relax steps are gone — cuisine, reputation and vibe are now soft *scoring* axes inside each member's `prefFn`, not in-engine filters. The cascade's only levers are the satisficing threshold and the radius.
+- The 0.1.0 cuisine-veto / vibe-floor soft relax steps are gone — cuisine, reputation and vibe are now soft *scoring* axes inside each member's `prefFn`, not in-engine filters. The cascade's only levers are the satisficing threshold and the radius.
 - The engine consumes input through the `votes-schema.ts` mapping layer, never by hardcoded field name.
 
 ## Related
 
 - [[adr/0011-worst-off-protecting-verdict-engine|ADR 0011]] — the decision record for this engine.
 - [[adr/0010-generic-jsonb-votes-schema|ADR 0010]] — the generic jsonb votes schema the mapping layer reads.
-- [[../10_prds/v1.1-quiz-redesign-prd|v1.1 Quiz Redesign & Verdict Engine PRD]] §module B.
-- [[../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] §3 (preference function) + §4 (verdict aggregation).
+- [[../10_prds/0.1.0-quiz-redesign-prd|0.1.0 Quiz Redesign & Verdict Engine PRD]] §module B.
+- [[../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]] §3 (preference function) + §4 (verdict aggregation).
 - [[../50_product/verdict-screen-spec|verdict-screen-spec]] — verdict-screen copy framework.
 - [[waiting-fire-trigger|waiting-fire-trigger.md]] — the Waiting surface + Realtime wiring.

@@ -77,7 +77,7 @@ function regretSlot(scores: Record<string, number>): QuestionSlot {
   };
 }
 
-/** A canonical v1.1 row — cuisine / budget / reputation / vibe / probe. */
+/** A canonical quiz-redesign row — cuisine / budget / reputation / vibe / probe. */
 function canonicalRow(overrides: Partial<VotesRow> = {}): VotesRow {
   return {
     user_id: overrides.user_id ?? "user-1",
@@ -91,10 +91,10 @@ function canonicalRow(overrides: Partial<VotesRow> = {}): VotesRow {
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// Happy path — canonical v1.1 row maps to the engine MemberVote.
+// Happy path — canonical quiz-redesign row maps to the engine MemberVote.
 // ───────────────────────────────────────────────────────────────────────
 
-Deno.test("maps a canonical v1.1 row to the engine MemberVote shape", () => {
+Deno.test("maps a canonical quiz-redesign row to the engine MemberVote shape", () => {
   const row = canonicalRow({
     user_id: "u7",
     display_name: "maya",
@@ -122,10 +122,10 @@ Deno.test("maps a canonical v1.1 row to the engine MemberVote shape", () => {
 // TB-06 adjacency — the cuisine_craving + reputation kinds map cleanly.
 // ───────────────────────────────────────────────────────────────────────
 
-Deno.test("the v1.1 cuisine_craving + reputation kinds map without a throw", () => {
+Deno.test("the quiz-redesign cuisine_craving + reputation kinds map without a throw", () => {
   // TB-06 reworded Q1 → cuisine_craving and Q3 → reputation and flagged
   // that the engine's QUESTION_KINDS set must learn them before a
-  // verdict can fire over a v1.1 vote. This is that regression guard.
+  // verdict can fire over a quiz-redesign vote. This is that regression guard.
   const row = canonicalRow({
     q1: cuisineSlot(["italian"]),
     q3: reputationSlot("popular"),

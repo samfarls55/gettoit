@@ -1,9 +1,9 @@
-// GetToIt web — v1.1 quiz screen smoke tests (tb-WF-10).
+// GetToIt web — redesigned quiz screen smoke tests (tb-WF-10).
 //
 // Stress-tests the controlled-state contract — every screen is a "dumb"
 // rendering of (state, callbacks). The lifted state lives in
 // `SessionRoom`; these tests prove each screen renders the canonical
-// v1.1 surface and surfaces the right callbacks.
+// redesigned surface and surfaces the right callbacks.
 
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -96,12 +96,12 @@ describe("QuizQ3Reputation", () => {
 });
 
 describe("QuizQ4Vibe", () => {
-  it("renders the v1.1 vibe vocabulary and the 5 stops", () => {
+  it("renders the redesigned vibe vocabulary and the 5 stops", () => {
     const calls: number[] = [];
     render(
       <QuizQ4Vibe value={2} onSelect={(i) => calls.push(i)} onAdvance={() => {}} />,
     );
-    // v1.1 vocabulary — SOCIAL is the mid-scale word, not the retired BUZZY.
+    // Redesigned vocabulary — SOCIAL is the mid-scale word, not the retired BUZZY.
     expect(screen.getByText("SOCIAL")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("vibe ROWDY"));
     expect(calls).toEqual([4]);

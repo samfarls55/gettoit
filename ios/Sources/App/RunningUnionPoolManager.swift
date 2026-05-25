@@ -1,4 +1,4 @@
-// GetToIt — RunningUnionPoolManager (TB-10 v1.1, PRD module G).
+// GetToIt — RunningUnionPoolManager (TB-10 quiz redesign, PRD module G).
 //
 // Server-side candidate-pool manager. Holds the group candidate pool as
 // the **running union** of every member's Foursquare fetch — never an

@@ -1,6 +1,6 @@
 -- TB-07 — verdict fire trigger + pg_cron auto-fire path.
 --
--- Two server-side paths drive the VerdictEngine in v1:
+-- Two server-side paths drive the VerdictEngine originally:
 --
 --   1. `AFTER INSERT ON votes` trigger — fires the engine the moment
 --      the last expected member submits. The trigger predicate is:

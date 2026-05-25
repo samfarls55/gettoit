@@ -4,9 +4,9 @@
 -- correctability window and visible hard-close:
 --
 --   * `correctability_window_seconds int default 30` — per-room
---     window length. PRD user story 60 admits 30–90s; v1 default is
+--     window length. PRD user story 60 admits 30–90s; original default is
 --     30s. Settable per room when the initiator's S01 flow grows a
---     control (post-v1 candidate); for now every room uses the
+--     control (post-launch candidate); for now every room uses the
 --     default.
 --   * `verdict_committed_at timestamptz` — null until the FIRST
 --     ratification on a verdict for this room. Set by the
@@ -50,7 +50,7 @@ alter table public.rooms
     add column if not exists locked_at timestamptz;
 
 comment on column public.rooms.correctability_window_seconds is
-    'TB-08 — seconds between the first ratification (verdict_committed_at) and the room flipping to status=locked. PRD admits 30–90; v1 default 30.';
+    'TB-08 — seconds between the first ratification (verdict_committed_at) and the room flipping to status=locked. PRD admits 30–90; original default 30.';
 
 comment on column public.rooms.verdict_committed_at is
     'TB-08 — when the first ratification landed on this room''s verdict. Null until then. Sets the start of the correctability window; the room locks at verdict_committed_at + correctability_window_seconds.';

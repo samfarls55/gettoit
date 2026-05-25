@@ -1,11 +1,11 @@
-// verdict-firing fixture tests (TB-13 — v1.1 firing on the Q5-complete
+// verdict-firing fixture tests (TB-13 — quiz-redesign firing on the Q5-complete
 // signal).
 //
 // Pure-logic tests against the fire-decision predicate's public
 // interface. No Supabase round-trip, no Edge runtime, no clock — just
 // `(FiringInput) → FiringDecision`.
 //
-// The v1.1 quiz redesign retires the v1 timer / shot-clock / deadline
+// The quiz redesign retires the pre-redesign timer / shot-clock / deadline
 // path. The verdict now fires on exactly two signals:
 //   1. All participants have completed Q5 (every room member has a
 //      votes row carrying a `regret`-kind Q5 slot) — auto-fire.

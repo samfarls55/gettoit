@@ -1,10 +1,10 @@
 // GetToIt — fire_verdict RPC integration tests (TB-07, re-pointed by
-// TB-13 onto the v1.1 firing contract).
+// TB-13 onto the quiz-redesign firing contract).
 //
 // Hits the live Supabase project. Skips when secrets are absent
 // (same pattern as VotesIntegrationTests / VerdictIntegrationTests).
 //
-// TB-13 (v1.1) retired the v1 timer / shot-clock / minimum-quorum
+// TB-13 (quiz redesign) retired the pre-redesign timer / shot-clock / minimum-quorum
 // firing path. The verdict now fires on exactly two signals:
 //   * All participants completed Q5 — the AFTER INSERT ON votes
 //     trigger auto-fires the moment every current member has a
@@ -151,9 +151,9 @@ final class FireVerdictIntegrationTests: XCTestCase {
     // MARK: - tests
 
     func testSoloInitiatorCanCloseVotingWithNoMinimumQuorum() async throws {
-        // TB-13 (v1.1): there is NO minimum quorum. A solo session —
+        // TB-13 (quiz redesign): there is NO minimum quorum. A solo session —
         // the initiator alone, with no other members and no votes —
-        // can still close voting and produce a verdict. The v1
+        // can still close voting and produce a verdict. The pre-redesign
         // `below_quorum` reject is gone.
         let client = try makeClient()
         let roomStore = RoomStore(client: client)
@@ -166,7 +166,7 @@ final class FireVerdictIntegrationTests: XCTestCase {
         XCTAssertEqual(result["status"] as? String, "firing",
             "expected a solo close-voting RPC to flip to firing — got \(result)")
         XCTAssertNil(result["error"],
-            "v1.1 has no quorum gate; close voting must not reject")
+            "quiz redesign has no quorum gate; close voting must not reject")
 
         let status = try await fetchRoomStatus(client: client, roomID: room.id)
         XCTAssertNotEqual(status, "open",
@@ -176,7 +176,7 @@ final class FireVerdictIntegrationTests: XCTestCase {
     }
 
     func testRoomAutoFiresOnceAllParticipantsCompleteQ5() async throws {
-        // TB-13 (v1.1): the verdict auto-fires the moment every member
+        // TB-13 (quiz redesign): the verdict auto-fires the moment every member
         // has completed Q5. A votes row written through the production
         // `QuizCoordinator.VoteRow` writer always carries a `regret`
         // Q5 slot, so once both members have voted the AFTER INSERT ON
@@ -228,7 +228,7 @@ final class FireVerdictIntegrationTests: XCTestCase {
     }
 
     func testInitiatorClosesVotingWithoutWaitingOnAStraggler() async throws {
-        // TB-13 (v1.1): the initiator's close-voting control produces
+        // TB-13 (quiz redesign): the initiator's close-voting control produces
         // the verdict without waiting on a straggler. Here the joiner
         // has joined but NOT voted — the room is not all-complete —
         // yet the initiator can still close voting and fire.

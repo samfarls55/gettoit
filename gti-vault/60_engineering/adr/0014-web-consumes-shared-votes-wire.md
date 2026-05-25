@@ -13,7 +13,7 @@ superseded_by: null
 
 Accepted — 2026-05-21. Decided in the `/grill-with-docs` session
 on the web invitee single-link flow
-([[../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]]
+([[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]]
 §Q2). Implemented by tb-WF-10.
 
 ## Context
@@ -28,16 +28,16 @@ currently defined **three separate times**:
 
 Copies 1 and 3 are kept honest because iOS and `compute-verdict` are
 exercised on every quiz run. Copy 2 is a **hand-mirror that rotted**:
-`web/lib/quiz.ts` still writes the v1 typed vote columns
+`web/lib/quiz.ts` still writes the 0.1.0 typed vote columns
 (`q1_vetoes` / `q2_budget` / `q3_walk_minutes` / `q4_vibe` /
 `q5_regret`) and the web screen still renders the deleted
-`DUMMY_CANDIDATES` fixture. The v1.1 redesign moved iOS and the
+`DUMMY_CANDIDATES` fixture. The 0.1.0 redesign moved iOS and the
 engine onto the generic jsonb votes schema
 ([[0010-generic-jsonb-votes-schema|ADR 0010]]); the web hand-mirror
 silently fell a whole quiz generation behind because nothing forces
 it to track the other two.
 
-The web invitee flow has to produce v1.1-shaped votes. The naive fix
+The web invitee flow has to produce 0.1.0-shaped votes. The naive fix
 is to hand-update `web/lib/quiz.ts` to match — i.e. keep the mirror
 and re-sync it. But three hand-copies already produced one silent
 divergence; a fourth re-sync just resets the clock on the next one.
@@ -178,7 +178,7 @@ monorepo.
 
 ## References
 
-- [[../../50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]]
+- [[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]]
   §Q2 — the grill decision this ADR records.
 - [[0003-web-fallback-nextjs-vercel|ADR 0003]] — the
   web-re-implements-the-spec rule whose spirit this sets aside for

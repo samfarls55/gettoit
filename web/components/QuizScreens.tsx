@@ -1,6 +1,6 @@
-// GetToIt web — Q1–Q5 quiz screens, v1.1 (tb-WF-10).
+// GetToIt web — Q1–Q5 quiz screens, quiz redesign (tb-WF-10).
 //
-// Web equivalents of the iOS v1.1 quiz surfaces (`QuizQ1Cuisine`,
+// Web equivalents of the iOS redesigned quiz surfaces (`QuizQ1Cuisine`,
 // `QuizQ2Budget`, `QuizQ3Reputation`, `QuizQ4Vibe`, `QuizQ5Regret`,
 // `QuizQ5NoResults`). The authoritative spec is
 // `design-system/surfaces/03-quiz.md` — these are 1:1 ports threaded
@@ -8,8 +8,8 @@
 // hold the quiz state. Per ADR 0003 the web fallback re-implements the
 // design-system surfaces rather than importing the JSX.
 //
-// v1.1 (tb-WF-10): the retired v1 questions (Q1 dietary vetoes, Q3
-// walk-distance) are replaced by the v1.1 scenario questions (Q1 cuisine
+// Quiz redesign (tb-WF-10): the retired pre-redesign questions (Q1 dietary vetoes, Q3
+// walk-distance) are replaced by the redesigned scenario questions (Q1 cuisine
 // craving, Q3 reputation/discovery). Q5 renders the strict-factorial
 // probe + the `no-results` honest-degradation mode (ADR 0013).
 

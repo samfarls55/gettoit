@@ -1,9 +1,9 @@
--- TB-04 (v1.1) — generic Q1..Q5 jsonb votes schema.
+-- TB-04 (quiz redesign) — generic Q1..Q5 jsonb votes schema.
 --
--- Replaces the v1 `votes` table's typed-per-question columns
+-- Replaces the pre-redesign `votes` table's typed-per-question columns
 -- (`q1_vetoes text[]`, `q2_budget int`, `q3_walk_minutes int`,
 -- `q4_vibe int`, `q5_regret jsonb`) with five GENERIC jsonb slots,
--- `q1`..`q5`. The v1.1 quiz redesign (PRD module H) makes quiz content
+-- `q1`..`q5`. The quiz redesign (PRD module H) makes quiz content
 -- session-variable: questions can be reordered, reworded, or have their
 -- option copy changed without a migration. The typed columns coupled
 -- the schema to one fixed quiz; the generic slots decouple it.
@@ -22,12 +22,12 @@
 -- schema — that is the whole point of the slot shape.
 --
 -- Pre-launch with no real user data, so recreating the table is
--- acceptable (the v1 TestFlight dogfood produced no rows worth
+-- acceptable (the pre-redesign TestFlight dogfood produced no rows worth
 -- preserving). DROP + CREATE is cleaner than five ALTER COLUMNs and
 -- a backfill that would have nothing to backfill.
 --
 -- RLS, the (room_id, user_id) primary key, the write-once contract,
--- and the cascading FKs are carried over verbatim from the v1 votes
+-- and the cascading FKs are carried over verbatim from the pre-redesign votes
 -- migration (`20260513215000000_votes.sql`) — only the answer columns
 -- change shape. See that file's header for the rationale behind each
 -- policy; it is unchanged here.
@@ -306,7 +306,7 @@ comment on function public.votes_patch_answer(uuid, uuid, text, jsonb) is
 
 -- ── apply_reroll — re-created against the generic jsonb shape ─────────
 --
--- TB-04: the v1 `apply_reroll` (20260514000300000_rerolls.sql) read
+-- TB-04: the pre-redesign `apply_reroll` (20260514000300000_rerolls.sql) read
 -- `min(q2_budget)` / `min(q3_walk_minutes)` and wrote `q4_vibe` /
 -- `q1_vetoes_extra` directly. Those typed columns are gone. The body
 -- below is identical in BEHAVIOR — same validation, same 3-cap, same
@@ -390,7 +390,7 @@ begin
     values (p_room_id, v_caller, p_reason, p_detail)
     returning id into v_reroll_id;
 
-    -- Per-reason mutations — same semantics as v1, jsonb-backed.
+    -- Per-reason mutations — same semantics as pre-redesign, jsonb-backed.
     if p_reason = 'cost' then
         v_existing_budget := least(
             public.votes_min_int_answer(p_room_id, 'budget_cap', 'tier', 4),
@@ -470,7 +470,7 @@ revoke all on function public.apply_reroll(uuid, text, text, text, int) from pub
 
 -- ── fetch_read_only_verdict — receipts re-cut for the jsonb shape ────
 --
--- TB-04: the v1 `fetch_read_only_verdict`
+-- TB-04: the pre-redesign `fetch_read_only_verdict`
 -- (20260514000500000_join_room_smart.sql) built each receipt from the
 -- typed votes columns. The body below is byte-identical except for the
 -- receipts aggregate, which now reads the generic slots through the

@@ -11,7 +11,7 @@ major_version = 15
 schema_paths = []
 
 [auth]
-# Anonymous sign-ins are how v1 onboarding works — every invitee
+# Anonymous sign-ins are how pre-S00a onboarding works — every invitee
 # authenticates anonymously before quizzing (PRD user story 15,
 # ADR 0007).
 enable_anonymous_sign_ins = true

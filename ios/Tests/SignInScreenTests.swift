@@ -1,4 +1,4 @@
-// GetToIt — SignInScreen tap-dispatch unit tests (bug-06 v1.1).
+// GetToIt — SignInScreen tap-dispatch unit tests (bug-06 quiz redesign).
 //
 // Covers the conditional dispatch in `SignInScreen.onSaveTapped`:
 //   * `.idle`      → `AuthCoordinator.signInWithApple`

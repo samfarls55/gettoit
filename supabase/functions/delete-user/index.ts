@@ -4,8 +4,8 @@
 // supabase-js auth adapter and the Deno.serve listener.
 //
 // References:
-//   * TB-16 ticket (gti-vault/15_issues/v1/issues/tb-16-privacy-legal-delete.md)
-//   * ADR 0006 (gti-vault/60_engineering/adr/0006-privacy-posture-v1.md)
+//   * TB-16 ticket (gti-vault/15_issues/0.1.0/issues/tb-16-privacy-legal-delete.md)
+//   * ADR 0006 (gti-vault/60_engineering/adr/0006-privacy-posture-0.1.0.md)
 
 import { createClient } from "npm:@supabase/supabase-js@2.43.4";
 import { type DeleteUserEnv, handleRequest } from "./handler.ts";

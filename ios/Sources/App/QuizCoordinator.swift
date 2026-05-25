@@ -4,7 +4,7 @@
 // quiz. Writes a single `votes` row on Q5 submit. One round-trip per
 // room per user.
 //
-// v1.1 question rework (PRD module J, part 1 — issue tb-06):
+// Quiz-redesign question rework (PRD module J, part 1 — issue tb-06):
 //   * Q1 — cuisine craving. Multi-select cuisine chips, capped at 3,
 //     with a mutually-exclusive "No preference" toggle. A soft scoring
 //     signal, not a hard veto (dietary vetoes moved to the profile).
@@ -32,7 +32,7 @@
 // (sg-05's `no-results` mode); the app never surfaces a fictitious
 // venue. The coordinator's `submit(...)` interface is unchanged.
 //
-// TB-15 (v1.1) — the per-member Foursquare fetch now fires from the
+// TB-15 (quiz redesign) — the per-member Foursquare fetch now fires from the
 // coordinator's quiz step machine: when the member advances Q4 -> Q5,
 // `advance()` kicks off `QuizCandidateFetch.fetchCandidates(...)` with
 // the member's REAL Q1 cuisines + Q2 spend cap + session parameters.
@@ -95,7 +95,7 @@ public enum QuizSubmitOutcome: Equatable, Sendable {
 /// that exercises a recorded fixture.
 public typealias QuizVoteWriter = @Sendable (QuizCoordinator.VoteRow) async throws -> Void
 
-/// bug-14 (v1.1) — the failure-surfacing seam for the `member_fetches`
+/// bug-14 (quiz redesign) — the failure-surfacing seam for the `member_fetches`
 /// persist. Before bug-14 a failed `member_fetches` write was caught
 /// and dropped inside `persistRawFetch`, so a failed or slow persist
 /// was invisible: no telemetry, no retry, no signal — and the verdict
@@ -131,7 +131,7 @@ public final class QuizCoordinator {
 
     public private(set) var step: Step = .q1
 
-    /// TB-15 (v1.1) — the per-member candidate fetch lifecycle. The
+    /// TB-15 (quiz redesign) — the per-member candidate fetch lifecycle. The
     /// fetch fires once, on the Q4 -> Q5 transition; Q5 reads this to
     /// decide between a loading state and the rendered card list.
     public enum Q5CandidatesState: Equatable, Sendable {
@@ -154,7 +154,7 @@ public final class QuizCoordinator {
 
     public private(set) var q5CandidatesState: Q5CandidatesState = .idle
 
-    /// bug-14 (v1.1) — the outcome of the member's `member_fetches`
+    /// bug-14 (quiz redesign) — the outcome of the member's `member_fetches`
     /// persist. The verdict must never fire against a `member_fetches`
     /// table missing this member's row because of a race or a dropped
     /// error; this makes the persist's result observable so `submit()`
@@ -206,13 +206,13 @@ public final class QuizCoordinator {
     private var candidates: [QuizCandidate]
     private let writer: QuizVoteWriter
 
-    /// TB-15 (v1.1) — the per-member Foursquare fetch. Non-nil on the
+    /// TB-15 (quiz redesign) — the per-member Foursquare fetch. Non-nil on the
     /// live quiz path (`QuizSessionAssembler` injects a
     /// `FoursquareQuizCandidateFetch`); nil on the legacy explicit-
     /// `candidates:` path so the unit tests stay fetch-free.
     private let candidateFetch: QuizCandidateFetch?
 
-    /// TB-21 (v1.1) — the writer that persists the member's full raw
+    /// TB-21 (quiz redesign) — the writer that persists the member's full raw
     /// Foursquare fetch into the server-readable `member_fetches`
     /// table. Fired once, when the per-member fetch resolves on the
     /// Q4 -> Q5 transition.
@@ -229,7 +229,7 @@ public final class QuizCoordinator {
     /// tests); the persistence step is then simply skipped.
     private let memberFetchWriter: MemberFetchWriter?
 
-    /// bug-14 (v1.1) — the failure-surfacing seam for the
+    /// bug-14 (quiz redesign) — the failure-surfacing seam for the
     /// `member_fetches` persist. Invoked with the thrown error when the
     /// write fails. Optional: the live quiz path binds it to a
     /// telemetry emission; unit / boundary tests omit it (the failure
@@ -241,7 +241,7 @@ public final class QuizCoordinator {
     /// already-running fetch instead of firing the N+1 calls twice.
     private var fetchTask: Task<Void, Never>?
 
-    /// TB-05 (v1.1) — the session-wide *parameters* bucket (meal time,
+    /// TB-05 (quiz redesign) — the session-wide *parameters* bucket (meal time,
     /// group context, service shape, transport mode). Set once by the
     /// initiator on the S01b surface and persisted on the room; the
     /// joiner path hydrates it off `rooms.session_params` so every
@@ -311,21 +311,21 @@ public final class QuizCoordinator {
         if let initialProgress { applyInitialProgress(initialProgress) }
     }
 
-    /// TB-15 (v1.1) — the live-quiz init. Q5 candidates are NOT supplied
+    /// TB-15 (quiz redesign) — the live-quiz init. Q5 candidates are NOT supplied
     /// up front; the candidate list starts empty and the per-member
     /// Foursquare fetch (`candidateFetch`) fires on the Q4 -> Q5
     /// transition with the member's real Q1-Q4 answers. This is the
     /// init `QuizSessionAssembler` uses for the running quiz — no
     /// PlacesProxy / Foursquare call fires before Q1-Q4 are answered.
     ///
-    /// TB-21 (v1.1) — `memberFetchWriter` persists the member's full
+    /// TB-21 (quiz redesign) — `memberFetchWriter` persists the member's full
     /// raw Foursquare fetch into the server-readable `member_fetches`
     /// table when the per-member fetch resolves. Optional: the live
     /// quiz path supplies one (`QuizSessionAssembler` injects a
     /// `MemberFetchSupabaseWriter`); the boundary tests omit it and the
     /// persistence step is skipped.
     ///
-    /// bug-14 (v1.1) — `memberFetchFailureSink` surfaces a failed
+    /// bug-14 (quiz redesign) — `memberFetchFailureSink` surfaces a failed
     /// `member_fetches` write (the live quiz path binds it to a
     /// telemetry emission). Optional: unit / boundary tests omit it and
     /// the failure stays observable via `lastMemberFetchPersist`.
@@ -543,7 +543,7 @@ public final class QuizCoordinator {
         case .q4:
             step = .q5
             advanced = true
-            // TB-15 (v1.1) — completing Q4 is the trigger for the
+            // TB-15 (quiz redesign) — completing Q4 is the trigger for the
             // per-member Foursquare fetch. The member has now answered
             // Q1 (cuisines) and Q2 (spend cap); fire the answer-tailored
             // N+1 calls. No PlacesProxy / Foursquare call fires before
@@ -668,7 +668,7 @@ public final class QuizCoordinator {
     /// `compute-verdict` Edge Function unions every member's persisted
     /// fetch into `options` at verdict fire time.
     ///
-    /// bug-14 (v1.1) — two changes to the pre-bug-14 behavior:
+    /// bug-14 (quiz redesign) — two changes to the pre-bug-14 behavior:
     ///
     ///   * **An empty raw fetch is now recorded, not skipped.** Before
     ///     bug-14 an empty `rawFetch` was guarded out entirely, so no
@@ -748,7 +748,7 @@ public final class QuizCoordinator {
     /// constraint reject from a prior successful write resolves as
     /// `.idempotent`.
     ///
-    /// bug-14 (v1.1) — the verdict-firing `votes` write is gated behind
+    /// bug-14 (quiz redesign) — the verdict-firing `votes` write is gated behind
     /// the member's candidate fetch AND its `member_fetches` persist.
     /// The `votes` insert triggers the server-side verdict fire; before
     /// bug-14 `submit()` did not await the per-member fetch task, so a
@@ -803,7 +803,7 @@ public final class QuizCoordinator {
 
     /// The wire shape for the `votes` row.
     ///
-    /// TB-04 (v1.1): the `votes` table stores answers in five generic
+    /// TB-04 (quiz redesign): the `votes` table stores answers in five generic
     /// jsonb slots (`q1`..`q5`), each a `{ meta, answer }` envelope.
     /// `meta.question_kind` is the discriminator the verdict-engine
     /// mapping layer (`supabase/functions/_shared/votes-schema.ts`)
@@ -824,7 +824,7 @@ public final class QuizCoordinator {
     /// One Q5 factorial card's rating on the wire — the card's
     /// `droppedAxis` paired with the member's 1…5 excitement score.
     ///
-    /// TB-24: this is the canonical v1.1 Q5 probe shape. The vote write
+    /// TB-24: this is the canonical quiz-redesign Q5 probe shape. The vote write
     /// emits `votes.q5.answer.ratings` as `[Q5RatingEntry]` — one entry
     /// per factorial card — so `compute-verdict` (`readQ5Ratings` /
     /// `mapVotesRowToPreferenceInputs`, merged in tb-23) builds a real
@@ -893,7 +893,7 @@ public final class QuizCoordinator {
         }
 
         /// Encode one generic `{ meta, answer }` slot. The `prompt`
-        /// strings are the v1.1 quiz copy — carried for audit, never
+        /// strings are the quiz-redesign quiz copy — carried for audit, never
         /// read by the engine's mapping layer.
         private func encodeSlot<A: Encodable>(
             into container: inout KeyedEncodingContainer<RowKey>,

@@ -7,7 +7,7 @@
 //
 // References:
 //   * ADR 0002 (gti-vault/60_engineering/adr/0002-places-data-foursquare-mapkit.md)
-//   * TB-05 ticket (gti-vault/15_issues/v1/issues/tb-05-foursquare-placesproxy.md)
+//   * TB-05 ticket (gti-vault/15_issues/0.1.0/issues/tb-05-foursquare-placesproxy.md)
 //   * Dietary-tag research (gti-vault/60_engineering/research/foursquare-dietary-tags-2026-05/)
 
 /** Pinned per ADR 0002 §"Live API surface verified 2026-05-13".
@@ -19,7 +19,7 @@ export const FOURSQUARE_API_VERSION = "2025-06-17";
 export const FOURSQUARE_BASE_URL = "https://places-api.foursquare.com";
 
 /** Inputs accepted by the PlacesProxy Edge Function. The shape mirrors
- *  the public spec in v1-prd §"PlacesProxy" (interfaces section) and the
+ *  the public spec in 0.1.0-prd §"PlacesProxy" (interfaces section) and the
  *  TB-05 ticket. */
 export interface PlacesProxyInput {
   lat: number;
@@ -44,7 +44,7 @@ export interface PlacesProxyFilters {
    *  resolves the meal instant in the search area's timezone and emits
    *  the token directly; the proxy passes it straight through. */
   open_at?: string;
-  /** TB-07/TB-17 (v1.1) — the craved cuisine this per-member fetch call
+  /** TB-07/TB-17 (quiz redesign) — the craved cuisine this per-member fetch call
    *  is tagged for: a `QuizCuisine` id (e.g. `"mexican"`), enumerated in
    *  `CUISINE_CATEGORY_MAP` below.
    *
@@ -73,7 +73,7 @@ export interface ShapedPlace {
   photos: string[];
   address: string | null;
   categories: string[];
-  /** TB-16 (v1.1) — reputation-axis metadata. The Foursquare quality
+  /** TB-16 (quiz redesign) — reputation-axis metadata. The Foursquare quality
    *  score (0..10), the volume signal (`stats.total_ratings`), and the
    *  record-age signal (`date_created`). The iOS `Q5VenueClassifier`
    *  buckets these pool-relatively into the Q5 factorial's reputation
@@ -85,7 +85,7 @@ export interface ShapedPlace {
   rating: number | null;
   total_ratings: number | null;
   date_created: string | null;
-  /** TB-18 (v1.1) — vibe-axis signal. Foursquare's crowd-sourced
+  /** TB-18 (quiz redesign) — vibe-axis signal. Foursquare's crowd-sourced
    *  `tastes` tag cloud, passed through verbatim. The iOS
    *  `Q5VenueClassifier` matches these tokens against the research-02
    *  curated allowlist to apply a bounded ±1 nudge to the category-
@@ -109,7 +109,7 @@ export interface PlaceHours {
  *  §"Live API surface verified". */
 export interface FoursquareSearchResponse {
   results: FoursquareSearchResult[];
-  /** Pagination cursor — opaque token; we don't paginate in v1 because
+  /** Pagination cursor — opaque token; we don't paginate currently because
    *  the EBA engine takes the first page as its candidate pool. */
   context?: { next_cursor?: string };
 }
@@ -138,7 +138,7 @@ export interface FoursquareSearchResult {
   /** Distance in metres from the search centre — used to estimate walk
    *  minutes without a routing API call. */
   distance?: number;
-  /** TB-16 (v1.1) — reputation-axis metadata. `rating` is Foursquare's
+  /** TB-16 (quiz redesign) — reputation-axis metadata. `rating` is Foursquare's
    *  0..10 quality score; `stats.total_ratings` is the volume signal;
    *  `date_created` is the ISO-8601 record-creation date. All optional —
    *  coverage is uneven across venues, per the foursquare-filter-surface
@@ -598,7 +598,7 @@ export function buildFoursquareQuery(input: PlacesProxyInput): FoursquareQueryPl
       "photos",
       "tastes",
       "distance",
-      // TB-16 (v1.1) — reputation-axis metadata for the Q5 factorial.
+      // TB-16 (quiz redesign) — reputation-axis metadata for the Q5 factorial.
       "rating",
       "stats",
       "date_created",
@@ -649,7 +649,7 @@ export function buildQuerySignature(input: PlacesProxyInput): string {
 
 /** Lightweight geo bucket used as the cache's first-tier key. We use a
  *  fixed grid in degrees rather than pulling in an h3 dependency for
- *  v1 — the column is named `geo_h3` per ADR 0002 to leave room for an
+ *  for now — the column is named `geo_h3` per ADR 0002 to leave room for an
  *  h3 upgrade without a schema change.
  *
  *  Bucket size: ~0.005 deg ≈ 555 m at the equator. Small enough that
@@ -750,7 +750,7 @@ export function shapeFoursquareResult(
     photos: (result.photos ?? []).map(photoToUrl),
     address: result.location?.formatted_address ?? null,
     categories: (result.categories ?? []).map((c) => c.name),
-    // TB-16 (v1.1) — reputation-axis metadata. Pass whatever Foursquare
+    // TB-16 (quiz redesign) — reputation-axis metadata. Pass whatever Foursquare
     // returned straight through; a venue with no reputation data shapes
     // as `null` on every field. The iOS `Q5VenueClassifier` buckets
     // these pool-relatively for the Q5 factorial's reputation axis.
@@ -759,7 +759,7 @@ export function shapeFoursquareResult(
       ? result.stats.total_ratings
       : null,
     date_created: result.date_created ?? null,
-    // TB-18 (v1.1) — vibe-axis signal. Pass the raw `tastes` tag cloud
+    // TB-18 (quiz redesign) — vibe-axis signal. Pass the raw `tastes` tag cloud
     // through verbatim (lower-casing and allowlist matching happen
     // client-side in the iOS Q5VenueClassifier). Absent `tastes`
     // shapes as `[]`.

@@ -152,7 +152,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 - The `"Widen radius"` re-run does **not** consume a reroll budget — the engine failed, not the group.
 - Non-initiators see only the chrome `Home` verb — the primary `Widen radius` CTA is suppressed (initiator-only). Home is their exit.
 - Voice-receipt row is suppressed — there's no verdict to receipt, and showing answers without a verdict reads as exposure.
-- No telemetry hint copy in v1 (`"This is rare — most groups find a spot at 2 mi."`). Revisit if the no-survivor rate proves high in beta.
+- No telemetry hint copy in 0.1.0 (`"This is rare — most groups find a spot at 2 mi."`). Revisit if the no-survivor rate proves high in beta.
 - VO order: eyebrow → hero (`"No spot fits"`) → meta (surviving hard-needs) → rule chip → primary CTA. The rule chip carries the load-bearing message and must be in the first read order.
 
 ## Edge cases

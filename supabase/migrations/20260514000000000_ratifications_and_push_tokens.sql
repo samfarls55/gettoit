@@ -30,8 +30,8 @@
 --     hits a clean index when iOS subscribes to the Realtime updates.
 --
 -- Why push_tokens.platform text:
---   * v1 only stores 'ios'. The column anticipates 'web' / 'android'
---     later but the check constraint keeps v1 honest (only 'ios'
+--   * Currently only stores 'ios'. The column anticipates 'web' / 'android'
+--     later but the check constraint keeps the schema honest (only 'ios'
 --     admitted today). Bump the check when expanding.
 
 -- ── ratifications ────────────────────────────────────────────────────
@@ -53,13 +53,13 @@ create table if not exists public.push_tokens (
     user_id        uuid        not null references auth.users (id) on delete cascade,
     device_token   text        not null,
     platform       text        not null
-        check (platform in ('ios')),  -- v1 only; bump when web/android land
+        check (platform in ('ios')),  -- ios only today; bump when web/android land
     registered_at  timestamptz not null default now(),
     primary key (user_id, device_token)
 );
 
 comment on table public.push_tokens is
-    'APNs device tokens for a user. Written by iOS PushCoordinator after the native push-permission grant. Read by the apns-sender Edge Function (service-role) for fanout. v1 supports ''ios'' only.';
+    'APNs device tokens for a user. Written by iOS PushCoordinator after the native push-permission grant. Read by the apns-sender Edge Function (service-role) for fanout. Currently supports ''ios'' only.';
 
 create index if not exists push_tokens_user_id_idx on public.push_tokens (user_id);
 

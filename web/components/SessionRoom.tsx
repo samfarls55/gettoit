@@ -6,7 +6,7 @@
 //   1. Anonymous sign-in (idempotent).
 //   2. Insert the caller as a `members` row (idempotent — the unique
 //      (room_id, user_id) primary key swallows retries).
-//   3. Drive the v1.1 5-question quiz; on Q4 -> Q5 fire the per-member
+//   3. Drive the quiz-redesign 5-question quiz; on Q4 -> Q5 fire the per-member
 //      Foursquare candidate fetch; submit the `votes` row.
 //   4. Subscribe to Realtime so the Waiting + Verdict surfaces stay in
 //      lockstep with iOS.
@@ -14,7 +14,7 @@
 //      arrives), fetch the verdict + cuts + receipts and render the
 //      read-only S05 surface.
 //
-// tb-WF-10 — the quiz is brought to v1.1 parity: scenario questions
+// tb-WF-10 — the quiz is brought to quiz-redesign parity: scenario questions
 // (Q1 cuisine craving, Q3 reputation), the generic `q1`..`q5` jsonb
 // votes (via the shared `votes-wire.ts` contract), the real per-member
 // candidate fetch (replacing the retired `DUMMY_CANDIDATES`), and the
@@ -142,7 +142,7 @@ export function SessionRoom({
   const [phase, setPhase] = useState<Phase>({ kind: "booting" });
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Quiz state — v1.1. Seeded from `initialProgress` when the shell
+  // Quiz state — quiz redesign. Seeded from `initialProgress` when the shell
   // handed a resume payload (web-01 §B); otherwise the quiz defaults.
   const [cuisine, setCuisine] = useState<CuisineSelection>(() => ({
     cuisines: new Set(initialProgress?.cuisines ?? []),
@@ -927,7 +927,7 @@ function FullScreenMessage({
   );
 }
 
-// sg-03 / TB-02 (v1.1) — emit the `waiting_download_cta_tapped` event
+// sg-03 / TB-02 (quiz redesign) — emit the `waiting_download_cta_tapped` event
 // into the Supabase `events` table per ADR 0005. Fire-and-forget.
 async function emitDownloadCtaEvent({
   roomId,

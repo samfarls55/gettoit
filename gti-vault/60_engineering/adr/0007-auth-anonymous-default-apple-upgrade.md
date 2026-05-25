@@ -15,14 +15,14 @@ Accepted — 2026-05-12.
 
 ## Context
 
-[[../../50_product/v1-scope|v1-scope.md]] flagged auth/identity model as open. [[../stack-patterns#auth|stack-patterns.md]] sketched anonymous-then-claim; this ADR ratifies it with a specific upgrade moment.
+[[../../50_product/0.1.0-scope|0.1.0-scope.md]] flagged auth/identity model as open. [[../stack-patterns#auth|stack-patterns.md]] sketched anonymous-then-claim; this ADR ratifies it with a specific upgrade moment.
 
 The auth model must:
 
 - Support the two-tap invitee promise (deep link → vote, no friction).
 - Allow opportunistic upgrade for users who want persistent groups + cross-device history.
 - Work on iOS and on the Next.js web fallback ([[0003-web-fallback-nextjs-vercel|ADR 0003]]).
-- Carry the [[0006-privacy-posture-v1|privacy posture]] (anonymous TTL, claim-on-link data merge).
+- Carry the [[0006-privacy-posture-0.1.0|privacy posture]] (anonymous TTL, claim-on-link data merge).
 
 ## Decision
 
@@ -35,7 +35,7 @@ The auth model must:
 3. If user taps the chip → `signInWithIdToken` flow (Authentication Services framework) → Supabase `auth.link_identity` to attach Apple identity to the existing anonymous `user_id`. No data loss.
 4. Web fallback voters stay anonymous indefinitely (no Sign in with Apple on browser-only flows). They are transient by design.
 
-### What is and isn't supported in v1
+### What is and isn't supported in 0.1.0
 
 - **Supported:** anonymous voting, Sign in with Apple upgrade, cross-device access for claimed users, deletion of all data per user.
 - **Not supported:** email/password, social logins other than Apple, phone-number auth, OTP, magic links, Sign in with Google.
@@ -54,7 +54,7 @@ The auth model must:
 
 - Lowest possible friction at invite time.
 - Single identity provider to maintain.
-- Anonymous TTL ([[0006-privacy-posture-v1|ADR 0006]]) cleans up unclaimed accounts automatically.
+- Anonymous TTL ([[0006-privacy-posture-0.1.0|ADR 0006]]) cleans up unclaimed accounts automatically.
 
 ### Negative / accepted tradeoffs
 
@@ -71,7 +71,7 @@ The auth model must:
 ## References
 
 - [[../stack-patterns#auth|stack-patterns.md §Auth]]
-- [[../../50_product/v1-scope|v1-scope.md]]
+- [[../../50_product/0.1.0-scope|0.1.0-scope.md]]
 - [[0001-ios-tech-stack-supabase|ADR 0001]]
-- [[0006-privacy-posture-v1|ADR 0006]]
-- [[../../15_issues/v1/issues/tb-12-apple-signin-upgrade|TB-12 — Apple Sign-in upgrade chip on Waiting]]
+- [[0006-privacy-posture-0.1.0|ADR 0006]]
+- [[../../15_issues/0.1.0/issues/tb-12-apple-signin-upgrade|TB-12 — Apple Sign-in upgrade chip on Waiting]]

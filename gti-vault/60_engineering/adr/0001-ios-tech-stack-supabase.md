@@ -1,13 +1,13 @@
 ---
 adr: 0001
-title: iOS v1 tech stack — Swift + SwiftUI + Supabase
+title: iOS 0.1.0 tech stack — Swift + SwiftUI + Supabase
 status: accepted
 date: 2026-05-12
 supersedes: null
 superseded_by: null
 ---
 
-# 0001 — iOS v1 tech stack: Swift + SwiftUI + Supabase
+# 0001 — iOS 0.1.0 tech stack: Swift + SwiftUI + Supabase
 
 ## Status
 
@@ -15,13 +15,13 @@ Accepted — 2026-05-12.
 
 ## Context
 
-GetToIt v1 is a group-first decision-paralysis killer with food as the first vertical. Core mechanic: a room of N humans voting on M options against a deadline, with a "verdict" surfaced when quorum or deadline is reached. North star is follow-through %.
+GetToIt 0.1.0 is a group-first decision-paralysis killer with food as the first vertical. Core mechanic: a room of N humans voting on M options against a deadline, with a "verdict" surfaced when quorum or deadline is reached. North star is follow-through %.
 
 Constraints driving this decision:
 
 - **Solo dev with Claude Code**, 1–3 month MVP target.
-- **iOS-only v1.** Android path is deferred but not ruled out — the stack must not foreclose it.
-- **Balanced priority lens:** ship v1 fastest *without* painting into a corner. Performance-per-dollar weighs heavily in the 0–10k DAU range.
+- **iOS-only 0.1.0.** Android path is deferred but not ruled out — the stack must not foreclose it.
+- **Balanced priority lens:** ship 0.1.0 fastest *without* painting into a corner. Performance-per-dollar weighs heavily in the 0–10k DAU range.
 - **Cross-platform stacks dropped** (React Native, Flutter) — Swift + SwiftUI is the chosen client.
 - **Anti-recommendations** that emerged during research (do not propose these): Realm / Atlas Device Sync (EOL 2025-09-30), Replicache (maintenance), Zero (no Swift), Triplit (no Swift), Electric SQL Swift (experimental community port).
 
@@ -55,7 +55,7 @@ Supabase provides Postgres + Realtime + Auth + Storage + Edge Functions. The Swi
 
 ### Negative / accepted tradeoffs
 
-- **Offline handling is DIY.** Native SDK has no offline queue. We will ship v1 with a thin SwiftData mirror + last-write-wins (LWW) reconciliation — adequate for 5-person groups with short deadline windows. PowerSync is a future overlay if offline pain materializes.
+- **Offline handling is DIY.** Native SDK has no offline queue. We will ship 0.1.0 with a thin SwiftData mirror + last-write-wins (LWW) reconciliation — adequate for 5-person groups with short deadline windows. PowerSync is a future overlay if offline pain materializes.
 - **No native optimistic mutation framework.** Pattern: update local `@State` immediately, fire the Supabase write, reconcile on the Realtime echo (or roll back on error). Boilerplate but well-trodden — estimate ~1–2 weeks to build a reusable pattern.
 - **No native APNs sender.** Server pushes ship via an Edge Function calling APNs directly with a `.p8` key, or via FCM as a relay. Roughly half a day of plumbing vs Firebase's zero-config FCM.
 - **No native invite primitive.** Build `/join/{roomId}` Universal Links yourself. Standard iOS pattern with the Associated Domains entitlement; not a blocker.

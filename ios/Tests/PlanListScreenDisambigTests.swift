@@ -1,7 +1,7 @@
 // GetToIt — PlanListScreen disambig + FAB wiring tests (tb-WF-6).
 //
 // Encodes the acceptance criteria from
-// `gti-vault/15_issues/workflow-overhaul/issues/tb-wf-6-plan-list-group-disambig.md`:
+// `gti-vault/15_issues/0.1.0/issues/tb-wf-6-plan-list-group-disambig.md`:
 //
 //   * The temp top-trailing chrome `+` (from tb-WF-5) is removed from
 //     the populated state.

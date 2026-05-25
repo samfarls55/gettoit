@@ -1,4 +1,4 @@
-// GetToIt — FoursquareFetchPlanner pure unit tests (TB-07 v1.1).
+// GetToIt — FoursquareFetchPlanner pure unit tests (TB-07 quiz redesign).
 //
 // The planner (PRD module D) is pure: it takes a member's Q1 cuisines +
 // Q2 spend cap, the shared SessionParameters, plus the session geo /

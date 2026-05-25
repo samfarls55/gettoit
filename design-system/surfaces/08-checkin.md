@@ -42,6 +42,6 @@ The reason is **stored but not visible to the group.** Different from reroll —
 
 ## Edge cases
 
-- **User says "We went" but secretly didn't.** Out of scope for v1. The product trusts the user.
+- **User says "We went" but secretly didn't.** Out of scope for 0.1.0. The product trusts the user.
 - **No response at all.** The no-signal sweeper marks a verdict with no `check_ins` row as "no signal" — does not count toward or against the metric. (A user who tapped `I'd rather not say` already has a `snoozed` row, so the sweeper skips them; both `snoozed` and `no_signal` are metric-excluded.)
 - **User skipped because the verdict was bad.** Reason feeds the user's preference model — future sessions adjust EBA thresholds.

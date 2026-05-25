@@ -1,4 +1,4 @@
-// GetToIt — S00b · Location permission pre-prime (TB-03 v1.1).
+// GetToIt — S00b · Location permission pre-prime (TB-03 quiz redesign).
 //
 // Soft prompt explaining why GetToIt wants location BEFORE iOS fires
 // the native `CLLocationManager.requestWhenInUseAuthorization` dialog.

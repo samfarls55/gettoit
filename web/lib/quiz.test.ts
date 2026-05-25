@@ -1,4 +1,4 @@
-// GetToIt web — v1.1 quiz helper unit tests (tb-WF-10).
+// GetToIt web — redesigned quiz helper unit tests (tb-WF-10).
 
 import { describe, expect, it } from "vitest";
 
@@ -96,7 +96,7 @@ describe("hasFreeCuisineSlot", () => {
 });
 
 describe("buildVoteRow", () => {
-  it("emits the generic q1..q5 jsonb slots, not the v1 typed columns", () => {
+  it("emits the generic q1..q5 jsonb slots, not the pre-redesign typed columns", () => {
     const row = buildVoteRow({
       roomId: "00000000-0000-0000-0000-000000000aaa",
       userId: "00000000-0000-0000-0000-000000000bbb",
@@ -124,7 +124,7 @@ describe("buildVoteRow", () => {
     expect(row.q4.answer.level).toBe(3);
     expect(row.q5.meta.question_kind).toBe("regret");
     expect(row.q5.answer.ratings).toHaveLength(3);
-    // No retired v1 columns leak onto the row. `VoteRow` has no index
+    // No retired pre-redesign columns leak onto the row. `VoteRow` has no index
     // signature, so the cast routes through `unknown` to probe for
     // off-type keys without TypeScript rejecting it as a non-overlap.
     const rowKeys = row as unknown as Record<string, unknown>;
@@ -148,7 +148,7 @@ describe("buildVoteRow", () => {
 });
 
 describe("schema invariants", () => {
-  it("uses the v1.1 vibe vocabulary, not the retired v1 labels", () => {
+  it("uses the redesigned vibe vocabulary, not the retired pre-redesign labels", () => {
     expect(VIBE_LABELS).toEqual(["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"]);
   });
 

@@ -1,11 +1,11 @@
 ---
 folder: 60_engineering/research/ios-stack-2026-05
-purpose: Tech-stack research artifacts for the v1 iOS stack decision
+purpose: Tech-stack research artifacts for the 0.1.0 iOS stack decision
 ---
 
 # ios-stack-2026-05 — Research
 
-Preliminary research artifacts produced by `/research` on 2026-05-12. Feeds the eventual ADR for the v1 iOS stack.
+Preliminary research artifacts produced by `/research` on 2026-05-12. Feeds the eventual ADR for the 0.1.0 iOS stack.
 
 ## Contents
 
@@ -28,7 +28,7 @@ Preliminary research artifacts produced by `/research` on 2026-05-12. Feeds the 
 
 ## Priority lens
 
-Balanced — ship v1 fastest without painting into corner. Perf-per-dollar weighs heavy in 0–10k DAU. iOS-only; cross-platform stacks dropped.
+Balanced — ship 0.1.0 fastest without painting into corner. Perf-per-dollar weighs heavy in 0–10k DAU. iOS-only; cross-platform stacks dropped.
 
 ## Items in deep research
 

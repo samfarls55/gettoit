@@ -239,7 +239,7 @@ begin
     end if;
 
     -- Member-only — anyone in the room can reroll. (v2 may restrict to
-    -- the initiator; v1 admits any member per the spec's "initiator-only
+    -- the initiator; the original admits any member per the spec's "initiator-only
     -- reroll trigger" being a UI-level rule, not a server-side gate.
     -- TB-10's iOS surface only exposes the affordance on the initiator
     -- path; the RPC is generous so a future role widening doesn't need
@@ -368,7 +368,7 @@ begin
     -- Reset the room back to verdict_ready=false so the iOS Realtime
     -- subscriber routes back to S04/S05 cleanly. Status flip: from
     -- 'verdict_ready' (or 'locked' if we ever admit reroll past
-    -- lock — v1 does NOT — but be defensive) → 'firing' so the
+    -- lock — the original does NOT — but be defensive) → 'firing' so the
     -- compute-verdict invocation has a fresh slate.
     update public.rooms
     set status = 'firing'

@@ -67,7 +67,7 @@ Deno.test("absent soft-preference answers fall back to neutral defaults", () => 
   assertEquals(slots.q4.answer.level, 2);
 });
 
-Deno.test("the question-kind taxonomy carries the v1.1 kinds", () => {
+Deno.test("the question-kind taxonomy carries the quiz-redesign kinds", () => {
   for (const kind of ["cuisine_craving", "budget_cap", "reputation", "vibe", "regret"]) {
     assertExists(QUESTION_KINDS.find((k) => k === kind));
   }

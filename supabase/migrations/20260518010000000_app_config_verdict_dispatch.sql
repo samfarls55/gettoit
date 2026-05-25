@@ -1,4 +1,4 @@
--- bug-09 (v1.1) — make the verdict-fire dispatch reachable.
+-- bug-09 (quiz redesign) — make the verdict-fire dispatch reachable.
 --
 -- Root cause
 -- ──────────
@@ -27,7 +27,7 @@
 --                           job from the `SUPABASE_SERVICE_ROLE_KEY`
 --                           GitHub Actions secret.
 --
--- See gti-vault/15_issues/v1.1/issues/bug-09-verdict-fire-dispatch-guc-noop.md
+-- See gti-vault/15_issues/0.1.0/issues/bug-09-verdict-fire-dispatch-guc-noop.md
 -- and gti-vault/60_engineering/verdict-dispatch-guc-superuser-blocker.md.
 
 -- ── 1. app_config table ─────────────────────────────────────────────
@@ -69,7 +69,7 @@ on conflict (key) do update set value = excluded.value;
 --   * (uuid)        — the 1-arg form, still referenced by the orphaned
 --                     `cron_auto_fire_or_expire`; delegates to the
 --                     2-arg form with `manual`.
---   * (uuid, text)  — the active v1.1 fire path (TB-13), invoked by the
+--   * (uuid, text)  — the active redesign fire path (TB-13), invoked by the
 --                     Q5-complete `votes` trigger and the close-voting
 --                     `fire_verdict` RPC.
 --
@@ -84,7 +84,7 @@ on conflict (key) do update set value = excluded.value;
 -- `app_config` rows (local dev / CI) still no-ops cleanly and never
 -- fails the votes INSERT. The `pg_net` POST and payload are unchanged.
 
--- 2-arg overload — the active v1.1 fire path.
+-- 2-arg overload — the active redesign fire path.
 create or replace function public.dispatch_compute_verdict(
     p_room_id uuid,
     p_method  text
@@ -157,6 +157,6 @@ end;
 $$;
 
 comment on function public.dispatch_compute_verdict(uuid) is
-    'bug-09 — 1-arg compatibility overload. Delegates to dispatch_compute_verdict(uuid, text) with method=manual. SECURITY DEFINER. Retained for the orphaned cron_auto_fire_or_expire reference; the live v1.1 fire path uses the 2-arg form.';
+    'bug-09 — 1-arg compatibility overload. Delegates to dispatch_compute_verdict(uuid, text) with method=manual. SECURITY DEFINER. Retained for the orphaned cron_auto_fire_or_expire reference; the live redesign fire path uses the 2-arg form.';
 
 revoke all on function public.dispatch_compute_verdict(uuid) from public;

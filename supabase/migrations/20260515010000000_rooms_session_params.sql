@@ -1,7 +1,7 @@
--- TB-05 (v1.1) — add the `session_params` jsonb column to `rooms`.
+-- TB-05 (quiz redesign) — add the `session_params` jsonb column to `rooms`.
 --
--- The *parameters* bucket of the v1.1 three-bucket input model (see
--- `gti-vault/10_prds/v1.1-quiz-redesign-prd.md` module (K)). Parameters
+-- The *parameters* bucket of the quiz redesign's three-bucket input model (see
+-- `gti-vault/10_prds/0.1.0-quiz-redesign-prd.md` module (K)). Parameters
 -- are the session settings that are CONSISTENT ACROSS EVERY PARTICIPANT
 -- — the initiator sets them once on the pre-quiz S01b surface, and every
 -- joiner reads them back without re-prompting.
@@ -23,7 +23,7 @@
 --
 -- Storage shape: ONE generic `jsonb` column, not four typed columns.
 -- This mirrors the TB-04 generic-jsonb `votes` decision (ADR 0010):
--- the v1.1 redesign is still settling which parameters the quiz
+-- the redesign is still settling which parameters the quiz
 -- consumes, and a flat jsonb object lets a parameter be added,
 -- removed, or have its option set changed WITHOUT a migration. The
 -- column stores `{ meal_time, group_context, service_shape,
@@ -53,7 +53,7 @@ alter table public.rooms
     );
 
 comment on column public.rooms.session_params is
-    'TB-05 (v1.1) — parameters bucket. Initiator-set, session-wide, '
+    'TB-05 (quiz redesign) — parameters bucket. Initiator-set, session-wide, '
     'consistent across every participant. Flat jsonb object: '
     '{ meal_time, group_context, service_shape, transport_mode }. '
     'NULL on rooms created before S01b; readers fall back to defaults. '

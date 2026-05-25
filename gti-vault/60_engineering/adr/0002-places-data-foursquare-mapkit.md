@@ -20,7 +20,7 @@ The food vertical needs a third-party places dataset. Restaurants surface as the
 Candidates considered:
 
 - **Google Places** — rejected. Paid since Feb 2025; per-call billing at our usage shape compounds quickly.
-- **Yelp Fusion** — rejected. Moved to paid; no acceptable free tier for v1.
+- **Yelp Fusion** — rejected. Moved to paid; no acceptable free tier for 0.1.0.
 - **Foursquare Places** — free tier ~10k calls/month on the endpoints we need (place search, details).
 - **Apple MapKit POI search** — free with Apple Developer account; native iOS only.
 
@@ -46,7 +46,7 @@ Foursquare migrated from the legacy `api.foursquare.com/v3/*` Places API to a ne
 
 #### `GET /places/search` — field shape (verified 2026-05-13, TB-05)
 
-Implemented in [[../../15_issues/v1/issues/tb-05-foursquare-placesproxy|TB-05]]; the Edge Function consumes these fields. Recorded fixture sits in `supabase/functions/_shared/places-proxy-core.test.ts` (`RECORDED_FOURSQUARE_RESPONSE`).
+Implemented in [[../../15_issues/0.1.0/issues/tb-05-foursquare-placesproxy|TB-05]]; the Edge Function consumes these fields. Recorded fixture sits in `supabase/functions/_shared/places-proxy-core.test.ts` (`RECORDED_FOURSQUARE_RESPONSE`).
 
 | Field | Type | Notes |
 |---|---|---|
@@ -68,7 +68,7 @@ Wire-layer:
 - The `fields` parameter is required to actually receive the optional `tastes` / `distance` / `photos` payloads; without it the response strips to a minimal projection.
 - Cap radius at the API's 100 km limit even though PRD radius tops at 5 mi — defence in depth.
 
-Re-evaluation trigger added: **another forced migration before v1 GA**. The legacy → 2025 migration was a hard cutover with no parallel-run window — assume future Foursquare migrations will be equally abrupt and budget the MapKit-only escape hatch accordingly.
+Re-evaluation trigger added: **another forced migration before 0.1.0 GA**. The legacy → 2025 migration was a hard cutover with no parallel-run window — assume future Foursquare migrations will be equally abrupt and budget the MapKit-only escape hatch accordingly.
 
 ## Why
 
@@ -88,7 +88,7 @@ Re-evaluation trigger added: **another forced migration before v1 GA**. The lega
 ### Negative / accepted tradeoffs
 
 - **Foursquare changed pricing once before.** Monitor billing-page changes; budget for a forced migration to MapKit-only if free tier disappears.
-- **MapKit web parity gap.** Web fallback has no MapKit option. If Foursquare is down, web fallback degrades to an error state. Acceptable for v1 beta scale.
+- **MapKit web parity gap.** Web fallback has no MapKit option. If Foursquare is down, web fallback degrades to an error state. Acceptable for 0.1.0 beta scale.
 - **Cache invalidation is now an operational concern.** Wrong TTL = stale hours-of-operation data. Adjustable per-zone.
 
 ## Re-evaluation triggers

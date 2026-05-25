@@ -9,7 +9,7 @@ related:
   - "[[decision-model]]"
   - "[[framework-comparison]]"
   - "[[paralysis-cause-priority]]"
-  - "[[v1-design-locks]]"
+  - "[[0.1.0-design-locks]]"
 sources:
   - "01_raw/group-fairness-procedural-justice/results/Tyler_Group_Value_Model.json"
   - "01_raw/group-fairness-procedural-justice/results/Voice_Effect.json"
@@ -152,9 +152,9 @@ The convergence is the synthesis: every construct points at the same failure (lo
 
 ## Open boundary conditions to flag
 
-These survive into v1 as known unresolved tensions, not as gaps to be closed by more research.
+These survive into 0.1.0 as known unresolved tensions, not as gaps to be closed by more research.
 
-- **Hierarchical → lateral extrapolation.** Most procedural-justice empirical base is hierarchical (police, courts, employers). Friend-group lateral context is extrapolation. Tyler, Voice, and Leventhal all flagged this in `ingroup_friend_specificity`. v1 should A/B test register (warm-friend vs court-formal copy) post-launch.
+- **Hierarchical → lateral extrapolation.** Most procedural-justice empirical base is hierarchical (police, courts, employers). Friend-group lateral context is extrapolation. Tyler, Voice, and Leventhal all flagged this in `ingroup_friend_specificity`. 0.1.0 should A/B test register (warm-friend vs court-formal copy) post-launch.
 - **Algorithm-as-decider.** Empirical work uses human authority figures. Whether the algorithm itself can carry the relational signal (respect, neutrality, trustworthy motives) is the central untested assumption. Verdict-screen tone is the lever; copy work owns this.
 - **Aggregate-rule vs personal-causal attribution boundary.** Literature does not resolve when naming the constrainer is welcome ("Maya can't do meat" — explicit) vs. attribute-only ("filtered for vegetarian options"). In-product test post-launch.
 - **Reactance threshold on ratification.** Public Commitment's effect persists only if the button feels voluntary. The exact copy that crosses from voluntary to coercive is empirically untested in friend-group context — needs a copy A/B.
@@ -168,4 +168,4 @@ These survive into v1 as known unresolved tensions, not as gaps to be closed by 
 - **Ratification UX is locked** — pre-commit + mutual-state visibility + hard close + if-then specification + friction-bearing quorum-redo.
 - **Loser-targeted copy** is the default voice for the verdict surface.
 
-Quiz length, signal type, and tiebreaker rule lock in [[v1-design-locks]] using this synthesis plus [[framework-comparison]] and [[paralysis-cause-priority]].
+Quiz length, signal type, and tiebreaker rule lock in [[0.1.0-design-locks]] using this synthesis plus [[framework-comparison]] and [[paralysis-cause-priority]].

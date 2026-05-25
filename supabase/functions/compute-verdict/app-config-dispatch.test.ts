@@ -224,7 +224,7 @@ Deno.test("bug-09 — dispatch_compute_verdict keeps the silent-return-when-empt
 });
 
 Deno.test("bug-09 — both dispatch_compute_verdict overloads are rewritten", () => {
-  // The active v1.1 fire path uses the 2-arg (uuid, text) overload; the
+  // The active redesign fire path uses the 2-arg (uuid, text) overload; the
   // orphaned cron path still references the 1-arg (uuid) form. Both must
   // read app_config or the 1-arg form would still no-op via the GUCs.
   const sql = appConfigMigration().toLowerCase();
@@ -237,7 +237,7 @@ Deno.test("bug-09 — both dispatch_compute_verdict overloads are rewritten", ()
     /create or replace function public\.dispatch_compute_verdict\s*\(\s*p_room_id uuid\s*,\s*p_method\s+text\s*\)/
       .test(sql),
     "the 2-arg `dispatch_compute_verdict(uuid, text)` overload — the " +
-      "active v1.1 fire path — must be rewritten.",
+      "active redesign fire path — must be rewritten.",
   );
 });
 

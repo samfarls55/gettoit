@@ -5,7 +5,7 @@ description: >
   "where to eat tonight"). Source: gti-vault/50_product/research-brief.md
   Priority 1.
 context:
-  product: GetToIt (group decision-paralysis killer, food vertical v1)
+  product: GetToIt (group decision-paralysis killer, food vertical 0.1.0)
   use_case: 5-question parallel-group quiz that produces single verdict
   north_star: verdicts followed through (whole group commits, not just majority)
 items:

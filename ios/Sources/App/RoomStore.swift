@@ -18,7 +18,7 @@
 // They aren't in a Postgres transaction. If step 2 fails the caller
 // is left without read access to their own room — the iOS UI surfaces
 // the failure and the next session create succeeds on its own. A
-// future RPC could fuse them into a single round-trip; for v1 this is
+// future RPC could fuse them into a single round-trip; this is
 // the simpler shape and the failure mode is recoverable.
 
 import Foundation
@@ -113,7 +113,7 @@ public final class RoomStore {
         )
     }
 
-    /// TB-05 (v1.1) — persist the initiator's pre-quiz S01b parameter
+    /// TB-05 (quiz redesign) — persist the initiator's pre-quiz S01b parameter
     /// selections onto the room. The parameters are the session-wide
     /// *parameters* bucket (meal time, group context, service shape,
     /// transport mode) — set once by the initiator, read back by every
@@ -135,7 +135,7 @@ public final class RoomStore {
             .execute()
     }
 
-    /// TB-05 (v1.1) — read the session parameters back for a joiner.
+    /// TB-05 (quiz redesign) — read the session parameters back for a joiner.
     /// Returns `SessionParameters.default` when the column is NULL
     /// (room created by a pre-S01b client / debug RPC) or the room
     /// is unreadable — a missing parameter set never strands a
@@ -145,7 +145,7 @@ public final class RoomStore {
         return room?.sessionParameters ?? SessionParameters.default
     }
 
-    /// TB-03 (v1.1) — value type for the rooms.location_* columns.
+    /// TB-03 (quiz redesign) — value type for the rooms.location_* columns.
     /// Carried through `createRoom` and decoded back on the returned
     /// `Room`. `source` records whether the coordinate came from
     /// CLLocationManager (`gps`) or the user's typeahead-committed
@@ -254,18 +254,18 @@ public final class RoomStore {
         /// TB-03). Column default `3219` (≈ 2.0 mi). Stored in meters
         /// because the PlacesProxy (TB-05) speaks meters to Foursquare.
         public let radiusMeters: Int
-        /// TB-03 (v1.1) — initiator-selected location. NULL on rows
+        /// TB-03 (quiz redesign) — initiator-selected location. NULL on rows
         /// inserted by clients that don't yet wire the LocationPicker
         /// (debug RPCs etc); the iOS S01 surface always supplies it.
         public let location: RoomLocation?
-        /// TB-05 (v1.1) — initiator-set session parameters bucket
+        /// TB-05 (quiz redesign) — initiator-set session parameters bucket
         /// (meal time, group context, service shape, transport mode).
         /// NULL on rows created before the S01b surface; readers fall
         /// back to `SessionParameters.default`.
         public let sessionParameters: SessionParameters?
         // Keep `created_at` as a string for now. The Postgres timestamp
         // shape (with microseconds and a timezone offset) doesn't decode
-        // cleanly via the default supabase-swift JSON decoder, and v1's
+        // cleanly via the default supabase-swift JSON decoder, and current
         // iOS surfaces never render this value — server-side cron + the
         // realtime broadcast carry the timing semantics.
         public let createdAt: String
@@ -413,7 +413,7 @@ public final class RoomStore {
             // the default with NULL and fail the `NOT NULL` constraint.
             try container.encodeIfPresent(timerMinutes, forKey: .timerMinutes)
             try container.encodeIfPresent(radiusMeters, forKey: .radiusMeters)
-            // TB-03 (v1.1) — location columns are nullable so the
+            // TB-03 (quiz redesign) — location columns are nullable so the
             // happy-path "no location yet" insert (debug RPCs etc) still
             // works. iOS S01 always supplies a RoomLocation via the
             // C-23 LocationPicker gate.
@@ -422,7 +422,7 @@ public final class RoomStore {
             try container.encodeIfPresent(location?.lng, forKey: .locationLng)
             try container.encodeIfPresent(location?.source.rawValue, forKey: .locationSource)
             try container.encodeIfPresent(location?.timeZoneIdentifier, forKey: .locationTz)
-            // TB-05 (v1.1) — `session_params` is a nullable jsonb
+            // TB-05 (quiz redesign) — `session_params` is a nullable jsonb
             // column. Omit the key when nil so a room created before
             // the S01b surface lands with a NULL column (readers fall
             // back to `SessionParameters.default`). The S01b flow
@@ -437,7 +437,7 @@ public final class RoomStore {
         }
     }
 
-    /// TB-05 (v1.1) — encoded payload for the `rooms.session_params`
+    /// TB-05 (quiz redesign) — encoded payload for the `rooms.session_params`
     /// UPDATE issued by `updateSessionParameters`. Touches only the
     /// one column so the room's other fields are left untouched.
     private struct SessionParametersUpdate: Encodable {

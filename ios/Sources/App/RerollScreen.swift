@@ -39,7 +39,7 @@
 //     via the apply_reroll RPC + the trg_rerolls_cap trigger; the
 //     surface only renders the "N left" stamp + the "last one" copy
 //     to make the cost vivid.
-//   * Decide which member can reroll. v1 ships with the initiator-only
+//   * Decide which member can reroll. The original release ships with the initiator-only
 //     UI gate enforced at the caller's routing layer (per S07 §
 //     "Edge cases · Group veto of reroll").
 //

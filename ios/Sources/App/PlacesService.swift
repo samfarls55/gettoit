@@ -35,7 +35,7 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
     public let photos: [String]
     public let address: String?
     public let categories: [String]
-    /// TB-16 (v1.1) — reputation-axis metadata. The Foursquare quality
+    /// TB-16 (quiz redesign) — reputation-axis metadata. The Foursquare quality
     /// score, 0…10. `nil` when the venue carries no rating, or when the
     /// Edge Function build predates the reputation-field projection
     /// (these three fields are decoded as `nil` on an older response —
@@ -43,17 +43,17 @@ public struct ShapedPlace: Codable, Equatable, Sendable {
     /// backward-compatible). `Q5VenueClassifier` reads it for the
     /// reputation axis (foursquare-filter-surface research §4).
     public let rating: Double?
-    /// TB-16 (v1.1) — reputation-axis volume signal: how many people
+    /// TB-16 (quiz redesign) — reputation-axis volume signal: how many people
     /// have rated the venue (`stats.total_ratings`). The primary
     /// "how known is this place" signal. `nil` when absent.
     public let totalRatings: Int?
-    /// TB-16 (v1.1) — reputation-axis age signal: the ISO-8601 date the
+    /// TB-16 (quiz redesign) — reputation-axis age signal: the ISO-8601 date the
     /// Foursquare record was created (`date_created`). A proxy for
     /// New vs Classic; `nil` when absent. See the research §4
     /// `date_created` caveat — it is the record's age, not the
     /// restaurant's.
     public let dateCreated: String?
-    /// TB-18 (v1.1) — vibe-axis signal: Foursquare's crowd-sourced
+    /// TB-18 (quiz redesign) — vibe-axis signal: Foursquare's crowd-sourced
     /// `tastes` tag cloud, passed through verbatim by the places-proxy.
     /// `Q5VenueClassifier` matches these tokens against the research-02
     /// curated allowlist to apply a bounded ±1 nudge to the category-
@@ -165,7 +165,7 @@ public struct PlacesFilters: Codable, Equatable, Sendable {
     public var dietary: [String]?
     public var priceTier: Int?
     public var openAt: String?
-    /// TB-07 (v1.1) — the craved cuisine this per-member fetch call is
+    /// TB-07 (quiz redesign) — the craved cuisine this per-member fetch call is
     /// tagged for (a `QuizCuisine` id, e.g. `"mexican"`). Set on the N
     /// per-cuisine calls of an N+1 fetch; `nil` on the mandatory
     /// general call.

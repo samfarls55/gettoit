@@ -9,10 +9,10 @@ Time-stamped research bundles that inform ADRs. Each subfolder is a self-contain
 
 ## Contents
 
-- [[ios-stack-2026-05/_index|ios-stack-2026-05/]] — v1 iOS tech-stack evaluation (May 2026).
+- [[ios-stack-2026-05/_index|ios-stack-2026-05/]] — 0.1.0 iOS tech-stack evaluation (May 2026).
 - [[foursquare-dietary-tags-2026-05/_index|foursquare-dietary-tags-2026-05/]] — Q1 menu-compliance dietary-tag audit against Foursquare Places API (May 2026). Draft pending live probe.
-- [[foursquare-filter-surface-2026-05/_index|foursquare-filter-surface-2026-05/]] — Foursquare fetch-time filter surface + venue-metadata mapping for the v1.1 quiz redesign (May 2026). Fixes the reputation + vibe axis scorer inputs and the per-member fetch planner's filter set. Closes research-01.
-- [[foursquare-tastes-vibe-2026-05/_index|foursquare-tastes-vibe-2026-05/]] — live-sampled Foursquare `tastes` token-frequency table + curated vibe-token allowlist for the v1.1 Q4 vibe classifier (May 2026). 30 direction-tagged tokens; measures `tastes` coverage at 66.8%. Closes research-02; consumed by tb-18.
+- [[foursquare-filter-surface-2026-05/_index|foursquare-filter-surface-2026-05/]] — Foursquare fetch-time filter surface + venue-metadata mapping for the 0.1.0 quiz redesign (May 2026). Fixes the reputation + vibe axis scorer inputs and the per-member fetch planner's filter set. Closes research-01.
+- [[foursquare-tastes-vibe-2026-05/_index|foursquare-tastes-vibe-2026-05/]] — live-sampled Foursquare `tastes` token-frequency table + curated vibe-token allowlist for the 0.1.0 Q4 vibe classifier (May 2026). 30 direction-tagged tokens; measures `tastes` coverage at 66.8%. Closes research-02; consumed by tb-18.
 
 ## Convention
 

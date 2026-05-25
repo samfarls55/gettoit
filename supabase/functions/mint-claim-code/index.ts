@@ -12,7 +12,7 @@
 //
 // References:
 //   * tb-WF-13 ticket
-//     (gti-vault/15_issues/workflow-overhaul/issues/tb-wf-13-claim-code-mint.md)
+//     (gti-vault/15_issues/0.1.0/issues/tb-wf-13-claim-code-mint.md)
 //   * ADR 0015
 //     (gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge.md)
 //

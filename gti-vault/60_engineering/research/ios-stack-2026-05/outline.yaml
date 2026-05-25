@@ -1,8 +1,8 @@
 topic: optimal_ios_tech_stack_groups_food
 description: >
   Evaluate iOS-only tech stack options for GetToIt — a group-first
-  decision-paralysis killer with food vertical v1. Balanced priority lens:
-  ship v1 fastest without painting into corner. Performance-per-dollar
+  decision-paralysis killer with food vertical 0.1.0. Balanced priority lens:
+  ship 0.1.0 fastest without painting into corner. Performance-per-dollar
   weighs heavy in the 0–10k DAU range.
 
 context:
@@ -12,8 +12,8 @@ context:
   north_star: follow-through %
   v1_vertical: food
   team_size: solo dev with Claude Code
-  priority_lens: balanced (ship v1 but don't paint into corner)
-  android_path: deferred — iOS-only v1, cross-platform stacks dropped
+  priority_lens: balanced (ship 0.1.0 but don't paint into corner)
+  android_path: deferred — iOS-only 0.1.0, cross-platform stacks dropped
   generated_at: 2026-05-12
 
 items:
@@ -65,11 +65,11 @@ excluded_from_deep_research:
     - Swift + SwiftUI + Hasura / PostgREST self-hosted — DIY graph layer
     - Swift + SwiftUI + Appwrite — profile overlaps Supabase, less differentiation
     - Swift + SwiftUI + PocketBase — requires self-host VPS appetite
-    - Swift + SwiftUI + Ditto — P2P mesh overkill for v1
+    - Swift + SwiftUI + Ditto — P2P mesh overkill for 0.1.0
     - Swift + SwiftUI + Automerge — CRDT DIY lift; revisit only if collab editing becomes core
 
 anti_recommendations:
-  reason: Avoid for GetToIt v1; documented to prevent revisiting.
+  reason: Avoid for GetToIt 0.1.0; documented to prevent revisiting.
   items:
     - Realm + MongoDB Atlas Device Sync — EOL Sep 30 2025
     - Replicache — maintenance mode; Rocicorp moved focus to Zero

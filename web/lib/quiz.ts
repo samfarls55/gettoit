@@ -1,13 +1,13 @@
-// GetToIt web — v1.1 quiz constants + vote-row shaping (tb-WF-10).
+// GetToIt web — quiz-redesign quiz constants + vote-row shaping (tb-WF-10).
 //
-// The web fallback's quiz, brought to v1.1 parity with the iOS app
+// The web fallback's quiz, brought to quiz-redesign parity with the iOS app
 // (`ios/Sources/App/QuizCoordinator.swift`) and the verdict engine.
 //
 // The vote WIRE SHAPE is no longer hand-mirrored here. Per ADR 0014 the
 // `{ meta, answer }` envelope + the `buildVotesSlotsFromLegacyAnswers`
 // builder live in the leaf module `supabase/functions/_shared/votes-wire.ts`,
-// imported directly below. The pre-v1.1 `web/lib/quiz.ts` wrote the
-// retired v1 typed columns (`q1_vetoes` / `q3_walk_minutes` / …); a web
+// imported directly below. The pre-redesign `web/lib/quiz.ts` wrote the
+// retired pre-redesign typed columns (`q1_vetoes` / `q3_walk_minutes` / …); a web
 // invitee voting through it produced a row `compute-verdict` could no
 // longer read. This module now writes the generic `q1`..`q5` jsonb slots.
 //
@@ -76,10 +76,10 @@ export const REPUTATION_OPTIONS: Array<{ id: string; label: string }> = [
 // Q4 — Vibe energy (cardinal 5-point scale)
 // ───────────────────────────────────────────────────────────────────────
 
-/** Q4 vibe vocabulary — the v1.1 energy/loudness scale. Mirrors the
+/** Q4 vibe vocabulary — the quiz-redesign energy/loudness scale. Mirrors the
  *  design-system `vibe-labels` token (`QUIET · CHILL · SOCIAL · LIVELY ·
- *  ROWDY`) and iOS `GTIVibeLabels.all`. The v1 `HUSHED · MELLOW · BUZZY
- *  · LOUD · ROWDY` vocabulary was retired by the v1.1 quiz redesign. */
+ *  ROWDY`) and iOS `GTIVibeLabels.all`. The pre-redesign `HUSHED · MELLOW · BUZZY
+ *  · LOUD · ROWDY` vocabulary was retired by the quiz redesign. */
 export const VIBE_LABELS = ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"] as const;
 
 // ───────────────────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ export interface VoteRow extends VotesSlotInsert {
   user_id: string;
 }
 
-/** Build the generic-slot `votes` row from the member's v1.1 answers.
+/** Build the generic-slot `votes` row from the member's quiz-redesign answers.
  *
  *  The five typed answers are wrapped into the `{ meta, answer }`
  *  envelopes by the shared `buildVotesSlotsFromLegacyAnswers` builder —

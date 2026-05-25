@@ -6,10 +6,10 @@
 // surface can be in: initiator-with-partial-quorum, invitee-all-in,
 // and everyone-answered.
 //
-// tb-WF-3: v1.1 retired the session timer, so the expired-no-quorum
+// tb-WF-3: the quiz redesign retired the session timer, so the expired-no-quorum
 // terminal that used to be one of the rendered modes is also gone.
 // The room can no longer reach `.expired` from a client-side timer;
-// the only no-result terminal in v1.1 is the engine-side
+// the only no-result terminal in the quiz redesign is the engine-side
 // `no_survivor` path which lives on S05, not S04.
 //
 // Stubs the AppleSignInProviding seam so the chip path doesn't try
@@ -130,7 +130,7 @@ final class WaitingScreenSnapshotTests: XCTestCase {
 
     /// Regression for tb-WF-3: the surface no longer renders a special
     /// "Couldn't reach quorum tonight" terminal when the room reaches
-    /// `.expired`. v1.1 has no session timer, so the only path to
+    /// `.expired`. The quiz redesign has no session timer, so the only path to
     /// `.expired` is a legacy room created before the timer was retired;
     /// the surface holds the regular main body in that case. The no-
     /// survivor terminal lives on S05 (engine-side `no_survivor`), not

@@ -85,7 +85,7 @@ final class VotesIntegrationTests: XCTestCase {
     /// Read back a votes row through the live client. Returns nil
     /// when RLS hides the row from the caller.
     ///
-    /// TB-04 (v1.1): `votes` stores answers in five generic jsonb
+    /// TB-04 (quiz redesign): `votes` stores answers in five generic jsonb
     /// slots (`q1`..`q5`), each a `{ meta, answer }` envelope. The
     /// readback decodes the envelopes and re-exposes the typed values
     /// so the assertions below stay legible.

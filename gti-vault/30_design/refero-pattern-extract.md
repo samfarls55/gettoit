@@ -1,20 +1,20 @@
 ---
 title: Refero Pattern Extract — Quiz + Verdict Loop
-description: Common UI/UX patterns observed in Refero across iOS quiz, verdict-reveal, group-lobby, and result-card flows. Feeds the v1 prototype directions.
+description: Common UI/UX patterns observed in Refero across iOS quiz, verdict-reveal, group-lobby, and result-card flows. Feeds the 0.1.0 prototype directions.
 type: research-extract
 status: superseded
 created: 2026-05-12
 related:
   - "[[frontend-design-brief]]"
-  - "[[v1-design-locks]]"
-  - "[[v1-directions]]"
+  - "[[0.1.0-design-locks]]"
+  - "[[0.1.0-directions]]"
 ---
 
 # Refero Pattern Extract — Quiz + Verdict Loop
 
-> **Superseded — design exploration archived.** These patterns fed the v1 prototype directions; the chosen direction (Sunset Pop) shipped as the `design-system/` package. Kept as a historical record.
+> **Superseded — design exploration archived.** These patterns fed the 0.1.0 prototype directions; the chosen direction (Sunset Pop) shipped as the `design-system/` package. Kept as a historical record.
 
-Patterns harvested from Refero screen + flow search for the surfaces GetToIt v1 needs: quiz (5 questions, one-decision-per-screen) and verdict reveal (single recommendation, copy-framework-locked). Apps cited are reference points, not models to copy.
+Patterns harvested from Refero screen + flow search for the surfaces GetToIt 0.1.0 needs: quiz (5 questions, one-decision-per-screen) and verdict reveal (single recommendation, copy-framework-locked). Apps cited are reference points, not models to copy.
 
 ## Quiz screen — common chassis
 
@@ -107,4 +107,4 @@ These confirm the brief's locks rather than challenge them.
 | **B — Quiet Serif** | Pill options (Vocabulary) on off-white | Family 1: serif statement, single accent, tap-to-continue ratification | 222, Stardust serif treatment |
 | **C — Sunset Pop** | Per-question gradient backgrounds, bold sans options | Family 2 amped: gradient hero + large numeric/wordmark verdict | LEGO, Drops onboarding, Stardust gradient |
 
-Direction docs in [[v1-directions]]; live prototype in `design-prototype/`.
+Direction docs in [[0.1.0-directions]]; live prototype in `design-prototype/`.

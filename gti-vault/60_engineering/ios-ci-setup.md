@@ -5,12 +5,12 @@ related:
   - "[[adr/0001-ios-tech-stack-supabase]]"
   - "[[adr/0004-monorepo-layout]]"
   - "[[adr/0008-ios-min-target-17]]"
-  - "[[../15_issues/v1/issues/tb-01-walking-skeleton]]"
+  - "[[../15_issues/0.1.0/issues/tb-01-walking-skeleton]]"
 ---
 
 # iOS CI setup — XcodeGen + macOS-14 runner
 
-How the iOS lane of `.github/workflows/ci.yml` builds and tests. Set up in [[../15_issues/v1/issues/tb-01-walking-skeleton|TB-01]]; this note is the durable runbook.
+How the iOS lane of `.github/workflows/ci.yml` builds and tests. Set up in [[../15_issues/0.1.0/issues/tb-01-walking-skeleton|TB-01]]; this note is the durable runbook.
 
 ## Constraint
 
@@ -20,7 +20,7 @@ How the iOS lane of `.github/workflows/ci.yml` builds and tests. Set up in [[../
 ## Why XcodeGen (not committed pbxproj, not Tuist, not pure SPM)
 
 - **Committed `.xcodeproj` was rejected.** Xcode rewrites `project.pbxproj` non-deterministically on every change — file ordering, UUIDs, build-phase reshuffles. Merge conflicts on every PR.
-- **Tuist was rejected.** Heavier than the project needs at v1 scale. XcodeGen is one YAML file and a Homebrew install; the dependency surface is smaller and the failure modes are well-understood.
+- **Tuist was rejected.** Heavier than the project needs at 0.1.0 scale. XcodeGen is one YAML file and a Homebrew install; the dependency surface is smaller and the failure modes are well-understood.
 - **Pure SPM (no .xcodeproj) was rejected.** `xcodebuild test` on a SwiftUI app target still wants an Xcode project + scheme. SPM-only works for libraries but not for a SwiftUI application target with an Info.plist, signing settings, and a simulator destination.
 
 ## Runner image
@@ -50,7 +50,7 @@ Set to **disabled** for CI (`CODE_SIGNING_ALLOWED=NO`, empty `CODE_SIGN_IDENTITY
 
 1. Add it to the `packages:` block in `ios/project.yml`.
 2. Reference it under the target's `dependencies:` list.
-3. Commit `project.yml`. CI's `xcodebuild test` resolves SPM on the runner; no `Package.resolved` is committed (the workflow does not currently cache SPM state — fast at v1 scale; revisit if test runtime crosses 5 min).
+3. Commit `project.yml`. CI's `xcodebuild test` resolves SPM on the runner; no `Package.resolved` is committed (the workflow does not currently cache SPM state — fast at 0.1.0 scale; revisit if test runtime crosses 5 min).
 
 ## Adding a new test file
 

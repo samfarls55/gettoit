@@ -1,17 +1,17 @@
 ---
-title: v1 Design Directions — Three Aesthetics
-description: Three aesthetic directions for the v1 food vertical, all using the same locked quiz + verdict mechanic. Built as a Next.js prototype at design-prototype/.
+title: 0.1.0 Design Directions — Three Aesthetics
+description: Three aesthetic directions for the 0.1.0 food vertical, all using the same locked quiz + verdict mechanic. Built as a Next.js prototype at design-prototype/.
 type: design-exploration
 status: superseded
 created: 2026-05-12
 related:
   - "[[frontend-design-brief]]"
   - "[[refero-pattern-extract]]"
-  - "[[v1-design-locks]]"
+  - "[[0.1.0-design-locks]]"
   - "[[60_engineering/adr/0001-ios-tech-stack-supabase]]"
 ---
 
-# v1 Design Directions — Three Aesthetics
+# 0.1.0 Design Directions — Three Aesthetics
 
 > **Superseded — design exploration archived.** Direction C (Sunset Pop) was chosen and built out as the full design system at `design-system/` (repo root). The `design-prototype/` Next.js app the "How to view" steps below describe no longer exists. Kept as a historical record of the three-direction exploration.
 
@@ -34,7 +34,7 @@ Routes:
 
 The prototype renders inside an iPhone 14-sized frame on a dark stage so the design reads at the right scale.
 
-> **Prototype only.** v1 ships native iOS in Swift + SwiftUI per [[60_engineering/adr/0001-ios-tech-stack-supabase|ADR 0001]]. Web prototype is for design exploration; component decisions translate to SwiftUI in implementation.
+> **Prototype only.** 0.1.0 ships native iOS in Swift + SwiftUI per [[60_engineering/adr/0001-ios-tech-stack-supabase|ADR 0001]]. Web prototype is for design exploration; component decisions translate to SwiftUI in implementation.
 
 ## Direction A — Warm Receipt
 
@@ -92,8 +92,8 @@ The prototype renders inside an iPhone 14-sized frame on a dark stage so the des
 ## Open decisions
 
 - **Direction lock.** No commitment yet. Walk all three end-to-end before locking.
-- **Tone copy.** Verdict-screen strings need final pass — owned by `40_marketing_branding/` per `[[v1-design-locks]]` Lock 4 "Open".
-- **Q4 axis label.** Currently "low-key ↔ lively". `[[v1-design-locks]]` flags cuisine/vibe/energy as open — locked here as vibe.
+- **Tone copy.** Verdict-screen strings need final pass — owned by `40_marketing_branding/` per `[[0.1.0-design-locks]]` Lock 4 "Open".
+- **Q4 axis label.** Currently "low-key ↔ lively". `[[0.1.0-design-locks]]` flags cuisine/vibe/energy as open — locked here as vibe.
 - **Reroll + check-in surfaces.** Out of scope for this exploration. Frontend brief lists 7 surfaces; this prototype covers 2 (quiz, verdict).
 
 ## Next session

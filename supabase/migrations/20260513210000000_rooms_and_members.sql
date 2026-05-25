@@ -25,12 +25,12 @@ create table if not exists public.rooms (
     status text not null default 'open'
         check (status in ('open', 'verdict_ready', 'locked', 'expired')),
     vertical text not null default 'food'
-        check (vertical in ('food')),  -- v1 ships food only; PRD §"User Stories" (2,3).
+        check (vertical in ('food')),  -- original ships food only; PRD §"User Stories" (2,3).
     created_at timestamptz not null default now()
 );
 
 comment on table public.rooms is
-    'A group decision session. Created by the initiator on S01; invitees join via Universal Link. v1 supports the food vertical only.';
+    'A group decision session. Created by the initiator on S01; invitees join via Universal Link. Pre-redesign supports the food vertical only.';
 
 -- ── members ──────────────────────────────────────────────────────────
 create table if not exists public.members (

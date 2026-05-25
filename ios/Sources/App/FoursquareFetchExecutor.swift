@@ -1,4 +1,4 @@
-// GetToIt — FoursquareFetchExecutor (TB-07 v1.1, PRD module F).
+// GetToIt — FoursquareFetchExecutor (TB-07 quiz redesign, PRD module F).
 //
 // Wraps the pure `FoursquareFetchPlanner`. Given one member's
 // per-member fetch inputs it asks the planner for the N+1 call specs,

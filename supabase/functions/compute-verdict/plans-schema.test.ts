@@ -15,8 +15,8 @@
 // remain present.
 //
 // References:
-//   * gti-vault/15_issues/workflow-overhaul/issues/tb-wf-1-plans-table-schema.md
-//   * gti-vault/50_product/workflow-overhaul-plan-setup.md
+//   * gti-vault/15_issues/0.1.0/issues/tb-wf-1-plans-table-schema.md
+//   * gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup.md
 //   * gti-vault/60_engineering/adr/0010-generic-jsonb-votes-schema.md
 //     (precedent for `session_params` jsonb shape)
 

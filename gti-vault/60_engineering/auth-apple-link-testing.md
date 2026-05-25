@@ -4,8 +4,8 @@ type: engineering-note
 created: 2026-05-13
 related:
   - "[[adr/0007-auth-anonymous-default-apple-upgrade]]"
-  - "[[../15_issues/v1/issues/tb-12-apple-signin-upgrade]]"
-  - "[[../15_issues/v1/issues/tb-17-testflight-cohort]]"
+  - "[[../15_issues/0.1.0/issues/tb-12-apple-signin-upgrade]]"
+  - "[[../15_issues/0.1.0/issues/tb-17-testflight-cohort]]"
   - "[[apple-keys-setup]]"
 ---
 

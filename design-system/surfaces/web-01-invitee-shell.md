@@ -20,7 +20,7 @@ Account-disjoint Plan-member subtype — no homepage, no Plan list, one Plan onl
 **Behavior is locked elsewhere.** The *what* of this flow — identity
 persistence, resume routing, the read-only verdict, leave semantics — is
 resolved and frozen in the decision doc
-[[../../gti-vault/50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]]
+[[../../gti-vault/50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]]
 (the `/grill-with-docs` session of 2026-05-21, Q1–Q8). This file is purely the
 *visual / UX / copy / motion* layer that sits on top of those decisions. Where
 this doc says "behavior" it points at the decision doc; it never re-decides.
@@ -34,7 +34,7 @@ design-system `code/screens/` JSX. The `verify.mjs` surface↔jsx pairing gate
 ## Scope
 
 This doc specs the **shell** — the five surfaces/states below. The **quiz
-itself** (Q1–Q5 on web at v1.1 parity — scenario questions, the per-member
+itself** (Q1–Q5 on web at 0.1.0 parity — scenario questions, the per-member
 candidate fetch, the Q5 factorial probe) is a separate sibling tracer-bullet,
 **tb-WF-10**, and is spec'd by [[03-quiz|S03 Quiz]]. The shell hands the quiz a
 member identity and a room; the quiz hands back vote slots. Anything the shell
@@ -85,7 +85,7 @@ specs only what the invitee sees.
 
 **Single text input, one CTA. No plan summary.** A plan summary would credit
 the initiator's name, which would need a new public RLS read path and depends
-on the unresolved v1.1 #2b initiator-display-name blocker (decision doc §Q4).
+on the unresolved 0.1.0 #2b initiator-display-name blocker (decision doc §Q4).
 The landing's job is to mint a member identity — nothing else.
 
 ### Layout
@@ -263,7 +263,7 @@ no venue for the card's venue slot; that case is the no-survivor variant below.
 > reachable state: it has a resolving membership and a real verdict row, so
 > §B's resume routing ("Plan decided → §C") lands it on §C. This subsection
 > closes that gap. It **ratifies the interim treatment**
-> [[../../gti-vault/15_issues/v1.1/issues/bug-17-web-verdict-surface-conformance|bug-17]]
+> [[../../gti-vault/15_issues/0.1.0/issues/bug-17-web-verdict-surface-conformance|bug-17]]
 > (#207) ships in web code, so the spec and the web code describe the same
 > surface regardless of which lands first. No new token, no new component.
 
@@ -344,7 +344,7 @@ CTA-less base card, and it never competes with the verdict for the eye.
 ## D · "This plan is closed" terminal
 
 A re-click whose **membership does not resolve**. This happens when the member
-row was purged by the 30-day anonymous-user TTL ([[../../gti-vault/60_engineering/adr/0006-privacy-posture-v1|ADR 0006]]),
+row was purged by the 30-day anonymous-user TTL ([[../../gti-vault/60_engineering/adr/0006-privacy-posture-0.1.0|ADR 0006]]),
 or when a stranger opens a forwarded link and has no member row at all.
 Behavior is locked in the decision doc §Q6.
 
@@ -471,7 +471,7 @@ is open without needing a button.
 > **Spec amendment — sg-WF-8.** Added 2026-05-21. Architecture:
 > [[../../gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]];
 > grilled decisions:
-> [[../../gti-vault/50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]]
+> [[../../gti-vault/50_product/0.1.0-workflow-overhaul-web-invitee-account-claim|0.1.0-workflow-overhaul-web-invitee-account-claim]]
 > §Q4–Q5. This section specs the visual / copy / motion layer of the web side
 > of the [[../../CONTEXT|Account claim]] bridge. The mint wiring — the
 > `claim_codes` table, the `mint-claim-code` edge function, the lazy-mint call
@@ -607,7 +607,7 @@ not inline a value.
 
 ## Out of scope (owned elsewhere)
 
-- **The web quiz at v1.1 parity** — scenario questions, the per-member
+- **The web quiz at 0.1.0 parity** — scenario questions, the per-member
   candidate fetch, the Q5 factorial probe. Sibling tracer-bullet **tb-WF-10**;
   spec'd by [[03-quiz|S03 Quiz]].
 - **The shell wiring** — the `/join/<roomId>` scaffold, the name-entry form,
@@ -634,8 +634,8 @@ not inline a value.
 
 ## Cross-references
 
-- [[../../gti-vault/50_product/workflow-overhaul-web-invitee-flow|workflow-overhaul-web-invitee-flow]] — the decision doc; locked behavior for every surface above (Q1–Q8). **This doc never re-decides what that doc locked.**
-- [[../../gti-vault/50_product/workflow-overhaul-web-invitee-account-claim|workflow-overhaul-web-invitee-account-claim]] — the decision doc for the sg-WF-8 `"Getting the app?"` mint affordance (Q4–Q5).
+- [[../../gti-vault/50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]] — the decision doc; locked behavior for every surface above (Q1–Q8). **This doc never re-decides what that doc locked.**
+- [[../../gti-vault/50_product/0.1.0-workflow-overhaul-web-invitee-account-claim|0.1.0-workflow-overhaul-web-invitee-account-claim]] — the decision doc for the sg-WF-8 `"Getting the app?"` mint affordance (Q4–Q5).
 - [[../../gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]] — the claim-code bridge architecture the mint affordance feeds.
 - [[00a-signin|S00a]] — the app-side `"Voted on the web?"` claim entry that receives the code this affordance mints.
 - [[03-quiz|S03 Quiz]] — the quiz the shell routes into; owns the `QuizChrome` `Leave` affordance §E reuses.

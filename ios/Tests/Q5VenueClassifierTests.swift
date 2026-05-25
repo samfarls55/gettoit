@@ -1,4 +1,4 @@
-// GetToIt — Q5VenueClassifier unit tests (TB-16 v1.1).
+// GetToIt — Q5VenueClassifier unit tests (TB-16 quiz redesign).
 //
 // The classifier turns a fetched `ShapedPlace` into its three-axis
 // `Q5VenueProfile` so the live `Q5FactorialCardGenerator` has a

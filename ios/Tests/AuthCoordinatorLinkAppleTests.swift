@@ -173,7 +173,7 @@ final class StubAuthLinker: SupabaseAuthLinker, @unchecked Sendable {
     }
 
     var result: Outcome = .failure(StubError.unset)
-    /// TB-02 v1.1 — separate canned outcome for `signInWithApple`, so
+    /// TB-02 (quiz redesign) — separate canned outcome for `signInWithApple`, so
     /// the link tests can stub it independently. Defaults match the
     /// link result so existing tests keep their single-knob shape.
     var signInResult: Outcome?

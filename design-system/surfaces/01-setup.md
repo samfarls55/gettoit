@@ -13,7 +13,7 @@ jsx:
 
 > **Code:** [`../code/screens/ScreenSetup.jsx`](../code/screens/ScreenSetup.jsx)
 
-The canonical **Plan creation + Plan edit** surface — one screen that collapses today's S01 (Initiator landing) + S01b (Pre-quiz parameters) into a single Setup screen. Lands the design-system contract for the workflow-overhaul phase per [[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] (the locked outcomes of the 2026-05-19 `/grill-with-docs` session).
+The canonical **Plan creation + Plan edit** surface — one screen that collapses today's S01 (Initiator landing) + S01b (Pre-quiz parameters) into a single Setup screen. Lands the design-system contract for the workflow-overhaul phase per [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] (the locked outcomes of the 2026-05-19 `/grill-with-docs` session).
 
 This surface ships once; the iOS wiring (replacing the existing `ScreenInitiator` + `ScreenParameters` paths) lives in the paired tracer-bullet **tb-WF-4**. Until that lands, the legacy S01 + S01b surfaces remain in the tree, marked `superseded`.
 
@@ -53,8 +53,8 @@ If a future spec change wants to add a seventh control, it has to justify the ad
 
 **Removed from the merged S01 + S01b inventory:**
 
-- **Category picker** — food only in v1, so no picker rendered (S01-initiator's drinks/movie placeholder rows are not carried forward).
-- **Timer chip group** — retired by v1.1 PRD US34 / US35 / §line 115. There is no session timer in v1.1+.
+- **Category picker** — food only in 0.1.0, so no picker rendered (S01-initiator's drinks/movie placeholder rows are not carried forward).
+- **Timer chip group** — retired by 0.1.0 PRD US34 / US35 / §line 115. There is no session timer in 0.1.0+.
 - **Transport mode chips** (S01b's `Walking / Driving`) — collapsed into the distance slider. The walk-vs-drive cognitive shift is signaled implicitly by the tick at 1.0 mi (see §Distance slider).
 
 ### Chip group treatment
@@ -90,7 +90,7 @@ The `How far` slider is a **non-uniform-step variant of C-21 Range Slider** (see
 - **Anchor tick at 1.0 mi:** a 2 × 10 px rounded rect (radius 1px) in the `color.slider.tick` token (`rgba(255,255,255,0.55)`), centered on the 6px track at the 1.0 mi position. Purely visual — no words, no label. Anchors the implicit walk/drive cognitive boundary without resurrecting the rejected transport-mode question.
 - **Mono-tag value label** above the row, top-right, aligned with the `How far` eyebrow on the left: `"1.0 MI"` (`{value.toFixed(1)} MI` rendered in `mono-tag` token treatment — Inter 500 / 11 / tracking 0.18em / UPPERCASE / white 0.88). **Never** `"WALKING DISTANCE"` or `"DRIVING DISTANCE"` — those labels would re-introduce the transport-mode binary the slider replaces.
 
-Range, default, snap-list, and tick position are locked. Any deviation requires re-grilling Q8 of [[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]].
+Range, default, snap-list, and tick position are locked. Any deviation requires re-grilling Q8 of [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]].
 
 ### New token
 
@@ -151,7 +151,7 @@ The Setup surface is the **Plan** surface, not the room surface. Persistence rul
 - **Edit mode primary tap**: writes back to the existing `plans` row, then immediately mints the room + fires the invite/quiz.
 - **Edit mode secondary (`SAVE CHANGES`) tap**: writes back to the existing `plans` row, returns to the list. No room created.
 
-Column-level mapping (Plan → captured controls) is owned by [[../../gti-vault/15_issues/workflow-overhaul/issues/tb-wf-1-plans-table-schema|tb-WF-1]] (Plans table schema). The room-level mapping inherits today's `rooms.session_params` jsonb shape (from S01b) plus a new `rooms.distance_mi` derived from the slider value — see tb-WF-4 for the room-side wiring.
+Column-level mapping (Plan → captured controls) is owned by [[../../gti-vault/15_issues/0.1.0/issues/tb-wf-1-plans-table-schema|tb-WF-1]] (Plans table schema). The room-level mapping inherits today's `rooms.session_params` jsonb shape (from S01b) plus a new `rooms.distance_mi` derived from the slider value — see tb-WF-4 for the room-side wiring.
 
 ## Accessibility
 
@@ -165,4 +165,4 @@ Column-level mapping (Plan → captured controls) is owned by [[../../gti-vault/
 
 ## Versions / history
 
-- `2026-05-19` — surface specified per [[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] (#154). Locked from the 2026-05-19 `/grill-with-docs` decisions in [[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]]. iOS wiring deferred to tb-WF-4 (gated on sg-WF-4 Plan list landing). Until tb-WF-4 lands, `01-initiator.md` and `01b-parameters.md` remain in the tree marked `superseded`.
+- `2026-05-19` — surface specified per [[../../gti-vault/15_issues/0.1.0/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] (#154). Locked from the 2026-05-19 `/grill-with-docs` decisions in [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]]. iOS wiring deferred to tb-WF-4 (gated on sg-WF-4 Plan list landing). Until tb-WF-4 lands, `01-initiator.md` and `01b-parameters.md` remain in the tree marked `superseded`.

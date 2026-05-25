@@ -324,7 +324,7 @@ public struct WaitingScreen: View {
     @ViewBuilder
     private var decideNowCTA: some View {
         if let coord = fireCoordinator, coord.isInitiator, let store = waitingStore {
-            // v1.1: minimum quorum is one member — the initiator
+            // Quiz redesign: minimum quorum is one member — the initiator
             // alone always satisfies it. The CTA is always tappable
             // (no `need 2 in` gate); the label surfaces the partial-
             // quorum cost so the initiator can decide. Per

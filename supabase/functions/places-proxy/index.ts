@@ -28,9 +28,9 @@
 //   }
 //
 // References:
-//   * v1 PRD §"PlacesProxy" (gti-vault/10_prds/v1-prd.md)
+//   * Original PRD §"PlacesProxy" (gti-vault/10_prds/0.1.0-prd.md)
 //   * ADR 0002 (gti-vault/60_engineering/adr/0002-places-data-foursquare-mapkit.md)
-//   * TB-05 (gti-vault/15_issues/v1/issues/tb-05-foursquare-placesproxy.md)
+//   * TB-05 (gti-vault/15_issues/0.1.0/issues/tb-05-foursquare-placesproxy.md)
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.43.4";
 import {

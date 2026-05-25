@@ -1,6 +1,6 @@
 // Surface 01b — Pre-quiz parameters setup (initiator)
 //
-// TB-05 (v1.1). The *parameters* bucket of the three-bucket input
+// TB-05 (0.1.0). The *parameters* bucket of the three-bucket input
 // model. Shown to the session initiator after S01 and before the
 // quiz. Captures the session-wide settings every participant shares:
 // meal time, group context, service shape, transport mode. Geography
@@ -11,7 +11,7 @@
 // Built from existing primitives only — Chip (C-04, single-select
 // variant), Glass row (geography echo), Eyebrow, GTIMark, PillCTA.
 // No new visual component is introduced; this is a new SURFACE
-// composed of locked components, per the v1.1 PRD module (K) note
+// composed of locked components, per the 0.1.0 PRD module (K) note
 // ("consumes existing tokens and components").
 
 const MEAL_TIMES    = ['Breakfast', 'Lunch', 'Dinner', 'Late night'];

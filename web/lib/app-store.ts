@@ -5,12 +5,12 @@
 // the user remains on S04 — the verdict still computes for the room
 // they voted in, and the user can come back to read it.
 //
-// TODO (TB-02 v1.1 / pre-public-launch milestone): swap the
+// TODO (TB-02 quiz redesign / pre-public-launch milestone): swap the
 // placeholder for the real App Store URL once the app's Apple ID
 // allocates. The placeholder routes to a generic apps.apple.com URL
-// path that will 404 — that's acceptable in v1.1 because (a) only the
+// path that will 404 — that's acceptable pre-launch because (a) only the
 // founder is on the platform, (b) the public launch milestone gates
-// on a real listing landing first. See the v1.1 _index "App Store URL
+// on a real listing landing first. See the 0.1.0 _index "App Store URL
 // placeholder" callout for the swap checklist.
 
 /**

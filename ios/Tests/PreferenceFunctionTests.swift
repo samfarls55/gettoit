@@ -1,4 +1,4 @@
-// GetToIt — PreferenceFunction pure unit tests (TB-09 v1.1).
+// GetToIt — PreferenceFunction pure unit tests (TB-09 quiz redesign).
 //
 // The preference engine (PRD modules A `buildPreferenceFunction` + E
 // axis scorers) is pure: it takes a member's stated Q1–Q4 profile and
@@ -6,7 +6,7 @@
 // any axis-profiled venue 1…5. No I/O, no clock, no group state.
 //
 // These tests assert the acceptance criteria (PRD module A + E test
-// plans, gti-vault/15_issues/v1.1/issues/tb-09-…):
+// plans, gti-vault/15_issues/0.1.0/issues/tb-09-…):
 //   * `buildPreferenceFunction` returns a `prefFn` producing 1…5
 //     scores for canned venues from canned Q1–Q5 inputs;
 //   * equal-weight init; an explicit "No preference" zeroes that axis;
@@ -19,7 +19,7 @@
 //   * the cuisine / reputation / vibe axis scorers each satisfy the
 //     fixed `venue -> 1…5` interface.
 //
-// Design source: gti-vault/50_product/v1.1-quiz-amendments §3
+// Design source: gti-vault/50_product/0.1.0-quiz-amendments §3
 // ("Q5 — the preference probe") and the research-01 metadata mapping
 // (gti-vault/60_engineering/research/foursquare-filter-surface-2026-05).
 

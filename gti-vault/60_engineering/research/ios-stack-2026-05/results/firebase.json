@@ -58,7 +58,7 @@
 
   "cost_at_100k_DAU": "Auth crosses 50K MAU threshold → Identity Platform billing kicks in ($0.0055/MAU on next 50K = ~$275/mo at 100K MAU). Firestore reads at chat-app scale typically $200–800/mo. Storage modest. Realistic total $500–2000/mo, generally 40–60% more than Supabase at equivalent scale per third-party comparisons. [uncertain] — Firestore costs are highly sensitive to listener / read patterns.",
 
-  "perf_per_dollar": "Strong for read-light apps, weak for read-heavy (chat, voting, presence). Per-document-read pricing means every snapshot listener tick costs money. Free quotas are generous enough that v1 typically costs nothing, but the cost curve steepens earlier than Supabase. Free push delivery (FCM) is uniquely valuable.",
+  "perf_per_dollar": "Strong for read-light apps, weak for read-heavy (chat, voting, presence). Per-document-read pricing means every snapshot listener tick costs money. Free quotas are generous enough that 0.1.0 typically costs nothing, but the cost curve steepens earlier than Supabase. Free push delivery (FCM) is uniquely valuable.",
 
   "realtime_message_cost_per_1k": "Firestore doesn't bill messages — it bills reads. Each listener event = one read = $0.0018 per 1K. FCM push delivery is free regardless of volume. Different cost model than Supabase: pay per data-change-fanned-out, not per WebSocket message.",
 
@@ -72,7 +72,7 @@
 
   "vendor_lockin_risk": "High. Firestore query model, security rules, and proprietary data format have no off-Google equivalent. Export path: Firestore export → Cloud Storage → BigQuery (one-way analytics, not portable to another OLTP store). Migrating off Firebase to Postgres is a substantial rewrite. Auth schema (custom claims, providers) is Firebase-shaped. The Firebase Extensions ecosystem deepens lock-in further.",
 
-  "scaling_ceiling": "Firestore: ~10K writes/sec per database (sharding via multiple databases possible since Native mode multi-DB GA), ~1M concurrent connections. Hot-document writes capped at ~1/sec/document. Far beyond GetToIt's v1 horizon. At very high scale, Firestore's per-op cost becomes prohibitive before its technical ceiling.",
+  "scaling_ceiling": "Firestore: ~10K writes/sec per database (sharding via multiple databases possible since Native mode multi-DB GA), ~1M concurrent connections. Hot-document writes capped at ~1/sec/document. Far beyond GetToIt's 0.1.0 horizon. At very high scale, Firestore's per-op cost becomes prohibitive before its technical ceiling.",
 
   "data_export_path": "Firestore export to Cloud Storage (proprietary format loadable into BigQuery only). No SQL dump. Auth users exportable via Admin SDK to JSON. Storage assets accessible via gsutil. Practical migration off Firebase is a multi-week project.",
 
@@ -86,7 +86,7 @@
 
   "app_intents_data_dependency": "DIY but unobstructed. App Intent → instantiates shared Firestore reference → Codable fetch. Works with Firestore's offline cache (intents resolve fast).",
 
-  "liveactivity_dynamic_island_push": "FCM HTTP v1 supports Live Activity push remotely via push-type: liveactivity headers — documented, with FCM handling the APNs translation. push-to-start tokens supported (iOS 17.2+). Cleaner integration than Supabase's direct-APNs path. 'Get started with Live Activity' is in official FCM docs.",
+  "liveactivity_dynamic_island_push": "FCM HTTP 0.1.0 supports Live Activity push remotely via push-type: liveactivity headers — documented, with FCM handling the APNs translation. push-to-start tokens supported (iOS 17.2+). Cleaner integration than Supabase's direct-APNs path. 'Get started with Live Activity' is in official FCM docs.",
 
   "widget_timeline_data_access": "Standard WidgetKit + App Group container. Firestore offline cache available from within widget extension (FirebaseFirestore configured in widget bundle). Reads served from local cache, listener can be triggered on widget timeline refresh.",
 
@@ -104,7 +104,7 @@
 
   "silent_push_to_compute_widget": "FCM supports content_available silent pushes with full APNs priority/expiration control. Standard pattern.",
 
-  "apns_priority_tier_support": "Full APNs priority control through FCM HTTP v1 API (apns_priority field, push-type headers). Same expressiveness as direct APNs.",
+  "apns_priority_tier_support": "Full APNs priority control through FCM HTTP 0.1.0 API (apns_priority field, push-type headers). Same expressiveness as direct APNs.",
 
   "cross_user_push_fanout_cost": "$0. FCM delivery free for unlimited iOS pushes. 5-person group × every vote × 4 watchers fanout = zero marginal push cost. This is Firebase's structural win vs Supabase (where Edge Function invocations bill at $2 per 1M past 500K free).",
 

@@ -59,7 +59,7 @@ export interface ApnsSenderEnv {
 export interface PushTokenRow {
   user_id: string;
   device_token: string;
-  /** Platform tag — only "ios" is honored in v1; other rows are
+  /** Platform tag — only "ios" is honored today; other rows are
    *  skipped in case the schema later admits "android" / "web". */
   platform: string;
 }
@@ -220,7 +220,7 @@ export async function handleRequest(
   });
 
   // Look up every iOS push token for the requested users. Other
-  // platforms are silently filtered out — v1 only delivers to iOS.
+  // platforms are silently filtered out — currently only delivers to iOS.
   const tokens = (await data.fetchPushTokens(userIds))
     .filter((row) => row.platform === "ios");
 

@@ -3,8 +3,8 @@ title: Apple keys — setup runbook
 type: runbook
 created: 2026-05-13
 related:
-  - "[[../15_issues/v1/issues/tb-00-external-accounts]]"
-  - "[[../15_issues/v1/issues/tb-12-apple-signin-upgrade]]"
+  - "[[../15_issues/0.1.0/issues/tb-00-external-accounts]]"
+  - "[[../15_issues/0.1.0/issues/tb-12-apple-signin-upgrade]]"
   - "[[devcontainer-setup]]"
   - "[[adr/0002-places-data-foursquare-mapkit]]"
   - "[[adr/0007-auth-anonymous-default-apple-upgrade]]"
@@ -12,18 +12,18 @@ related:
 
 # Apple keys — setup runbook
 
-Step-by-step for obtaining and wiring the Apple credentials v1 needs. Pairs with [[devcontainer-setup|devcontainer-setup.md]] (which covers the `gh secret set` commands) and the issues above.
+Step-by-step for obtaining and wiring the Apple credentials 0.1.0 needs. Pairs with [[devcontainer-setup|devcontainer-setup.md]] (which covers the `gh secret set` commands) and the issues above.
 
-## Summary — what v1 actually needs
+## Summary — what 0.1.0 actually needs
 
 | Key | Used for | Where it lives | Status |
 |---|---|---|---|
 | App Store Connect API key (`.p8`) | CI uploads to TestFlight, App Store submission via `xcrun altool` | GitHub Actions secrets | Required |
-| Sign in with Apple key (`.p8`) | Supabase verifies Apple identity tokens server-side ([[../15_issues/v1/issues/tb-12-apple-signin-upgrade\|TB-12]]) | Supabase dashboard (Auth → Providers → Apple) | Required |
-| APNs auth key (`.p8`) | Edge Function signs JWTs to deliver pushes ([[../15_issues/v1/issues/tb-08-ratification-push-hard-close\|TB-08]], [[../15_issues/v1/issues/tb-14-checkin-telemetry\|TB-14]]) | GitHub Actions + Supabase Edge Function secrets | Required |
+| Sign in with Apple key (`.p8`) | Supabase verifies Apple identity tokens server-side ([[../15_issues/0.1.0/issues/tb-12-apple-signin-upgrade\|TB-12]]) | Supabase dashboard (Auth → Providers → Apple) | Required |
+| APNs auth key (`.p8`) | Edge Function signs JWTs to deliver pushes ([[../15_issues/0.1.0/issues/tb-08-ratification-push-hard-close\|TB-08]], [[../15_issues/0.1.0/issues/tb-14-checkin-telemetry\|TB-14]]) | GitHub Actions + Supabase Edge Function secrets | Required |
 | MapKit JS key | Embedding Apple Maps on a webpage | — | **Not needed.** Per [[adr/0002-places-data-foursquare-mapkit\|ADR-0002]], native iOS uses MapKit framework (no key); web fallback skips MapKit entirely (Foursquare-only). |
 
-Native iOS MapKit (`import MapKit`) needs zero keys. Skip MapKit JS for v1.
+Native iOS MapKit (`import MapKit`) needs zero keys. Skip MapKit JS for 0.1.0.
 
 ## Prerequisites (one-time)
 
@@ -103,7 +103,7 @@ If the App ID already exists, edit it: click into the App ID and tick any missin
 3. Register, then click into it → tick **Sign in with Apple** → **Configure**:
    - Primary App ID: the App ID above.
    - Domain: `<project-ref>.supabase.co`
-   - Return URL: `https://<project-ref>.supabase.co/auth/v1/callback`
+   - Return URL: `https://<project-ref>.supabase.co/auth/0.1.0/callback`
 
 ### Generate the key
 
@@ -132,7 +132,7 @@ Same yearly cadence as #1. Generate new → update Supabase → revoke old.
 
 ## Key 3 — APNs auth key
 
-Used by the **APNsSender Edge Function** ([[../15_issues/v1/issues/tb-08-ratification-push-hard-close|TB-08]]) to sign short-lived JWTs that authenticate `POST` requests to Apple's APNs HTTP/2 endpoint. Native iOS device-token registration (`UIApplication.registerForRemoteNotifications`) does **not** need this `.p8` — only the server side does.
+Used by the **APNsSender Edge Function** ([[../15_issues/0.1.0/issues/tb-08-ratification-push-hard-close|TB-08]]) to sign short-lived JWTs that authenticate `POST` requests to Apple's APNs HTTP/2 endpoint. Native iOS device-token registration (`UIApplication.registerForRemoteNotifications`) does **not** need this `.p8` — only the server side does.
 
 ### Prereq
 
@@ -141,7 +141,7 @@ Used by the **APNsSender Edge Function** ([[../15_issues/v1/issues/tb-08-ratific
 ### Generate
 
 1. https://developer.apple.com/account/resources/authkeys/list → **+**.
-2. **Key Name**: `GetToIt APNs v1`.
+2. **Key Name**: `GetToIt APNs 0.1.0`.
 3. Tick **Apple Push Notifications service (APNs)** — leave everything else unchecked.
 4. **Environment**: `Both` (one key serves sandbox endpoint `api.sandbox.push.apple.com` for dev/TestFlight-internal and production endpoint `api.push.apple.com` for App Store builds).
 5. **Key Restriction**: `Team Scoped (All Topics)`. Apple does not allow `Topic Specific` when Environment = `Both`. With one app in the team the wider scope is theoretical privilege only; revisit if a second app ever lands (then revoke + regenerate two topic-scoped keys).
@@ -177,7 +177,7 @@ python3 -c "import json; print(json.dumps([
   {'name':'APNS_TEAM_ID','value':'<team id>'},
   {'name':'APNS_TOPIC','value':'app.gettoit.GetToIt'},
 ]))" > /tmp/apns.json
-curl -sS -X POST "https://api.supabase.com/v1/projects/${REF}/secrets" \
+curl -sS -X POST "https://api.supabase.com/0.1.0/projects/${REF}/secrets" \
   -H "Authorization: Bearer ${TOK}" -H "Content-Type: application/json" \
   --data-binary @/tmp/apns.json
 shred -u /tmp/apns.json
@@ -186,7 +186,7 @@ shred -u /tmp/apns.json
 Verify:
 
 ```bash
-curl -sS "https://api.supabase.com/v1/projects/${REF}/secrets" \
+curl -sS "https://api.supabase.com/0.1.0/projects/${REF}/secrets" \
   -H "Authorization: Bearer ${TOK}" | python3 -m json.tool | grep -i apns
 ```
 
@@ -198,10 +198,10 @@ APNs auth keys don't expire (unlike the SiwA-derived OAuth client_secret JWT —
 
 ## Key 4 — MapKit JS
 
-**Skip.** Not required for v1. Documented here so the question doesn't get re-asked.
+**Skip.** Not required for 0.1.0. Documented here so the question doesn't get re-asked.
 
 - Native iOS MapKit POI search needs no key — per [[adr/0002-places-data-foursquare-mapkit|ADR-0002]] it's the fallback to Foursquare on iOS.
-- Web fallback ([[../15_issues/v1/issues/tb-15-web-fallback|TB-15]]) does not embed Apple Maps — Foursquare-only, degrade to error if Foursquare is down.
+- Web fallback ([[../15_issues/0.1.0/issues/tb-15-web-fallback|TB-15]]) does not embed Apple Maps — Foursquare-only, degrade to error if Foursquare is down.
 
 Revisit only if a future web feature genuinely needs Apple Maps embeds, in which case MapKit JS adds a server-side JWT-minting endpoint to the architecture (the `.p8` signs short-lived JWTs delivered to the browser).
 

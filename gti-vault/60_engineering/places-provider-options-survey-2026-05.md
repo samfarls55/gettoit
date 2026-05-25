@@ -65,7 +65,7 @@ for now, accepting its known weaknesses:
 - The staleness is real and acknowledged — the Foursquare consumer app has been
   largely unmaintained since ~2019; reviews and closure data are stale.
 - But Foursquare still provides a **decent baseline** — usable category, taste,
-  price, and hours data for the v1.1 quiz recipes.
+  price, and hours data for the 0.1.0 quiz recipes.
 - It is the **cheapest of the providers that actually feed this quiz**: Google is
   pricier per call and forces the `places-proxy` caching rework; Yelp is a $299+/mo
   fixed subscription that only amortizes at call volume GetToIt does not have yet.
@@ -267,7 +267,7 @@ with a separate ratings source.
 - **Role / why not primary:** MapKit is **not ruled out** — it is already in
   production in two roles (ADR 0002 fallback provider + the `VenueClosureVerifier`
   closure cross-check) and should keep both. What it cannot be is the *primary*
-  provider, and the blocker is the **v1.1 quiz design, not MapKit quality**: the quiz
+  provider, and the blocker is the **0.1.0 quiz design, not MapKit quality**: the quiz
   compiles each answer into a recipe of cuisine / price / attribute / reputation
   filters, and MapKit exposes neither those filters nor the data to filter
   client-side. A simpler "good restaurants near me, sorted, closed ones removed"
@@ -391,7 +391,7 @@ For completeness, what is being replaced. Pro tier ~31 fields; Premium tier adds
 hours, `rating`, `price`, `popularity`, `tastes`, photos, tips, amenity booleans.
 Fine-grained 1,000+ filterable taxonomy. **30-day caching allowed** (the
 `places-proxy` cache is compliant). Pricing: list price Pro $15/1k, Premium $18.75/1k.
-The rich fields the v1.1 quiz needs (hours, rating, price, tastes, photos) are all
+The rich fields the 0.1.0 quiz needs (hours, rating, price, tastes, photos) are all
 **Premium** tier, which has no free allowance. **The widely-cited $200/mo developer
 credit does not apply to GetToIt's account** — the project runs straight
 pay-as-you-go off a prepaid balance (founder confirmed 2026-05-19, started with a $20
@@ -423,8 +423,8 @@ calls/mo on 2026-06-01. Closure signal effectively absent — the reason for thi
 
 ## Impact on the quiz design
 
-The v1.1 quiz compiles each answer into a recipe of filters
-([[../50_product/v1.1-quiz-amendments]], [[places-api-foursquare-vs-google]] §4).
+The 0.1.0 quiz compiles each answer into a recipe of filters
+([[../50_product/0.1.0-quiz-amendments]], [[places-api-foursquare-vs-google]] §4).
 A provider switch is not field-neutral:
 
 - **Foursquare's 1,000+ fully-filterable taxonomy is the finest of any provider.**
@@ -440,7 +440,7 @@ A provider switch is not field-neutral:
 
 ## Deriving vibe attributes (Q4 nudge)
 
-The v1.1 Q4 vibe axis runs a category-archetype baseline plus a bounded +/-1 nudge.
+The 0.1.0 Q4 vibe axis runs a category-archetype baseline plus a bounded +/-1 nudge.
 That nudge is fed **entirely** by Foursquare's `tastes` field — the 30-token allowlist
 from [[research/foursquare-tastes-vibe-2026-05/report|foursquare-tastes-vibe-2026-05]],
 consumed by tb-18's `Q5VenueClassifier`. **Leaving Foursquare removes that input.**
@@ -508,7 +508,7 @@ is comparable; global coverage and closure-signal quality are weaker than Google
 
 **Do not switch to Mapbox, Overture, or FSQ OS Places expecting fresher data** — all
 three are Foursquare-derived. They are only worth considering as a free base catalog
-*if* the product drops ratings entirely, which contradicts the v1.1 quiz design.
+*if* the product drops ratings entirely, which contradicts the 0.1.0 quiz design.
 
 **Hybrid worth weighing** (the [[places-api-foursquare-vs-google]] note already
 raised this): keep Foursquare for discovery/taxonomy and add Google purely for the
@@ -532,14 +532,14 @@ stated position is to drop Foursquare as *primary*, not patch it.
    flat regardless of volume. Yelp only beats pay-as-you-go above a crossover of
    roughly 8,000-16,000 calls/month. What is the projected monthly call volume?
 4. **Can reputation be dropped from the quiz?** If yes, the cheap Tier 3 options open
-   up. If no (current v1.1 design), the choice is locked to Google or Yelp.
+   up. If no (current 0.1.0 design), the choice is locked to Google or Yelp.
 5. **How is the Q4 vibe nudge re-fed?** Foursquare `tastes` disappears with the
    migration. Google needs a derive-vibe build (Path B above); Yelp supplies
    `NoiseLevel`/`Ambience` directly. See "Deriving vibe attributes". This re-opens
    tb-18 / [[research/foursquare-tastes-vibe-2026-05/report|the tastes-vibe research]].
 6. **Is the paid provider bought by the quiz?** The entire per-call / subscription
    cost exists to feed cuisine recipes, price caps, ratings, and vibe. A de-scoped
-   quiz could run on free MapKit alone. Is the v1.1 quiz design firm enough that the
+   quiz could run on free MapKit alone. Is the 0.1.0 quiz design firm enough that the
    provider spend is non-negotiable, or is "simpler quiz, free data" on the table?
 
 ## See also
@@ -547,4 +547,4 @@ stated position is to drop Foursquare as *primary*, not patch it.
 - [[places-api-foursquare-vs-google]] — the earlier two-way comparison this supersedes
 - [[foursquare-venue-closure-signal]] — the closure investigation + MapKit workaround
 - [[adr/0002-places-data-foursquare-mapkit|ADR 0002]] — current Foursquare-primary decision (now under review)
-- [[../50_product/v1.1-quiz-amendments|v1.1-quiz-amendments]] — quiz recipe model affected by a provider switch
+- [[../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]] — quiz recipe model affected by a provider switch

@@ -1,9 +1,9 @@
 ---
 folder: 60_engineering
-purpose: Implementation patterns implied by the v1 stack decision (ADR 0001)
+purpose: Implementation patterns implied by the 0.1.0 stack decision (ADR 0001)
 ---
 
-# Stack Patterns — GetToIt v1
+# Stack Patterns — GetToIt 0.1.0
 
 Implementation patterns and conventions implied by [[adr/0001-ios-tech-stack-supabase|ADR 0001]]. Capture *now* so the choices behind each pattern survive memory decay.
 
@@ -55,24 +55,24 @@ Relational, with RLS policies enforcing room-scoped access. Indicative tables:
 - `members (room_id, user_id, role, joined_at)` — `role` ∈ {`owner`, `participant`}
 - `options (id, room_id, label, payload_json)` — `payload_json` carries food-vertical fields (place_id, lat, lng, etc.)
 - `votes (room_id, user_id, option_id, created_at)` — unique on (room_id, user_id) for single-vote semantics, or composite if ranked
-- `verdicts (room_id, option_id, computed_at, method)` — `method` ∈ {`quorum`, `manual`, `deadline`, `no_survivor`}; `deadline` is inert in v1.1 (no shot clock — see "Verdict firing" below)
+- `verdicts (room_id, option_id, computed_at, method)` — `method` ∈ {`quorum`, `manual`, `deadline`, `no_survivor`}; `deadline` is inert in 0.1.0 (no shot clock — see "Verdict firing" below)
 
 **RLS rule of thumb:** every table has `WHERE room_id IN (SELECT room_id FROM members WHERE user_id = auth.uid())` style policies. Auth.uid() comes from the JWT. Declarative, server-enforced.
 
 ## Verdict firing / computation
 
-Server-authoritative. The v1.1 quiz has no shot clock — the verdict fires on a **Q5-complete signal**, not a deadline:
+Server-authoritative. The 0.1.0 quiz has no shot clock — the verdict fires on a **Q5-complete signal**, not a deadline:
 
 - **Trigger-driven:** `AFTER INSERT ON votes` checks whether every current room member has completed Q5 (a `regret`-kind votes slot). If so, it computes the verdict, inserts into `verdicts`, and broadcasts `verdict_ready`.
 - **Manual close:** the initiator's `fire_verdict(room_id)` RPC fires on demand, with no minimum quorum — a solo session resolves.
 
-The v1 per-minute `pg_cron` deadline scan is retired: a timer cron would expire a live v1.1 room mid-quiz. `rooms.deadline_at` / `rooms.timer_minutes` remain as inert columns. See [[verdict-engine|verdict-engine.md]] §"Firing" and [[waiting-fire-trigger|waiting-fire-trigger.md]].
+The 0.1.0 per-minute `pg_cron` deadline scan is retired: a timer cron would expire a live 0.1.0 room mid-quiz. `rooms.deadline_at` / `rooms.timer_minutes` remain as inert columns. See [[verdict-engine|verdict-engine.md]] §"Firing" and [[waiting-fire-trigger|waiting-fire-trigger.md]].
 
 ## Food vertical / geo
 
 - **PostGIS extension enabled.** Use `geography(Point, 4326)` for restaurant locations.
 - **Nearby query:** `ST_DWithin(location, ST_MakePoint(lng, lat)::geography, radius_meters)`.
-- **Places data:** Foursquare (free 10k/mo on relevant endpoints) is the cost-floor pick for v1; Apple MapKit POI search is free with a developer account and is the fallback. Avoid Google Places (paid since Feb 2025) and Yelp Fusion (paid).
+- **Places data:** Foursquare (free 10k/mo on relevant endpoints) is the cost-floor pick for 0.1.0; Apple MapKit POI search is free with a developer account and is the fallback. Avoid Google Places (paid since Feb 2025) and Yelp Fusion (paid).
 - Store a minimal `places` cache table to avoid re-hitting the third-party API per session.
 
 ## Push notifications
@@ -84,12 +84,12 @@ The v1 per-minute `pg_cron` deadline scan is retired: a timer cron would expire 
 
 ## Offline
 
-**v1 strategy: DIY SwiftData mirror with last-write-wins.**
+**0.1.0 strategy: DIY SwiftData mirror with last-write-wins.**
 
 - Local SwiftData store mirrors the active room's `votes` rows.
 - Writes go to local store immediately (optimistic UI), then fire to Supabase.
 - Reconcile on Realtime echo or rollback on error.
-- Conflict resolution: LWW by `created_at`. Acceptable for v1 because vote windows are short (minutes, not days) and groups are small (≤ ~8 people).
+- Conflict resolution: LWW by `created_at`. Acceptable for 0.1.0 because vote windows are short (minutes, not days) and groups are small (≤ ~8 people).
 - Estimate ~1–2 weeks of engineering for a reusable pattern.
 
 **Escape hatch:** if offline pain materializes during the first sprint, layer PowerSync on top (do *not* switch BaaS). Accept the $25–60/mo cost floor and the Live Activity caveat documented in ADR 0001.
@@ -100,11 +100,11 @@ At 0–1k DAU: free tier carries the load. Watch the 7-day idle-pause caveat.
 At 1k+ DAU: $25/mo Pro plan covers 100K MAU + 500 realtime conns + 5M msgs + 250GB egress — meaningful headroom into the low-10k DAU range.
 At 10k+ DAU: re-model. Postgres reads are unmetered on Pro; realtime messages and egress are the variable axes.
 
-## What we are explicitly not doing in v1
+## What we are explicitly not doing in 0.1.0
 
 - React Native, Flutter, or any cross-platform client framework.
 - Firebase, Convex, CloudKit, Nakama, Turso, InstantDB. See ADR 0001 alternatives.
 - PowerSync overlay. Defer until offline UX pain shows up.
-- Custom auth (no email/password flow in v1 — Sign in with Apple + anonymous only).
+- Custom auth (no email/password flow in 0.1.0 — Sign in with Apple + anonymous only).
 - Google Places or Yelp Fusion (paid; use Foursquare or MapKit).
 - Realtime Postgres Changes for live vote fanout (use Broadcast).

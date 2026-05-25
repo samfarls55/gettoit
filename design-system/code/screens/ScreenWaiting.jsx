@@ -1,12 +1,12 @@
 // Surface 04 — Waiting / coordination
 // Honest, calm. No spinners.
-// v1.1: verdict fires on either all-Q5-submitted (auto, engine-side) or
-// the initiator's "Decide now" tap. There is no session timer — the v1
-// countdown mono-tag was retired by the v1.1 quiz redesign PRD
+// 0.1.0: verdict fires on either all-Q5-submitted (auto, engine-side) or
+// the initiator's "Decide now" tap. There is no session timer — the 0.1.0
+// countdown mono-tag was retired by the 0.1.0 quiz redesign PRD
 // (sg-WF-3 / #156).
 // TB-12: anonymous users on iOS get an Auth Upgrade Chip (C-22) above the
 // other CTAs. Web fallback passes `platform="web"` and the chip stays hidden.
-// sg-03 (v1.1): web-fallback anonymous voters get a "Download the app" CTA
+// sg-03 (0.1.0): web-fallback anonymous voters get a "Download the app" CTA
 // in the dock slot C-22 leaves empty on web. Exactly one of the two
 // affordances ever renders for a given context — never both.
 
@@ -35,7 +35,7 @@ function ScreenWaiting({
   ];
   const done = people.filter(p => p.answered).length;
 
-  // v1.1: minimum quorum is one member (the initiator alone). The
+  // 0.1.0: minimum quorum is one member (the initiator alone). The
   // "Decide now" CTA is always tappable for the initiator; the label
   // surfaces the partial-quorum cost so they can make the call.
   const decideLabel = `Decide now · ${done} of ${people.length} in`;

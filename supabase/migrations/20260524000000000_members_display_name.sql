@@ -6,7 +6,7 @@
 -- name on a name-entry-alone surface; that name is written here, onto
 -- their `members` row.
 --
--- Verified during the workflow-overhaul-web-invitee-flow grill (§Q4):
+-- Verified during the 0.1.0-workflow-overhaul-web-invitee-flow grill (§Q4):
 -- there was no `members.display_name` column across the prior 27
 -- migrations. `compute-verdict` synthesizes a placeholder name,
 -- `"m" + userId.slice(0, 4)`, for every member. This migration is the

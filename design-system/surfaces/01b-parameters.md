@@ -10,13 +10,13 @@ jsx:
 
 # S01b · Pre-quiz parameters setup
 
-> **SUPERSEDED (2026-05-19) — replaced by [[01-setup|S01 Plan setup]].** The workflow-overhaul phase collapsed [[01-initiator|S01 Initiator Landing]] + this surface into a single Plan setup screen ([[../../gti-vault/15_issues/workflow-overhaul/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] / #154). The new surface carries this surface's flat eyebrow-per-control rhythm, the four chip groups, and the read-only LocationPicker echo pattern forward — with the transport-mode chip group dropped (collapsed into a distance slider per workflow-overhaul Q8). This file and `code/screens/ScreenParameters.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-4** retires the consuming Swift code; do **not** build new features against this surface. See [[../../gti-vault/50_product/workflow-overhaul-plan-setup|workflow-overhaul-plan-setup]] for the locked decisions.
+> **SUPERSEDED (2026-05-19) — replaced by [[01-setup|S01 Plan setup]].** The workflow-overhaul phase collapsed [[01-initiator|S01 Initiator Landing]] + this surface into a single Plan setup screen ([[../../gti-vault/15_issues/0.1.0/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] / #154). The new surface carries this surface's flat eyebrow-per-control rhythm, the four chip groups, and the read-only LocationPicker echo pattern forward — with the transport-mode chip group dropped (collapsed into a distance slider per workflow-overhaul Q8). This file and `code/screens/ScreenParameters.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-4** retires the consuming Swift code; do **not** build new features against this surface. See [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] for the locked decisions.
 
 > **Code:** [`../code/screens/ScreenParameters.jsx`](../code/screens/ScreenParameters.jsx)
 
 The session initiator sets the parameters that apply to **everyone** in the session, between the S01 share step and the start of the quiz.
 
-This surface was added by TB-05 (v1.1) — it is the iOS home of the *parameters* bucket of the v1.1 three-bucket input model (see `gti-vault/10_prds/v1.1-quiz-redesign-prd.md`). It introduces **no new component** — the PRD module (K) note is explicit that the pre-quiz surface "consumes existing tokens and components."
+This surface was added by TB-05 (0.1.0) — it is the iOS home of the *parameters* bucket of the 0.1.0 three-bucket input model (see `gti-vault/10_prds/0.1.0-quiz-redesign-prd.md`). It introduces **no new component** — the PRD module (K) note is explicit that the pre-quiz surface "consumes existing tokens and components."
 
 ## What this surface defends against
 

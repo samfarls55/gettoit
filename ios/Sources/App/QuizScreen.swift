@@ -221,11 +221,11 @@ public struct QuizScreen: View {
         case .q4:
             QuizQ4Vibe(coordinator: coordinator)
         case .q5:
-            // TB-15 (v1.1) — the per-member Foursquare fetch fires on
+            // TB-15 (quiz redesign) — the per-member Foursquare fetch fires on
             // the Q4 -> Q5 transition. While it is in flight Q5 shows a
             // loading state.
             //
-            // TB-26 (v1.1) — once the fetch resolves Q5 routes on the
+            // TB-26 (quiz redesign) — once the fetch resolves Q5 routes on the
             // result: a real factorial pool renders the rateable cards;
             // a no-factorial-usable pool (empty union, `nil` factorial,
             // thrown fetch, or no session coordinate) renders the
