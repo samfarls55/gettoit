@@ -43,6 +43,7 @@
 // no value is bound to the tick.
 
 import SwiftUI
+import UIKit
 
 @MainActor
 public struct SetupScreen: View {
@@ -231,6 +232,13 @@ public struct SetupScreen: View {
     private let userID: UUID
     private let locationCoordinator: LocationCoordinator
     private let editingPlan: PlansStore.Plan?
+    /// Optional telemetry writer. Production wires the `Supabase`-backed
+    /// writer from `RootView`; render-only tests + the rare host that
+    /// doesn't care about telemetry pass nil. The `invite_shared`
+    /// event (PRD user story 8) fires from the share-sheet dismiss
+    /// closure when this is non-nil — bug-29 re-enables an event that
+    /// last fired 2026-05-20 when PR #180 retired InitiatorScreen.
+    private let telemetry: TelemetryWriter?
 
     /// Fires after a successful primary-CTA tap on a Plan that minted
     /// a Room. Carries the `(roomID, planID)` pair so the host can
@@ -255,6 +263,17 @@ public struct SetupScreen: View {
     @State private var distanceMiles: Double
     @State private var phase: Phase = .ready
     @State private var locationSheetOpen: Bool = false
+    /// bug-29 — owns the open/close flag for the iOS share sheet
+    /// presented in group/duo mode after Plan + Room mint. Lifted off
+    /// a bare `@State` so the bug-29 contract is unit-testable. See
+    /// `SetupShareSheetState` + its tests in
+    /// `ios/Tests/SetupShareSheetStateTests.swift`.
+    @StateObject private var shareSheetState = SetupShareSheetState()
+    /// bug-29 — buffer the planID for the `onLaunched` callback so the
+    /// share-sheet `onDisappear` closure can fire it once the user
+    /// finishes (or cancels) the share. Mirrors the retired
+    /// InitiatorScreen's deferred-launch shape.
+    @State private var pendingPlanIDForShare: UUID?
 
     public enum Phase: Equatable, Sendable {
         case ready
@@ -273,6 +292,7 @@ public struct SetupScreen: View {
         userID: UUID,
         locationCoordinator: LocationCoordinator,
         editingPlan: PlansStore.Plan? = nil,
+        telemetry: TelemetryWriter? = nil,
         onLaunched: ((UUID, UUID) -> Void)? = nil,
         onSaved: ((PlansStore.Plan) -> Void)? = nil,
         onDiscarded: (() -> Void)? = nil
@@ -284,6 +304,7 @@ public struct SetupScreen: View {
         self.userID = userID
         self.locationCoordinator = locationCoordinator
         self.editingPlan = editingPlan
+        self.telemetry = telemetry
         self.onLaunched = onLaunched
         self.onSaved = onSaved
         self.onDiscarded = onDiscarded
@@ -380,6 +401,45 @@ public struct SetupScreen: View {
                 coordinator: locationCoordinator,
                 onDismiss: { locationSheetOpen = false }
             )
+        }
+        // bug-29 — re-ports the share-sheet wiring deleted with
+        // `InitiatorScreen.swift` (PR #180, commit 87e803a). In
+        // `.group` / `.duo` mode the primary CTA mints Plan + Room,
+        // builds the canonical `InviteLink.url(...)`, and assigns
+        // `shareSheetState.pendingShare` to open this sheet. The
+        // `onDisappear` closure mirrors the retired InitiatorScreen
+        // behavior: share completed AND share canceled both fire
+        // `onLaunched` so the host routes the initiator into Waiting
+        // (the Plan + Room are already minted; backing out via Setup
+        // back/exit is a separate path), and both fire
+        // `TelemetryWriter.inviteShared(...)` to re-enable the
+        // `invite_shared` event (PRD user story 8) that has not fired
+        // in prod since 2026-05-20.
+        .sheet(item: Binding(
+            get: { shareSheetState.pendingShare },
+            set: { newValue in
+                if newValue == nil {
+                    shareSheetState.dismiss()
+                }
+            }
+        )) { share in
+            ShareSheet(items: [share.url])
+                .accessibilityIdentifier("setup.share.sheet")
+                .onDisappear {
+                    let planID = pendingPlanIDForShare
+                    pendingPlanIDForShare = nil
+                    shareSheetState.dismiss()
+                    // Best-effort telemetry — the network round-trip
+                    // must never block the route into Waiting. Same
+                    // fire-and-forget shape every other client-side
+                    // telemetry call uses.
+                    if let telemetry {
+                        Task { try? await telemetry.inviteShared(roomID: share.id, userID: userID) }
+                    }
+                    if let planID {
+                        onLaunched?(share.id, planID)
+                    }
+                }
         }
     }
 
@@ -751,11 +811,26 @@ public struct SetupScreen: View {
     }
 
     /// Primary CTA — mints (or updates) the Plan AND mints the Room
-    /// linked to it. Fires the existing invite / quiz flow.
+    /// linked to it.
+    ///
+    /// Solo path (`primaryLabel == "Start the quiz"`): fires
+    /// `onLaunched` immediately so the host routes into Quiz Q1 — the
+    /// existing tb-WF-4 behavior.
+    ///
+    /// Group / duo path (`primaryLabel == "Drop the invite link"`)
+    /// — bug-29: builds the canonical `InviteLink.url(...)` from the
+    /// freshly-minted room id + a placeholder token (matches the
+    /// retired InitiatorScreen pattern — signed/expiring tokens land
+    /// in a later tracer bullet) and assigns
+    /// `shareSheetState.pendingShare` to open the iOS share sheet.
+    /// `onLaunched` fires from the sheet's `onDisappear` closure so
+    /// the host routes the initiator into Waiting only after the
+    /// share completes / cancels.
     private func tapPrimary() {
         guard nameValid else { return }
         let payload = snapshotPayload()
         phase = .launchingRoom
+        let presentsShareSheet = (resolvedPlanScope != .solo)
         Task {
             do {
                 let plan = try await persistPlan(payload: payload)
@@ -770,7 +845,19 @@ public struct SetupScreen: View {
                     planID: plan.id
                 )
                 phase = .ready
-                onLaunched?(room.id, plan.id)
+                if presentsShareSheet {
+                    // Token is a placeholder — the v1 contract just
+                    // needs the round-trip-able shape per
+                    // `InviteLink.url(...)`. Signed/expiring tokens
+                    // land in a later tracer bullet. This mirrors the
+                    // retired InitiatorScreen pattern verbatim.
+                    let token = UUID().uuidString
+                    let url = InviteLink.url(roomID: room.id, inviteToken: token)
+                    pendingPlanIDForShare = plan.id
+                    shareSheetState.present(roomID: room.id, url: url)
+                } else {
+                    onLaunched?(room.id, plan.id)
+                }
             } catch {
                 phase = .error("Couldn't start the plan. \(String(describing: error))")
             }
@@ -843,6 +930,24 @@ public struct SetupScreen: View {
             onDiscarded?()
         }
     }
+}
+
+// MARK: - share sheet bridge (bug-29)
+
+/// Bridges `UIActivityViewController` into SwiftUI so SetupScreen can
+/// present the iOS share sheet from `.sheet(item:)`. Verbatim port of
+/// the type retired from `InitiatorScreen.swift` (commit 87e803a) —
+/// no behavior change. SwiftUI's `ShareLink` would suit a single
+/// `URL`, but the retired type is what bug-29 closes against so we
+/// keep the surface byte-equal.
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - flow layout (reused from ParametersScreen)
