@@ -222,6 +222,15 @@ public struct VerdictScreen: View {
     /// Suppressed in `.readOnly` and `.noSurvivor` per S05 §Modes.
     /// Suppressed when `rerollsUsed >= 3` (the footer reads "No rerolls
     /// left" instead per S07 §"Edge cases").
+    ///
+    /// bug-27 (2026-05-25): NO default value. Before bug-27 this
+    /// parameter defaulted to `{}` and every one of the 5 production
+    /// call sites omitted it — the live tertiary CTA was a silent
+    /// no-op. The default is gone so the compiler forces every future
+    /// call site to wire `onReroll` explicitly. The two `.readOnly` /
+    /// `.noSurvivor` / no-survivor call sites that gate the affordance
+    /// off via mode still pass `onReroll: { }` so the empty closure is
+    /// explicit and load-bearing, not silently defaulted.
     private let onReroll: () -> Void
 
     public init(
@@ -237,7 +246,7 @@ public struct VerdictScreen: View {
         onRatify: @escaping () -> Void = {},
         onWidenRadius: @escaping (Int) -> Void = { _ in },
         onHome: @escaping () -> Void = {},
-        onReroll: @escaping () -> Void = {}
+        onReroll: @escaping () -> Void
     ) {
         self.verdict = verdict
         self.mode = mode

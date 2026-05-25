@@ -258,6 +258,11 @@ public struct RootView: View {
                         host: host,
                         auth: coordinators.auth,
                         promptStore: AuthPromptStore(client: coordinators.client),
+                        // bug-27 — pass the Supabase client through so
+                        // the post-quiz `.verdict` phase can mount
+                        // `VerdictRerollHost` and the tertiary REROLL
+                        // CTA opens the S07 sheet.
+                        client: coordinators.client,
                         onEndSession: {
                             host.teardown()
                             postQuizHost = nil
@@ -283,7 +288,14 @@ public struct RootView: View {
                             openSoloSetup()
                             readOnlyView = nil
                             deepLink = nil
-                        }
+                        },
+                        // bug-27 — `.readOnly` mode suppresses the reroll
+                        // tertiary at render, but `onReroll` no longer
+                        // defaults to `{}`. The empty closure is explicit
+                        // and load-bearing: it documents that this branch
+                        // intentionally has no reroll wiring (the late-
+                        // joiner's verdict is sealed).
+                        onReroll: { }
                     )
                 } else if let payload = deepLink {
                     JoinScreen(
@@ -407,7 +419,12 @@ public struct RootView: View {
                             isInitiator: false,
                             onAdvance: {
                                 joinedReadOnly = nil
-                            }
+                            },
+                            // bug-27 — `.readOnly` mode suppresses the
+                            // reroll tertiary at render. Empty closure
+                            // is explicit per bug-27's architectural
+                            // fix (drop the `onReroll = {}` default).
+                            onReroll: { }
                         )
                     } else if let context = createdDecidedVerdict {
                         // tb-WF-8 — Created Decided-active tap from the
@@ -421,14 +438,23 @@ public struct RootView: View {
                         // teardown semantics the legacy `onAdvance`
                         // path used (clear the context, fall back
                         // through the precedence chain to S00).
-                        VerdictScreen(
+                        // bug-27 (2026-05-25) — wrap in
+                        // `VerdictRerollHost` so the tertiary REROLL
+                        // CTA actually opens the S07 sheet. Before
+                        // bug-27 the bare `VerdictScreen(...)` here
+                        // left `onReroll` defaulted to `{}` and the
+                        // tap was dead. The host owns the `RerollStore`
+                        // + the sheet-presented `RerollScreen`.
+                        VerdictRerollHost(
                             verdict: context.payload.verdict,
+                            roomID: context.roomID,
                             mode: .default,
                             isInitiator: true,
-                            onAdvance: {
+                            client: coordinators.client,
+                            onHome: {
                                 createdDecidedVerdict = nil
                             },
-                            onHome: {
+                            onAdvance: {
                                 createdDecidedVerdict = nil
                             }
                         )
@@ -442,7 +468,15 @@ public struct RootView: View {
                             isInitiator: false,
                             onAdvance: {
                                 createdHistoryVerdict = nil
-                            }
+                            },
+                            // bug-27 — `.readOnly` mode suppresses the
+                            // reroll tertiary at render; the closed
+                            // history Plan never burns a reroll. Empty
+                            // closure is explicit per bug-27's
+                            // architectural fix (drop the `onReroll =
+                            // {}` default so the next call site has to
+                            // wire it).
+                            onReroll: { }
                         )
                     } else {
                         // tb-WF-5 → tb-WF-6 → tb-WF-7 — S00 Plan list.
@@ -1027,6 +1061,11 @@ public struct RootView: View {
                 host: host,
                 auth: auth,
                 promptStore: AuthPromptStore(client: client),
+                // bug-27 — pass the Supabase client so the post-quiz
+                // `.verdict` phase mounts `VerdictRerollHost` and the
+                // tertiary REROLL CTA opens the S07 sheet on the
+                // joined-resume → waiting → verdict route.
+                client: client,
                 onEndSession: {
                     host.teardown()
                     joinedResume = nil

@@ -27,6 +27,7 @@
 // CLAUDE.md — no inline hex / px / easing literals.
 
 import SwiftUI
+import Supabase
 
 @MainActor
 public struct PostQuizHostScreen: View {
@@ -40,16 +41,26 @@ public struct PostQuizHostScreen: View {
     /// is never reached, so the chip dependencies are never needed.
     private let auth: AuthCoordinator?
     private let promptStore: AuthPromptStore?
+    /// bug-27 (2026-05-25) — Supabase client the `.verdict` phase
+    /// passes to `VerdictRerollHost` so the tertiary REROLL CTA can
+    /// open the S07 sheet. Optional so the existing snapshot tests
+    /// keep passing without a client; when nil the verdict renders as
+    /// the bare `VerdictScreen` (no live reroll wiring, same as
+    /// pre-bug-27 behaviour) which is fine for the smoke tests. The
+    /// `RootView` call site always supplies it.
+    private let client: SupabaseClient?
 
     public init(
         host: PostQuizHost,
         auth: AuthCoordinator? = nil,
         promptStore: AuthPromptStore? = nil,
+        client: SupabaseClient? = nil,
         onEndSession: @escaping () -> Void = {}
     ) {
         self.host = host
         self.auth = auth
         self.promptStore = promptStore
+        self.client = client
         self.onEndSession = onEndSession
     }
 
@@ -61,18 +72,7 @@ public struct PostQuizHostScreen: View {
             case .waiting(let store):
                 waitingSurface(store: store)
             case .verdict(let view):
-                VerdictScreen(
-                    verdict: view.verdict,
-                    mode: view.mode,
-                    isInitiator: host.context.isInitiator,
-                    // bug-22 — the chrome-row `Home` verb pops to S00
-                    // Plan list with the just-decided Plan visible in
-                    // the Decided section. `onEndSession` already
-                    // performs that fallback through the precedence
-                    // chain in `RootView` (clears `postQuizHost` →
-                    // chain falls through to PlanListScreen).
-                    onHome: onEndSession
-                )
+                verdictSurface(view: view)
             case .failed:
                 failedSurface
             }
@@ -82,6 +82,48 @@ public struct PostQuizHostScreen: View {
             // hierarchy — the poll loop's `Task.checkCancellation()`
             // catches that and unwinds. No leaked task.
             await host.start()
+        }
+    }
+
+    // MARK: - verdict (bug-27)
+
+    /// bug-27 — wire the verdict phase to `VerdictRerollHost` so the
+    /// tertiary REROLL CTA actually opens the S07 sheet. Before bug-27
+    /// the bare `VerdictScreen(...)` here left `onReroll` defaulted to
+    /// `{}` and the tap was dead for any post-quiz session that landed
+    /// the verdict on this surface (the second live `VerdictScreen`
+    /// site documented on bug-27's diagnosis).
+    ///
+    /// When `client` is nil (the snapshot-test call sites that never
+    /// reach a real reroll) we fall back to the bare `VerdictScreen`
+    /// passing an explicit empty `onReroll` so the screen still
+    /// materialises — this mirrors the read-only branches in
+    /// `RootView`.
+    @ViewBuilder
+    private func verdictSurface(view: VerdictStore.VerdictView) -> some View {
+        if let client {
+            VerdictRerollHost(
+                verdict: view.verdict,
+                roomID: host.context.roomID,
+                mode: view.mode,
+                isInitiator: host.context.isInitiator,
+                client: client,
+                // bug-22 — the chrome-row `Home` verb pops to S00 Plan
+                // list with the just-decided Plan visible in the
+                // Decided section. `onEndSession` already performs that
+                // fallback through the precedence chain in `RootView`
+                // (clears `postQuizHost` → chain falls through to
+                // PlanListScreen).
+                onHome: onEndSession
+            )
+        } else {
+            VerdictScreen(
+                verdict: view.verdict,
+                mode: view.mode,
+                isInitiator: host.context.isInitiator,
+                onHome: onEndSession,
+                onReroll: { }
+            )
         }
     }
 
