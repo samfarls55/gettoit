@@ -29,9 +29,9 @@ Concurrency cap: 2 (default).
 | bug-21 | #221 | merged | afk/bug-21 | [#229](https://github.com/samfarls55/gettoit/pull/229) | C-25 Action Dot hit area expanded to HIG 44pt; merged `fddf598` |
 | bug-22 | #222 | merged | afk/bug-22 | [#230](https://github.com/samfarls55/gettoit/pull/230) | Start over -> Home in top-leading chrome row; merged `cdf018e` |
 | bug-23 | #223 | merged | afk/bug-23 | [#231](https://github.com/samfarls55/gettoit/pull/231) | C-26 FAB T1 ink-fill rework + `GTIShadow.fab` token; merged `d0e7dd6` |
-| bug-24 | #224 | pr-open | afk/bug-24 | [#232](https://github.com/samfarls55/gettoit/pull/232) | New C-27 ActionSheet primitive + S00 migration. First subagent ended early w/o merging; resume subagent dispatched to rebase + retrigger CI |
-| bug-25 | #225 | building | afk/bug-25 | — | Quiz progress strip layout regression |
-| bug-26 | #226 | queued | afk/bug-26 | — | Remove verdict "See what got cut" drawer |
+| bug-24 | #224 | merged | afk/bug-24 | [#232](https://github.com/samfarls55/gettoit/pull/232) | New C-27 ActionSheet primitive + S00 migration; resume subagent rebased + merged `b18f34b` |
+| bug-25 | #225 | merged | afk/bug-25 | [#233](https://github.com/samfarls55/gettoit/pull/233) | Symmetric topBar spacers + bounded Q1 chrome spacer; merged `bd7a455` |
+| bug-26 | #226 | building | afk/bug-26 | — | Remove verdict "See what got cut" drawer |
 | bug-28 | #228 | queued | afk/bug-28 | — | Solo verdict time-badge subtitle copy |
 
 ## Event log
@@ -41,3 +41,4 @@ Concurrency cap: 2 (default).
 - 16:39 — bug-22 MERGED via PR #230 (`cdf018e`). Slot freed; spawned bug-24. Spec amendment lands with PR: S05 `Start over` -> `Home` repositioned to top-leading chrome row; `accessibility.md` VO read order updated.
 - 16:58 — bug-23 MERGED via PR #231 (`d0e7dd6`). Slot freed; spawned bug-25. Spec changes: C-26 FAB rework (T1 ink-fill), new `GTIShadow.fab` token + `.gtiShadow(_:)` extension, CHANGELOG marked BREAKING (FAB visual treatment changes).
 - 17:14 — bug-24 subagent ended early. PR #232 opened with full work (new C-27 ActionSheet primitive, S00 disambig + delete-confirm migrated), but the subagent did not merge: PR is `CONFLICTING` against main (bug-22 + bug-23 landed after the branch was cut) and the `ci.yml` workflow never triggered on the PR (only Vercel reported). Dispatched resume subagent in fresh worktree to rebase against `origin/main`, force-push to retrigger CI, then merge. Slot stays at 2 (bug-25 + bug-24-resume).
+- 17:22 — bug-24 MERGED via PR #232 (`b18f34b`). Resume subagent rebased against main (kept both bug-23 + bug-24 rows on `_index.md`), force-push retriggered CI automatically (no poke needed), all lanes green. bug-25 also visible as merged on main as PR #233 (`bd7a455`) — subagent notification still pending. Spawned bug-26 to fill the slot.
