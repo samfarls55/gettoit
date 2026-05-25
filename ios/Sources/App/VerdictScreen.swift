@@ -45,10 +45,12 @@ public struct VerdictScreen: View {
         /// TB-13 — single-member solo flow. Surface keeps the eyebrow +
         /// hero + meta + time badge + rule chip + `"I'm in"` + reroll;
         /// suppresses the voice-receipt row; replaces the group-save
-        /// affordance with the C-22 save-taste-profile chip. The time
-        /// badge audience reads `"You"` (singular) rather than
-        /// `"All N of you"`. See `design-system/surfaces/05-verdict.md`
-        /// §"solo".
+        /// affordance with the C-22 save-taste-profile chip. bug-28 —
+        /// the time badge renders the timestamp ONLY; the audience
+        /// subtitle is omitted. The communal `"All N of you"` frame
+        /// self-cancels with N = 1, and `"You"` only restates what the
+        /// solo voter already knows. See
+        /// `design-system/surfaces/05-verdict.md` §"solo".
         case solo
     }
 
@@ -482,10 +484,17 @@ public struct VerdictScreen: View {
                 .tracking(GTIFont.TrackingEm.displayS * 34)
                 .foregroundStyle(GTIColor.ink)
                 .lineSpacing(0)
-            Text(verdict.timeBadge.audience.uppercased())
-                .font(.system(size: 9, weight: .black))
-                .tracking(GTIFont.TrackingEm.eyebrow * 9)
-                .foregroundStyle(GTIColor.ink)
+            // bug-28 — solo mode (and any other caller) signals
+            // "suppress the audience subtitle" by passing an empty
+            // audience string. The subtitle Text is dropped entirely so
+            // the VStack collapses to one child — no empty placeholder
+            // row. Group modes (N ≥ 2) still surface `"ALL N OF YOU"`.
+            if !verdict.timeBadge.audience.isEmpty {
+                Text(verdict.timeBadge.audience.uppercased())
+                    .font(.system(size: 9, weight: .black))
+                    .tracking(GTIFont.TrackingEm.eyebrow * 9)
+                    .foregroundStyle(GTIColor.ink)
+            }
         }
         .padding(.horizontal, 30)
         .padding(.vertical, 12)

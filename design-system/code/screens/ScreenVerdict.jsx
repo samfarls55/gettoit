@@ -189,10 +189,16 @@ function ScreenVerdict({
                 <div className="gti-display" style={{ fontSize: 34, letterSpacing: '-0.02em', lineHeight: 1 }}>
                   7:00 PM
                 </div>
-                <div style={{
-                  marginTop: 4, fontSize: 9, fontWeight: 800,
-                  letterSpacing: 0.18, textTransform: 'uppercase',
-                }}>{isSolo ? 'You' : 'All four of you'}</div>
+                {/* bug-28 — solo drops the audience subtitle entirely.
+                    The communal `"All N of you"` frame self-cancels with
+                    N = 1, and `"You"` only restates what the solo voter
+                    already knows. Group modes still surface the line. */}
+                {!isSolo && (
+                  <div style={{
+                    marginTop: 4, fontSize: 9, fontWeight: 800,
+                    letterSpacing: 0.18, textTransform: 'uppercase',
+                  }}>All four of you</div>
+                )}
               </div>
             </div>
           )}

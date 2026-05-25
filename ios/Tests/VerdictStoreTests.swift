@@ -96,12 +96,14 @@ final class VerdictStoreTests: XCTestCase {
     }
 
     func testAudienceCopyForSolo() {
-        // TB-13 — solo audience reads bare `"You"`. The communal frame
-        // `"All N of you"` doesn't apply to a single voice. The S05
-        // solo variant time badge surfaces this copy directly. See
-        // `surfaces/05-verdict.md` §"solo".
-        XCTAssertEqual(VerdictStore.audienceCopy(forMemberCount: 1), "You",
-                       "solo time-badge audience reads 'You' (singular) — no communal frame")
+        // bug-28 — solo audience is OMITTED entirely. Earlier TB-13
+        // contract relabeled the singular case to `"You"`; the
+        // 2026-05-24 grill amended the spec — the communal frame
+        // self-cancels with N = 1, and `"You"` would only restate what
+        // the solo voter already knows. See
+        // `design-system/surfaces/05-verdict.md` §"solo" (post-bug-28).
+        XCTAssertEqual(VerdictStore.audienceCopy(forMemberCount: 1), "",
+                       "solo time-badge audience is omitted — empty string drops the subtitle row")
     }
 
     func testAudienceCopyForLargeGroupFallsBackToNumber() {

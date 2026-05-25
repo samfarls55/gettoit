@@ -140,14 +140,14 @@ Per surface, the focus order ladders from top → bottom, with the primary CTA a
 
 ### Verdict (`solo` mode)
 1. **Chrome row** (bug-22) — `Home` text verb, top-leading. Announced as `"Home, button"`. Tap pops to S00 Plan list.
-2. Eyebrow (`"Tonight, the verdict is"`) → Hero → Meta → Time badge (audience `"You"`) → Rule chip
+2. Eyebrow (`"Tonight, the verdict is"`) → Hero → Meta → Time badge (timestamp only — audience subtitle omitted per bug-28) → Rule chip
 3. Cuts drawer trigger (informational; same affordance as `default`)
 4. Primary CTA (`"I'm in"` / `"You're in"` once committed — no N-of-M denominator)
 5. Auth Upgrade Chip (`"Save this taste profile"`) — replaces the `default` mode's group-save affordance. Hidden when the user is already linked.
 6. Reroll tertiary
 7. Committed-state status line (`"Window closes in 47s"` once committed) — empty pre-commit; the chrome `Home` verb is the only navigation affordance pre-commit.
    - Voice-receipt row is suppressed — VO focus skips from rule chip directly to cuts trigger / CTA. No `"voice not counted"` announcement; the row simply isn't part of the read order.
-   - Time badge audience announces as `"Tonight at 7 PM, for you"` (singular form of the communal frame).
+   - Time badge announces as `"Tonight at 7 PM"` (bug-28). The audience subtitle is omitted on solo, so VO has nothing to announce after the timestamp — the communal `"for all N of you"` clause is the group-mode contract; solo has no equivalent.
 
 ### Reroll sheet
 1. Eyebrow + headline (modal title)
@@ -177,7 +177,7 @@ Per-component:
 | Chip (default) | `"{label}"` `accessibilityHint: "Double tap to add as a hard no."` |
 | Chip (selected) | `"{label}, selected"` `hint: "Double tap to remove."` |
 | Vibe stop | `"Vibe: {word}, position {n} of 5"` |
-| Time badge | `"Tonight at 7 PM, for all four of you"` |
+| Time badge | Group: `"Tonight at 7 PM, for all four of you"`. Solo (bug-28): `"Tonight at 7 PM"` — the audience clause is dropped when the visible subtitle is suppressed. |
 | Rule sentence | (read as static text; no special handling) |
 | Receipt chip | `"{name}: {action}"` |
 | Cuts trigger | `"See what got cut. Double tap to expand."` |
