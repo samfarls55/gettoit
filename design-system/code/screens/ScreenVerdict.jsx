@@ -1,6 +1,11 @@
-// Surface 09 — Verdict (hero) · 6 modes: 'default' | 'cuts' | 'committed' | 'read-only' | 'no-survivor' | 'solo'
+// Surface 09 — Verdict (hero) · 5 modes: 'default' | 'committed' | 'read-only' | 'no-survivor' | 'solo'
 // Choreographed reveal is canon (~1.4s).  Five-second test:
 //   verdict → rule → receipts → ratify → correctability — all in priority read order.
+//
+// bug-26 (2026-05-24) — the `cuts` mode and its "See what got cut →" drawer
+// were retired in full. The drawer offered a friction-free change-of-mind
+// path that re-litigated the verdict without paying the reroll's 3-burn /
+// stated-reason friction; reroll is now the only re-decide channel.
 
 const VERDICT_CHOREO = {
   eyebrow:  80,
@@ -45,13 +50,11 @@ function ScreenVerdict({
   const isReadOnly = mode === 'read-only';
   const isNoSurvivor = mode === 'no-survivor';
 
-  const [cutsOpen, setCutsOpen] = React.useState(mode === 'cuts');
   const [committed, setCommitted] = React.useState(mode === 'committed');
   const [widenOpen, setWidenOpen] = React.useState(false);
   const [widenRadius, setWidenRadius] = React.useState(3.0); // current + 1.0 mi
 
   React.useEffect(() => {
-    setCutsOpen(mode === 'cuts');
     setCommitted(mode === 'committed');
     setWidenOpen(false);
   }, [mode]);
@@ -96,7 +99,6 @@ function ScreenVerdict({
   // Solo suppresses receipts — one voice doesn't need to be receipted
   // back to itself. The group-default still surfaces the row.
   const showReceipts = !isNoSurvivor && !isSolo;
-  const showCutsDrawer = !isNoSurvivor;
   // bug-22 — `Home` chrome row surfaces on every iOS-reachable mode
   // except `read-only`. Web `read-only` invitees have no Plan-list
   // destination per the Web invitee definition in CONTEXT.md, and the
@@ -227,64 +229,6 @@ function ScreenVerdict({
                   delay={VERDICT_CHOREO.receipts + i * 80}
                 />
               ))}
-            </div>
-          )}
-
-          {/* cuts drawer — suppressed for no-survivor */}
-          {showCutsDrawer && (
-            <div style={{ marginTop: 18, padding: '0 22px' }}>
-              {!cutsOpen ? (
-                <button onClick={() => setCutsOpen(true)} style={{
-                  appearance: 'none', border: 0, background: 'transparent',
-                  color: 'rgba(255,255,255,0.85)', cursor: 'pointer',
-                  width: '100%', textAlign: 'center', padding: 8,
-                  fontFamily: 'var(--ff-body)', fontSize: 11, fontWeight: 800,
-                  letterSpacing: 0.16, textTransform: 'uppercase',
-                  ...anim(VERDICT_CHOREO.cta - 100, 500),
-                }}>See what got cut →</button>
-              ) : (
-                <div style={{ animation: 'gti-fade-up 360ms var(--ease-out-soft) both' }}>
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '0 4px 8px',
-                  }}>
-                    <div className="gti-eyebrow" style={{ color: '#fff', opacity: 0.7 }}>
-                      What got cut
-                    </div>
-                    <button onClick={() => setCutsOpen(false)} style={{
-                      appearance: 'none', border: 0, background: 'transparent',
-                      color: 'rgba(255,255,255,0.7)', cursor: 'pointer',
-                      fontFamily: 'var(--ff-body)', fontSize: 10, fontWeight: 800,
-                      letterSpacing: 0.14, textTransform: 'uppercase', padding: 2,
-                    }}>Hide</button>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {[
-                      { name: 'Ren Soba',   reason: 'over budget cap' },
-                      { name: 'Café Lou',   reason: 'shellfish veto' },
-                      { name: 'Halal Cart', reason: 'outside walk range' },
-                    ].map((c, i) => (
-                      <div key={c.name} style={{
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-                        padding: '8px 12px', borderRadius: 10,
-                        background: 'rgba(0,0,0,0.18)',
-                        animation: `gti-fade-up 340ms var(--ease-out-soft) ${i * 60}ms both`,
-                      }}>
-                        <span style={{
-                          textDecoration: 'line-through',
-                          textDecorationColor: 'rgba(255,255,255,0.6)',
-                          textDecorationThickness: 1.5,
-                          fontWeight: 800, fontSize: 14, color: '#fff',
-                        }}>{c.name}</span>
-                        <span style={{
-                          fontSize: 11, fontWeight: 600,
-                          color: 'rgba(255,255,255,0.7)', letterSpacing: 0.06,
-                        }}>{c.reason}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 

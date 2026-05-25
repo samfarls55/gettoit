@@ -293,7 +293,7 @@ Resolutions of note:
 | bug-23 | [[issues/bug-23-plan-list-fab-design-system-fit\|Plan list FAB rework — T1 ink-fill, new `shadow.fab` token]] | done (spec-gap) — PR #231 | AFK | [#223](https://github.com/samfarls55/gettoit/issues/223) | — |
 | bug-24 | [[issues/bug-24-bottom-sheet-ios-shape\|Split sheet primitive — keep C-16; add C-27 native-iOS Action Sheet]] | done (spec-gap) — PR #232 | AFK | [#224](https://github.com/samfarls55/gettoit/issues/224) | — |
 | bug-25 | [[issues/bug-25-quiz-progress-strip-layout-regression\|topBar trailing-spacer fix + Q1 chrome-row height-invariance audit]] | done (bug) — PR #233 | AFK | [#225](https://github.com/samfarls55/gettoit/issues/225) | — |
-| bug-26 | [[issues/bug-26-verdict-cuts-drawer-removal\|Full removal of the cuts drawer — collapse `cuts` mode into `default`]] | ready-for-agent (spec-gap) | AFK | [#226](https://github.com/samfarls55/gettoit/issues/226) | — |
+| bug-26 | [[issues/bug-26-verdict-cuts-drawer-removal\|Full removal of the cuts drawer — collapse `cuts` mode into `default`]] | done (spec-gap) — PR #235 | AFK | [#226](https://github.com/samfarls55/gettoit/issues/226) | — |
 | bug-27 | [[issues/bug-27-reroll-broken\|Reroll broken end-to-end — deferred to a `/diagnose` session]] | needs-info | — | [#227](https://github.com/samfarls55/gettoit/issues/227) | `/diagnose` against a TestFlight build |
 | bug-28 | [[issues/bug-28-solo-time-badge-audience-copy\|Drop solo audience subtitle entirely — group `"ALL N OF YOU"` unchanged]] | done (spec-gap) | AFK | [#228](https://github.com/samfarls55/gettoit/issues/228) | — |
 

@@ -9,7 +9,8 @@
 // The TB-09 contract on S05 `no-survivor`:
 //   * Eyebrow `"Tonight"`, hero `"NO SPOT / FITS"` (stacked one word
 //     per line), meta line surfaces surviving hard-needs.
-//   * Time badge, voice receipts, cuts drawer all SUPPRESSED.
+//   * Time badge + voice receipts SUPPRESSED. bug-26 removed the cuts
+//     drawer from every mode, so it is no longer a per-mode flag.
 //   * Primary CTA `"Widen radius"` (initiator-only); inline-expansion
 //     range slider 1..10 mi when tapped. Re-run commit fires
 //     `onWidenRadius(_:)`.
@@ -49,7 +50,7 @@ final class VerdictScreenNoSurvivorTests: XCTestCase {
 
     // MARK: - mode-flag contract
 
-    func testNoSurvivorModeSuppressesTimeBadgeReceiptsAndCuts() {
+    func testNoSurvivorModeSuppressesTimeBadgeAndReceipts() {
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.noSurvivorFixture(),
             mode: .noSurvivor
@@ -59,8 +60,6 @@ final class VerdictScreenNoSurvivorTests: XCTestCase {
             "no-survivor suppresses the time badge — there is no when/where to celebrate")
         XCTAssertFalse(snap.showReceipts,
             "no-survivor suppresses voice receipts — no verdict to receipt")
-        XCTAssertFalse(snap.showCutsDrawer,
-            "no-survivor suppresses the cuts drawer — the rule chip carries the load-bearing message")
     }
 
     func testNoSurvivorEyebrowIsTonightBare() {

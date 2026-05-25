@@ -15,7 +15,7 @@ Everything else is utility motion (button press, chip select, sheet open).
 | Token | Bezier | Use |
 |---|---|---|
 | `ease-out` | `cubic-bezier(.22, .61, .36, 1)` | Button press, chip select, top bar progress |
-| `ease-out-soft` | `cubic-bezier(.16, 1, .3, 1)` | Display text rise, sheet open, time-badge pop, cuts drawer fade-up |
+| `ease-out-soft` | `cubic-bezier(.16, 1, .3, 1)` | Display text rise, sheet open, time-badge pop |
 | `ease-in-out` | `cubic-bezier(.65, 0, .35, 1)` | Gradient color interpolation (only). Symmetric ease so the surface change reads as continuous. |
 
 **SwiftUI:** `Animation.timingCurve(0.16, 1, 0.3, 1, duration: 0.7)` etc.
@@ -88,7 +88,7 @@ Total time to interactive: ~1.88s. **The hero, time, and rule all land before 1.
 
 **Mode-specific reveal:**
 
-- **`read-only`** — same sequence as `choreo`. CTA fade-up at 1380ms lands on the re-invite CTA (`"Start a new decision"`) instead of `"I'm in"`. Cuts drawer trigger remains in its slot.
+- **`read-only`** — same sequence as `choreo`. CTA fade-up at 1380ms lands on the re-invite CTA (`"Start a new decision"`) instead of `"I'm in"`.
 - **`no-survivor`** — compressed reveal. There's no time badge or receipt row to choreograph, so the sequence collapses to: eyebrow (80ms · 500ms) → hero (280ms · 800ms) → meta (700ms · 500ms) → rule chip (1020ms · 500ms) → CTA (1380ms · 500ms). The rule chip carries the load-bearing message and lands before the CTA on purpose; the user reads the why before being offered the widen action. The inline `"Widen radius"` slider, when opened, fades up in 320ms (`gti-fade-up`).
 
 **SwiftUI implementation:**
@@ -144,7 +144,6 @@ The shutters are **dark blue-black** (`#0A0A0F`) with **sun-yellow hairline edge
 | Top bar progress current segment | width | (n/a — discrete steps; current segment fills 100% of its bay) |
 | Sheet open (reroll) | translateY + opacity | 380ms | ease-out-soft |
 | Sheet dismiss | reverse of open | 280ms | ease-out |
-| Cuts drawer open | height + fade-up children with 60ms stagger | 360ms / 340ms | ease-out-soft |
 | Avatar dot answered | all (color, ring, opacity) | 320ms | ease-out |
 | Receipt stagger | per-chip delay | 80ms | n/a |
 | Receipt entry | translateY 8 + scale 0.96 → 1 + opacity 0→1 | 480ms | ease-out-soft |
@@ -166,7 +165,6 @@ When `prefers-reduced-motion: reduce`:
 2. **Verdict reveal:** force `verdictReveal = 'off'` — everything appears at once.
 3. **Hard-close:** force `closeMotion = 'fade'`, drop the stamp pop animation.
 4. **Receipt stagger:** flatten to simultaneous.
-5. **Cuts drawer:** instant open/close, no fade-up.
 6. **Sheet open:** drop the translateY rise; opacity fade only.
 7. **Chip / CTA press scale:** keep (it's a press-feedback, not parallax).
 

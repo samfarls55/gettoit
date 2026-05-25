@@ -13,7 +13,8 @@
 //   * Suppressed: ratification CTA, reroll affordance, "Start over"
 //     secondary, pre-permission line.
 //   * Primary CTA `"Start a new decision"` (white pill).
-//   * Cuts drawer remains available (informational).
+//   * bug-26 (2026-05-24) — the cuts drawer was retired from every
+//     mode; read-only no longer surfaces a "See what got cut" trigger.
 //   * VO announces "Not available — this verdict is closed." for the
 //     ratification path.
 //
@@ -60,7 +61,7 @@ final class VerdictScreenReadOnlyTests: XCTestCase {
 
     // MARK: - mode flags (locked contract)
 
-    func testReadOnlyModeKeepsTimeBadgeReceiptsAndCutsDrawer() {
+    func testReadOnlyModeKeepsTimeBadgeAndReceipts() {
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.fixture(),
             mode: .readOnly
@@ -70,8 +71,6 @@ final class VerdictScreenReadOnlyTests: XCTestCase {
             "read-only mode keeps the time badge — the late-joiner sees the locked when/where")
         XCTAssertTrue(snap.showReceipts,
             "read-only mode keeps voice receipts — the late-joiner sees who contributed")
-        XCTAssertTrue(snap.showCutsDrawer,
-            "read-only mode keeps the cuts drawer (informational — reading what got cut helps understand what they missed)")
     }
 
     func testReadOnlyEyebrowIsTonightsVerdictPastTenseImplicit() {

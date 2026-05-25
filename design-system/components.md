@@ -223,18 +223,9 @@ The aggregate-rule receipt. One short sentence, not a paragraph. **Names what el
 
 ---
 
-## C-13 · Cuts Drawer
+## C-13 · _(retired — Cuts Drawer)_
 
-Collapsed by default. Reveals struck-through eliminated options, each tagged with the rule that killed it.
-
-| Element | Spec |
-|---|---|
-| Trigger (collapsed) | "See what got cut →" — eyebrow style, full width, white 0.85, centered |
-| Header (open) | Eyebrow "What got cut" + tappable "Hide" eyebrow on right |
-| Row | padding `8px 12px`, radius 10, `rgba(0,0,0,0.18)` bg, `gti-fade-up` stagger 60ms |
-| Cut name | Inter 800 / 14, white, `text-decoration: line-through` 1.5px white 0.6 |
-| Cut reason | Inter 600 / 11, white 0.7 |
-| Row gap | 6 |
+The cuts-drawer primitive was retired by bug-26 (2026-05-24). The verdict surface no longer carries a "See what got cut →" trigger or its expanded drawer in any mode. The slot is left intentionally empty — the design system tolerates gaps, and re-numbering would invalidate every existing C-NN citation in `surfaces/`, `accessibility.md`, and the iOS/web ports. See `CHANGELOG.md` for the rationale.
 
 ---
 
