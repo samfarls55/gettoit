@@ -143,6 +143,13 @@ function ScreenSetup({
                   }}
                 />
               </div>
+              {/* wfr-24 — adjacent character-limit hint (Input Hints
+                  pattern). Overrides the surface doc's original
+                  "no truncation indicator" line. */}
+              <span style={{
+                fontFamily: 'var(--ff-body)', fontSize: 13, fontWeight: 400,
+                color: 'rgba(255,255,255,0.55)',
+              }}>Up to 40 characters</span>
             </div>
 
             {/* 2. Who's coming — single-select chips (occasion framing) */}
@@ -161,6 +168,13 @@ function ScreenSetup({
                 place={locationPlace}
                 onOpen={onLocationOpen}
               />
+              {/* wfr-24 — optional + we'll-prompt-later hint
+                  (Input Hints pattern). Matches workflow-overhaul
+                  Q10 — Plan can ship with NULL location. */}
+              <span style={{
+                fontFamily: 'var(--ff-body)', fontSize: 13, fontWeight: 400,
+                color: 'rgba(255,255,255,0.55)',
+              }}>Optional — we'll prompt later</span>
             </div>
 
             {/* 4. When are you eating — single-select chips */}
@@ -199,6 +213,14 @@ function ScreenSetup({
                 ariaLabel="Plan distance"
                 valueLabel={`${distance.toFixed(1)} miles`}
               />
+              {/* wfr-24 — adjacent unit hint (Input Hints pattern).
+                  The mono-tag value label carries the live value;
+                  this clarifies the slider's purpose in plain language. */}
+              <span style={{
+                fontFamily: 'var(--ff-body)', fontSize: 13, fontWeight: 400,
+                color: 'rgba(255,255,255,0.55)',
+                marginTop: 4,
+              }}>From your location, in miles</span>
             </div>
 
             <div style={{ height: 4 }} />
