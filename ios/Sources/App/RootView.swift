@@ -71,12 +71,12 @@ public struct RootView: View {
     @State private var readOnlyView: ReadOnlyContext?
     /// TB-16 — set when the user taps a "Settings" affordance. tb-WF-5
     /// retired the legacy `LandingScreen.swift` entry point ("Account
-    /// Settings" CTA); the Plan list surface doc carries no top-level
-    /// Settings affordance, so until a follow-up wires a new entry
-    /// (Plan list chrome menu or settings sheet from inside Setup),
-    /// this state slot is reachable only when an external caller flips
-    /// it true. Renders the S09 Settings surface; the route clears on
-    /// Done or after a successful delete + re-bootstrap.
+    /// Settings" CTA); wfr-06 wires the entry through the S00 Plan list's
+    /// top-trailing settings chrome glyph (gear, SF Symbol `gearshape`)
+    /// — the host passes `onOpenSettings: { showingSettings = true }`
+    /// into `PlanListScreen`. Renders the S09 Settings surface; the
+    /// route clears on Done or after a successful delete + re-
+    /// bootstrap.
     @State private var showingSettings = false
     /// tb-WF-4 → tb-WF-5 — set when the user opens the Plan setup
     /// surface. While non-nil, the host renders the S01 SetupScreen
@@ -571,6 +571,17 @@ public struct RootView: View {
                                     userID: userID,
                                     coordinators: coordinators
                                 )
+                            },
+                            // wfr-06 — top-trailing settings chrome
+                            // glyph. Flips `showingSettings = true`;
+                            // the precedence chain above mounts
+                            // SettingsScreen, whose `onDone` flips the
+                            // flag back to false and returns control
+                            // to this surface. Closes the
+                            // SettingsScreen-has-no-UI-entry-point gap
+                            // documented on `@State showingSettings`.
+                            onOpenSettings: {
+                                showingSettings = true
                             }
                         )
                         .task { await refreshPlanList(userID: userID) }
