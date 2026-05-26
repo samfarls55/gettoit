@@ -57,11 +57,13 @@ C-22 stays in the spec — it's the correct fallback if any future surface ever 
 
 A [[../../CONTEXT|Web invitee]] who voted in the browser and then installs the iOS app gets a **fresh, disjoint Apple `user_id`** the moment they tap Sign in with Apple — the browser vote strands ([[../../gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]] §Context). The fix is **transport, before the Apple tap**: the web fallback mints a [[../../CONTEXT|Claim code]] that carries the browser's anonymous session; S00a collects it, installs it into the keychain, and the Apple tap then becomes `linkApple` (the legacy-anonymous row in the Two-launch boundary table above) instead of `signInWithApple`. The ordering — code first, Apple second — is exactly why the affordance lives **on S00a**: putting both on one screen makes the only correct order the default order ([[../../gti-vault/60_engineering/adr/0015-web-invitee-account-claim-bridge|ADR 0015]] §Why).
 
-### Default state — the quiet secondary entry
+### Default state — the labeled secondary entry
 
-Beneath the Sign-in-with-Apple pill, in the CTA dock, sits a **secondary text affordance** labelled `"Voted on the web?"`. It is deliberately **quiet and secondary** — the `eyebrow`-token text-link treatment (Inter 700 / 11 / tracking 0.18em / UPPERCASE, white 0.6, 44pt-tall hit row, centered), the same low-key treatment S00b's `"Pick a place manually"` and S01's `"SETTINGS"` link use. It never competes with the white pill for the eye.
+> **Spec amendment — wfr-21.** Updated 2026-05-26. The original sg-WF-8 lock specced this affordance as an `eyebrow`-token text link (quiet, 44pt hit row). A `/workflow-review` audit flagged the treatment as **buried** under the Apple pill — users with a claim code had to scan the page to find the entry. wfr-21 promotes it to a labeled secondary button (`PillCTA` `ghost` variant — C-05 row 4): transparent fill, white text, 1.5px white-0.5 inset stroke, `cta` register (UPPERCASE), full-column width, 52pt tall. Same primitive S01's "Open in app" / "Nudge Sam" secondary pills use. It reads as a button now, not an eyebrow link — but still visibly secondary to the filled white Apple pill. The common fresh-install user still reads "Voted on the web?" and ignores it without friction.
 
-The common fresh-install user — who was **never on the web** — reads `"Voted on the web?"`, answers "no" in their head, and **ignores it without friction**. It costs them nothing: no field, no extra screen, no decision. The affordance only matters to the small population of Web invitees converting to an app install, and for them it is the entire bridge.
+Beneath the Sign-in-with-Apple pill, in the CTA dock, sits a **secondary pill affordance** labelled `"Voted on the web?"`. It uses the `PillCTA` `ghost` variant (C-05) — transparent fill, white text, 1.5px white-0.5 inset stroke, `cta` register at 52pt height. It is visibly secondary to the filled white Apple pill but still reads as a tappable button, not a sentence link.
+
+The common fresh-install user — who was **never on the web** — reads `"Voted on the web?"`, answers "no" in their head, and **ignores it without friction**. It costs them nothing: no field, no extra screen, no decision. The affordance only matters to the small population of Web invitees converting to an app install, and for them it is the entire bridge — and wfr-21 ensures they can find it without scanning.
 
 ### Revealed state — code entry
 
@@ -98,7 +100,7 @@ The whole affordance is composition: the `eyebrow`-token text link is the S00b /
 
 ## Components used
 
-`GradientSurface` (initiator stop — visual continuity into S01 if the user proceeds) · `GTIMark` · `Eyebrow` · display headline (one word per line, like S01) · body sub-copy · single `PillCTA` `white` variant with Apple-glyph prefix (the same primitive C-22's `default` state uses) · the `"Voted on the web?"` `eyebrow`-token text link · the revealed account-claim soft-glass code input + its `PillCTA white` submit CTA.
+`GradientSurface` (initiator stop — visual continuity into S01 if the user proceeds) · `GTIMark` · `Eyebrow` · display headline (one word per line, like S01) · body sub-copy · single `PillCTA` `white` variant with Apple-glyph prefix (the same primitive C-22's `default` state uses) · the `"Voted on the web?"` `PillCTA` `ghost` variant (wfr-21 promotion from eyebrow text link) · the revealed account-claim soft-glass code input + its `PillCTA white` submit CTA.
 
 **No new components.** The Apple-prefixed pill is the existing `PillCTA white` + the prefix slot the component already exposes; the C-22 default-state render is the visual precedent. We do not import C-22 directly because S00a has no dismiss path and no `success` / `in-progress` / `dismissed` states — the surface owns its own copy, and the post-tap result is a route change, not a state change. The account-claim affordance (see §"Voted on the web?" above) is likewise pure composition of existing primitives — no new component, no new token.
 
