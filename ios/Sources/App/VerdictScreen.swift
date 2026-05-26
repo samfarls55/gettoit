@@ -947,11 +947,9 @@ public struct VerdictScreen: View {
 
         let eyebrow: String
         switch mode {
-        case .noSurvivor: eyebrow = "Tonight"
-        case .readOnly:   eyebrow = "Tonight's verdict"
-        // Solo intentionally falls through to the default copy — the
-        // singular voice still produced a verdict.
-        default:          eyebrow = "Tonight, the verdict is"
+        case .noSurvivor:                            eyebrow = "Tonight"
+        case .readOnly:                              eyebrow = "Tonight's verdict"
+        case .default, .committed, .solo:            eyebrow = "Tonight, the verdict is"
         }
 
         let primaryLabel: String

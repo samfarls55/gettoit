@@ -70,6 +70,22 @@ final class VerdictScreenRatifyTests: XCTestCase {
             "committed mode keeps the pre-permission line — the next-day check-in is voluntary, not opt-out")
     }
 
+    func testCommittedEyebrowMatchesDefault() {
+        // bug-32 — `.committed` shares the default eyebrow copy. Locked
+        // explicitly so the ENUM-002 fix (removing the `default:` arm of
+        // the `switch mode` over `eyebrow`) cannot silently drop the
+        // committed case.
+        let verdict = VerdictScreen.Verdict.fixture()
+        let snap = VerdictScreen(
+            verdict: verdict,
+            mode: .committed,
+            ratifiedCount: 1,
+            ratifiedTotal: 4
+        ).modeSnapshot
+        XCTAssertEqual(snap.eyebrowCopy, "Tonight, the verdict is",
+            "committed eyebrow matches default — the verdict copy doesn't change once you've committed")
+    }
+
     func testReadOnlyModeSuppressesThePreCheckInLine() {
         let verdict = VerdictScreen.Verdict.fixture()
         let snap = VerdictScreen(verdict: verdict, mode: .readOnly).modeSnapshot
