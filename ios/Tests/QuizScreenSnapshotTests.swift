@@ -117,6 +117,44 @@ final class QuizScreenSnapshotTests: XCTestCase {
             "S03 §Q5 default mode surfaces exactly 3 candidates")
     }
 
+    // MARK: - wfr-22 — progress strip step labels
+
+    /// wfr-22 — the progress strip's accessibility label follows the
+    /// locked `design-system/accessibility.md` §4 contract:
+    /// `"Question {n} of 5"`. The helper is the single source of truth;
+    /// both the visible label and the accessibilityLabel modifier read
+    /// from it.
+    func testProgressAccessibilityLabelMatchesLockedSpec() {
+        XCTAssertEqual(QuizScreen.progressAccessibilityLabel(forStep: 1), "Question 1 of 5")
+        XCTAssertEqual(QuizScreen.progressAccessibilityLabel(forStep: 2), "Question 2 of 5")
+        XCTAssertEqual(QuizScreen.progressAccessibilityLabel(forStep: 3), "Question 3 of 5")
+        XCTAssertEqual(QuizScreen.progressAccessibilityLabel(forStep: 4), "Question 4 of 5")
+        XCTAssertEqual(QuizScreen.progressAccessibilityLabel(forStep: 5), "Question 5 of 5")
+    }
+
+    /// wfr-22 — the visible label uses the short `Q{n} of 5` form so
+    /// the progress capsule row keeps its compact horizontal footprint.
+    /// Sighted users get the position, VoiceOver gets the longer
+    /// `"Question {n} of 5"` via the parent accessibility label.
+    func testProgressVisibleLabelIsCompactStepForm() {
+        XCTAssertEqual(QuizScreen.progressVisibleLabel(forStep: 1), "Q1 of 5")
+        XCTAssertEqual(QuizScreen.progressVisibleLabel(forStep: 5), "Q5 of 5")
+    }
+
+    /// wfr-22 — QuizScreen renders without crashing at every quiz step
+    /// (Q1..Q5) with the new progress label in place. Mirrors the
+    /// existing `testQuizScreenRendersInEverySubmitState` smoke but
+    /// asserts each step independently so a regression at any single
+    /// step is identifiable. Stand-in for pixel snapshots until the
+    /// snapshot library lands (see file header).
+    func testQuizScreenRendersAtEveryQuizStepWithProgressLabel() {
+        for target in [QuizCoordinator.Step.q1, .q2, .q3, .q4, .q5] {
+            let coord = makeCoordinator()
+            while coord.step != target { coord.advance() }
+            render(QuizScreen(coordinator: coord, onClose: {}))
+        }
+    }
+
     // MARK: - TB-26: Q5 no-results reference snapshot
 
     /// The Q5 `no-results` screen (sg-05's `no-results` mode) renders

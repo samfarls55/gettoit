@@ -298,35 +298,59 @@ public struct QuizScreen: View {
         // `.padding(.horizontal, step5)` insets. Both spacers are
         // `accessibilityHidden` so the strip is the only addressable
         // element in this row.
-        HStack(alignment: .center, spacing: GTISpacing.step4) {
-            Color.clear
-                .frame(width: 32, height: 32)
-                .accessibilityHidden(true)
+        //
+        // wfr-22 — the capsule strip pairs with a visible "Q{n} of 5"
+        // label so sighted users get position, and the combined
+        // element exposes `"Question {n} of 5"` to VoiceOver per
+        // `design-system/accessibility.md` §4. The visible label sits
+        // below the capsules in a tight VStack — keeping it inside
+        // the centred slot preserves the bug-25 horizontal symmetry.
+        VStack(spacing: GTISpacing.step2) {
+            HStack(alignment: .center, spacing: GTISpacing.step4) {
+                Color.clear
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
 
-            HStack(spacing: 5) {
-                ForEach(0..<5, id: \.self) { i in
-                    Capsule()
-                        .fill(i < activeIndex ? GTIColor.paper : GTIColor.paper.opacity(0.32))
-                        .frame(height: 4)
-                        .animation(
-                            .timingCurve(
-                                GTIMotion.Easing.out.0,
-                                GTIMotion.Easing.out.1,
-                                GTIMotion.Easing.out.2,
-                                GTIMotion.Easing.out.3,
-                                duration: 0.300
-                            ),
-                            value: activeIndex
-                        )
+                HStack(spacing: 5) {
+                    ForEach(0..<5, id: \.self) { i in
+                        Capsule()
+                            .fill(i < activeIndex ? GTIColor.paper : GTIColor.paper.opacity(0.32))
+                            .frame(height: 4)
+                            .animation(
+                                .timingCurve(
+                                    GTIMotion.Easing.out.0,
+                                    GTIMotion.Easing.out.1,
+                                    GTIMotion.Easing.out.2,
+                                    GTIMotion.Easing.out.3,
+                                    duration: 0.300
+                                ),
+                                value: activeIndex
+                            )
+                    }
                 }
-            }
-            .accessibilityIdentifier("quiz.progress")
+                .accessibilityIdentifier("quiz.progress")
 
-            Color.clear
-                .frame(width: 32, height: 32)
+                Color.clear
+                    .frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
+            }
+
+            Text(QuizScreen.progressVisibleLabel(forStep: activeIndex))
+                .font(.system(size: GTIFont.Size.monoTag, weight: .semibold, design: .monospaced))
+                .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
+                .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                .accessibilityIdentifier("quiz.progress.label")
                 .accessibilityHidden(true)
         }
         .padding(.horizontal, GTISpacing.step5)
+        // wfr-22 — combine the capsule strip + visible label into a
+        // single accessibility element so VoiceOver reads
+        // `"Question {n} of 5"` once per step, not 6 times (5 capsules
+        // + 1 label). The visible label is `accessibilityHidden` above
+        // for the same reason — the combined parent label owns the
+        // announcement.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(QuizScreen.progressAccessibilityLabel(forStep: activeIndex)))
     }
 
     // MARK: - content router
@@ -510,6 +534,26 @@ public struct QuizScreen: View {
         case .q1, .submitting, .submitted, .failed: return false
         case .q2, .q3, .q4, .q5: return true
         }
+    }
+
+    // MARK: - wfr-22 — progress strip step labels
+
+    /// wfr-22 — VoiceOver label for the 5-segment progress strip.
+    /// Locked to `design-system/accessibility.md` §4: `"Question {n}
+    /// of 5"`. Static so tests can pin the copy without instantiating
+    /// the view. `step` is the 1-indexed quiz position derived from
+    /// `activeIndex`; callers pass it directly.
+    public static func progressAccessibilityLabel(forStep step: Int) -> String {
+        "Question \(step) of 5"
+    }
+
+    /// wfr-22 — compact visible label rendered under the progress
+    /// capsules (e.g. `"Q1 of 5"`). The short form keeps the strip's
+    /// horizontal footprint tight while still giving sighted users
+    /// the same position context VoiceOver gets. Static so tests can
+    /// pin the copy directly.
+    public static func progressVisibleLabel(forStep step: Int) -> String {
+        "Q\(step) of 5"
     }
 
     // MARK: - bug-38 test seams
