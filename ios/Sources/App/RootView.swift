@@ -112,6 +112,14 @@ public struct RootView: View {
     /// tb-WF-8 — Decided-expired rows backing the S00 Plan list's
     /// History section.
     @State private var planListHistory: [PlansStore.DecidedPlanRow] = []
+    /// wfr-11 — true while `refreshPlanList` is in flight. Drives the
+    /// PlanListScreen's cold-load skeleton branch (the screen itself
+    /// suppresses the skeleton when any bucket already has rows, so a
+    /// hot reload after a write keeps the cached rows on screen
+    /// instead of flashing placeholders). Cleared in the same actor
+    /// hop that publishes the fetched rows, so the swap from skeleton
+    /// → real rows is atomic from the view's perspective.
+    @State private var isLoadingPlanList: Bool = false
     /// tb-WF-8 — when set, the host mounts the full VerdictScreen (with
     /// reroll affordance per surface §"Tap behavior") for a Created
     /// Decided-active Plan tapped from the list. Cleared when the user
@@ -519,6 +527,7 @@ public struct RootView: View {
                             decided: PlanListScreen.sortedDecided(planListDecided),
                             history: PlanListScreen.sortedHistory(planListHistory),
                             signedInUserID: userID,
+                            isLoading: isLoadingPlanList,
                             onRequestDisambig: {},
                             onPickGroupMode: { mode in
                                 if coordinators.locationCoordinator.authorization == .notDetermined {
@@ -704,6 +713,14 @@ public struct RootView: View {
     @MainActor
     private func refreshPlanList(userID: UUID) async {
         guard let coordinators else { return }
+        // wfr-11 — flip the loading flag for the duration of the four
+        // fetches. Always clear it on the way out, even if every
+        // subquery throws (the PlanListScreen's cold-load gate also
+        // checks `isEmpty`, so we won't get stuck on a permanent
+        // skeleton if all buckets remain empty after a failure — the
+        // empty hero takes over).
+        self.isLoadingPlanList = true
+        defer { self.isLoadingPlanList = false }
         async let pendingTask  = coordinators.plansStore.plansForList(userID: userID)
         async let joinedTask   = coordinators.plansStore.joinedPlansForList(userID: userID)
         async let decidedTask  = coordinators.plansStore.plansDecidedForList(userID: userID)
