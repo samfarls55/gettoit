@@ -157,8 +157,59 @@ public struct PostQuizHostScreen: View {
             }
             .padding(.horizontal, GTISpacing.step6)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // wfr-13 — Escape Hatch (interaction-patterns: Escape Hatch /
+            // P-01 Safe Exploration). Before this the user was trapped on
+            // the spinner while the post-Q5 router polled `verdicts`. The
+            // top-trailing Cancel returns to S00 Plan list — `onEndSession`
+            // (wired by `RootView`) calls `host.teardown()` to cancel the
+            // poll task and clears `postQuizHost` so the precedence chain
+            // falls through to PlanList. No confirmation: Q5 has already
+            // been submitted, nothing to discard, and the Escape Hatch
+            // anti-pattern guidance is explicit that a Cancel button that
+            // requires confirmation defeats its own purpose.
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: onEndSession) {
+                        Text(PostQuizHostScreen.resolvingCancelLabel.uppercased())
+                            .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                            .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                            .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                            .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                            .padding(.horizontal, 4)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("postQuiz.resolving.cancel")
+                    .accessibilityLabel(PostQuizHostScreen.resolvingCancelLabel)
+                }
+                .padding(.horizontal, GTISpacing.step5)
+                .frame(minHeight: 44)
+                Spacer()
+            }
         }
         .accessibilityIdentifier("postQuiz.resolving")
+    }
+
+    // MARK: - wfr-13 test seams
+
+    /// wfr-13 — text-only verb on the top-trailing chrome slot of the
+    /// `.resolving` phase. Matches the QuizChrome / LockedScreen
+    /// text-verb idiom (eyebrow type, no SF Symbol). Pinned by
+    /// `PostQuizHostScreenTests` so future paraphrase drift trips the
+    /// build, not the user.
+    public static let resolvingCancelLabel = "Cancel"
+
+    /// wfr-13 — test seam. The chrome Cancel is a SwiftUI Button bound
+    /// to the host-supplied `onEndSession` closure; SwiftUI tests do
+    /// not traverse the rendered tree to hit-test buttons, so this
+    /// exposes the closure invocation as a public surface for the
+    /// unit tests. The `forTesting` suffix marks it as a test-only
+    /// contract; the production code never calls this. Mirrors
+    /// `LockedScreen.simulateHomeTapForTesting()` (wfr-12).
+    public func simulateResolvingCancelTapForTesting() {
+        onEndSession()
     }
 
     // MARK: - waiting (S04 — group path)
