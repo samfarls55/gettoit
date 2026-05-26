@@ -316,6 +316,15 @@ public struct RootView: View {
                         },
                         onLateJoiner: { route in
                             Task { await loadReadOnly(roomID: payload.roomID, route: route, store: coordinators.lateJoinerStore) }
+                        },
+                        // wfr-14 — Cancel during `.joining` and "Try
+                        // another link" during `.error` both clear the
+                        // deepLink slot so the precedence-chain falls
+                        // back to S00 Plan list. The in-flight Task
+                        // started by `JoinScreen.task` is auto-
+                        // cancelled by SwiftUI when the view unmounts.
+                        onCancel: {
+                            deepLink = nil
                         }
                     )
                 } else if let userID = coordinators.auth.state.userID {

@@ -39,6 +39,13 @@ public struct JoinScreen: View {
     /// room's S01 defaults so the re-invite CTA on the read-only S05
     /// surface can pre-populate them.
     private let onLateJoiner: ((LateJoinerStore.Route) -> Void)?
+    /// wfr-14 — fires when the user abandons the join flow, either
+    /// via the Cancel chrome during `.joining` or the "Try another
+    /// link" tertiary on `.error`. RootView clears `deepLink` in the
+    /// wired handler so the user returns to the S00 Plan list. Same
+    /// closure for both paths per the Escape Hatch pattern: one
+    /// surface, one escape destination.
+    private let onCancel: () -> Void
 
     public init(
         payload: InviteLink.Payload,
@@ -47,7 +54,8 @@ public struct JoinScreen: View {
         lateJoinerStore: LateJoinerStore? = nil,
         phase: Phase = .joining,
         onJoined: ((UUID, UUID) -> Void)? = nil,
-        onLateJoiner: ((LateJoinerStore.Route) -> Void)? = nil
+        onLateJoiner: ((LateJoinerStore.Route) -> Void)? = nil,
+        onCancel: @escaping () -> Void = {}
     ) {
         self.payload = payload
         self.auth = auth
@@ -56,6 +64,7 @@ public struct JoinScreen: View {
         self._phase = State(initialValue: phase)
         self.onJoined = onJoined
         self.onLateJoiner = onLateJoiner
+        self.onCancel = onCancel
     }
 
     public var body: some View {
@@ -70,6 +79,9 @@ public struct JoinScreen: View {
                     .foregroundStyle(GTIColor.TextOnGradient.secondary)
 
                 content
+                    .padding(.top, GTISpacing.step2)
+
+                escapeAffordance
                     .padding(.top, GTISpacing.step2)
             }
             .padding(GTISpacing.step6)
@@ -104,6 +116,79 @@ public struct JoinScreen: View {
                 .multilineTextAlignment(.center)
                 .accessibilityIdentifier("join.error")
         }
+    }
+
+    /// wfr-14 — Escape Hatch + Error Messages patterns. Renders a
+    /// "Cancel" tertiary during `.joining` (the user can abort the
+    /// load) and a "Try another link" tertiary during `.error` (the
+    /// user can recover from a dead invite). The `.joined` phase
+    /// intentionally has no escape here — the host transitions
+    /// straight into the quiz on the `onJoined` callback, so the
+    /// JoinScreen unmounts on its own.
+    @ViewBuilder
+    private var escapeAffordance: some View {
+        switch phase {
+        case .joining:
+            Button(action: onCancel) {
+                Text(JoinScreen.cancelLabel.uppercased())
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(GTIFont.TrackingEm.eyebrow * 11)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.55))
+                    .padding(GTISpacing.step1)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("join.cta.cancel")
+            .accessibilityLabel(JoinScreen.cancelLabel)
+        case .error:
+            Button(action: onCancel) {
+                Text(JoinScreen.backLabel.uppercased())
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                    .padding(GTISpacing.step1)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("join.cta.back")
+            .accessibilityLabel(JoinScreen.backLabel)
+        case .joined:
+            EmptyView()
+        }
+    }
+
+    // MARK: - copy labels (wfr-14)
+
+    /// Cancel chrome label during `.joining`. Plain voluntary verb per
+    /// the Escape Hatch pattern. Matches the dialog/loader Cancel
+    /// idiom used elsewhere (SettingsScreen confirm-alert cancel,
+    /// RerollScreen cancel CTA).
+    public static let cancelLabel = "Cancel"
+
+    /// Recovery label during `.error`. Names the fix (re-invite) per
+    /// the Error Messages pattern instead of a sterile "Back" /
+    /// "Retry," and keeps the warm-friend register (CLAUDE.md product
+    /// invariant #1).
+    public static let backLabel = "Try another link"
+
+    // MARK: - test seams (wfr-14)
+
+    /// Drives the Cancel tertiary's closure directly. SwiftUI's
+    /// `Button` doesn't expose an easy programmatic-tap path in unit
+    /// tests, and the closure is the load-bearing contract. Mirrors
+    /// `LockedScreen.simulateHomeTapForTesting`.
+    public func simulateCancelTapForTesting() {
+        onCancel()
+    }
+
+    /// Drives the "Try another link" tertiary's closure directly.
+    /// Currently the same closure as Cancel — both paths share the
+    /// "abandon this deep-link" host destination. Kept as a separate
+    /// seam so the AC mapping is one-to-one with the test suite.
+    public func simulateBackTapForTesting() {
+        onCancel()
     }
 
     private func joinIfNeeded() async {
