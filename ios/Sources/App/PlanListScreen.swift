@@ -178,6 +178,22 @@ public struct PlanListScreen: View {
     /// parent Q3).
     public static let joinedChipLabel: String = "JOINED"
 
+    /// wfr-06 — accessibility identifier for the top-trailing settings
+    /// chrome glyph. Stable contract — UI test harnesses + future a11y
+    /// audits pin this string.
+    public static let settingsGlyphAccessibilityIdentifier: String =
+        "planList.settings.glyph"
+
+    /// wfr-06 — VoiceOver label for the settings chrome glyph. Single
+    /// noun — names the destination, not the icon. NEVER `"Open
+    /// settings"`, `"Account"`, `"Gear"`.
+    public static let settingsGlyphAccessibilityLabel: String = "Settings"
+
+    /// wfr-06 — VoiceOver hint for the settings chrome glyph. Names the
+    /// destination + the round-trip ("Done returns here").
+    public static let settingsGlyphAccessibilityHint: String =
+        "Opens the Settings screen."
+
     // MARK: - pure helpers
 
     /// Empty-state detection (pre-tb-WF-8 shape). Retained for the
@@ -450,6 +466,12 @@ public struct PlanListScreen: View {
     /// `PlansStore.roomIDForJoinedPlan` before invoking
     /// `MemberLeaveStore`.
     private let onLeavePlan: (PlansStore.JoinedPlanRow) -> Void
+    /// wfr-06 — fires when the user taps the top-trailing settings
+    /// chrome glyph. The host (RootView) flips `showingSettings = true`,
+    /// at which point the existing precedence chain renders
+    /// SettingsScreen. `SettingsScreen.onDone` flips the flag back to
+    /// false, returning the user to this surface.
+    private let onOpenSettings: () -> Void
 
     // MARK: - state
 
@@ -557,7 +579,8 @@ public struct PlanListScreen: View {
         onTapJoined: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in },
         onTapDecidedOrHistory: @escaping (PlansStore.DecidedPlanRow) -> Void = { _ in },
         onDeletePlan: @escaping (PlansStore.Plan, PlansStore.LifecycleState) -> Void = { _, _ in },
-        onLeavePlan: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in }
+        onLeavePlan: @escaping (PlansStore.JoinedPlanRow) -> Void = { _ in },
+        onOpenSettings: @escaping () -> Void = { }
     ) {
         self.pending = pending
         self.joined = joined
@@ -571,6 +594,7 @@ public struct PlanListScreen: View {
         self.onTapDecidedOrHistory = onTapDecidedOrHistory
         self.onDeletePlan = onDeletePlan
         self.onLeavePlan = onLeavePlan
+        self.onOpenSettings = onOpenSettings
 
         // Hydrate the History collapse state from UserDefaults using
         // the per-user key. `@AppStorage`'s declarative form wants a
@@ -674,11 +698,18 @@ public struct PlanListScreen: View {
 
     private var emptyState: some View {
         ZStack(alignment: .topLeading) {
-            // Top-leading GTI mark — present on both states so the
-            // user sees consistent chrome between empty + populated.
-            gtiMark
-                .padding(.horizontal, GTISpacing.step6)
-                .padding(.top, GTISpacing.step16)
+            // Top chrome — GTI mark leading, settings glyph trailing.
+            // The chrome row mirrors the populated-state `topBar` so a
+            // first-launch user with zero plans can still reach
+            // Settings (App Store 5.1.1(v) — account deletion must be
+            // discoverable from a cold launch). wfr-06.
+            HStack {
+                gtiMark
+                Spacer()
+                settingsGlyph
+            }
+            .padding(.horizontal, GTISpacing.step6)
+            .padding(.top, GTISpacing.step16)
 
             VStack(spacing: GTISpacing.step4) {
                 Text(Self.emptyHeroEyebrow.uppercased())
@@ -761,13 +792,17 @@ public struct PlanListScreen: View {
         }
     }
 
-    /// Top bar — GTI mark on the leading edge. The trailing slot is
-    /// empty in this slice; the create affordance moved to the C-26
-    /// FAB at the bottom-right (tb-WF-6).
+    /// Top bar — GTI mark on the leading edge, settings chrome glyph
+    /// on the trailing edge (wfr-06). The create affordance moved to
+    /// the C-26 FAB at the bottom-right (tb-WF-6); the trailing slot
+    /// now hosts the `Sign-In Tools` settings entry per the workflow-
+    /// design hub's pattern (top-right reserved for signed-in user
+    /// tooling — settings / account / sign-out).
     private var topBar: some View {
         HStack(alignment: .center) {
             gtiMark
             Spacer()
+            settingsGlyph
         }
         .padding(.horizontal, GTISpacing.step6)
         .padding(.top, GTISpacing.step16)
@@ -1222,6 +1257,38 @@ public struct PlanListScreen: View {
         .accessibilityHidden(true)
     }
 
+    /// wfr-06 — top-trailing settings chrome glyph. Honours the
+    /// workflow-design hub's `Sign-In Tools` convention (upper-right
+    /// for signed-in user tooling) and keeps the chrome visually
+    /// quiet — SF Symbol `gearshape`, paper @ 0.72 opacity to match
+    /// the same secondary-on-gradient register the gtiMark uses. Tap
+    /// fires `onOpenSettings`; the host (RootView) flips
+    /// `showingSettings = true` and SettingsScreen renders via the
+    /// existing precedence chain.
+    private var settingsGlyph: some View {
+        Button(action: onOpenSettings) {
+            ZStack {
+                // 22pt tap target — matches the gtiMark's visual
+                // weight so the chrome row reads as balanced.
+                RoundedRectangle(cornerRadius: GTISpacing.step1, style: .continuous)
+                    .fill(Color.clear)
+                    .frame(width: 22, height: 22)
+                Image(systemName: "gearshape")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(GTIColor.TextOnGradient.secondary)
+            }
+            // Expand the hit area to 44pt — HIG minimum — without
+            // disturbing the visible 22pt glyph footprint.
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(Self.settingsGlyphAccessibilityIdentifier)
+        .accessibilityLabel(Self.settingsGlyphAccessibilityLabel)
+        .accessibilityHint(Self.settingsGlyphAccessibilityHint)
+        .accessibilityAddTraits(.isButton)
+    }
+
     // MARK: - actions
 
     /// Open the disambig sheet. Both the empty-state hero pill and the
@@ -1349,6 +1416,15 @@ extension PlanListScreen {
     func simulateDeletePlanConfirm(_ plan: PlansStore.Plan) {
         let ctx = ConfirmContext.delete(plan: plan)
         fireConfirmedAction(for: ctx)
+    }
+
+    /// Test-only hook (wfr-06) — drive the top-trailing settings
+    /// chrome glyph tap without walking the SwiftUI view tree. Invokes
+    /// the same `onOpenSettings` callback the visible glyph fires;
+    /// production code goes through the Button + SwiftUI dispatcher.
+    @MainActor
+    func simulateOpenSettings() {
+        onOpenSettings()
     }
 
     /// Test-only hook (tb-WF-9) — drive a `Leave plan` confirmation
