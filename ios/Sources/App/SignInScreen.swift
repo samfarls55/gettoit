@@ -23,17 +23,20 @@
 //   * CTA label:      "Save my taste profile"  (NEVER "Sign in with Apple")
 //   * Error line:     "Couldn't reach Apple. Try again."
 //
-// tb-WF-14 / sg-WF-8 — the "Voted on the web?" account-claim affordance.
-// Beneath the Apple pill sits a quiet `eyebrow`-token text link; the
-// common fresh-install user reads it, answers "no" in their head, and
-// ignores it. The small population of Web invitees converting to an app
-// install taps it, types the claim code minted on the web, and the
-// redeem installs the carried anonymous session into the keychain — so
-// the Apple tap then routes through `linkApple`, preserving the
-// `user_id`. Pure composition of existing primitives — the soft-glass
-// input pattern (C-23 typeahead) + `PillCTA white` — no new component,
-// no new token. See design-system/surfaces/00a-signin.md §"Voted on the
-// web?".
+// tb-WF-14 / sg-WF-8 / wfr-21 — the "Voted on the web?" account-claim
+// affordance. Beneath the Apple pill sits a labeled secondary
+// `PillCTA` `ghost` button (wfr-21 promoted this from the original
+// quiet `eyebrow`-token text link after a workflow-review flagged the
+// link as buried); the common fresh-install user reads it, answers
+// "no" in their head, and ignores it. The small population of Web
+// invitees converting to an app install taps it, types the claim code
+// minted on the web, and the redeem installs the carried anonymous
+// session into the keychain — so the Apple tap then routes through
+// `linkApple`, preserving the `user_id`. Pure composition of existing
+// primitives — the soft-glass input pattern (C-23 typeahead) +
+// `PillCTA white` for submit + `PillCTA ghost` for reveal — no new
+// component, no new token. See design-system/surfaces/00a-signin.md
+// §"Voted on the web?".
 //   * Claim affordance label:  "Voted on the web?"
 //   * Teaching copy:           "Bring back your recent web Plans. ..."
 //   * Claim CTA label:         "Bring my Plans over"  (NEVER "Redeem")
@@ -55,6 +58,66 @@ public struct SignInScreen: View {
         case idle
         case linking
     }
+
+    // MARK: - spec-locked copy (00a-signin.md §"Copy register")
+
+    /// Apple sign-in pill label. Reuses the C-22 register; the `cta`
+    /// token uppercases this at render time. NEVER `"Sign in with Apple"`.
+    public static let applePillLabel = "Save my taste profile"
+
+    /// "Voted on the web?" account-claim reveal label. Question-form,
+    /// warm-friend register; asks the user to self-identify rather than
+    /// announcing a feature. NEVER `"Restore account"`, NEVER `"Have a code?"`.
+    public static let claimRevealLabel = "Voted on the web?"
+
+    /// Claim-code submit CTA label. Voluntary verb, plain noun; the
+    /// `cta` token uppercases it at render. NEVER `"Redeem"`, NEVER `"Submit"`.
+    public static let claimSubmitLabel = "Bring my Plans over"
+
+    // MARK: - spec-locked CTA treatment (wfr-21)
+    //
+    // The workflow-review found the claim-code affordance was rendering
+    // as a quiet eyebrow text link — buried under the Apple pill. The
+    // treatments below are the regression guard: the view body reads
+    // from these declarations and the snapshot test asserts they
+    // remain distinct and that the claim reveal stays a labeled button
+    // (C-05 `ghost`), not an eyebrow link.
+
+    /// Visual hierarchy for a CTA on the sign-in surface.
+    public enum CtaStyle: Equatable { case filledPill, ghostPill, textLink }
+
+    /// Background-fill token used by a CTA.
+    public enum CtaFill: Equatable { case paper, none }
+
+    /// Foreground-text token used by a CTA.
+    public enum CtaForeground: Equatable {
+        case ink
+        case paper
+        case textOnGradientTertiary
+    }
+
+    /// Treatment of a single CTA on the surface — style + fill + foreground.
+    public struct CtaTreatment: Equatable {
+        public let style: CtaStyle
+        public let fill: CtaFill
+        public let foreground: CtaForeground
+    }
+
+    /// The primary Apple pill — filled white (C-05 `white`).
+    public static let applePillTreatment = CtaTreatment(
+        style: .filledPill,
+        fill: .paper,
+        foreground: .ink
+    )
+
+    /// The claim-code reveal — labeled secondary button (C-05 `ghost`).
+    /// wfr-21 promoted this from an eyebrow text link so users with a
+    /// code can find the entry without scanning.
+    public static let claimRevealTreatment = CtaTreatment(
+        style: .ghostPill,
+        fill: .none,
+        foreground: .paper
+    )
 
     @State private var phase: Phase = .idle
     @State private var errorMessage: String?
@@ -185,7 +248,7 @@ public struct SignInScreen: View {
                     .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(GTIColor.TextOnSurface.primary)
                     .accessibilityHidden(true)
-                Text("Save my taste profile")
+                Text(Self.applePillLabel)
                     .font(.system(size: GTIFont.Size.cta, weight: .heavy))
                     .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
                     .textCase(.uppercase)
@@ -200,15 +263,16 @@ public struct SignInScreen: View {
         .buttonStyle(.plain)
         .disabled(inProgress)
         .accessibilityIdentifier("signin.cta")
-        .accessibilityLabel(Text("Save my taste profile"))
+        .accessibilityLabel(Text(Self.applePillLabel))
         .accessibilityHint(Text("Signs you in with Apple"))
     }
 
     // MARK: - "Voted on the web?" account-claim affordance (tb-WF-14)
 
-    /// The account-claim affordance — collapsed quiet link by default,
-    /// the revealed code-entry state once tapped. sg-WF-8 §"Default
-    /// state" / §"Revealed state".
+    /// The account-claim affordance — collapsed ghost pill by default
+    /// (wfr-21), the revealed code-entry state once tapped. See
+    /// sg-WF-8 §"Default state" / §"Revealed state" and the wfr-21
+    /// amendment in 00a-signin.md.
     @ViewBuilder
     private var claimAffordance: some View {
         switch claim.phase {
@@ -219,25 +283,35 @@ public struct SignInScreen: View {
         }
     }
 
-    /// The quiet secondary entry — `eyebrow`-token text-link treatment
-    /// (Inter 700 / 11 / tracking 0.18em / UPPERCASE, white 0.6, a
-    /// 44pt-tall centered hit row). The same low-key treatment S00b's
-    /// "Pick a place manually" and S01's "SETTINGS" link use. It never
-    /// competes with the white pill for the eye.
+    /// The secondary entry — `C-05 ghost` PillCTA treatment
+    /// (transparent fill, white text, 1.5px white-0.5 inset stroke).
+    /// wfr-21 promoted this from an eyebrow text link so the small
+    /// population of web invitees converting to an app install can
+    /// find their bridge without scanning the surface. The label
+    /// stays in `cta` register (UPPERCASE) so it reads as a button,
+    /// not a sentence link.
     private var votedOnTheWebLink: some View {
         Button {
             onVotedOnTheWebTapped()
         } label: {
-            Text("Voted on the web?")
-                .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+            Text(Self.claimRevealLabel)
+                .font(.system(size: GTIFont.Size.cta, weight: .heavy))
+                .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
                 .textCase(.uppercase)
-                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(
+                    RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
+                        .fill(Color.clear)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
+                        .stroke(GTIColor.paper.opacity(0.5), lineWidth: 1.5)
+                )
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("signin.claim.reveal")
-        .accessibilityLabel(Text("Voted on the web?"))
+        .accessibilityLabel(Text(Self.claimRevealLabel))
         .accessibilityHint(Text("Bring a Plan you voted on in your browser into the app"))
     }
 
@@ -312,7 +386,7 @@ public struct SignInScreen: View {
             Button {
                 Task { await onBringMyPlansOverTapped() }
             } label: {
-                Text("Bring my Plans over")
+                Text(Self.claimSubmitLabel)
                     .font(.system(size: GTIFont.Size.cta, weight: .heavy))
                     .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
                     .textCase(.uppercase)
@@ -325,7 +399,7 @@ public struct SignInScreen: View {
             .buttonStyle(.plain)
             .disabled(submitDisabled)
             .accessibilityIdentifier("signin.claim.submit")
-            .accessibilityLabel(Text("Bring my Plans over"))
+            .accessibilityLabel(Text(Self.claimSubmitLabel))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

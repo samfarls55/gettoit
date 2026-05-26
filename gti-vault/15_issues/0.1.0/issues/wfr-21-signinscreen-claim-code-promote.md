@@ -1,7 +1,7 @@
 ---
 issue: wfr-21
 title: Promote claim-code affordance on SignInScreen
-status: ready-for-agent
+status: in-progress
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
