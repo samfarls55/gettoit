@@ -8,7 +8,14 @@
 //
 // Visual: midnight gradient (reuses the registered `midnight` stop —
 // no new tokens), GTI mark top-left, eyebrow + smaller display
-// headline + body paragraph + white PillCTA + mono-tag "Done" footer.
+// headline + body paragraph + CTA dock.
+//
+// CTA dock (wfr-07, 2026-05-26): DONE is the visually dominant white
+// PillCTA (C-05 white variant); DELETE MY DATA renders below it in the
+// C-05 ghost destructive treatment (transparent fill, 1.5pt white-0.5
+// stroke, white text). The no-red contract from `tokens.md §1.3`
+// governs — destructive weight lives in the outline + copy + the
+// native two-step confirm alert, never in a colored fill.
 //
 // Behavior: tap "Delete my data" → native iOS confirm alert → on
 // confirm: `AuthCoordinator.deleteAndReboot()` (calls the delete-user
@@ -48,6 +55,53 @@ public struct SettingsScreen: View {
         case ready
         case deleting
         case error(String)
+    }
+
+    /// Locked visual hierarchy contract for S09 (wfr-07). Encoded on
+    /// the type so SettingsScreenTests can pin the post-wfr-07 register
+    /// without walking the view tree. A regression that re-promotes
+    /// DELETE to the white-pill register cannot ship without flipping
+    /// these flags — at which point the tests fail and reviewers can
+    /// challenge the change against `surfaces/09-settings.md`.
+    public enum Style {
+        /// C-05 PillCTA variants used on S09 after wfr-07.
+        public enum PillFill: Equatable { case white, ghost }
+
+        /// DONE renders as the C-05 white PillCTA — the visually
+        /// dominant primary that returns the user to S01.
+        public static let donePillFill: PillFill = .white
+
+        /// DELETE MY DATA renders in the C-05 ghost destructive
+        /// treatment — transparent fill, 1.5pt white-0.5 stroke, white
+        /// text. Demoted from the white-pill register per wfr-07.
+        public static let deletePillFill: PillFill = .ghost
+
+        /// C-05 ghost variant stroke width — matches the registered
+        /// PlanDisambigSheet ghost-pill register so all ghost pills in
+        /// the system share one outline weight.
+        public static let ghostStrokeWidth: CGFloat = 1.5
+
+        /// C-05 ghost variant stroke opacity — white 0.5 on gradient.
+        public static let ghostStrokeOpacity: Double = 0.5
+
+        /// `tokens.md §1.3` no-red contract — destructive treatment on
+        /// S09 is outline + copy, never a colored fill. Sun is the
+        /// only state color in Sunset Pop.
+        public static let usesRedDestructiveColor: Bool = false
+
+        /// CTA dock render order — lower = closer to the top of the
+        /// dock. DONE (primary) renders above DELETE (secondary) so
+        /// the dominant action sits closest to the thumb dock.
+        public static let donePrimaryOrder: Int = 0
+        public static let deleteSecondaryOrder: Int = 1
+
+        /// Two-step confirm alert copy preserved from the original
+        /// surface spec — wfr-07 changes the visual register of the
+        /// trigger only, never the consent flow.
+        public static let confirmAlertTitle: String = "Delete your data?"
+        public static let confirmAlertMessage: String = "This can't be undone."
+        public static let confirmAlertDestructiveLabel: String = "Delete forever"
+        public static let confirmAlertCancelLabel: String = "Cancel"
     }
 
     public var body: some View {
@@ -94,16 +148,16 @@ public struct SettingsScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .alert(
-            "Delete your data?",
+            Style.confirmAlertTitle,
             isPresented: $showingConfirm
         ) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete forever", role: .destructive) {
+            Button(Style.confirmAlertCancelLabel, role: .cancel) {}
+            Button(Style.confirmAlertDestructiveLabel, role: .destructive) {
                 runDelete()
             }
             .accessibilityIdentifier("settings.alert.delete")
         } message: {
-            Text("This can't be undone.")
+            Text(Style.confirmAlertMessage)
         }
     }
 
@@ -120,42 +174,76 @@ public struct SettingsScreen: View {
                     .accessibilityIdentifier("settings.error")
             }
 
-            Button {
-                showingConfirm = true
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
-                        .fill(GTIColor.paper)
-                        .frame(height: 60)
-                    Group {
-                        if phase == .deleting {
-                            ProgressView()
-                                .tint(GTIColor.ink)
-                        } else {
-                            Text("DELETE MY DATA")
-                                .font(.system(size: GTIFont.Size.cta, weight: .black))
-                                .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
-                                .foregroundStyle(GTIColor.ink)
-                        }
+            // DONE — C-05 white PillCTA, the visually dominant primary.
+            // wfr-07 promoted this from the mono-tag footer link to the
+            // canonical white pill so the user's exit verb is the most
+            // prominent action on the surface.
+            donePill
+
+            // DELETE MY DATA — C-05 ghost destructive treatment. The
+            // outline + copy + native two-step confirm alert carry the
+            // destructive weight per `tokens.md §1.3` (no red).
+            deletePill
+        }
+    }
+
+    /// C-05 white PillCTA — `var(--paper)` fill, ink text, 60pt tall,
+    /// radius 999. The visually dominant primary on S09 after wfr-07.
+    @ViewBuilder
+    private var donePill: some View {
+        Button(action: onDone) {
+            ZStack {
+                RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
+                    .fill(GTIColor.paper)
+                    .frame(height: 60)
+                Text("DONE")
+                    .font(.system(size: GTIFont.Size.cta, weight: .black))
+                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                    .foregroundStyle(GTIColor.ink)
+            }
+        }
+        .accessibilityIdentifier("settings.done")
+        .accessibilityLabel("Done. Return to start.")
+        .disabled(phase == .deleting)
+    }
+
+    /// C-05 ghost PillCTA — transparent fill, 1.5pt white-0.5 stroke,
+    /// 60pt tall, radius 999. The destructive treatment on S09 after
+    /// wfr-07; mirrors the ghost-pill register PlanDisambigSheet uses
+    /// for its Solo / Group affordances. The destructive weight rides
+    /// the outline + copy + native confirm alert, not a colored fill.
+    @ViewBuilder
+    private var deletePill: some View {
+        Button {
+            showingConfirm = true
+        } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
+                    .fill(Color.clear)
+                RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
+                    .strokeBorder(
+                        Color.white.opacity(Style.ghostStrokeOpacity),
+                        lineWidth: Style.ghostStrokeWidth
+                    )
+                Group {
+                    if phase == .deleting {
+                        ProgressView()
+                            .tint(GTIColor.TextOnGradient.primary)
+                    } else {
+                        Text("DELETE MY DATA")
+                            .font(.system(size: GTIFont.Size.cta, weight: .black))
+                            .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                            .foregroundStyle(GTIColor.TextOnGradient.primary)
                     }
                 }
             }
-            .accessibilityIdentifier("settings.cta.delete")
-            .accessibilityLabel("Delete my data")
-            .disabled(phase == .deleting)
-
-            Button(action: onDone) {
-                Text("DONE")
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
-                    .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("settings.done")
-            .accessibilityLabel("Done. Return to start.")
-            .disabled(phase == .deleting)
+            .frame(height: 60)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("settings.cta.delete")
+        .accessibilityLabel("Delete my data")
+        .disabled(phase == .deleting)
     }
 
     // MARK: - actions
