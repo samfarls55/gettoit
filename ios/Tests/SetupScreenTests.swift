@@ -238,4 +238,92 @@ final class SetupScreenTests: XCTestCase {
         XCTAssertEqual(SetupScreen.metersFromMiles(SetupScreen.defaultDistanceMiles), 1609,
             "defaultDistanceMiles → meters must match plans.distance_meters default of 1609")
     }
+
+    // MARK: - disabled-state CTA affordance (wfr-09)
+
+    /// wfr-09 — when the dock CTAs are disabled (name empty), opacity
+    /// alone fails low-vision + colorblind users. Both CTAs swap their
+    /// label to a non-opacity affordance — a "name your plan" prompt
+    /// that names exactly what is missing. Acceptance criterion #1:
+    /// "Disabled CTA carries a visible label change or icon."
+    ///
+    /// Voice register: warm-friend, second-person imperative — never
+    /// `"Name required"` (form-field register).
+
+    func testPrimaryCTADisabledCopyIsDistinctFromEveryEnabledState() {
+        let disabled = SetupScreen.primaryCTADisabledCopy()
+        XCTAssertFalse(disabled.isEmpty, "disabled label must not be empty")
+        XCTAssertNotEqual(disabled, SetupScreen.primaryCTACopy(for: .solo))
+        XCTAssertNotEqual(disabled, SetupScreen.primaryCTACopy(for: .duo))
+        XCTAssertNotEqual(disabled, SetupScreen.primaryCTACopy(for: .group))
+    }
+
+    func testSecondaryCTADisabledCopyIsDistinctFromEveryEnabledState() {
+        let disabled = SetupScreen.secondaryCTADisabledCopy()
+        XCTAssertFalse(disabled.isEmpty, "disabled label must not be empty")
+        XCTAssertNotEqual(disabled, SetupScreen.secondaryCTACopy(for: .create))
+        XCTAssertNotEqual(disabled, SetupScreen.secondaryCTACopy(for: .edit))
+    }
+
+    /// Voice register check — the disabled copy must read as the
+    /// warm-friend, second-person directive the design system codifies
+    /// (per `surfaces/01-setup.md` §"Copy register" + `README.md`
+    /// product invariant #1). The required substring is the load-bearing
+    /// word: the user must "name" their plan. Forbidden form-field
+    /// register: `required` / `field` / `error`.
+    func testDisabledCopyUsesWarmFriendRegister() {
+        let primary = SetupScreen.primaryCTADisabledCopy().lowercased()
+        let secondary = SetupScreen.secondaryCTADisabledCopy().lowercased()
+        for copy in [primary, secondary] {
+            XCTAssertTrue(copy.contains("name"),
+                "disabled copy must name what's missing — got \(copy)")
+            XCTAssertFalse(copy.contains("required"),
+                "disabled copy must not use form-field register — got \(copy)")
+            XCTAssertFalse(copy.contains("error"),
+                "disabled copy must not use form-field register — got \(copy)")
+        }
+    }
+
+    /// The label-to-display picker — chooses between the enabled and
+    /// disabled label by the same `nameValid` gate the `.disabled(...)`
+    /// modifier reads. This is the single source of truth the view body
+    /// reads when rendering the dock label.
+    func testPrimaryLabelToDisplaySwapsOnNameValid() {
+        XCTAssertEqual(
+            SetupScreen.primaryLabelToDisplay(nameValid: false, groupContext: .group),
+            SetupScreen.primaryCTADisabledCopy(),
+            "disabled state shows the affordance label, not the enabled label"
+        )
+        XCTAssertEqual(
+            SetupScreen.primaryLabelToDisplay(nameValid: true, groupContext: .group),
+            SetupScreen.primaryCTACopy(for: .group)
+        )
+        XCTAssertEqual(
+            SetupScreen.primaryLabelToDisplay(nameValid: true, groupContext: .solo),
+            SetupScreen.primaryCTACopy(for: .solo)
+        )
+        XCTAssertEqual(
+            SetupScreen.primaryLabelToDisplay(nameValid: true, groupContext: .duo),
+            SetupScreen.primaryCTACopy(for: .duo)
+        )
+    }
+
+    func testSecondaryLabelToDisplaySwapsOnNameValid() {
+        XCTAssertEqual(
+            SetupScreen.secondaryLabelToDisplay(nameValid: false, mode: .create),
+            SetupScreen.secondaryCTADisabledCopy()
+        )
+        XCTAssertEqual(
+            SetupScreen.secondaryLabelToDisplay(nameValid: false, mode: .edit),
+            SetupScreen.secondaryCTADisabledCopy()
+        )
+        XCTAssertEqual(
+            SetupScreen.secondaryLabelToDisplay(nameValid: true, mode: .create),
+            SetupScreen.secondaryCTACopy(for: .create)
+        )
+        XCTAssertEqual(
+            SetupScreen.secondaryLabelToDisplay(nameValid: true, mode: .edit),
+            SetupScreen.secondaryCTACopy(for: .edit)
+        )
+    }
 }
