@@ -293,7 +293,14 @@ public final class LocationCoordinator: NSObject {
         let search = MKLocalSearch(request: request)
         search.start { [weak self] response, _ in
             guard let self else { completion?(false); return }
-            DispatchQueue.main.async {
+            // Hop to the main actor via structured concurrency — the
+            // enclosing class is `@MainActor`, so mutations to
+            // `self.place` / `self.suggestions` need to land there.
+            // Semantics differ slightly from a manual main-queue
+            // dispatch (one extra cooperative-pool hop) but the
+            // observable effect on `@Published` state is the same.
+            // See CONC-010.
+            Task { @MainActor in
                 guard
                     let item = response?.mapItems.first,
                     item.placemark.coordinate.latitude.isFinite,
@@ -339,7 +346,12 @@ public final class LocationCoordinator: NSObject {
     ) {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         geocoder.reverseGeocodeLocation(location) { placemarks, _ in
-            DispatchQueue.main.async {
+            // Per CONC-010: hop to the main actor through structured
+            // concurrency rather than a manual main-queue dispatch.
+            // `completion` is a `(TimeZone) -> Void` that, in the only
+            // current caller (`select(suggestion:)`), feeds back into a
+            // `@MainActor`-isolated commit path.
+            Task { @MainActor in
                 completion(placemarks?.first?.timeZone ?? .current)
             }
         }
@@ -383,7 +395,12 @@ public final class LocationCoordinator: NSObject {
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, _ in
             guard let self else { return }
-            DispatchQueue.main.async {
+            // Per CONC-010: structured-concurrency hop to the main
+            // actor in place of the prior manual main-queue dispatch.
+            // `[weak self]` is still required to break the retain
+            // cycle on the long-lived geocoder callback; `Task`
+            // closures don't change that.
+            Task { @MainActor in
                 let mark = placemarks?.first
                 let (name, sub) = LocationCoordinator.displayName(from: mark, fallbackCoordinate: coordinate)
                 let resolved = ResolvedPlace(
