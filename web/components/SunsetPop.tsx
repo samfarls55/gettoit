@@ -11,6 +11,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { type CSSProperties, type ReactNode } from "react";
 
 // ── The 4-stop gradient map. Mirrors `GTI_GRADIENTS` in components.jsx ──
@@ -543,14 +544,25 @@ export function Glass({
 }
 
 export function GTIMark({ size = 18 }: { size?: number }) {
+  // wfr-18. The wordmark is the GetToIt home affordance on every web
+  // surface (NameEntry, InviteShell, InviteShellSurfaces terminals,
+  // WaitingScreen). Rendering it as a Link to `/` gives users a global
+  // Escape Hatch / Habituated home gesture without changing the visual
+  // lockup — the inline-flex row, tile, and "GetToIt" span are
+  // unchanged; we only swap the outer <div> for an <a>-shaped <Link>
+  // and reset the inherited anchor styles so the wordmark looks
+  // identical to its pre-link form.
   return (
-    <div
+    <Link
+      href="/"
+      aria-label="GetToIt — home"
       style={{
-        display: "flex",
+        display: "inline-flex",
         alignItems: "center",
         gap: 10,
         color: "var(--paper)",
         fontFamily: "var(--ff-body)",
+        textDecoration: "none",
       }}
     >
       <div
@@ -575,6 +587,6 @@ export function GTIMark({ size = 18 }: { size?: number }) {
       >
         GetToIt
       </span>
-    </div>
+    </Link>
   );
 }
