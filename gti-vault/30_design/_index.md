@@ -1,17 +1,17 @@
 ---
 folder: 30_design
-purpose: Design system — tokens, components, previews, briefs
+purpose: Interaction-patterns hub + superseded visual-design exploration archive
 ---
 
 # 30_design — Design
 
-Single source of truth for design system: tokens, components, previews, briefs.
+Hosts the interaction-patterns workflow-design hub (active) plus the pre-build visual-design exploration that fed `design-system/` at repo root (superseded). Visual tokens / components / motion now live in repo-root `design-system/`, not here.
 
 ## Contents
 
 ### Active
 
-- [[interaction-patterns/_index|interaction-patterns/]] — Workflow-audit framework distilled from Tidwell/Brewer/Valencia, *Designing Interfaces* (O'Reilly, 3rd ed., 2020). Per-pattern entries with audit signals (present/missing/anti-pattern), foundations (cognition + behavior principles), visual-style lenses, UI-systems lenses, plus a per-surface audit checklist and alphabetical quick reference. Entry point: [[interaction-patterns/00-how-to-audit]].
+- [[interaction-patterns/README|interaction-patterns/]] — Workflow-design hub distilled from Tidwell/Brewer/Valencia, *Designing Interfaces* (O'Reilly, 3rd ed., 2020). Six files: `principles.md` (29 foundation rules), `patterns.md` (81 named patterns, flat catalog), `surfaces.md` (9 surface playbooks + screen-type taxonomy + nav models), `workflows.md` (10 end-to-end recipes), `patterns.json` (machine index), `README.md` (entry point). Supports both audit and construction workflows.
 
 ### Superseded
 
@@ -25,4 +25,4 @@ The four docs below are **superseded** — pre-build design-exploration artifact
 ## Visual vs interaction split
 
 - **Visual** (tokens, color, type, motion, spacing) — lives in `design-system/` at repo root. The superseded docs above were its pre-build exploration.
-- **Interaction** (workflow patterns, navigation models, form/list/action patterns, cognition principles) — lives in [[interaction-patterns/_index|interaction-patterns/]]. Source-of-truth audit framework, not a one-off exploration.
+- **Interaction** (workflow patterns, navigation models, form/list/action patterns, cognition principles) — lives in [[interaction-patterns/README|interaction-patterns/]]. Source-of-truth design hub, not a one-off exploration.

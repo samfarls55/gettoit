@@ -1,0 +1,2157 @@
+{
+  "version": "1.0",
+  "generated_from": {
+    "patterns": "patterns.md",
+    "principles": "principles.md",
+    "workflows": "workflows.md"
+  },
+  "patterns": [
+    {
+      "id": "accordion",
+      "name": "Accordion",
+      "kind": "pattern",
+      "anchor": "patterns.md#Accordion",
+      "surface_tags": [
+        "settings",
+        "data"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "V-01"
+      ],
+      "source_chapter": 4,
+      "related": [
+        "module-tabs",
+        "collapsible-panels",
+        "titled-sections"
+      ]
+    },
+    {
+      "id": "action-panel",
+      "name": "Action Panel",
+      "kind": "pattern",
+      "anchor": "patterns.md#Action Panel",
+      "surface_tags": [
+        "do",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "button-groups",
+        "movable-panels",
+        "center-stage"
+      ]
+    },
+    {
+      "id": "alpha-numeric-scroller",
+      "name": "Alpha/Numeric Scroller",
+      "kind": "pattern",
+      "anchor": "patterns.md#Alpha/Numeric Scroller",
+      "surface_tags": [
+        "data"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-08",
+        "P-12"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "jump-to-item",
+        "annotated-scroll-bar"
+      ]
+    },
+    {
+      "id": "alternative-views",
+      "name": "Alternative Views",
+      "kind": "pattern",
+      "anchor": "patterns.md#Alternative Views",
+      "surface_tags": [
+        "overview",
+        "focus",
+        "data"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-04",
+        "P-09"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "deep-links",
+        "dynamic-queries"
+      ]
+    },
+    {
+      "id": "animated-transition",
+      "name": "Animated Transition",
+      "kind": "pattern",
+      "anchor": "patterns.md#Animated Transition",
+      "surface_tags": [
+        "overview",
+        "focus",
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "V-01"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "modal-panel"
+      ]
+    },
+    {
+      "id": "annotated-scroll-bar",
+      "name": "Annotated Scroll Bar",
+      "kind": "pattern",
+      "anchor": "patterns.md#Annotated Scroll Bar",
+      "surface_tags": [
+        "data",
+        "focus"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-12",
+        "V-01"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "alpha-numeric-scroller",
+        "datatips"
+      ]
+    },
+    {
+      "id": "autocompletion",
+      "name": "Autocompletion",
+      "kind": "pattern",
+      "anchor": "patterns.md#Autocompletion",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-11",
+        "P-03"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "input-prompt",
+        "forgiving-format",
+        "good-defaults-and-smart-prefills"
+      ]
+    },
+    {
+      "id": "bottom-navigation",
+      "name": "Bottom Navigation",
+      "kind": "pattern",
+      "anchor": "patterns.md#Bottom Navigation",
+      "surface_tags": [
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-07",
+        "P-08"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "vertical-stack",
+        "generous-borders",
+        "filmstrip"
+      ]
+    },
+    {
+      "id": "breadcrumbs",
+      "name": "Breadcrumbs",
+      "kind": "pattern",
+      "anchor": "patterns.md#Breadcrumbs",
+      "surface_tags": [
+        "overview",
+        "data"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "P-03"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "progress-indicator",
+        "feature-search-and-browse"
+      ]
+    },
+    {
+      "id": "button-groups",
+      "name": "Button Groups",
+      "kind": "pattern",
+      "anchor": "patterns.md#Button Groups",
+      "surface_tags": [
+        "do",
+        "make",
+        "form"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-03"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "prominent-done-button-or-assumed-next-step",
+        "visual-framework"
+      ]
+    },
+    {
+      "id": "cancelability",
+      "name": "Cancelability",
+      "kind": "pattern",
+      "anchor": "patterns.md#Cancelability",
+      "surface_tags": [
+        "do",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-04"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "spinners-and-loading-indicators"
+      ]
+    },
+    {
+      "id": "canvas-plus-palette",
+      "name": "Canvas Plus Palette",
+      "kind": "pattern",
+      "anchor": "patterns.md#Canvas Plus Palette",
+      "surface_tags": [
+        "make"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-06",
+        "P-12",
+        "V-01"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "module-tabs",
+        "center-stage"
+      ]
+    },
+    {
+      "id": "cards",
+      "name": "Cards",
+      "kind": "pattern",
+      "anchor": "patterns.md#Cards",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-03"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "thumbnail-grid",
+        "grid-of-equals"
+      ]
+    },
+    {
+      "id": "carousel",
+      "name": "Carousel",
+      "kind": "pattern",
+      "anchor": "patterns.md#Carousel",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-08",
+        "V-01"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "thumbnail-grid",
+        "filmstrip"
+      ]
+    },
+    {
+      "id": "center-stage",
+      "name": "Center Stage",
+      "kind": "pattern",
+      "anchor": "patterns.md#Center Stage",
+      "surface_tags": [
+        "focus",
+        "make",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-03"
+      ],
+      "source_chapter": 4,
+      "related": [
+        "collapsible-panels",
+        "movable-panels"
+      ]
+    },
+    {
+      "id": "clear-entry-points",
+      "name": "Clear Entry Points",
+      "kind": "pattern",
+      "anchor": "patterns.md#Clear Entry Points",
+      "surface_tags": [
+        "entry",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-02",
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "mobile-direct-access"
+      ]
+    },
+    {
+      "id": "collapsible-panels",
+      "name": "Collapsible Panels",
+      "kind": "pattern",
+      "anchor": "patterns.md#Collapsible Panels",
+      "surface_tags": [
+        "make",
+        "focus",
+        "settings"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "V-01"
+      ],
+      "source_chapter": 4,
+      "related": [
+        "center-stage",
+        "movable-panels",
+        "accordion",
+        "module-tabs"
+      ]
+    },
+    {
+      "id": "collections-and-cards",
+      "name": "Collections and Cards",
+      "kind": "pattern",
+      "anchor": "patterns.md#Collections and Cards",
+      "surface_tags": [
+        "data",
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "grid-of-equals",
+        "vertical-stack",
+        "infinite-list"
+      ]
+    },
+    {
+      "id": "command-history",
+      "name": "Command History",
+      "kind": "pattern",
+      "anchor": "patterns.md#Command History",
+      "surface_tags": [
+        "make",
+        "do"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-10",
+        "P-11"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "multilevel-undo",
+        "macros"
+      ]
+    },
+    {
+      "id": "dashboard",
+      "name": "Dashboard",
+      "kind": "pattern",
+      "anchor": "patterns.md#Dashboard",
+      "surface_tags": [
+        "overview",
+        "data"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-08",
+        "V-01"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "titled-sections",
+        "multi-y-graph",
+        "small-multiples"
+      ]
+    },
+    {
+      "id": "data-brushing",
+      "name": "Data Brushing",
+      "kind": "pattern",
+      "anchor": "patterns.md#Data Brushing",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-06",
+        "P-01"
+      ],
+      "source_chapter": 9,
+      "related": [
+        "dynamic-queries",
+        "data-spotlight"
+      ]
+    },
+    {
+      "id": "data-spotlight",
+      "name": "Data Spotlight",
+      "kind": "pattern",
+      "anchor": "patterns.md#Data Spotlight",
+      "surface_tags": [
+        "data",
+        "focus"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-09"
+      ],
+      "source_chapter": 9,
+      "related": [
+        "datatips",
+        "dynamic-queries"
+      ]
+    },
+    {
+      "id": "datatips",
+      "name": "Datatips",
+      "kind": "pattern",
+      "anchor": "patterns.md#Datatips",
+      "surface_tags": [
+        "data",
+        "focus"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "V-01"
+      ],
+      "source_chapter": 9,
+      "related": [
+        "data-spotlight"
+      ]
+    },
+    {
+      "id": "deep-links",
+      "name": "Deep Links",
+      "kind": "pattern",
+      "anchor": "patterns.md#Deep Links",
+      "surface_tags": [
+        "overview",
+        "focus",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-10",
+        "P-08"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "alternative-views",
+        "dynamic-queries"
+      ]
+    },
+    {
+      "id": "drop-down-chooser",
+      "name": "Drop-down Chooser",
+      "kind": "pattern",
+      "anchor": "patterns.md#Drop-down Chooser",
+      "surface_tags": [
+        "form",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "autocompletion",
+        "fill-in-the-blanks",
+        "escape-hatch"
+      ]
+    },
+    {
+      "id": "dynamic-queries",
+      "name": "Dynamic Queries",
+      "kind": "pattern",
+      "anchor": "patterns.md#Dynamic Queries",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-06",
+        "P-12"
+      ],
+      "source_chapter": 9,
+      "related": [
+        "data-brushing"
+      ]
+    },
+    {
+      "id": "error-messages",
+      "name": "Error Messages",
+      "kind": "pattern",
+      "anchor": "patterns.md#Error Messages",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-03"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "password-strength-meter",
+        "forgiving-format",
+        "input-hints",
+        "cancelability"
+      ]
+    },
+    {
+      "id": "escape-hatch",
+      "name": "Escape Hatch",
+      "kind": "pattern",
+      "anchor": "patterns.md#Escape Hatch",
+      "surface_tags": [
+        "overview",
+        "entry",
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-04"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "modal-panel"
+      ]
+    },
+    {
+      "id": "fat-menus",
+      "name": "Fat Menus",
+      "kind": "pattern",
+      "anchor": "patterns.md#Fat Menus",
+      "surface_tags": [
+        "overview",
+        "settings"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "V-01"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "sitemap-footer",
+        "titled-sections"
+      ]
+    },
+    {
+      "id": "feature-search-and-browse",
+      "name": "Feature, Search, and Browse",
+      "kind": "pattern",
+      "anchor": "patterns.md#Feature, Search, and Browse",
+      "surface_tags": [
+        "overview",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-02",
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "menu-page",
+        "breadcrumbs",
+        "cards"
+      ]
+    },
+    {
+      "id": "fill-in-the-blanks",
+      "name": "Fill-in-the-Blanks",
+      "kind": "pattern",
+      "anchor": "patterns.md#Fill-in-the-Blanks",
+      "surface_tags": [
+        "form",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "P-12"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "drop-down-chooser",
+        "smart-menu-items"
+      ]
+    },
+    {
+      "id": "filmstrip",
+      "name": "Filmstrip",
+      "kind": "pattern",
+      "anchor": "patterns.md#Filmstrip",
+      "surface_tags": [
+        "mobile-overlay",
+        "overview"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-07",
+        "P-08"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "bottom-navigation",
+        "collections-and-cards"
+      ]
+    },
+    {
+      "id": "forgiving-format",
+      "name": "Forgiving Format",
+      "kind": "pattern",
+      "anchor": "patterns.md#Forgiving Format",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "P-05"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "structured-format",
+        "input-hints",
+        "autocompletion",
+        "error-messages"
+      ]
+    },
+    {
+      "id": "generous-borders",
+      "name": "Generous Borders",
+      "kind": "pattern",
+      "anchor": "patterns.md#Generous Borders",
+      "surface_tags": [
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "vertical-stack",
+        "bottom-navigation"
+      ]
+    },
+    {
+      "id": "good-defaults-and-smart-prefills",
+      "name": "Good Defaults and Smart Prefills",
+      "kind": "pattern",
+      "anchor": "patterns.md#Good Defaults and Smart Prefills",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-05",
+        "P-11",
+        "P-03"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "input-prompt",
+        "autocompletion"
+      ]
+    },
+    {
+      "id": "grid-of-equals",
+      "name": "Grid of Equals",
+      "kind": "pattern",
+      "anchor": "patterns.md#Grid of Equals",
+      "surface_tags": [
+        "overview",
+        "data"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "V-01",
+        "P-03"
+      ],
+      "source_chapter": 4,
+      "related": [
+        "collections-and-cards",
+        "titled-sections"
+      ]
+    },
+    {
+      "id": "help-systems",
+      "name": "Help Systems",
+      "kind": "pattern",
+      "anchor": "patterns.md#Help Systems",
+      "surface_tags": [
+        "overview",
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "P-13",
+        "P-12"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "input-hints",
+        "hover-or-pop-up-tools"
+      ]
+    },
+    {
+      "id": "hover-or-pop-up-tools",
+      "name": "Hover or Pop-Up Tools",
+      "kind": "pattern",
+      "anchor": "patterns.md#Hover or Pop-Up Tools",
+      "surface_tags": [
+        "data",
+        "do"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-12"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "action-panel",
+        "list-inlay",
+        "drop-down-chooser"
+      ]
+    },
+    {
+      "id": "infinite-list",
+      "name": "Infinite List",
+      "kind": "pattern",
+      "anchor": "patterns.md#Infinite List",
+      "surface_tags": [
+        "data",
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-08",
+        "P-02"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "loading-or-progress-indicators",
+        "collections-and-cards",
+        "vertical-stack"
+      ]
+    },
+    {
+      "id": "input-hints",
+      "name": "Input Hints",
+      "kind": "pattern",
+      "anchor": "patterns.md#Input Hints",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "P-05"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "input-prompt",
+        "forgiving-format",
+        "error-messages"
+      ]
+    },
+    {
+      "id": "input-prompt",
+      "name": "Input Prompt",
+      "kind": "pattern",
+      "anchor": "patterns.md#Input Prompt",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "P-05"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "input-hints",
+        "good-defaults-and-smart-prefills",
+        "autocompletion"
+      ]
+    },
+    {
+      "id": "jump-to-item",
+      "name": "Jump to Item",
+      "kind": "pattern",
+      "anchor": "patterns.md#Jump to Item",
+      "surface_tags": [
+        "data",
+        "form"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-12",
+        "P-11"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "alpha-numeric-scroller",
+        "autocompletion"
+      ]
+    },
+    {
+      "id": "list-builder",
+      "name": "List Builder",
+      "kind": "pattern",
+      "anchor": "patterns.md#List Builder",
+      "surface_tags": [
+        "form",
+        "settings"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-12",
+        "P-04"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "drop-down-chooser"
+      ]
+    },
+    {
+      "id": "list-inlay",
+      "name": "List Inlay",
+      "kind": "pattern",
+      "anchor": "patterns.md#List Inlay",
+      "surface_tags": [
+        "data",
+        "focus"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-04",
+        "P-09"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "two-panel-selector-or-split-view",
+        "one-window-drilldown",
+        "accordion"
+      ]
+    },
+    {
+      "id": "loading-or-progress-indicators",
+      "name": "Loading or Progress Indicators",
+      "kind": "pattern",
+      "anchor": "patterns.md#Loading or Progress Indicators",
+      "surface_tags": [
+        "mobile-overlay",
+        "do"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-02",
+        "P-08"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "touch-tools",
+        "infinite-list"
+      ]
+    },
+    {
+      "id": "macros",
+      "name": "Macros",
+      "kind": "pattern",
+      "anchor": "patterns.md#Macros",
+      "surface_tags": [
+        "make",
+        "do"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-11",
+        "P-06"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "multilevel-undo",
+        "command-history"
+      ]
+    },
+    {
+      "id": "make-it-mobile",
+      "name": "Make It Mobile",
+      "kind": "pattern",
+      "anchor": "patterns.md#Make It Mobile",
+      "surface_tags": [
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-02",
+        "P-08",
+        "V-05"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "vertical-stack",
+        "richly-connected-apps"
+      ]
+    },
+    {
+      "id": "many-workspaces",
+      "name": "Many Workspaces",
+      "kind": "pattern",
+      "anchor": "patterns.md#Many Workspaces",
+      "surface_tags": [
+        "make",
+        "focus"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-04",
+        "P-10"
+      ],
+      "source_chapter": 2,
+      "related": []
+    },
+    {
+      "id": "media-browser",
+      "name": "Media Browser",
+      "kind": "pattern",
+      "anchor": "patterns.md#Media Browser",
+      "surface_tags": [
+        "overview",
+        "focus",
+        "data"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-09"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "thumbnail-grid",
+        "two-panel-selector-or-split-view",
+        "pyramid"
+      ]
+    },
+    {
+      "id": "menu-page",
+      "name": "Menu Page",
+      "kind": "pattern",
+      "anchor": "patterns.md#Menu Page",
+      "surface_tags": [
+        "overview",
+        "entry",
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "feature-search-and-browse",
+        "settings-editor"
+      ]
+    },
+    {
+      "id": "mobile-direct-access",
+      "name": "Mobile Direct Access",
+      "kind": "pattern",
+      "anchor": "patterns.md#Mobile Direct Access",
+      "surface_tags": [
+        "mobile-overlay",
+        "entry"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-02",
+        "P-08"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "clear-entry-points"
+      ]
+    },
+    {
+      "id": "modal-panel",
+      "name": "Modal Panel",
+      "kind": "pattern",
+      "anchor": "patterns.md#Modal Panel",
+      "surface_tags": [
+        "mobile-overlay",
+        "do",
+        "form"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-07",
+        "V-01"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "escape-hatch"
+      ]
+    },
+    {
+      "id": "module-tabs",
+      "name": "Module Tabs",
+      "kind": "pattern",
+      "anchor": "patterns.md#Module Tabs",
+      "surface_tags": [
+        "settings",
+        "data",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "V-01"
+      ],
+      "source_chapter": 4,
+      "related": [
+        "accordion",
+        "collapsible-panels",
+        "titled-sections",
+        "movable-panels"
+      ]
+    },
+    {
+      "id": "movable-panels",
+      "name": "Movable Panels",
+      "kind": "pattern",
+      "anchor": "patterns.md#Movable Panels",
+      "surface_tags": [
+        "make",
+        "settings",
+        "overview"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "P-07",
+        "P-04"
+      ],
+      "source_chapter": 4,
+      "related": [
+        "center-stage",
+        "collapsible-panels"
+      ]
+    },
+    {
+      "id": "multi-y-graph",
+      "name": "Multi-Y Graph",
+      "kind": "pattern",
+      "anchor": "patterns.md#Multi-Y Graph",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-09"
+      ],
+      "source_chapter": 9,
+      "related": [
+        "small-multiples",
+        "datatips",
+        "titled-sections"
+      ]
+    },
+    {
+      "id": "multilevel-undo",
+      "name": "Multilevel Undo",
+      "kind": "pattern",
+      "anchor": "patterns.md#Multilevel Undo",
+      "surface_tags": [
+        "make",
+        "do"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-06"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "smart-menu-items",
+        "command-history"
+      ]
+    },
+    {
+      "id": "new-item-row",
+      "name": "New-Item Row",
+      "kind": "pattern",
+      "anchor": "patterns.md#New-Item Row",
+      "surface_tags": [
+        "data",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-06",
+        "P-05"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "good-defaults-and-smart-prefills",
+        "input-prompt"
+      ]
+    },
+    {
+      "id": "one-window-drilldown",
+      "name": "One-Window Drilldown",
+      "kind": "pattern",
+      "anchor": "patterns.md#One-Window Drilldown",
+      "surface_tags": [
+        "data",
+        "focus",
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-04",
+        "P-09"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "two-panel-selector-or-split-view",
+        "list-inlay",
+        "menu-page"
+      ]
+    },
+    {
+      "id": "pagination",
+      "name": "Pagination",
+      "kind": "pattern",
+      "anchor": "patterns.md#Pagination",
+      "surface_tags": [
+        "data"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-08",
+        "P-09"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "infinite-list"
+      ]
+    },
+    {
+      "id": "password-strength-meter",
+      "name": "Password Strength Meter",
+      "kind": "pattern",
+      "anchor": "patterns.md#Password Strength Meter",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-06",
+        "P-03"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "input-hints",
+        "error-messages"
+      ]
+    },
+    {
+      "id": "preview",
+      "name": "Preview",
+      "kind": "pattern",
+      "anchor": "patterns.md#Preview",
+      "surface_tags": [
+        "do",
+        "make",
+        "form"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-06"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "cancelability",
+        "multilevel-undo",
+        "forgiving-format"
+      ]
+    },
+    {
+      "id": "progress-indicator",
+      "name": "Progress Indicator",
+      "kind": "pattern",
+      "anchor": "patterns.md#Progress Indicator",
+      "surface_tags": [
+        "form",
+        "do"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-04",
+        "P-09"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "wizard",
+        "breadcrumbs"
+      ]
+    },
+    {
+      "id": "prominent-done-button-or-assumed-next-step",
+      "name": "Prominent \"Done\" Button or Assumed Next Step",
+      "kind": "pattern",
+      "anchor": "patterns.md#Prominent \"Done\" Button or Assumed Next Step",
+      "surface_tags": [
+        "do",
+        "form"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "button-groups",
+        "visual-framework"
+      ]
+    },
+    {
+      "id": "pyramid",
+      "name": "Pyramid",
+      "kind": "pattern",
+      "anchor": "patterns.md#Pyramid",
+      "surface_tags": [
+        "overview",
+        "focus"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-04",
+        "P-09"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "media-browser",
+        "breadcrumbs"
+      ]
+    },
+    {
+      "id": "richly-connected-apps",
+      "name": "Richly Connected Apps",
+      "kind": "pattern",
+      "anchor": "patterns.md#Richly Connected Apps",
+      "surface_tags": [
+        "mobile-overlay",
+        "do"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-07",
+        "P-11",
+        "B-01"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "make-it-mobile"
+      ]
+    },
+    {
+      "id": "settings-editor",
+      "name": "Settings Editor",
+      "kind": "pattern",
+      "anchor": "patterns.md#Settings Editor",
+      "surface_tags": [
+        "settings",
+        "form"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-07",
+        "P-09",
+        "P-03"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "menu-page",
+        "two-panel-selector-or-split-view"
+      ]
+    },
+    {
+      "id": "sign-in-tools",
+      "name": "Sign-In Tools",
+      "kind": "pattern",
+      "anchor": "patterns.md#Sign-In Tools",
+      "surface_tags": [
+        "entry",
+        "settings"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-07",
+        "P-09"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "settings-editor"
+      ]
+    },
+    {
+      "id": "sitemap-footer",
+      "name": "Sitemap Footer",
+      "kind": "pattern",
+      "anchor": "patterns.md#Sitemap Footer",
+      "surface_tags": [
+        "overview",
+        "settings"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-09",
+        "P-12"
+      ],
+      "source_chapter": 3,
+      "related": [
+        "fat-menus",
+        "menu-page"
+      ]
+    },
+    {
+      "id": "small-multiples",
+      "name": "Small Multiples",
+      "kind": "pattern",
+      "anchor": "patterns.md#Small Multiples",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-09"
+      ],
+      "source_chapter": 9,
+      "related": [
+        "multi-y-graph",
+        "cards"
+      ]
+    },
+    {
+      "id": "smart-menu-items",
+      "name": "Smart Menu Items",
+      "kind": "pattern",
+      "anchor": "patterns.md#Smart Menu Items",
+      "surface_tags": [
+        "do",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-01",
+        "P-03"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "multilevel-undo",
+        "cancelability"
+      ]
+    },
+    {
+      "id": "spinners-and-loading-indicators",
+      "name": "Spinners and Loading Indicators",
+      "kind": "pattern",
+      "anchor": "patterns.md#Spinners and Loading Indicators",
+      "surface_tags": [
+        "do",
+        "make"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-02",
+        "P-08"
+      ],
+      "source_chapter": 8,
+      "related": [
+        "cancelability",
+        "loading-or-progress-indicators"
+      ]
+    },
+    {
+      "id": "streams-and-feeds",
+      "name": "Streams and Feeds",
+      "kind": "pattern",
+      "anchor": "patterns.md#Streams and Feeds",
+      "surface_tags": [
+        "overview",
+        "data",
+        "mobile-overlay"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-08",
+        "P-13"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "infinite-list"
+      ]
+    },
+    {
+      "id": "structured-format",
+      "name": "Structured Format",
+      "kind": "pattern",
+      "anchor": "patterns.md#Structured Format",
+      "surface_tags": [
+        "form",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-07",
+        "P-12"
+      ],
+      "source_chapter": 10,
+      "related": [
+        "forgiving-format",
+        "input-prompt"
+      ]
+    },
+    {
+      "id": "tags",
+      "name": "Tags",
+      "kind": "pattern",
+      "anchor": "patterns.md#Tags",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-10",
+        "P-13"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "deep-links"
+      ]
+    },
+    {
+      "id": "thumbnail-grid",
+      "name": "Thumbnail Grid",
+      "kind": "pattern",
+      "anchor": "patterns.md#Thumbnail Grid",
+      "surface_tags": [
+        "data",
+        "overview"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-09"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "cards",
+        "carousel",
+        "grid-of-equals"
+      ]
+    },
+    {
+      "id": "titled-sections",
+      "name": "Titled Sections",
+      "kind": "pattern",
+      "anchor": "patterns.md#Titled Sections",
+      "surface_tags": [
+        "overview",
+        "settings",
+        "form"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "V-01",
+        "P-03"
+      ],
+      "source_chapter": 4,
+      "related": [
+        "module-tabs",
+        "accordion",
+        "collapsible-panels"
+      ]
+    },
+    {
+      "id": "touch-tools",
+      "name": "Touch Tools",
+      "kind": "pattern",
+      "anchor": "patterns.md#Touch Tools",
+      "surface_tags": [
+        "mobile-overlay",
+        "focus"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-08",
+        "V-01"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "loading-or-progress-indicators"
+      ]
+    },
+    {
+      "id": "two-panel-selector-or-split-view",
+      "name": "Two-Panel Selector or Split View",
+      "kind": "pattern",
+      "anchor": "patterns.md#Two-Panel Selector or Split View",
+      "surface_tags": [
+        "data",
+        "focus",
+        "overview"
+      ],
+      "platform_tags": [
+        "desktop"
+      ],
+      "foundations_touched": [
+        "P-04",
+        "P-09"
+      ],
+      "source_chapter": 7,
+      "related": [
+        "one-window-drilldown",
+        "list-inlay"
+      ]
+    },
+    {
+      "id": "vertical-stack",
+      "name": "Vertical Stack",
+      "kind": "pattern",
+      "anchor": "patterns.md#Vertical Stack",
+      "surface_tags": [
+        "mobile-overlay",
+        "form"
+      ],
+      "platform_tags": [
+        "mobile"
+      ],
+      "foundations_touched": [
+        "P-03",
+        "V-01"
+      ],
+      "source_chapter": 6,
+      "related": [
+        "collections-and-cards",
+        "bottom-navigation",
+        "generous-borders"
+      ]
+    },
+    {
+      "id": "visual-framework",
+      "name": "Visual Framework",
+      "kind": "pattern",
+      "anchor": "patterns.md#Visual Framework",
+      "surface_tags": [
+        "overview",
+        "settings"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-07",
+        "P-09",
+        "V-01"
+      ],
+      "source_chapter": 4,
+      "related": []
+    },
+    {
+      "id": "wizard",
+      "name": "Wizard",
+      "kind": "pattern",
+      "anchor": "patterns.md#Wizard",
+      "surface_tags": [
+        "form",
+        "do",
+        "entry"
+      ],
+      "platform_tags": [
+        "any"
+      ],
+      "foundations_touched": [
+        "P-04",
+        "P-05"
+      ],
+      "source_chapter": 2,
+      "related": [
+        "progress-indicator",
+        "good-defaults-and-smart-prefills"
+      ]
+    }
+  ],
+  "principles": [
+    {
+      "id": "P-01",
+      "name": "Safe Exploration",
+      "kind": "cognition",
+      "anchor": "principles.md#P-01. Safe Exploration"
+    },
+    {
+      "id": "P-02",
+      "name": "Instant Gratification",
+      "kind": "cognition",
+      "anchor": "principles.md#P-02. Instant Gratification"
+    },
+    {
+      "id": "P-03",
+      "name": "Satisficing",
+      "kind": "cognition",
+      "anchor": "principles.md#P-03. Satisficing"
+    },
+    {
+      "id": "P-04",
+      "name": "Changes in Midstream",
+      "kind": "cognition",
+      "anchor": "principles.md#P-04. Changes in Midstream"
+    },
+    {
+      "id": "P-05",
+      "name": "Deferred Choices",
+      "kind": "cognition",
+      "anchor": "principles.md#P-05. Deferred Choices"
+    },
+    {
+      "id": "P-06",
+      "name": "Incremental Construction",
+      "kind": "cognition",
+      "anchor": "principles.md#P-06. Incremental Construction"
+    },
+    {
+      "id": "P-07",
+      "name": "Habituation",
+      "kind": "cognition",
+      "anchor": "principles.md#P-07. Habituation"
+    },
+    {
+      "id": "P-08",
+      "name": "Microbreaks",
+      "kind": "cognition",
+      "anchor": "principles.md#P-08. Microbreaks"
+    },
+    {
+      "id": "P-09",
+      "name": "Spatial Memory",
+      "kind": "cognition",
+      "anchor": "principles.md#P-09. Spatial Memory"
+    },
+    {
+      "id": "P-10",
+      "name": "Prospective Memory",
+      "kind": "cognition",
+      "anchor": "principles.md#P-10. Prospective Memory"
+    },
+    {
+      "id": "P-11",
+      "name": "Streamlined Repetition",
+      "kind": "cognition",
+      "anchor": "principles.md#P-11. Streamlined Repetition"
+    },
+    {
+      "id": "P-12",
+      "name": "Keyboard Only",
+      "kind": "cognition",
+      "anchor": "principles.md#P-12. Keyboard Only"
+    },
+    {
+      "id": "P-13",
+      "name": "Social Proof + Collaboration",
+      "kind": "cognition",
+      "anchor": "principles.md#P-13. Social Proof + Collaboration"
+    },
+    {
+      "id": "V-01",
+      "name": "Visual hierarchy",
+      "kind": "visual",
+      "anchor": "principles.md#V-01. Visual hierarchy"
+    },
+    {
+      "id": "V-02",
+      "name": "Color",
+      "kind": "visual",
+      "anchor": "principles.md#V-02. Color"
+    },
+    {
+      "id": "V-03",
+      "name": "Typography",
+      "kind": "visual",
+      "anchor": "principles.md#V-03. Typography"
+    },
+    {
+      "id": "V-04",
+      "name": "Readability",
+      "kind": "visual",
+      "anchor": "principles.md#V-04. Readability"
+    },
+    {
+      "id": "V-05",
+      "name": "Evoking a feeling",
+      "kind": "visual",
+      "anchor": "principles.md#V-05. Evoking a feeling"
+    },
+    {
+      "id": "V-06",
+      "name": "Images",
+      "kind": "visual",
+      "anchor": "principles.md#V-06. Images"
+    },
+    {
+      "id": "S-01",
+      "name": "Design system exists + enforced",
+      "kind": "system",
+      "anchor": "principles.md#S-01. Design system exists + enforced"
+    },
+    {
+      "id": "S-02",
+      "name": "Atomic-design hierarchy visible in code",
+      "kind": "system",
+      "anchor": "principles.md#S-02. Atomic-design hierarchy visible in code"
+    },
+    {
+      "id": "S-03",
+      "name": "UI framework choice + discipline",
+      "kind": "system",
+      "anchor": "principles.md#S-03. UI framework choice + discipline"
+    },
+    {
+      "id": "S-04",
+      "name": "Style inheritance + propagation",
+      "kind": "system",
+      "anchor": "principles.md#S-04. Style inheritance + propagation"
+    },
+    {
+      "id": "S-05",
+      "name": "Responsive + cross-platform consistency",
+      "kind": "system",
+      "anchor": "principles.md#S-05. Responsive + cross-platform consistency"
+    },
+    {
+      "id": "S-06",
+      "name": "Framework as floor, not ceiling",
+      "kind": "system",
+      "anchor": "principles.md#S-06. Framework as floor, not ceiling"
+    },
+    {
+      "id": "B-01",
+      "name": "Connected devices",
+      "kind": "beyond",
+      "anchor": "principles.md#B-01. Connected devices"
+    },
+    {
+      "id": "B-02",
+      "name": "Anticipatory systems",
+      "kind": "beyond",
+      "anchor": "principles.md#B-02. Anticipatory systems"
+    },
+    {
+      "id": "B-03",
+      "name": "Assistive systems",
+      "kind": "beyond",
+      "anchor": "principles.md#B-03. Assistive systems"
+    },
+    {
+      "id": "B-04",
+      "name": "Natural user interfaces",
+      "kind": "beyond",
+      "anchor": "principles.md#B-04. Natural user interfaces"
+    }
+  ],
+  "workflows": [
+    {
+      "id": "checkout",
+      "name": "Checkout",
+      "anchor": "workflows.md#Checkout",
+      "patterns": [
+        "progress-indicator",
+        "good-defaults-and-smart-prefills",
+        "prominent-done-button-or-assumed-next-step",
+        "input-hints",
+        "error-messages",
+        "cancelability",
+        "autocompletion",
+        "password-strength-meter",
+        "forgiving-format"
+      ]
+    },
+    {
+      "id": "onboarding",
+      "name": "Onboarding",
+      "anchor": "workflows.md#Onboarding",
+      "patterns": [
+        "clear-entry-points",
+        "good-defaults-and-smart-prefills",
+        "prominent-done-button-or-assumed-next-step",
+        "input-prompt",
+        "wizard",
+        "help-systems",
+        "sign-in-tools"
+      ]
+    },
+    {
+      "id": "search-results",
+      "name": "Search results",
+      "anchor": "workflows.md#Search results",
+      "patterns": [
+        "autocompletion",
+        "dynamic-queries",
+        "pagination",
+        "infinite-list",
+        "jump-to-item",
+        "forgiving-format",
+        "alternative-views",
+        "data-brushing",
+        "tags"
+      ]
+    },
+    {
+      "id": "editor",
+      "name": "Editor",
+      "anchor": "workflows.md#Editor",
+      "patterns": [
+        "canvas-plus-palette",
+        "multilevel-undo",
+        "preview",
+        "hover-or-pop-up-tools",
+        "command-history",
+        "macros",
+        "movable-panels",
+        "many-workspaces"
+      ]
+    },
+    {
+      "id": "settings-management",
+      "name": "Settings management",
+      "anchor": "workflows.md#Settings management",
+      "patterns": [
+        "settings-editor",
+        "titled-sections",
+        "good-defaults-and-smart-prefills",
+        "error-messages",
+        "module-tabs",
+        "two-panel-selector-or-split-view",
+        "feature-search-and-browse",
+        "smart-menu-items"
+      ]
+    },
+    {
+      "id": "sign-in-sign-up",
+      "name": "Sign-in / sign-up",
+      "anchor": "workflows.md#Sign-in / sign-up",
+      "patterns": [
+        "sign-in-tools",
+        "input-hints",
+        "password-strength-meter",
+        "error-messages",
+        "forgiving-format",
+        "autocompletion",
+        "good-defaults-and-smart-prefills"
+      ]
+    },
+    {
+      "id": "monitoring-dashboard",
+      "name": "Monitoring dashboard",
+      "anchor": "workflows.md#Monitoring dashboard",
+      "patterns": [
+        "dashboard",
+        "center-stage",
+        "datatips",
+        "small-multiples",
+        "dynamic-queries",
+        "multi-y-graph",
+        "data-brushing",
+        "data-spotlight",
+        "annotated-scroll-bar"
+      ]
+    },
+    {
+      "id": "browse-and-detail",
+      "name": "Browse and detail",
+      "anchor": "workflows.md#Browse and detail",
+      "patterns": [
+        "two-panel-selector-or-split-view",
+        "one-window-drilldown",
+        "list-inlay",
+        "thumbnail-grid",
+        "cards",
+        "pyramid",
+        "pagination",
+        "infinite-list",
+        "alternative-views",
+        "tags",
+        "breadcrumbs"
+      ]
+    },
+    {
+      "id": "media-library-viewer",
+      "name": "Media library viewer",
+      "anchor": "workflows.md#Media library viewer",
+      "patterns": [
+        "media-browser",
+        "thumbnail-grid",
+        "filmstrip",
+        "carousel",
+        "cancelability",
+        "alternative-views",
+        "tags",
+        "jump-to-item"
+      ]
+    },
+    {
+      "id": "multi-step-survey-or-form",
+      "name": "Multi-step survey or form",
+      "anchor": "workflows.md#Multi-step survey or form",
+      "patterns": [
+        "wizard",
+        "progress-indicator",
+        "fill-in-the-blanks",
+        "good-defaults-and-smart-prefills",
+        "error-messages",
+        "input-hints",
+        "drop-down-chooser",
+        "structured-format"
+      ]
+    }
+  ]
+}
