@@ -4,6 +4,12 @@
 // rows of options, no profile editor — the empty space is the feature.
 // Reuses the registered `midnight` gradient so this surface visually
 // steps out of the Sunset Pop ritual arc.
+//
+// CTA dock hierarchy (wfr-07, 2026-05-26): DONE is the visually dominant
+// C-05 white PillCTA; DELETE MY DATA renders below it in the C-05 ghost
+// destructive treatment. The no-red contract from `tokens.md §1.3`
+// governs — destructive weight lives in the outline + copy + native
+// confirm alert, never in a colored fill.
 
 function ScreenSettings({ onDelete, onDone }) {
   return (
@@ -35,18 +41,8 @@ function ScreenSettings({ onDelete, onDone }) {
         </p>
 
         <CTADock>
-          <PillCTA label="Delete my data" fill="white" onClick={onDelete} />
-          <button
-            onClick={onDone}
-            style={{
-              appearance: 'none', background: 'transparent', border: 0, cursor: 'pointer',
-              minHeight: 44, marginTop: 4,
-              fontFamily: 'var(--ff-mono)', fontSize: 11, fontWeight: 700,
-              letterSpacing: '0.18em', textTransform: 'uppercase',
-              color: 'rgba(255,255,255,0.55)',
-            }}
-            aria-label="Done — return to start"
-          >Done</button>
+          <PillCTA label="Done" fill="white" onClick={onDone} />
+          <PillCTA label="Delete my data" fill="ghost" onClick={onDelete} />
         </CTADock>
       </div>
     </GradientSurface>

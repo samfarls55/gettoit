@@ -23,7 +23,16 @@ This surface deliberately does **not** look like a typical settings screen. Ther
 
 ## Components used
 
-`GradientSurface` (midnight stop) · `GTIMark` · `Eyebrow` · display headline (smaller than S01's, 36pt) · body paragraph · `PillCTA` white · footer text link (same treatment as the S01 entry point — `eyebrow` mono-tag, tertiary on gradient).
+`GradientSurface` (midnight stop) · `GTIMark` · `Eyebrow` · display headline (smaller than S01's, 36pt) · body paragraph · `PillCTA` white (DONE primary) · `PillCTA` ghost (DELETE destructive).
+
+## CTA dock hierarchy (wfr-07, 2026-05-26)
+
+The CTA dock pairs the user's exit verb above the destructive verb:
+
+1. **`DONE`** — C-05 PillCTA `white` variant. The visually dominant primary; returning to S01 is the modal action on this surface and the dock's primary slot belongs to it.
+2. **`DELETE MY DATA`** — C-05 PillCTA `ghost` variant (transparent fill, 1.5pt white-0.5 stroke, white text). The destructive treatment lives in the outline + the copy + the native two-step confirm alert, never in a colored fill. The `tokens.md §1.3` no-red contract still governs.
+
+Why ghost (not the white pill, not a red token): the original 0.1.0 spec used the white pill for DELETE because DELETE was the only action on the surface. With DONE now sitting on the dock as the user's primary exit, the white pill belongs to the modal verb (DONE) and the destructive verb demotes to ghost — matching the C-05 `ghost` register PlanDisambigSheet uses for its Solo / Group affordances. The outline reads as "not the primary", the copy reads as "destructive", and the native alert is the consent gate. Sun-fill was not considered — sun is the system's signal for "the system registered your input", never for a destructive action.
 
 ## Gradient choice — midnight
 
@@ -39,7 +48,7 @@ Reuses the existing `midnight` gradient stop (`tokens.json` → `gradient.surfac
 - **`"Deletes everything: your sessions, your votes, your taste profile. Rooms you joined keep going — your spot in them clears. Can't be undone."`** — body paragraph. Names exactly what gets removed and what survives (per ADR 0006: cascade-on-participated-rooms means co-participants lose your rows, but the room itself stays alive for the others). The "can't be undone" line is the regret-prevention guardrail; no "are you sure" softening.
 - **`"Delete my data"`** — CTA. First-person possessive, plain verb. Not "Delete account" (corporate), not "Erase me" (cute).
 - **`"Delete forever"` / `"Cancel"`** — native iOS alert buttons. "Forever" is the irreversibility signal in the moment of confirmation. Cancel is default; user has to traverse to the destructive button.
-- **`"Done"`** — footer link (returns to S01). Plain, terminal verb.
+- **`"Done"`** — primary CTA (returns to S01). Plain, terminal verb. Promoted from a footer mono-tag link to the C-05 white PillCTA in wfr-07.
 
 ## Behavior
 
