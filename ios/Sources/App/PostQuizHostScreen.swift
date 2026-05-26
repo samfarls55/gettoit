@@ -49,19 +49,34 @@ public struct PostQuizHostScreen: View {
     /// pre-bug-27 behaviour) which is fine for the smoke tests. The
     /// `RootView` call site always supplies it.
     private let client: SupabaseClient?
+    /// wfr-17 — invoked when the initiator taps the top-leading Leave
+    /// chrome on the `.waiting` phase. Distinct from `onEndSession`
+    /// because Leave on S04 carries a side effect (expire the room
+    /// via `MemberLeaveStore.leaveAndExpire`) on top of the
+    /// host-teardown + route-flip that `onEndSession` performs.
+    /// Defaults to `onEndSession` so call sites that don't supply it
+    /// (the existing snapshot tests, the failed/verdict phases that
+    /// don't reach Waiting) keep working — the chrome row is still
+    /// hidden for invitees and for the legacy TB-12 call sites that
+    /// don't wire `auth` + `promptStore`, so the default is only
+    /// reachable in code paths where a Leave tap was impossible
+    /// anyway.
+    private let onLeaveWaiting: () -> Void
 
     public init(
         host: PostQuizHost,
         auth: AuthCoordinator? = nil,
         promptStore: AuthPromptStore? = nil,
         client: SupabaseClient? = nil,
-        onEndSession: @escaping () -> Void = {}
+        onEndSession: @escaping () -> Void = {},
+        onLeaveWaiting: (() -> Void)? = nil
     ) {
         self.host = host
         self.auth = auth
         self.promptStore = promptStore
         self.client = client
         self.onEndSession = onEndSession
+        self.onLeaveWaiting = onLeaveWaiting ?? onEndSession
     }
 
     public var body: some View {
@@ -229,7 +244,12 @@ public struct PostQuizHostScreen: View {
                 promptStore: promptStore,
                 waitingStore: store,
                 onAdvanceToVerdict: { _ in },
-                onStartOver: onEndSession
+                onStartOver: onEndSession,
+                // wfr-17 — initiator-only Leave chrome. The view layer
+                // gates this on `store.isInitiator`, so an invitee
+                // instance never invokes it; the host screen forwards
+                // unconditionally.
+                onLeave: onLeaveWaiting
             )
         } else {
             // No chip dependencies wired — fall back to the neutral
@@ -237,6 +257,18 @@ public struct PostQuizHostScreen: View {
             // supplies them via `RootView`.
             resolvingSurface
         }
+    }
+
+    // MARK: - wfr-17 test seam
+
+    /// wfr-17 — test seam. Mirrors
+    /// `simulateResolvingCancelTapForTesting()` (wfr-13). SwiftUI
+    /// tests don't traverse the rendered tree to hit-test buttons,
+    /// so this exposes the closure invocation as a public surface
+    /// for the unit tests. The `forTesting` suffix marks it as a
+    /// test-only contract; production code never calls this.
+    public func simulateWaitingLeaveTapForTesting() {
+        onLeaveWaiting()
     }
 
     // MARK: - failed

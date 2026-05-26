@@ -159,6 +159,83 @@ final class WaitingScreenSnapshotTests: XCTestCase {
         render(view)
     }
 
+    // MARK: - wfr-17 — initiator Leave chrome
+
+    /// wfr-17 — chrome label is the plain "Leave" text verb. Matches
+    /// the QuizChrome / LockedScreen / PostQuizHost cancel chrome
+    /// idiom (text-only, eyebrow type, no SF Symbol). The locked
+    /// constant defends against future paraphrase drift.
+    func testLeaveChromeLabelIsTextVerbLeave() {
+        XCTAssertEqual(WaitingScreen.leaveChromeLabel, "Leave")
+    }
+
+    /// wfr-17 — the initiator sees the Leave chrome and tapping it
+    /// fires the host-supplied `onLeave` closure. The closure is
+    /// wired (in production) to a MemberLeaveStore.leaveAndExpire +
+    /// post-Q5 router teardown sequence that returns the user to S00
+    /// Plan list. This test pins the closure contract; the store
+    /// wiring is covered by `QuizChromeExitTests.testLeaveAndExpire*`.
+    func testInitiatorLeaveChromeTapInvokesOnLeave() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, isInitiator: true)
+        var leaveCalls = 0
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider(),
+            onLeave: { leaveCalls += 1 }
+        )
+        // Materialise once so the SwiftUI body has run at least once
+        // (mirrors `LockedScreenTests.testHomeChromeTapInvokesOnHome`).
+        render(view)
+        view.simulateLeaveChromeTapForTesting()
+        XCTAssertEqual(leaveCalls, 1,
+            "expected the initiator's Leave chrome tap to invoke onLeave exactly once")
+    }
+
+    /// wfr-17 — invitees never see the Leave chrome. Leaving the
+    /// session is an initiator-only verb on S04 (it expires the room
+    /// — an invitee cannot expire the room they didn't create, per
+    /// RLS, and the social shape of "I bail" for an invitee is the
+    /// Plan-list Leave-plan path that survives the room for the rest).
+    /// The view enforces this by not invoking the supplied closure
+    /// when `isInitiator` is false; the chrome row simply isn't
+    /// wired to a tap target for invitees.
+    func testInviteeLeaveChromeTapIsNoOp() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, isInitiator: false)
+        var leaveCalls = 0
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider(),
+            onLeave: { leaveCalls += 1 }
+        )
+        render(view)
+        view.simulateLeaveChromeTapForTesting()
+        XCTAssertEqual(leaveCalls, 0,
+            "expected an invitee's Leave chrome tap to be a no-op (invitees do not see the chrome)")
+    }
+
+    /// wfr-17 — render-smoke that the chrome row materialises on
+    /// the WaitingScreen surface for the initiator. Defends against
+    /// the chrome subview panicking on layout. Mirrors
+    /// `PostQuizHostScreenTests.testResolvingPhaseRendersWithCancelChromeWired`.
+    func testInitiatorWaitingRendersWithLeaveChromeWired() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, isInitiator: true)
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider(),
+            onLeave: { }
+        )
+        render(view)
+    }
+
     func testLegacyTB12InitializerStillCompiles() {
         // Confirms the no-store WaitingScreen path (TB-12 launch
         // surface) still materialises without crashing. Some callers

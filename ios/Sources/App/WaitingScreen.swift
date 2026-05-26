@@ -74,6 +74,15 @@ public struct WaitingScreen: View {
     /// no-op. Retained on the type so existing call sites compile.
     private let onAdvanceToVerdict: ((UUID) -> Void)?
     private let onStartOver: (() -> Void)?
+    /// wfr-17 — invoked when the initiator taps the top-leading Leave
+    /// chrome verb. The production call site
+    /// (`RootView.leavePostQuizWaiting`) wires this to a
+    /// `MemberLeaveStore.leaveAndExpire` call followed by
+    /// `postQuizHost = nil`, so the precedence chain returns the user
+    /// to S00 Plan list. Optional so the legacy TB-12 / snapshot-test
+    /// instantiations keep compiling; when `nil` (or the current role
+    /// is not initiator) the chrome row is hidden.
+    private let onLeave: (() -> Void)?
 
     /// Designated initializer — used by TB-07 to drive the full
     /// surface against a live `WaitingStore` + `FireVerdictCoordinator`.
@@ -85,7 +94,8 @@ public struct WaitingScreen: View {
         appleProvider: AppleSignInProviding? = nil,
         now: @escaping () -> Date = { .now },
         onAdvanceToVerdict: ((UUID) -> Void)? = nil,
-        onStartOver: (() -> Void)? = nil
+        onStartOver: (() -> Void)? = nil,
+        onLeave: (() -> Void)? = nil
     ) {
         self.auth = auth
         self.promptStore = promptStore
@@ -95,6 +105,7 @@ public struct WaitingScreen: View {
         self.now = now
         self.onAdvanceToVerdict = onAdvanceToVerdict
         self.onStartOver = onStartOver
+        self.onLeave = onLeave
     }
 
     public var body: some View {
@@ -164,6 +175,21 @@ public struct WaitingScreen: View {
             }
             .accessibilityHidden(true)
 
+            // wfr-17 — initiator-only Leave chrome verb. Sits next to
+            // the brand tile so the same row carries both brand + the
+            // session-end escape hatch (foundation P-01 *Safe
+            // Exploration*, pattern *Escape Hatch*). Text-only
+            // treatment mirrors LockedScreen.homeChromeRow,
+            // VerdictScreen.homeChromeRow, and
+            // PostQuizHostScreen.resolvingCancel. Tap fires
+            // `onLeave`, which the production wiring (RootView)
+            // chains to MemberLeaveStore.leaveAndExpire so the
+            // initiator's Leave both drops their membership AND
+            // marks the room expired (the verdict can no longer fire
+            // without the initiator's `Decide now` tap; expiring the
+            // room turns the surface into a clean exit for everyone).
+            leaveChromeButton
+
             Spacer()
 
             Text("YOU'RE IN")
@@ -172,6 +198,43 @@ public struct WaitingScreen: View {
                 .foregroundStyle(GTIColor.TextOnGradient.tertiary)
                 .accessibilityIdentifier("waiting.eyebrow")
         }
+        .frame(minHeight: 44)
+    }
+
+    /// wfr-17 — Leave chrome verb. Visible only for the initiator
+    /// (per S04 spec: only the room's creator can expire the room,
+    /// and the verdict can no longer fire without their `Decide now`
+    /// tap — leaving = ending the session). Invitees never see this
+    /// affordance; their session-end path is the Plan-list Leave-plan
+    /// row, which survives the room for the rest of the group. When
+    /// `onLeave` is nil (the legacy TB-12 instantiation, snapshot
+    /// tests that don't provide it) the row is also hidden so the
+    /// existing call sites keep compiling unchanged.
+    @ViewBuilder
+    private var leaveChromeButton: some View {
+        if isInitiator, let onLeave {
+            Button(action: onLeave) {
+                Text(WaitingScreen.leaveChromeLabel.uppercased())
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("waiting.chrome.leave")
+            .accessibilityLabel(WaitingScreen.leaveChromeLabel)
+            .accessibilityHint(Text("Ends this session and returns you to your plans"))
+        }
+    }
+
+    /// Whether the current viewer is the room's initiator. Derived
+    /// from `WaitingStore.isInitiator` so the view doesn't accept an
+    /// override that contradicts the store. Falls back to `false`
+    /// when no store is wired (legacy TB-12 path).
+    private var isInitiator: Bool {
+        waitingStore?.isInitiator ?? false
     }
 
     private func headlineBlock(store: WaitingStore) -> some View {
@@ -469,6 +532,34 @@ public struct WaitingScreen: View {
             // Read fail-soft. Local intent honored.
         }
         phase = .dismissed
+    }
+
+    // MARK: - wfr-17 test seams
+
+    /// wfr-17 — text-only verb on the top-leading chrome slot. Matches
+    /// the LockedScreen `Home` / VerdictScreen `Home` / PostQuizHost
+    /// `Cancel` text-verb idiom (no SF Symbol). The locked constant
+    /// defends against future paraphrase drift.
+    public static let leaveChromeLabel = "Leave"
+
+    /// wfr-17 — test seam. The chrome row is a SwiftUI Button bound
+    /// to the private `onLeave` closure; SwiftUI tests do not traverse
+    /// the rendered tree to hit-test buttons, so this exposes the
+    /// closure invocation as a public surface for the unit tests.
+    /// The `forTesting` suffix marks it as a test-only contract;
+    /// production code never calls this. Mirrors
+    /// `LockedScreen.simulateHomeTapForTesting()` (wfr-12) and
+    /// `PostQuizHostScreen.simulateResolvingCancelTapForTesting()`
+    /// (wfr-13).
+    ///
+    /// Honours the view's own initiator-only guard: a tap simulated
+    /// against an invitee instance is a no-op, mirroring what the
+    /// rendered button does (the row isn't materialised, so a real
+    /// user tap is impossible). This keeps the test seam and the
+    /// production guard in lockstep.
+    public func simulateLeaveChromeTapForTesting() {
+        guard isInitiator else { return }
+        onLeave?()
     }
 }
 

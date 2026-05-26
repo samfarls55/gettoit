@@ -117,6 +117,41 @@ public final class MemberLeaveStore {
         try await expireRoom(roomID)
     }
 
+    /// wfr-17 — initiator Leave path from S04 Waiting. Drops the
+    /// caller's membership AND marks the room expired in a single
+    /// flow, with no `isSolo` gate.
+    ///
+    /// Why this is distinct from `leave(role:isSolo:)`:
+    ///   * `leave(...)`'s room-expire branch is gated on
+    ///     `isSolo == true` — the Plan-list / quiz-chrome contract
+    ///     where an initiator exiting a non-solo room keeps the room
+    ///     alive for the remaining members.
+    ///   * On S04 Waiting the initiator has already submitted Q5. The
+    ///     intent of Leave there is "kill this session," not "let the
+    ///     others continue without me" — the verdict can no longer
+    ///     fire without the initiator's `Decide now` tap, and the
+    ///     room would otherwise sit idle until the cron's no-signal
+    ///     sweeper retires it. Expiring the room synchronously turns
+    ///     the surface into a clean exit for all members.
+    ///
+    /// The DELETE runs first; the UPDATE only runs on a successful
+    /// DELETE. Mirrors `leave(...)`'s ordering for the same reason —
+    /// the safer partial-failure outcome is "I left, room still
+    /// open" (the no-signal sweeper cleans it up) rather than "room
+    /// expired but I'm still a member" (confusing realtime events).
+    ///
+    /// RLS authorisation: this method is INITIATOR-ONLY by contract.
+    /// The call site (`RootView.leavePostQuizWaiting`) only wires
+    /// this through to the WaitingScreen Leave chrome, which is
+    /// initiator-only by view-layer guard. An invitee can never reach
+    /// it. The room UPDATE would 403 for a non-creator caller anyway
+    /// per `rooms_update_creator`, but the call-site guard is the
+    /// primary contract.
+    public func leaveAndExpire(roomID: UUID, userID: UUID) async throws {
+        try await deleteMembership(roomID, userID)
+        try await expireRoom(roomID)
+    }
+
     /// Encoded payload for the `rooms` UPDATE. Touches only the
     /// `status` column so the room's other fields stay untouched.
     private struct RoomStatusUpdate: Encodable {
