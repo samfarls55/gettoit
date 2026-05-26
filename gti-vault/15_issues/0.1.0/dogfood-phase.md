@@ -186,7 +186,7 @@ First `/swift-code-review` sweep against `CODING_STANDARDS.md` (just added). Run
 |---|---|---|---|---|---|
 | bug-30 | [[issues/bug-30-setupscreen-snapdistance-force-unwraps\|Replace force-unwraps in `SetupScreen.snapDistance` (OPT-001)]] | done (bug) — PR #244 | AFK | [#239](https://github.com/samfarls55/gettoit/issues/239) | — |
 | bug-31 | [[issues/bug-31-rerollscreen-reason-switch-exhaustive\|Enumerate `Reason` cases in `RerollScreen.handleSubmit` (ENUM-002)]] | done (bug) — PR #243 | AFK | [#240](https://github.com/samfarls55/gettoit/issues/240) | — |
-| bug-32 | [[issues/bug-32-verdictscreen-mode-switch-exhaustive\|Enumerate mode-snapshot cases in `VerdictScreen.modeSnapshot` (ENUM-002)]] | ready-for-agent | AFK | [#241](https://github.com/samfarls55/gettoit/issues/241) | — |
+| bug-32 | [[issues/bug-32-verdictscreen-mode-switch-exhaustive\|Enumerate mode-snapshot cases in `VerdictScreen.modeSnapshot` (ENUM-002)]] | done (bug) — PR #245 | AFK | [#241](https://github.com/samfarls55/gettoit/issues/241) | — |
 | bug-33 | [[issues/bug-33-locationcoordinator-dispatchqueue-mainactor\|Swap `DispatchQueue.main.async` for `Task { @MainActor in ... }` in `LocationCoordinator` (CONC-010)]] | ready-for-agent | AFK | [#242](https://github.com/samfarls55/gettoit/issues/242) | — |
 
 ## Cross-references

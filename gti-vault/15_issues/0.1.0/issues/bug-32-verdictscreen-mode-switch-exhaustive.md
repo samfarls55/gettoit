@@ -1,7 +1,7 @@
 ---
 issue: bug-32
 title: Enumerate verdict mode cases in VerdictScreen.modeSnapshot switch
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 241
 created: 2026-05-25
@@ -61,3 +61,7 @@ Out of scope:
 ## Surfaced by
 
 `/swift-code-review` against `ios/`, 2026-05-25.
+
+## Comments
+
+- 2026-05-26 — Closed via PR #245 (squash-merged to main, all CI green including `ios (xcodebuild test)`). Replaced `default:` in `VerdictScreen.modeSnapshot`'s eyebrow switch with explicit `case .default, .committed, .solo:`; dropped the solo-only fall-through comment. Added a `.committed` eyebrow lock test (`VerdictScreenRatifyTests.testCommittedEyebrowMatchesDefault`) to cover the previously-implicit case. iOS Mode enum cases: `.default`, `.committed`, `.readOnly`, `.noSurvivor`, `.solo` — all five now enumerated. Existing eyebrow assertions for the other modes were already present and stayed green.
