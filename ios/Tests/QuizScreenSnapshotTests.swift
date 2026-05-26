@@ -117,6 +117,27 @@ final class QuizScreenSnapshotTests: XCTestCase {
             "S03 §Q5 default mode surfaces exactly 3 candidates")
     }
 
+    // MARK: - wfr-23 — Q5 final CTA copy is finish-shaped
+
+    /// wfr-23 — the Q5 default-state primary CTA must read "Drop the
+    /// verdict" (a finish-shaped label), not the generic "Next" used on
+    /// Q1..Q4. Pinning the exported constant defends against paraphrase
+    /// drift. Spec: `design-system/surfaces/03-quiz.md` §Q5.
+    func testQ5DefaultCTALabelIsLockedFinishCopy() {
+        XCTAssertEqual(QuizQ5Regret.primaryCTALabel, "Drop the verdict")
+        XCTAssertNotEqual(QuizQ5Regret.primaryCTALabel, "Next",
+            "Q5 final CTA must differ from the Q1..Q4 generic Next label")
+    }
+
+    /// wfr-23 — the Q5 no-results-state primary CTA must read "Head to
+    /// the verdict". Same finish-shaped contract as the default state;
+    /// the no-results mode preserves the terminal framing.
+    func testQ5NoResultsCTALabelIsLockedFinishCopy() {
+        XCTAssertEqual(QuizQ5NoResults.primaryCTALabel, "Head to the verdict")
+        XCTAssertNotEqual(QuizQ5NoResults.primaryCTALabel, "Next",
+            "Q5 no-results CTA must differ from the Q1..Q4 generic Next label")
+    }
+
     // MARK: - wfr-22 — progress strip step labels
 
     /// wfr-22 — the progress strip's accessibility label follows the

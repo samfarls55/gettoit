@@ -190,6 +190,27 @@ describe("QuizQ5", () => {
     expect(calls).toEqual([["v-cuisine", 5]]);
   });
 
+  // wfr-23 — the Q5 default-state primary CTA reads "Drop the verdict",
+  // a finish-shaped label that differs from the generic "Next" CTA used
+  // on Q1..Q4. Locked-copy test defending against paraphrase drift —
+  // the spec lives in `design-system/surfaces/03-quiz.md` §Q5.
+  it("renders the finish-shaped 'Drop the verdict' CTA on the default state", () => {
+    render(
+      <QuizQ5
+        state="default"
+        candidates={FACTORIAL_CARDS}
+        ratings={{}}
+        onRate={() => {}}
+        onSubmit={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Drop the verdict" }),
+    ).toBeInTheDocument();
+    // The Q1..Q4 generic "Next" CTA must not appear on the final step.
+    expect(screen.queryByRole("button", { name: /^Next$/i })).toBeNull();
+  });
+
   it("renders the no-results honest-degradation mode without fictitious venues", () => {
     render(
       <QuizQ5
