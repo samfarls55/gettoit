@@ -1,7 +1,7 @@
 ---
 issue: wfr-14
 title: Add Cancel to JoinScreen joining + Back to error phase
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
@@ -32,3 +32,7 @@ None — can start immediately.
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #14.
+
+## Comments
+
+- 2026-05-26 — Closed by [#287](https://github.com/samfarls55/gettoit/pull/287). Added a shared `onCancel` closure wired to RootView's `deepLink = nil`. Cancel tertiary on `.joining` (11pt eyebrow, 55% opacity — matches RerollScreen cancel), "Try another link" tertiary on `.error` (regular eyebrow, 78% opacity — matches LockedScreen home chrome). `.joined` deliberately has no escape (host hops straight into the quiz). In-flight join `Task` auto-cancelled by SwiftUI's `.task` modifier on unmount. All CI checks green (ios xcodebuild test 3m50s pass, design-system verify pass).
