@@ -89,7 +89,7 @@ final class VerdictRerollHostTests: XCTestCase {
             VerdictRerollHost(
                 verdict: verdict,
                 roomID: UUID(),
-                mode: .default,
+                surface: .live(flavor: .default),
                 isInitiator: true,
                 client: makeClient()
             )
@@ -105,7 +105,7 @@ final class VerdictRerollHostTests: XCTestCase {
             VerdictRerollHost(
                 verdict: verdict,
                 roomID: UUID(),
-                mode: .solo,
+                surface: .live(flavor: .solo),
                 isInitiator: true,
                 client: makeClient()
             )

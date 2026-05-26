@@ -1,7 +1,7 @@
 ---
 issue: bug-34
 title: Split VerdictScreen into live / read-only / no-survivor surfaces (ADR 0018)
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 273
 created: 2026-05-26
@@ -84,6 +84,10 @@ Sweep `design-system/surfaces/05-verdict.md`:
 ## Surfaced by
 
 `/workflow-review` audit, 2026-05-26. Finding #1, S1 cognition tier. Grill closed 2026-05-26 via `/grill-with-docs`. ADR 0018 accepted same day.
+
+## Comments
+
+- 2026-05-26 — AFK run executed the split per ADR 0018. Three Swift files in `ios/Sources/App/`: `VerdictScreen.swift` keeps the live shell with a three-case `Flavor` enum (`.default` / `.committed` / `.solo`); `VerdictReadOnlyScreen.swift` is the new closed-verdict surface with the arrival-vector-aware `showHomeChrome` flag; `NoSurvivorScreen.swift` is the new widen-and-retry surface. The shared `Verdict` / `TimeBadge` / `Receipt` / `Cut` value types stayed nested on `VerdictScreen` (no `VerdictModels.swift` extraction needed — the new screens reference them via `VerdictScreen.Verdict`, etc.). `VerdictRerollHost` is now a dispatcher: callers pass a `Surface` enum (`.live(flavor:)` / `.readOnly(showHomeChrome:)` / `.noSurvivor`), and the host mounts the right leaf — with the `RerollStore` plumbing only on `.live`. The `VerdictScreen.Mode` enum moved to `VerdictStore.Mode` (it's the data-layer signal, not the view's render flavor). `design-system/surfaces/05-verdict.md` now covers only the three live flavors; `05a-verdict-read-only.md` and `05b-no-survivor.md` are the new sibling surface docs. The `design-system/scripts/verify.mjs` pairing rule was extended to accept `jsx: []` for sub-surface docs that share a parent's JSX (one JSX file, three Swift files — explicit sub-surface opt-out beats double-claim or orphan jsx errors). Finding #16 (`Restore Escape affordance on VerdictScreen .readOnly`) is flagged in the PR body for re-scoping but not modified or closed in this PR per spec.
 
 ## References
 

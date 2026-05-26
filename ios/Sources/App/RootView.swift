@@ -341,22 +341,21 @@ public struct RootView: View {
                     // values back into the Setup defaults would re-
                     // introduce the contract the workflow-overhaul
                     // phase deliberately retired.
-                    VerdictScreen(
+                    // bug-34 / ADR 0018 — the sealed-deep-link branch
+                    // mounts `VerdictReadOnlyScreen` directly. Web
+                    // invitees have no Plan list to land on; the
+                    // chrome row is suppressed (`showHomeChrome:
+                    // false`). The `Done` chrome verb + the primary
+                    // `Start a new decision` CTA both fire `onAdvance`
+                    // — the host re-routes the user to Solo Setup.
+                    VerdictReadOnlyScreen(
                         verdict: readOnly.payload.verdict,
-                        mode: .readOnly,
-                        isInitiator: false,
+                        showHomeChrome: false,
                         onAdvance: {
                             openSoloSetup()
                             readOnlyView = nil
                             deepLink = nil
-                        },
-                        // bug-27 — `.readOnly` mode suppresses the reroll
-                        // tertiary at render, but `onReroll` no longer
-                        // defaults to `{}`. The empty closure is explicit
-                        // and load-bearing: it documents that this branch
-                        // intentionally has no reroll wiring (the late-
-                        // joiner's verdict is sealed).
-                        onReroll: { }
+                        }
                     )
                 } else if let payload = deepLink {
                     JoinScreen(
@@ -493,18 +492,21 @@ public struct RootView: View {
                         // list rather than starting a fresh Plan (the
                         // re-invite CTA path is the late-joiner
                         // deep-link branch, owned by `readOnlyView`).
-                        VerdictScreen(
+                        // bug-34 / ADR 0018 — Joined-card Decided tap
+                        // mounts `VerdictReadOnlyScreen`. Account
+                        // members reach this via PlanList, so the Home
+                        // chrome is rendered (`showHomeChrome: true`).
+                        // The chrome `Done` verb and the primary
+                        // `Start a new decision` CTA both fire
+                        // `onAdvance` — the host clears the
+                        // `joinedReadOnly` slot and falls back to
+                        // PlanList via the precedence chain.
+                        VerdictReadOnlyScreen(
                             verdict: readOnly.payload.verdict,
-                            mode: .readOnly,
-                            isInitiator: false,
+                            showHomeChrome: true,
                             onAdvance: {
                                 joinedReadOnly = nil
-                            },
-                            // bug-27 — `.readOnly` mode suppresses the
-                            // reroll tertiary at render. Empty closure
-                            // is explicit per bug-27's architectural
-                            // fix (drop the `onReroll = {}` default).
-                            onReroll: { }
+                            }
                         )
                     } else if let context = createdDecidedVerdict {
                         // tb-WF-8 — Created Decided-active tap from the
@@ -528,7 +530,7 @@ public struct RootView: View {
                         VerdictRerollHost(
                             verdict: context.payload.verdict,
                             roomID: context.roomID,
-                            mode: .default,
+                            surface: .live(flavor: .default),
                             isInitiator: true,
                             client: coordinators.client,
                             onHome: {
@@ -540,23 +542,17 @@ public struct RootView: View {
                         )
                     } else if let context = createdHistoryVerdict {
                         // tb-WF-8 — Created History (decided-expired)
-                        // tap. Read-only Verdict — the Plan is sealed;
-                        // reroll is suppressed by `.readOnly` mode.
-                        VerdictScreen(
+                        // tap. bug-34 / ADR 0018 — mounts
+                        // `VerdictReadOnlyScreen` (closed Plan, no
+                        // reroll, no ratify). Account members reach
+                        // this from PlanList History, so the Home
+                        // chrome is rendered.
+                        VerdictReadOnlyScreen(
                             verdict: context.payload.verdict,
-                            mode: .readOnly,
-                            isInitiator: false,
+                            showHomeChrome: true,
                             onAdvance: {
                                 createdHistoryVerdict = nil
-                            },
-                            // bug-27 — `.readOnly` mode suppresses the
-                            // reroll tertiary at render; the closed
-                            // history Plan never burns a reroll. Empty
-                            // closure is explicit per bug-27's
-                            // architectural fix (drop the `onReroll =
-                            // {}` default so the next call site has to
-                            // wire it).
-                            onReroll: { }
+                            }
                         )
                     } else {
                         // tb-WF-5 → tb-WF-6 → tb-WF-7 — S00 Plan list.

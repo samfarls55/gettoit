@@ -87,12 +87,12 @@ final class VerdictScreenSoloTests: XCTestCase {
 
     func testSoloModeRendersWithoutCrashing() {
         let verdict = VerdictScreen.Verdict.soloFixture()
-        render(VerdictScreen(verdict: verdict, mode: .solo))
+        render(VerdictScreen(verdict: verdict, flavor: .solo))
     }
 
     func testSoloModeRendersWithCommittedState() {
         let verdict = VerdictScreen.Verdict.soloFixture()
-        render(VerdictScreen(verdict: verdict, mode: .solo, ratifiedCount: 1, ratifiedTotal: 1))
+        render(VerdictScreen(verdict: verdict, flavor: .solo, ratifiedCount: 1, ratifiedTotal: 1))
     }
 
     // MARK: - mode-flag contract
@@ -100,7 +100,7 @@ final class VerdictScreenSoloTests: XCTestCase {
     func testSoloModeKeepsTimeBadgeButSuppressesReceipts() {
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.soloFixture(),
-            mode: .solo
+            flavor: .solo
         ).modeSnapshot
 
         XCTAssertTrue(snap.showTimeBadge,
@@ -114,7 +114,7 @@ final class VerdictScreenSoloTests: XCTestCase {
         // still produced a verdict.
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.soloFixture(),
-            mode: .solo
+            flavor: .solo
         ).modeSnapshot
         XCTAssertEqual(snap.eyebrowCopy, "Tonight, the verdict is",
             "solo eyebrow is the same definite article as default")
@@ -123,7 +123,7 @@ final class VerdictScreenSoloTests: XCTestCase {
     func testSoloPrimaryCtaIsImInBeforeCommit() {
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.soloFixture(),
-            mode: .solo
+            flavor: .solo
         ).modeSnapshot
         XCTAssertEqual(snap.primaryCtaLabel, "I'm in",
             "solo primary CTA reads 'I'm in' — same voluntary register as default")
@@ -138,7 +138,7 @@ final class VerdictScreenSoloTests: XCTestCase {
         // bug-22 — Home chrome row applies to every iOS-reachable mode.
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.soloFixture(),
-            mode: .solo
+            flavor: .solo
         ).modeSnapshot
         XCTAssertTrue(snap.showHomeChrome,
             "solo mode surfaces the Home chrome row per bug-22")
@@ -151,22 +151,23 @@ final class VerdictScreenSoloTests: XCTestCase {
         // gate without coupling the test to chip-internal state.
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.soloFixture(),
-            mode: .solo
+            flavor: .solo
         ).modeSnapshot
         XCTAssertTrue(snap.showSaveTasteProfileChip,
             "solo replaces the group-save affordance with the save-taste-profile chip")
     }
 
-    func testNonSoloModesDoNotSurfaceTheSaveTasteProfileChip() {
-        // Default, committed, no-survivor, read-only — none surface
-        // the C-22 chip on S05 (it lives on S04 for those flows per
-        // TB-12). The `.cuts` mode was retired by bug-26.
-        for mode: VerdictScreen.Mode in [.default, .committed, .noSurvivor, .readOnly] {
-            let verdict: VerdictScreen.Verdict =
-                (mode == .noSurvivor) ? .noSurvivorFixture() : .fixture()
-            let snap = VerdictScreen(verdict: verdict, mode: mode).modeSnapshot
+    func testNonSoloFlavorsDoNotSurfaceTheSaveTasteProfileChip() {
+        // Default, committed — neither surfaces the C-22 chip on the
+        // live verdict (it lives on S04 for those flows per TB-12).
+        // bug-34 / ADR 0018: the `.readOnly` and `.noSurvivor` modes
+        // moved to their own surfaces (`VerdictReadOnlyScreen`,
+        // `NoSurvivorScreen`) — neither carries the save-chip either,
+        // by construction (the chip is solo-only).
+        for flavor: VerdictScreen.Flavor in [.default, .committed] {
+            let snap = VerdictScreen(verdict: .fixture(), flavor: flavor).modeSnapshot
             XCTAssertFalse(snap.showSaveTasteProfileChip,
-                "mode \(mode) must not surface the solo save-taste-profile chip")
+                "flavor \(flavor) must not surface the solo save-taste-profile chip")
         }
     }
 

@@ -244,14 +244,14 @@ public final class LateJoinerStore {
 
     public struct ReadOnlyPayload: Equatable, Sendable {
         public let verdict: VerdictScreen.Verdict
-        public let mode: VerdictScreen.Mode
+        public let mode: VerdictStore.Mode
         public let timerMinutes: Int
         public let radiusMeters: Int
         public let roomStatus: String
 
         public init(
             verdict: VerdictScreen.Verdict,
-            mode: VerdictScreen.Mode,
+            mode: VerdictStore.Mode,
             timerMinutes: Int,
             radiusMeters: Int,
             roomStatus: String

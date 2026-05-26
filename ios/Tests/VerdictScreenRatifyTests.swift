@@ -53,7 +53,7 @@ final class VerdictScreenRatifyTests: XCTestCase {
 
     func testDefaultModeRendersThePreCheckInLine() {
         let verdict = VerdictScreen.Verdict.fixture()
-        let snap = VerdictScreen(verdict: verdict, mode: .default).modeSnapshot
+        let snap = VerdictScreen(verdict: verdict, flavor: .default).modeSnapshot
         XCTAssertEqual(snap.preCheckInLine, VerdictScreen.preCheckInCopy,
             "default mode surfaces the pre-permission line under the CTA")
     }
@@ -62,7 +62,7 @@ final class VerdictScreenRatifyTests: XCTestCase {
         let verdict = VerdictScreen.Verdict.fixture()
         let snap = VerdictScreen(
             verdict: verdict,
-            mode: .committed,
+            flavor: .committed,
             ratifiedCount: 1,
             ratifiedTotal: 4
         ).modeSnapshot
@@ -78,7 +78,7 @@ final class VerdictScreenRatifyTests: XCTestCase {
         let verdict = VerdictScreen.Verdict.fixture()
         let snap = VerdictScreen(
             verdict: verdict,
-            mode: .committed,
+            flavor: .committed,
             ratifiedCount: 1,
             ratifiedTotal: 4
         ).modeSnapshot
@@ -86,19 +86,13 @@ final class VerdictScreenRatifyTests: XCTestCase {
             "committed eyebrow matches default — the verdict copy doesn't change once you've committed")
     }
 
-    func testReadOnlyModeSuppressesThePreCheckInLine() {
-        let verdict = VerdictScreen.Verdict.fixture()
-        let snap = VerdictScreen(verdict: verdict, mode: .readOnly).modeSnapshot
-        XCTAssertEqual(snap.preCheckInLine, "",
-            "read-only late-joiner has no ratification path — no check-in to promise")
-    }
-
-    func testNoSurvivorSuppressesThePreCheckInLine() {
-        let verdict = VerdictScreen.Verdict.noSurvivorFixture()
-        let snap = VerdictScreen(verdict: verdict, mode: .noSurvivor).modeSnapshot
-        XCTAssertEqual(snap.preCheckInLine, "",
-            "no-survivor has no verdict to check in on — suppress the line")
-    }
+    // bug-34 / ADR 0018: the `.readOnly` and `.noSurvivor` modes moved
+    // off the live verdict surface entirely. The pre-permission line's
+    // suppression is now a by-construction property of those new
+    // screens (`VerdictReadOnlyScreen` and `NoSurvivorScreen` never
+    // render it). The prior per-mode suppression tests on
+    // `VerdictScreen` no longer apply — see `VerdictReadOnlyScreenTests`
+    // and `NoSurvivorScreenTests` for the new contracts.
 
     // MARK: - committed CTA + countdown
 
@@ -144,7 +138,7 @@ final class VerdictScreenRatifyTests: XCTestCase {
         let verdict = VerdictScreen.Verdict.fixture()
         let snap = VerdictScreen(
             verdict: verdict,
-            mode: .committed,
+            flavor: .committed,
             ratifiedCount: 3,
             ratifiedTotal: 4,
             correctabilityWindowSeconds: 47
@@ -160,7 +154,7 @@ final class VerdictScreenRatifyTests: XCTestCase {
         let verdict = VerdictScreen.Verdict.fixture()
         render(VerdictScreen(
             verdict: verdict,
-            mode: .committed,
+            flavor: .committed,
             ratifiedCount: 2,
             ratifiedTotal: 4,
             correctabilityWindowSeconds: 30
@@ -169,7 +163,7 @@ final class VerdictScreenRatifyTests: XCTestCase {
 
     func testDefaultModeRendersTheImInPill() {
         let verdict = VerdictScreen.Verdict.fixture()
-        let snap = VerdictScreen(verdict: verdict, mode: .default).modeSnapshot
+        let snap = VerdictScreen(verdict: verdict, flavor: .default).modeSnapshot
         XCTAssertEqual(snap.primaryCtaLabel, "I'm in",
             "default mode CTA reads 'I'm in' per S05 §Modes")
         XCTAssertFalse(snap.isCommittedFlavor)
@@ -180,13 +174,13 @@ final class VerdictScreenRatifyTests: XCTestCase {
     func testTappingImInCallsOnRatifyClosureExactlyOnce() async {
         // A SwiftUI tap-simulation is fragile in unit-test scope; we
         // assert the closure plumbing via the public mode-snapshot
-        // contract: when the host rebuilds `VerdictScreen(mode: .committed)`
+        // contract: when the host rebuilds `VerdictScreen(flavor: .committed)`
         // after the tap, the surface flips. The handleImInTap path
         // itself is exercised end-to-end in the integration test.
         var ratifyCalls = 0
         let _ = VerdictScreen(
             verdict: .fixture(),
-            mode: .default,
+            flavor: .default,
             onRatify: { ratifyCalls += 1 }
         )
         // The closure must hold a reference but not auto-fire on init.

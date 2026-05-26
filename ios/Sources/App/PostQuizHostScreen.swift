@@ -129,11 +129,18 @@ public struct PostQuizHostScreen: View {
     /// `RootView`.
     @ViewBuilder
     private func verdictSurface(view: VerdictStore.VerdictView) -> some View {
+        // bug-34 / ADR 0018 — the dispatcher turns the
+        // `VerdictStore.Mode` signal into the matching surface
+        // (live / no-survivor). The post-quiz path never produces a
+        // `.readOnly` mode (VerdictStore writes `.default` / `.solo` /
+        // `.noSurvivor`), so `Surface.from(verdictView:)` is total
+        // here.
+        let surface = VerdictRerollHost.Surface.from(verdictView: view)
         if let client {
             VerdictRerollHost(
                 verdict: view.verdict,
                 roomID: host.context.roomID,
-                mode: view.mode,
+                surface: surface,
                 isInitiator: host.context.isInitiator,
                 client: client,
                 // bug-22 — the chrome-row `Home` verb pops to S00 Plan
@@ -145,13 +152,30 @@ public struct PostQuizHostScreen: View {
                 onHome: onEndSession
             )
         } else {
-            VerdictScreen(
-                verdict: view.verdict,
-                mode: view.mode,
-                isInitiator: host.context.isInitiator,
-                onHome: onEndSession,
-                onReroll: { }
-            )
+            // Snapshot-test fallback (no Supabase client) — mount the
+            // leaf directly. Read-only never appears on the post-quiz
+            // path; the surface is always live or no-survivor.
+            switch surface {
+            case .live(let flavor):
+                VerdictScreen(
+                    verdict: view.verdict,
+                    flavor: flavor,
+                    onHome: onEndSession,
+                    onReroll: { }
+                )
+            case .noSurvivor:
+                NoSurvivorScreen(
+                    verdict: view.verdict,
+                    isInitiator: host.context.isInitiator,
+                    onHome: onEndSession
+                )
+            case .readOnly:
+                VerdictReadOnlyScreen(
+                    verdict: view.verdict,
+                    showHomeChrome: true,
+                    onAdvance: onEndSession
+                )
+            }
         }
     }
 

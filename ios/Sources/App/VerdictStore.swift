@@ -1,9 +1,16 @@
-// GetToIt — VerdictStore (TB-06 + TB-09).
+// GetToIt — VerdictStore (TB-06 + TB-09 + bug-34).
 //
 // Reads the `verdicts` + `option_cuts` rows for a room and shapes them
-// into a `(VerdictScreen.Verdict, VerdictScreen.Mode)` pair the S05
-// surface can render. iOS NEVER recomputes the verdict — that's the
-// engine's job. This store is read-only over PostgREST + supabase-swift.
+// into a `(VerdictScreen.Verdict, VerdictStore.Mode)` pair the
+// `VerdictRerollHost` dispatcher uses to pick the right surface. iOS
+// NEVER recomputes the verdict — that's the engine's job. This store
+// is read-only over PostgREST + supabase-swift.
+//
+// bug-34 / ADR 0018: VerdictStore now owns the `Mode` enum (the prior
+// `VerdictScreen.Mode` was retired when the 5-mode unified struct was
+// split into three surfaces). `Mode` is the room-state signal — the
+// dispatcher (`VerdictRerollHost.Surface.from(verdictView:)`)
+// translates it into the matching surface.
 //
 // TB-09 additions:
 //   * `fetchVerdict` returns `(verdict, mode)` so the caller knows
@@ -44,19 +51,36 @@ public final class VerdictStore {
 
     // MARK: - public surface
 
+    /// Room-state signal for the verdict view. The dispatcher
+    /// (`VerdictRerollHost.Surface.from(verdictView:)`) maps these
+    /// cases onto the three post-bug-34 surfaces:
+    ///
+    ///   * `.default` / `.committed` / `.solo` → live `VerdictScreen`
+    ///   * `.noSurvivor` → `NoSurvivorScreen`
+    ///   * `.readOnly` → `VerdictReadOnlyScreen` (set by
+    ///     `LateJoinerStore` for sealed deep-link arrivals, not by this
+    ///     store — `VerdictStore` only fetches live + no-survivor).
+    public enum Mode: String, Sendable {
+        case `default`
+        case committed
+        case solo
+        case readOnly
+        case noSurvivor
+    }
+
     /// Bundle of a verdict + its rendering mode + the surface inputs.
     /// Returning the mode lets the caller switch to `.noSurvivor` /
     /// `.readOnly` without re-fetching.
     public struct VerdictView: Equatable, Sendable {
         public let verdict: VerdictScreen.Verdict
-        public let mode: VerdictScreen.Mode
+        public let mode: Mode
         /// Surviving hard-needs labels for the no-survivor meta line.
         /// Empty for non-no-survivor modes.
         public let survivingHardNeeds: [String]
 
         public init(
             verdict: VerdictScreen.Verdict,
-            mode: VerdictScreen.Mode,
+            mode: Mode,
             survivingHardNeeds: [String] = []
         ) {
             self.verdict = verdict

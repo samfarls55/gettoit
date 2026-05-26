@@ -164,8 +164,13 @@ for (const docName of surfaceDocs) {
     if (!(reqKey in fm)) pairingErrors.push(`surfaces/${docName}: frontmatter missing "${reqKey}"`);
   }
   const jsxList = Array.isArray(fm.jsx) ? fm.jsx : [];
-  if (jsxList.length === 0) {
-    pairingErrors.push(`surfaces/${docName}: frontmatter "jsx" must be a non-empty list`);
+  // bug-34 / ADR 0018 — sub-surface docs (e.g. `05a-verdict-read-only.md`,
+  // `05b-no-survivor.md`) live alongside a parent surface that owns the
+  // canonical JSX. They declare `jsx: []` to opt out of pairing — the
+  // parent claim is still enforced via the orphan-jsx sweep below.
+  const isSubSurface = fm.jsx === '[]';
+  if (jsxList.length === 0 && !isSubSurface) {
+    pairingErrors.push(`surfaces/${docName}: frontmatter "jsx" must be a non-empty list (use "jsx: []" for sub-surfaces that share a parent's JSX)`);
   }
   for (const rel of jsxList) {
     const abs = path.join(dsRoot, rel);
