@@ -664,11 +664,13 @@ Added 2026-05-20 for sg-WF-4 (#157).
 | Element | Spec |
 |---|---|
 | Container | inline 36×36 button, radius 999, transparent bg by default |
-| Glyph | `⋯` Inter 900 / 18 / white 0.6, vertically centered |
+| Glyph | `⋯` Inter 900 / 18 / white 0.78, vertically centered |
 | Open state | bg → `rgba(255,255,255,0.10)`, glyph → white 1.0; 140ms `var(--ease-out)` |
 | Tap target | 36×36 visible; the host card row reserves a 36-wide trailing slot so the visible button clears HIG 44pt via the surrounding row padding |
 | `aria-haspopup` | `"menu"` |
 | `aria-expanded` | mirrors the host's open state |
+
+> wfr-28 (2026-05-26) raised the closed-state glyph from white 0.6 → white 0.78 after the workflow-review whole-app audit flagged the dot as effectively invisible on the gradient. The open state stays at white 1.0 so the open/closed visual delta still reads.
 
 ### Visual spec — `ActionDotMenu`
 

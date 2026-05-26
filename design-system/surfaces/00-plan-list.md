@@ -83,7 +83,7 @@ The Pending and Decided headers are visually identical to History but non-intera
 | Element | Spec |
 |---|---|
 | Plan name | Inter 700 / 17 / line 1.2, white, 1 line, ellipsis on overflow |
-| Trailing menu | C-25 `ActionDotMenuTrigger`, glyph `⋯` Inter 900 / 18 / white 0.6 |
+| Trailing menu | C-25 `ActionDotMenuTrigger`, glyph `⋯` Inter 900 / 18 / white 0.78 (wfr-28) |
 
 ### Created Decided / History card (2-line)
 

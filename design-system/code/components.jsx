@@ -1099,7 +1099,8 @@ function ActionDotMenuTrigger({ open, onToggle, ariaLabel = 'More actions' }) {
         appearance: 'none', border: 0, background: 'transparent',
         width: 36, height: 36, borderRadius: 999,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        color: 'rgba(255,255,255,0.6)',
+        // wfr-28 — closed-state glyph raised from white 0.6 → white 0.78 for discoverability.
+        color: 'rgba(255,255,255,0.78)',
         fontFamily: 'var(--ff-body)', fontWeight: 900, fontSize: 18,
         lineHeight: 1, cursor: 'pointer',
         transition: 'background 140ms var(--ease-out), color 140ms var(--ease-out)',

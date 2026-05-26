@@ -117,6 +117,19 @@ public enum ActionDotMenu {
         return GTIColor.TextOnGradient.primary
     }
 
+    /// Foreground color for the trigger glyph. wfr-28 raised the
+    /// closed-state weight from `tertiary` (white 0.6) to `secondary`
+    /// (white 0.78) after workflow-review flagged the dot as
+    /// effectively invisible on the gradient. The open state stays at
+    /// `primary` (white 1.0) so the open/closed visual delta still
+    /// reads. Locked here so a future "soften the dot" regression has
+    /// to update the test that pins the contract.
+    public static func triggerForegroundColor(isOpen: Bool) -> Color {
+        isOpen
+            ? GTIColor.TextOnGradient.primary
+            : GTIColor.TextOnGradient.secondary
+    }
+
     // MARK: - Trigger
 
     /// The always-visible `⋯` button on the host row. Owns its own
@@ -152,9 +165,7 @@ public enum ActionDotMenu {
                     Text(ActionDotMenu.triggerGlyph)
                         .font(.system(size: ActionDotMenu.triggerGlyphSize, weight: .black))
                         .foregroundStyle(
-                            isOpen
-                                ? GTIColor.TextOnGradient.primary
-                                : GTIColor.TextOnGradient.tertiary
+                            ActionDotMenu.triggerForegroundColor(isOpen: isOpen)
                         )
                         .frame(
                             width: ActionDotMenu.triggerDiameter,
