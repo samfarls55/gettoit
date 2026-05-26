@@ -22,3 +22,4 @@ Live + archived progress logs from `/execute-issues` runs. One file per run, nam
 | 2026-05-22-1708 | done | [[2026-05-22-1708-afk-execution-log]] — dogfood bug-20 (web verdict §C live-update re-fetch on reroll), 1/1 merged, 0 escalated |
 | 2026-05-24-1615 | done | [[2026-05-24-1615-afk-execution-log]] — dogfood UI batch (bug-21..26, bug-28), 7/7 merged, 0 escalated, bug-27 skipped (needs-info), 1 mid-flight resume (bug-24) |
 | 2026-05-25-1742 | done | [[2026-05-25-1742-afk-execution-log]] — swift-code-review hardening batch (bug-30..33), 2/2 dispatched merged (bug-30, bug-31), bug-32 + bug-33 deferred per user scope cut |
+| 2026-05-26-0231 | done | [[2026-05-26-0231-afk-execution-log]] — swift-code-review tail (bug-32, bug-33), 2/2 merged, 0 escalated — AFK backlog clear |
