@@ -1,11 +1,13 @@
 ---
 issue: wfr-27
 title: Add Loading indicator to WaitingScreen chip-phase load
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
 github_issue: 268
+pr: 304
+merged: 2026-05-26
 ---
 
 # wfr-27 — WaitingScreen has no Loading/Progress signal during initial chip-phase load
@@ -16,8 +18,8 @@ The `.loading` chip phase (`WaitingScreen.swift:100-151`) currently renders noth
 
 ## Acceptance criteria
 
-- [ ] ProgressView or skeleton visible during `.loading`.
-- [ ] Snapshot test covers loading state.
+- [x] ProgressView or skeleton visible during `.loading`.
+- [x] Snapshot test covers loading state.
 
 ## Blocked by
 
@@ -30,3 +32,17 @@ None — can start immediately.
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #27.
+
+## Comments
+
+### 2026-05-26 — Done (PR #304)
+
+Shipped a `ProgressView` in the WaitingScreen CTA dock, gated on `phase == .loading`. The indicator sits in situ where the AuthUpgradeChip will land (per the *Loading or Progress Indicators* pattern: "Place the indicator in situ — where the missing content will appear — not in a generic top bar"). Hides the moment the chip-phase resolves to any other state so the spinner doesn't leak.
+
+**Autonomy calls:**
+
+- Chose `ProgressView` over skeleton — the chip slot is one capsule, not a content-shaped block, so a skeleton would mislead about the resolved chip's shape. Spinner sits cleanly in the same vertical real estate.
+- Tinted `GTIColor.TextOnGradient.primary` to match the existing `quiz.q5.loading` / `submitting` ProgressView idiom in QuizScreen.
+- Reserved `minHeight: 44` so the slot doesn't visibly jump when the indicator gives way to the resolved chip.
+- Extracted the visibility rule as a public static predicate (`shouldRenderChipLoadingIndicator(for:)`) so the test covers every `ChipPhase` without spinning up a SwiftUI body. Mirrors the locked-constant / pure-helper idiom from `leaveChromeLabel` (wfr-17) and `sessionEndedToastLabel` (bug-37).
+- Locked accessibility id as `waiting.chip.loading` (matches the `<surface>.<region>.<role>` convention).
