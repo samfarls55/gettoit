@@ -182,4 +182,40 @@ final class SetupScreenRenderTests: XCTestCase {
                 .injectingError(.init(field: .crossField, message: "Couldn't save the plan."))
         )
     }
+
+    // MARK: - wfr-26 persistent name label render coverage
+
+    /// wfr-26 acceptance criterion #3 — "Snapshot test covers empty +
+    /// typed states." Empty state: name field renders with the
+    /// persistent label visible above and the in-field Input Prompt
+    /// placeholder still active. Body materialisation is the snapshot-
+    /// equivalent gate until pixel snapshotting lands.
+    func testNameLabelRendersInEmptyState() {
+        render(makeScreen(mode: .create, groupMode: .group))
+    }
+
+    /// wfr-26 acceptance criterion #3 — typed state: the persistent
+    /// label must still render once the user has typed and the in-field
+    /// placeholder has disappeared. Seeded via the existing `editingPlan`
+    /// prefill path (the cleanest way to land on a non-empty `name`
+    /// without driving the network).
+    func testNameLabelRendersInTypedState() {
+        let plan = PlansStore.Plan(
+            id: UUID(),
+            creatorID: UUID(),
+            name: "Friday dinner",
+            category: "food",
+            scope: .group,
+            location: nil,
+            sessionParameters: SessionParameters(
+                mealTime: .dinner,
+                groupContext: .group,
+                serviceShape: .dineInIndoor,
+                transportMode: .walk
+            ),
+            distanceMeters: 1609,
+            status: .pending
+        )
+        render(makeScreen(mode: .edit, groupMode: .group, editingPlan: plan))
+    }
 }

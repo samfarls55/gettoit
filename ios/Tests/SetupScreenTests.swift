@@ -153,6 +153,18 @@ final class SetupScreenTests: XCTestCase {
             "group path keeps Two of us / A group, drops Just me")
     }
 
+    // MARK: - persistent name field label (wfr-26)
+
+    /// wfr-26 — the persistent label copy above the name input. The
+    /// label is the **field label** (not the section eyebrow it
+    /// replaces). Sentence case, second-person casual register —
+    /// matches the placeholder's verb phrase so the field and its label
+    /// read as a single Input Prompt + Label pair per
+    /// `patterns.md` §"Input Prompt" + §"Input Hints".
+    func testNameLabelCopy() {
+        XCTAssertEqual(SetupScreen.nameLabelCopy(), "Name this plan")
+    }
+
     // MARK: - name validation
 
     /// Both dock CTAs gate on `name.trim().length > 0` per

@@ -260,6 +260,26 @@ public struct SetupScreen: View {
         !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    // MARK: - persistent name label (wfr-26)
+
+    /// wfr-26 — persistent field label above the name input. Replaces
+    /// the section eyebrow that previously sat above the row
+    /// (`NAME THIS PLAN`, eyebrow-token UPPERCASE treatment). The
+    /// eyebrow read as a section heading; the audit (workflow-review
+    /// 2026-05-26, finding #26) flagged the in-field placeholder as
+    /// the only label because the eyebrow's visual register doesn't
+    /// declare "this is the field's name". Pairs with the existing
+    /// in-field Input Prompt placeholder (`Name this plan` inside the
+    /// empty field) per `patterns.md` §"Input Prompt": "If you need
+    /// both label + format hint, use a floating label with a separate
+    /// Input Hints" — the label persists during and after typing while
+    /// the placeholder disappears on type. Voice register matches the
+    /// placeholder + the hint so the three layers read as one Input
+    /// Prompt + Label + Hint group.
+    public static func nameLabelCopy() -> String {
+        "Name this plan"
+    }
+
     // MARK: - input hints (wfr-24)
 
     /// wfr-24 — adjacent hint copy under the name input. Names the
@@ -670,7 +690,18 @@ public struct SetupScreen: View {
 
     private var nameField: some View {
         VStack(alignment: .leading, spacing: GTISpacing.step2) {
-            sectionEyebrow("NAME THIS PLAN", id: "setup.name.eyebrow")
+            // wfr-26 — persistent field label. Replaces the section
+            // eyebrow that previously sat here (`NAME THIS PLAN`,
+            // eyebrow token UPPERCASE). The new treatment reads as a
+            // field label (sentence case, body size, semibold,
+            // white-secondary) so it can't be mistaken for a section
+            // heading and so it visually pairs with the in-field
+            // placeholder + the hint below. Persists during and after
+            // typing — the placeholder disappears, this label stays.
+            // VO is unaffected: the field carries its own
+            // `accessibilityLabel("Name this plan")`, and this view is
+            // hidden from a11y so the label isn't double-announced.
+            fieldLabel(SetupScreen.nameLabelCopy(), id: "setup.name.label")
 
             // Glass row hosting a borderless `TextField`. Matches the
             // C-23 picker treatment per surface doc §"Name input
@@ -930,6 +961,21 @@ public struct SetupScreen: View {
             .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
             .foregroundStyle(GTIColor.TextOnGradient.tertiary)
             .accessibilityIdentifier(id)
+    }
+
+    /// wfr-26 — persistent field-label treatment used above text-input
+    /// fields (currently just the name field). Distinct from
+    /// `sectionEyebrow`: sentence case + body-sm semibold + white-
+    /// secondary so the label reads as a field name, not a section
+    /// heading. Marked `accessibilityHidden` so the field's own
+    /// `accessibilityLabel` is the single VO announcement — no
+    /// double-read.
+    private func fieldLabel(_ text: String, id: String) -> some View {
+        Text(text)
+            .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+            .foregroundStyle(GTIColor.TextOnGradient.secondary)
+            .accessibilityIdentifier(id)
+            .accessibilityHidden(true)
     }
 
     /// wfr-24 — adjacent field-hint treatment. Smaller + lighter than
