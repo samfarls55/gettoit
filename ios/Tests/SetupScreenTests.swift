@@ -65,6 +65,31 @@ final class SetupScreenTests: XCTestCase {
             "above-range value clamps to the top stop")
     }
 
+    /// bug-30 — `snapDistance` originally force-unwrapped `distanceSteps.first!`
+    /// / `distanceSteps.last!`. The fix replaces both with `??` fallbacks
+    /// (`0` floor, `Self.maxDistanceMiles` ceiling) per CODING_STANDARDS.md
+    /// rule OPT-001. Behavior is observably identical because
+    /// `distanceSteps` is a static-let literal, but the three acceptance
+    /// criteria from the bug-30 spec are pinned here so a future
+    /// regression that breaks the clamp / passthrough contract fails
+    /// loud — and so the snap helper is exercised at the exact endpoints
+    /// the spec named.
+    func testSnapDistance_bug30AcceptanceCriteria() {
+        guard
+            let first = SetupScreen.distanceSteps.first,
+            let last = SetupScreen.distanceSteps.last
+        else {
+            return XCTFail("distanceSteps must be non-empty")
+        }
+        XCTAssertEqual(SetupScreen.snapDistance(-1), first, accuracy: 0.001,
+            "negative input clamps to the first stop")
+        XCTAssertEqual(SetupScreen.snapDistance(100), last, accuracy: 0.001,
+            "far-above-range input clamps to the last stop")
+        let interior = SetupScreen.distanceSteps[2]
+        XCTAssertEqual(SetupScreen.snapDistance(interior), interior, accuracy: 0.001,
+            "an exact stop passes through unchanged")
+    }
+
     /// The mono-tag value label format. `String(format:)` mirrors the
     /// JSX `distance.toFixed(1)` so the slider label reads `"1.0 MI"`
     /// (never `"1 MI"` or `"1.00 MI"`).

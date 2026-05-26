@@ -100,8 +100,15 @@ public struct SetupScreen: View {
     /// the lower-index (smaller) stop wins — same behavior as the JSX
     /// reduce (`Math.abs(stop - v) <` is strict).
     public static func snapDistance(_ value: Double) -> Double {
-        if value <= distanceSteps.first! { return distanceSteps.first! }
-        if value >= distanceSteps.last! { return distanceSteps.last! }
+        // `distanceSteps` is a static-let literal, so `first` / `last` are
+        // never nil in practice — but per CODING_STANDARDS rule OPT-001
+        // (bug-30) we still avoid the force-unwrap. Defensive fallbacks:
+        // 0 for the floor, `Self.maxDistanceMiles` for the ceiling. Both
+        // are already declared adjacent and bracket the legal range.
+        let firstStop = distanceSteps.first ?? 0
+        let lastStop = distanceSteps.last ?? Self.maxDistanceMiles
+        if value <= firstStop { return firstStop }
+        if value >= lastStop { return lastStop }
         var best = distanceSteps[0]
         var bestDistance = abs(value - best)
         for stop in distanceSteps.dropFirst() {
