@@ -45,7 +45,7 @@ Concurrency cap: 2.
 | wfr-19 | #260 | waiting | afk/wfr-19 | - | Privacy/Terms home link (waits wfr-18) |
 | wfr-20 | #261 | waiting | afk/wfr-20 | - | InviteShell terminal home link (waits wfr-18) |
 | wfr-29 | #270 | waiting | afk/wfr-29 | - | SettingsScreen DONE top-left (waits wfr-06+wfr-07) |
-| wfr-30 | #271 | waiting | afk/wfr-30 | - | InviteShell name-entry help (waits wfr-10) |
+| wfr-30 | #271 | merged | afk/wfr-30 | [#308](https://github.com/samfarls55/gettoit/pull/308) | InviteShell name-entry help (folded into wfr-10 footer) |
 
 ## Event log
 
