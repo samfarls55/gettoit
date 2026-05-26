@@ -153,6 +153,38 @@ final class PostQuizHostScreenTests: XCTestCase {
         )
     }
 
+    /// wfr-17 — the host screen forwards a waiting-Leave tap to the
+    /// supplied `onLeaveWaiting` closure. The `RootView` call site
+    /// wires that closure to a MemberLeaveStore.leaveAndExpire call
+    /// followed by `postQuizHost = nil`, so the precedence chain
+    /// returns the user to S00 Plan list. This test pins the
+    /// closure contract; the store wiring is covered by
+    /// `QuizChromeExitTests.testLeaveAndExpire*`.
+    func testWaitingLeaveTapInvokesOnLeaveWaiting() {
+        let host = PostQuizHost(
+            context: PostQuizSessionContext(
+                roomID: UUID(),
+                userID: UUID(),
+                isInitiator: true,
+                invitedShared: true
+            ),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in nil },
+            sleep: { _ in }
+        )
+        var leaveCalls = 0
+        let screen = PostQuizHostScreen(
+            host: host,
+            auth: makeAuth(),
+            promptStore: makePromptStore(),
+            onLeaveWaiting: { leaveCalls += 1 }
+        )
+        render(screen)
+        screen.simulateWaitingLeaveTapForTesting()
+        XCTAssertEqual(leaveCalls, 1,
+            "expected the waiting-Leave chrome tap to invoke onLeaveWaiting exactly once")
+    }
+
     func testWaitingPhaseRendersTheWaitingScreen() {
         // A group session opens on `.waiting` — the screen materialises
         // the S04 Waiting surface, NOT the neutral resolving hold.

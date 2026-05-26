@@ -165,4 +165,58 @@ final class QuizChromeExitTests: XCTestCase {
         XCTAssertTrue(expire.calls.isEmpty,
             "expected role=joiner to suppress room-expire regardless of isSolo")
     }
+
+    // MARK: - wfr-17 — initiator Leave from S04 Waiting
+
+    /// wfr-17 — the WaitingScreen initiator Leave path drops the
+    /// initiator's membership AND marks the room expired in the same
+    /// flow, regardless of how many other members have joined. This is
+    /// distinct from `leave(role:isSolo:)` whose room-expire branch is
+    /// gated on `isSolo == true` (the Plan-list / quiz-chrome path
+    /// where the initiator leaving a non-solo room keeps the room
+    /// alive for the remaining members). On S04 Waiting the initiator
+    /// has already submitted Q5 and the intent of Leave is "kill this
+    /// session," not "let the others continue without me" — the room
+    /// has nobody who can fire the verdict anymore.
+    func testLeaveAndExpireDropsMembershipAndExpiresTheRoom() async throws {
+        let delete = RecordingMemberDelete()
+        let expire = RecordingRoomExpire()
+        let store = MemberLeaveStore(
+            deleteMembership: delete.handler(),
+            expireRoom: expire.handler()
+        )
+
+        try await store.leaveAndExpire(roomID: roomID, userID: userID)
+
+        XCTAssertEqual(delete.calls, [.init(roomID: roomID, userID: userID)],
+            "expected leaveAndExpire to drop the caller's membership exactly once")
+        XCTAssertEqual(expire.calls, [.init(roomID: roomID)],
+            "expected leaveAndExpire to mark the room expired exactly once")
+    }
+
+    /// wfr-17 — DELETE runs before UPDATE. Mirrors the existing
+    /// `leave(...)` contract: a successful DELETE followed by a failed
+    /// UPDATE leaves a "I left, but the room is still open" state the
+    /// verdict cron's no-signal sweeper expires anyway — the safer
+    /// failure mode than "room expired but I'm still a member."
+    func testLeaveAndExpireRunsDeleteBeforeUpdate() async throws {
+        // Order is asserted by failing the DELETE and observing that
+        // the UPDATE never ran.
+        struct Boom: Error {}
+        let expire = RecordingRoomExpire()
+        let store = MemberLeaveStore(
+            deleteMembership: { _, _ in throw Boom() },
+            expireRoom: expire.handler()
+        )
+
+        do {
+            try await store.leaveAndExpire(roomID: roomID, userID: userID)
+            XCTFail("expected leaveAndExpire to rethrow the DELETE failure")
+        } catch is Boom {
+            // expected
+        }
+
+        XCTAssertTrue(expire.calls.isEmpty,
+            "expected the room-expire UPDATE to never fire when the membership DELETE throws")
+    }
 }

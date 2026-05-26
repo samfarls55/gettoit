@@ -274,6 +274,23 @@ public struct RootView: View {
                         onEndSession: {
                             host.teardown()
                             postQuizHost = nil
+                        },
+                        // wfr-17 — initiator-only Leave from S04
+                        // Waiting. Drops the initiator's `members` row
+                        // AND marks `rooms.status = 'expired'` so the
+                        // session ends cleanly for every member (the
+                        // verdict can no longer fire without the
+                        // initiator's `Decide now` tap; expiring the
+                        // room turns the surface into a clean exit).
+                        // The route flip back to S00 Plan list follows
+                        // the same precedence-chain fallback as
+                        // `onEndSession` — clearing `postQuizHost`
+                        // lands the user on the Plan list.
+                        onLeaveWaiting: {
+                            leavePostQuizWaiting(
+                                host: host,
+                                client: coordinators.client
+                            )
                         }
                     )
                 } else if let readOnly = readOnlyView {
@@ -1364,6 +1381,58 @@ public struct RootView: View {
             if let userID = coordinators?.auth.state.userID {
                 Task { await refreshPlanList(userID: userID) }
             }
+        }
+    }
+
+    /// wfr-17 — handle the WaitingScreen Leave chrome tap.
+    ///
+    /// The initiator has just submitted Q5, the room is on S04
+    /// Waiting, and they want to back out. Calling
+    /// `MemberLeaveStore.leaveAndExpire`:
+    ///   * DELETEs the initiator's `members` row (so their identity
+    ///     is no longer in the room).
+    ///   * UPDATEs `rooms.status = 'expired'` so the session ends for
+    ///     every other member too. This is the load-bearing
+    ///     difference from `leaveQuizThenRoute`'s initiator-non-solo
+    ///     branch (which keeps the room alive for the remaining
+    ///     members) — on S04 the verdict can no longer fire without
+    ///     the initiator's `Decide now` tap, so leaving = ending the
+    ///     session for everyone.
+    ///
+    /// Why the route flip is synchronous: same reasoning as
+    /// `leaveQuizThenRoute` — the user has explicitly tapped Leave
+    /// and expects to land on the Plan list immediately, not after
+    /// the round-trip resolves. The two writes are fire-and-forget;
+    /// a failed UPDATE leaves a stuck-open room the verdict cron's
+    /// no-signal sweeper expires anyway.
+    private func leavePostQuizWaiting(
+        host: PostQuizHost,
+        client: SupabaseClient
+    ) {
+        let store = MemberLeaveStore.live(client: client)
+        let roomID = host.context.roomID
+        let userID = host.context.userID
+        Task {
+            do {
+                try await store.leaveAndExpire(roomID: roomID, userID: userID)
+            } catch {
+                // Best-effort: a failed write leaves a stuck-open room
+                // that the verdict cron's no-signal sweeper expires
+                // anyway. The route flip below fires synchronously
+                // either way, so the user is never stranded on the
+                // Waiting surface.
+            }
+        }
+        // Route flip: tear the host down (cancels the verdict poll)
+        // and clear the slot so the precedence chain falls through to
+        // the Plan list — the same destination `onEndSession` uses.
+        host.teardown()
+        postQuizHost = nil
+        // Refresh the Plan list rows so a freshly-expired Plan
+        // reflects its new status the moment the user lands back here
+        // (parity with `leaveQuizThenRoute`).
+        if let userID = coordinators?.auth.state.userID {
+            Task { await refreshPlanList(userID: userID) }
         }
     }
 
