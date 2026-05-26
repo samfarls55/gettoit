@@ -52,6 +52,68 @@ final class PostQuizHostScreenTests: XCTestCase {
         render(PostQuizHostScreen(host: host))
     }
 
+    // MARK: - wfr-13 — resolving Escape Hatch
+
+    /// wfr-13 — chrome label is the plain "Cancel" text verb. Matches
+    /// the QuizChrome / LockedScreen text-only chrome idiom. NEVER
+    /// paraphrase to "Dismiss" / "Back" / an SF Symbol — the locked
+    /// constant defends against that drift.
+    func testResolvingCancelLabelIsTextVerbCancel() {
+        XCTAssertEqual(PostQuizHostScreen.resolvingCancelLabel, "Cancel")
+    }
+
+    /// wfr-13 — tapping the resolving Cancel chrome fires `onEndSession`.
+    /// The `RootView` call site wires that closure to
+    /// `host.teardown() + postQuizHost = nil`, so the user lands back
+    /// on S00 Plan list via the precedence chain. This test pins the
+    /// closure contract; the screen body and the host wiring are both
+    /// covered separately.
+    func testResolvingCancelTapInvokesOnEndSession() {
+        let host = makeHost()
+        var endSessionCalls = 0
+        let screen = PostQuizHostScreen(
+            host: host,
+            onEndSession: { endSessionCalls += 1 }
+        )
+        // Materialise once so the SwiftUI body has run at least once
+        // (mirrors `LockedScreenTests.testHomeChromeTapInvokesOnHome`).
+        render(screen)
+        screen.simulateResolvingCancelTapForTesting()
+        XCTAssertEqual(endSessionCalls, 1)
+    }
+
+    /// wfr-13 — and critically: tapping Cancel during `.resolving` does
+    /// NOT fire the verdict. The host's poll task is owned by the
+    /// surface lifecycle (`.task { await host.start() }`), and
+    /// `onEndSession`'s `host.teardown()` cancels it. Asserting at this
+    /// level: the host phase stays `.resolving` after the cancel tap,
+    /// proving no verdict transition piggybacked on the tap path.
+    func testResolvingCancelDoesNotFireTheVerdict() {
+        let host = makeHost()
+        let screen = PostQuizHostScreen(host: host, onEndSession: { })
+        render(screen)
+        // Pre-condition: a freshly-built solo host is in `.resolving`.
+        guard case .resolving = host.phase else {
+            return XCTFail("Pre-condition: solo host must open on .resolving")
+        }
+        screen.simulateResolvingCancelTapForTesting()
+        // Post-condition: the tap path does not transition the host to
+        // `.verdict` — the verdict only lands when the poll fires, and
+        // the `RootView` cancel wiring tears the poll down rather than
+        // resolving it.
+        if case .verdict = host.phase {
+            XCTFail("Cancel tap must NOT fire the verdict; phase=.verdict")
+        }
+    }
+
+    /// wfr-13 — render-smoke that the chrome row materialises on the
+    /// resolving phase. Defends against the chrome subview panicking on
+    /// layout. Mirrors `LockedScreenTests.testRendersWithHomeChromeWired`.
+    func testResolvingPhaseRendersWithCancelChromeWired() {
+        let host = makeHost()
+        render(PostQuizHostScreen(host: host, onEndSession: { }))
+    }
+
     // MARK: - phase: verdict
 
     func testVerdictPhaseRendersTheVerdictScreen() async throws {
