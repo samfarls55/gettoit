@@ -1,0 +1,34 @@
+---
+issue: wfr-14
+title: Add Cancel to JoinScreen joining + Back to error phase
+status: ready-for-agent
+type: AFK
+surfaced_by: workflow-review 2026-05-26
+created: 2026-05-26
+github_issue: 255
+---
+
+# wfr-14 — JoinScreen joining spinner has no Cancel; error state has no Back
+
+## What to build
+
+`.joining` phase shows a progress spinner with no abort path. `.error` phase shows a message with no back/retry link. Add a "Cancel" affordance during joining and a "Go back" link on error.
+
+## Acceptance criteria
+
+- [ ] Cancel affordance visible during `.joining`.
+- [ ] Back / "Try another link" visible on `.error`.
+- [ ] Cancel clears `deepLink` and returns to PlanList.
+
+## Blocked by
+
+None — can start immediately.
+
+## Hub anchors
+
+- [[../../30_design/interaction-patterns/patterns#Escape Hatch]]
+- [[../../30_design/interaction-patterns/patterns#Error Messages]]
+
+## Surfaced by
+
+`/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #14.

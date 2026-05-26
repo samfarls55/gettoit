@@ -15,7 +15,7 @@ The phases below are organizational only — same cycle, distinct decomposition 
 - [[dogfood-phase|Dogfood follow-ups (formerly the "v1.1" batch)]] — first-install TestFlight feedback (2026-05-14), the quiz-redesign + verdict-engine PRD ([[../../10_prds/0.1.0-quiz-redesign-prd|0.1.0 Quiz Redesign PRD]]), Q5-wiring fix, premium-data follow-ups, post-Q5 router fix, verdict-pipeline integration, candidate-pool floor, verdict-spinner diagnosis, solo-session post-mortem, AFK-run follow-ups, UI dogfood batch.
 - [[workflow-overhaul-phase|Workflow overhaul (formerly "workflow-overhaul")]] — Plans as persistent named items, list-as-landing, collapsed Setup screen, three nav verbs (Back/Exit/Delete), web invitee shell + account-claim bridge.
 
-All `tb-NN-*` / `bug-NN-*` / `sg-NN-*` / `tb-wf-N-*` / `sg-wf-N-*` issue files live flat in [[issues|0.1.0/issues/]].
+All `tb-NN-*` / `bug-NN-*` / `sg-NN-*` / `tb-wf-N-*` / `sg-wf-N-*` / `wfr-NN-*` issue files live flat in [[issues|0.1.0/issues/]].
 
 ## Loose-leaf phase notes
 
@@ -26,3 +26,7 @@ Diagnostic notes captured outside the issue files themselves but still relevant 
 - [[service-shape-attributes-unbacked|service-shape-attributes-unbacked]] — Foursquare `attributes` adjacency for the service-shape session parameter.
 - [[ios-integration-tests-flaky-on-shared-db|ios-integration-tests-flaky-on-shared-db]] — flaky integration tests against the shared live Supabase DB.
 - [[verdict-pipeline-pool-manager-unwired|verdict-pipeline-pool-manager-unwired]] — `RunningUnionPoolManager` not-wired-in smell on the verdict side.
+
+## Workflow-review batches
+
+- [[../_runs/2026-05-26-0958-workflow-review|2026-05-26 whole-app workflow-review]] — 32 findings against `gti-vault/30_design/interaction-patterns/`. Issue bucket #6..#31 published as `wfr-06`..`wfr-31` (GitHub #247-#272). Grill bucket #1, #2, #3, #4, #5, #32 still pending `/grill-with-docs`.
