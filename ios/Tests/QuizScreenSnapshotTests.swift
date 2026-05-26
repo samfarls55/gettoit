@@ -144,6 +144,152 @@ final class QuizScreenSnapshotTests: XCTestCase {
         render(QuizScreen(coordinator: coord, onClose: {}))
     }
 
+    // MARK: - bug-38 — session-ended handler
+
+    /// bug-38 — toast copy mirrors WaitingScreen's locked copy (bug-37),
+    /// from CONTEXT.md §"Plan delete": "joiners get a 'session ended'
+    /// toast and are punted." Locked constant defends against future
+    /// paraphrase drift; pinning it here means a paraphrase on either
+    /// surface trips the test.
+    func testQuizScreenSessionEndedToastLabelIsLockedCopy() {
+        XCTAssertEqual(QuizScreen.sessionEndedToastLabel, "Session ended")
+    }
+
+    /// bug-38 — toast copy MATCHES WaitingScreen's. Per the AFK brief,
+    /// the two surfaces share the same inline primitive shape; the
+    /// locked copy must be identical so a user who gets punted from
+    /// mid-quiz and a user who gets punted from S04 see the same
+    /// affordance.
+    func testQuizScreenSessionEndedCopyMatchesWaitingScreen() {
+        XCTAssertEqual(
+            QuizScreen.sessionEndedToastLabel,
+            WaitingScreen.sessionEndedToastLabel,
+            "bug-38 toast copy must match bug-37 (ADR-0019 surface-owned ownership)"
+        )
+    }
+
+    /// bug-38 — duration matches WaitingScreen's. Same primitive,
+    /// same visibility window; a tweak on one surface must be a
+    /// deliberate divergence, not a drift.
+    func testQuizScreenSessionEndedDurationMatchesWaitingScreen() {
+        XCTAssertEqual(
+            QuizScreen.sessionEndedToastDuration,
+            WaitingScreen.sessionEndedToastDuration,
+            "bug-38 toast duration must match bug-37 (ADR-0019 surface-owned ownership)"
+        )
+    }
+
+    /// bug-38 — when the room-status projection transitions to
+    /// `.expired`, the screen fires the host-supplied `onSessionEnded`
+    /// closure (the host then clears `activeQuiz` so the user lands
+    /// on PlanList). Mirrors WaitingScreen's bug-37 test seam: SwiftUI
+    /// tests cannot directly trigger `.onChange` modifiers from a
+    /// state mutation, so the screen exposes a `simulateSessionEndedForTesting`
+    /// seam that runs the same handler the production `.onChange`
+    /// would invoke when status arrives as `.expired`.
+    func testQuizScreenExpiredStatusFiresOnSessionEnded() {
+        let coord = makeCoordinator()
+        let store = WaitingStore(roomID: UUID(), currentUserID: UUID(), isInitiator: true)
+        store.bootstrap(members: [], answered: [], status: .open)
+        var sessionEndedCalls = 0
+        let view = QuizScreen(
+            coordinator: coord,
+            role: .initiator,
+            isSolo: false,
+            roomStatusStore: store,
+            onExit: { },
+            onSessionEnded: { sessionEndedCalls += 1 }
+        )
+        render(view)
+        store.apply(event: .roomStatusChanged(.expired))
+        view.simulateSessionEndedForTesting()
+        XCTAssertEqual(sessionEndedCalls, 1,
+            "expected RoomStatus.expired to fire onSessionEnded exactly once")
+    }
+
+    /// bug-38 — invitee instances ALSO fire onSessionEnded. The
+    /// session-ended transition is not initiator-only — every member
+    /// in the room needs to be punted when the room expires,
+    /// regardless of who initiated. Mirrors bug-37's invitee guard.
+    func testQuizScreenExpiredStatusFiresOnSessionEndedForInviteeToo() {
+        let coord = makeCoordinator()
+        let store = WaitingStore(roomID: UUID(), currentUserID: UUID(), isInitiator: false)
+        store.bootstrap(members: [], answered: [], status: .open)
+        var sessionEndedCalls = 0
+        let view = QuizScreen(
+            coordinator: coord,
+            role: .joiner,
+            isSolo: false,
+            roomStatusStore: store,
+            onExit: { },
+            onSessionEnded: { sessionEndedCalls += 1 }
+        )
+        render(view)
+        store.apply(event: .roomStatusChanged(.expired))
+        view.simulateSessionEndedForTesting()
+        XCTAssertEqual(sessionEndedCalls, 1,
+            "expected invitees to also receive the session-ended punt")
+    }
+
+    /// bug-38 — non-expired status transitions do NOT fire
+    /// onSessionEnded. Guards against an over-broad .onChange that
+    /// punts the user on every status flip (firing, verdict_ready,
+    /// locked). Mirrors bug-37's non-expired guard.
+    func testQuizScreenNonExpiredStatusDoesNotFireOnSessionEnded() {
+        let coord = makeCoordinator()
+        let store = WaitingStore(roomID: UUID(), currentUserID: UUID(), isInitiator: true)
+        store.bootstrap(members: [], answered: [], status: .open)
+        var sessionEndedCalls = 0
+        let view = QuizScreen(
+            coordinator: coord,
+            role: .initiator,
+            isSolo: false,
+            roomStatusStore: store,
+            onExit: { },
+            onSessionEnded: { sessionEndedCalls += 1 }
+        )
+        render(view)
+        // .firing, .verdictReady, .locked are not session-ended.
+        store.apply(event: .roomStatusChanged(.firing))
+        store.apply(event: .roomStatusChanged(.verdictReady))
+        store.apply(event: .roomStatusChanged(.locked))
+        XCTAssertEqual(sessionEndedCalls, 0,
+            "expected only .expired (not .firing / .verdictReady / .locked) to fire onSessionEnded")
+    }
+
+    /// bug-38 — render-smoke that an `.expired` status materialises
+    /// the toast subview without crashing.
+    func testQuizScreenExpiredStatusRendersWithToastWithoutCrashing() {
+        let coord = makeCoordinator()
+        let store = WaitingStore(roomID: UUID(), currentUserID: UUID(), isInitiator: true)
+        store.bootstrap(members: [], answered: [], status: .expired)
+        let view = QuizScreen(
+            coordinator: coord,
+            role: .initiator,
+            isSolo: false,
+            roomStatusStore: store,
+            onExit: { },
+            onSessionEnded: { }
+        )
+        render(view)
+    }
+
+    /// bug-38 — the legacy QuizScreen initializers (no roomStatusStore /
+    /// no onSessionEnded) still compile and render. Snapshot tests,
+    /// chrome tests, and the JoinedResumeQuizHost all instantiate
+    /// without the new params; they must keep working unchanged.
+    func testQuizScreenLegacyInitializersStillCompile() {
+        let coord = makeCoordinator()
+        render(QuizScreen(coordinator: coord, onClose: { }))
+        let coord2 = makeCoordinator()
+        render(QuizScreen(
+            coordinator: coord2,
+            role: .initiator,
+            isSolo: false,
+            onExit: { }
+        ))
+    }
+
     // MARK: - coordinator default state
 
     func testDefaultsMatchTheSpecDefaults() {
