@@ -1,24 +1,23 @@
-// GetToIt — VerdictScreen (TB-06 + TB-09).
+// GetToIt — VerdictScreen (live verdict, post-bug-34).
 //
-// SwiftUI port of `design-system/code/screens/ScreenVerdict.jsx`.
-// The verdict surface is the hero — the screen this whole product
-// exists to deliver. The choreography is canon: ms-exact timings
-// from `motion.md` §"Verdict reveal — full choreography", sourced
-// through `GTIMotion.ChoreoDelay` so a token bump catches via the
-// design-system verify gate.
+// The hero — the screen this whole product exists to deliver. Per
+// ADR 0018 (accepted 2026-05-26, implemented by bug-34) the prior
+// 5-mode unified struct was decomposed into three surfaces: this
+// `VerdictScreen` (live), `VerdictReadOnlyScreen` (closed), and
+// `NoSurvivorScreen` (widen-and-retry). What stayed here is the live
+// verdict shell — eyebrow + hero + time-badge + receipts + reroll
+// + Home chrome — driven by a three-case `Flavor` enum.
 //
-// Modes supported here:
-//   * `.default` — clean run (TB-06). Standard reveal.
-//   * `.noSurvivor` — TB-09 terminal. Eyebrow `"Tonight"`, hero
-//     `"NO SPOT / FITS"` (one word per line per the standard rule),
-//     meta line surfaces surviving hard-needs, rule chip carries the
-//     load-bearing message, primary CTA `"Widen radius"` opens an
-//     inline range slider (1–10 mi, current+1.0 mi default), commit
-//     fires `onWidenRadius(meters:)`. Suppressed: time badge, voice
-//     receipts.
-//   * `.committed`, `.readOnly` — wired through the same `mode`
-//     parameter; TB-08 / TB-11 land the full implementations.
-//   * `.solo` — TB-13 single-member surface; see `Mode.solo` doc.
+// Flavors:
+//   * `.default` — clean run pre-ratify.
+//   * `.committed` — post-`I'm in` group view with sun-fill pill,
+//     `You're in · N of M` label, and the dock countdown.
+//   * `.solo` — single-member surface. Eyebrow + hero + time-badge +
+//     rule chip + I'm in + reroll all present; suppresses the
+//     voice-receipt row (one voice doesn't need to be receipted
+//     back to itself) and the time-badge audience subtitle (the
+//     communal frame self-cancels with N = 1). Replaces the group
+//     save affordance with the C-22 save-taste-profile chip.
 //
 // bug-26 (2026-05-24) — the `.cuts` mode and its expanded "See what
 // got cut" drawer were retired in full. The drawer offered a friction-
@@ -32,10 +31,8 @@
 //   * Compute anything from `votes`. The engine in
 //     `supabase/functions/_shared/verdict-engine.ts` is the single
 //     canonical implementation; iOS surfaces the engine's output.
-//   * Wire the "I'm in" CTA to the ratification path — TB-08.
-//   * Spawn the widen-radius re-run network call — the view calls
-//     `onWidenRadius(meters:)` and the caller wires the
-//     `compute-verdict` re-invocation.
+//   * Render closed verdicts — that's `VerdictReadOnlyScreen`.
+//   * Render no-survivor terminals — that's `NoSurvivorScreen`.
 //
 // Reduced motion: drops the choreographed reveal to instant per
 // `motion.md` §"Reduced motion fallback". Receipts land simultaneously.
@@ -44,20 +41,16 @@ import SwiftUI
 
 @MainActor
 public struct VerdictScreen: View {
-    public enum Mode: String, Sendable {
+    /// Three-case flavor enum for the live verdict surface. ADR 0018
+    /// renamed the prior 5-case `Mode` to `Flavor` to mark the scope
+    /// contraction; `.readOnly` and `.noSurvivor` moved to their own
+    /// surfaces.
+    public enum Flavor: String, Sendable {
         case `default`
         case committed
-        case readOnly
-        case noSurvivor
-        /// TB-13 — single-member solo flow. Surface keeps the eyebrow +
-        /// hero + meta + time badge + rule chip + `"I'm in"` + reroll;
-        /// suppresses the voice-receipt row; replaces the group-save
-        /// affordance with the C-22 save-taste-profile chip. bug-28 —
-        /// the time badge renders the timestamp ONLY; the audience
-        /// subtitle is omitted. The communal `"All N of you"` frame
-        /// self-cancels with N = 1, and `"You"` only restates what the
-        /// solo voter already knows. See
-        /// `design-system/surfaces/05-verdict.md` §"solo".
+        /// TB-13 — single-member solo flow. See file header for the
+        /// surface contract. `design-system/surfaces/05-verdict.md`
+        /// §"solo" carries the locked rules.
         case solo
     }
 
@@ -156,27 +149,17 @@ public struct VerdictScreen: View {
 
     @State private var revealStep: Int = 0
     @State private var receiptIndexShown: Int = -1
-    @State private var widenSliderOpen: Bool = false
-    @State private var widenRadiusMiles: Double = 3.0
     /// TB-08 — local commit flag. Flipped by the "I'm in" tap, drives
     /// the sun-fill / "You're in · N of M" CTA per S05 §Modes.
     @State private var committedLocally: Bool = false
     /// TB-08 — wall-clock seconds remaining in the correctability
     /// window. The view ticks this on a 1-Hz Task while in committed
-    /// mode. Null when no commitment exists yet.
+    /// flavor. Null when no commitment exists yet.
     @State private var windowSecondsRemaining: Int? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let verdict: Verdict
-    private let mode: Mode
-    /// Whether the current viewer initiated the room. Drives the
-    /// no-survivor "Widen radius" CTA visibility — initiator-only per
-    /// `surfaces/05-verdict.md` §"no-survivor".
-    private let isInitiator: Bool
-    /// Current room radius in meters. Drives the widen slider's
-    /// default suggestion (current + 1.0 mi) per
-    /// `surfaces/05-verdict.md` §"no-survivor".
-    private let currentRadiusMeters: Int
+    private let flavor: Flavor
     /// CTA non-functional in TB-06; TB-08 wires this. Kept as a closure
     /// so the call sites compile through the ratification work later.
     private let onAdvance: () -> Void
@@ -193,20 +176,10 @@ public struct VerdictScreen: View {
     /// the prompt fires AFTER the ratification row writes. Defaults
     /// to no-op so existing call sites compile through.
     private let onRatify: () -> Void
-    /// Fires when the initiator commits the widen-radius slider value
-    /// (passes the chosen radius in METERS). The caller wires the
-    /// `compute-verdict` re-invocation. Defaults to no-op so existing
-    /// `.default` call sites compile through.
-    private let onWidenRadius: (Int) -> Void
     /// bug-22 — fires when the user taps the top-leading `Home` text
-    /// verb in the new verdict chrome row. Pure navigation — pops to
-    /// S00 Plan list. No session teardown, no membership mutation
-    /// (the room is already closed at verdict per `CONTEXT.md` →
-    /// *Plan / Room lifecycle*). The host wires this to the same
-    /// destination the retired `onStartOver` reached (the post-quiz
-    /// host's `onEndSession` already lands on S00 Plan list via the
-    /// precedence-chain fallback in `RootView`). Defaults to no-op.
-    /// See `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
+    /// verb in the verdict chrome row. Pure navigation — pops to S00
+    /// Plan list. No session teardown, no membership mutation. See
+    /// `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
     private let onHome: () -> Void
     /// TB-08 — correctability window in seconds. Defaults to 30 per
     /// `rooms.correctability_window_seconds`. The view drives a 1-Hz
@@ -219,58 +192,37 @@ public struct VerdictScreen: View {
     private let rerollsUsed: Int
     /// TB-10 — fires when the user taps the tertiary "Reroll" button.
     /// The host wires this to a sheet presentation of `RerollScreen`.
-    /// Suppressed in `.readOnly` and `.noSurvivor` per S05 §Modes.
     /// Suppressed when `rerollsUsed >= 3` (the footer reads "No rerolls
     /// left" instead per S07 §"Edge cases").
-    ///
-    /// bug-27 (2026-05-25): NO default value. Before bug-27 this
-    /// parameter defaulted to `{}` and every one of the 5 production
-    /// call sites omitted it — the live tertiary CTA was a silent
-    /// no-op. The default is gone so the compiler forces every future
-    /// call site to wire `onReroll` explicitly. The two `.readOnly` /
-    /// `.noSurvivor` / no-survivor call sites that gate the affordance
-    /// off via mode still pass `onReroll: { }` so the empty closure is
-    /// explicit and load-bearing, not silently defaulted.
     private let onReroll: () -> Void
 
     public init(
         verdict: Verdict,
-        mode: Mode = .default,
-        isInitiator: Bool = true,
-        currentRadiusMeters: Int = 3219, // ~2.0 mi — S01 default
+        flavor: Flavor = .default,
         ratifiedCount: Int = 0,
         ratifiedTotal: Int = 0,
         correctabilityWindowSeconds: Int = 30,
         rerollsUsed: Int = 0,
         onAdvance: @escaping () -> Void = {},
         onRatify: @escaping () -> Void = {},
-        onWidenRadius: @escaping (Int) -> Void = { _ in },
         onHome: @escaping () -> Void = {},
         onReroll: @escaping () -> Void
     ) {
         self.verdict = verdict
-        self.mode = mode
-        self.isInitiator = isInitiator
-        self.currentRadiusMeters = currentRadiusMeters
+        self.flavor = flavor
         self.ratifiedCount = ratifiedCount
         self.ratifiedTotal = ratifiedTotal
         self.correctabilityWindowSeconds = correctabilityWindowSeconds
         self.rerollsUsed = rerollsUsed
         self.onAdvance = onAdvance
         self.onRatify = onRatify
-        self.onWidenRadius = onWidenRadius
         self.onHome = onHome
         self.onReroll = onReroll
-        self._widenRadiusMiles = State(
-            initialValue: VerdictScreen.widenRadiusInitialMiles(
-                currentRadiusMeters: currentRadiusMeters
-            )
-        )
-        // Pre-load the commit flag when the mode is `.committed` (used
+        // Pre-load the commit flag when the flavor is `.committed` (used
         // by snapshot tests + the TB-11 read-only late-joiner path).
-        self._committedLocally = State(initialValue: mode == .committed)
+        self._committedLocally = State(initialValue: flavor == .committed)
         self._windowSecondsRemaining = State(
-            initialValue: mode == .committed ? correctabilityWindowSeconds : nil
+            initialValue: flavor == .committed ? correctabilityWindowSeconds : nil
         )
     }
 
@@ -284,20 +236,18 @@ public struct VerdictScreen: View {
 
             VStack(spacing: 0) {
                 // bug-22 — Home chrome row. Top-leading text verb
-                // mirroring the QuizChrome `Back` slot. Suppressed in
-                // `.readOnly` (the deep-link late-joiner has no Plan-
-                // list destination for someone else's Plan). See
+                // mirroring the QuizChrome `Back` slot. Always rendered
+                // on the live verdict surface (every flavor has a Plan-
+                // list destination). See
                 // `design-system/surfaces/05-verdict.md` §"Verdict
                 // chrome (Home)".
-                if modeSnapshot.showHomeChrome {
-                    homeChromeRow
-                        .padding(.top, GTISpacing.step3)
-                        .padding(.horizontal, GTISpacing.step5)
-                }
+                homeChromeRow
+                    .padding(.top, GTISpacing.step3)
+                    .padding(.horizontal, GTISpacing.step5)
 
                 // Eyebrow
                 eyebrow
-                    .padding(.top, modeSnapshot.showHomeChrome ? GTISpacing.step4 : GTISpacing.step10)
+                    .padding(.top, GTISpacing.step4)
                     .padding(.horizontal, GTISpacing.step6)
 
                 // Hero — stacked one word per line, uppercase
@@ -310,28 +260,22 @@ public struct VerdictScreen: View {
                     .padding(.top, GTISpacing.step3)
                     .padding(.horizontal, GTISpacing.step6)
 
-                // Time badge — pops at 820ms
-                if modeSnapshot.showTimeBadge {
-                    timeBadge
-                        .padding(.top, GTISpacing.step6)
-                }
+                // Time badge — pops at 820ms. Always rendered on the
+                // live verdict surface (no flavor suppresses it).
+                timeBadge
+                    .padding(.top, GTISpacing.step6)
 
                 // Rule chip
                 ruleChip
                     .padding(.top, GTISpacing.step6)
                     .padding(.horizontal, GTISpacing.step6)
 
-                // Voice receipts — wrapped row of glass chips
+                // Voice receipts — wrapped row of glass chips. Solo
+                // suppresses the row (one voice doesn't need to be
+                // receipted back to itself).
                 if modeSnapshot.showReceipts {
                     receiptsRow
                         .padding(.top, GTISpacing.step6)
-                        .padding(.horizontal, GTISpacing.step6)
-                }
-
-                // No-survivor inline widen-radius expansion
-                if mode == .noSurvivor && widenSliderOpen {
-                    widenRadiusExpansion
-                        .padding(.top, GTISpacing.step5)
                         .padding(.horizontal, GTISpacing.step6)
                 }
 
@@ -383,20 +327,15 @@ public struct VerdictScreen: View {
 
     /// bug-22 + wfr-16 — top-leading chrome verb. Same eyebrow-token
     /// treatment + 44pt hit row as the QuizChrome `Back` slot. Pure
-    /// navigation: tap fires `onHome` on group modes (pops to S00 Plan
-    /// list) or `onAdvance` on `.readOnly` (the late-joiner has no
-    /// Plan list — `Done` fires the Solo Setup re-invite path). Top-
+    /// navigation: tap fires `onHome` (pops to S00 Plan list). Top-
     /// trailing slot is intentionally empty (S05 has no `Exit`
-    /// counterpart; the verdict is not exitable, and the Plan persists
-    /// by design). See `design-system/surfaces/05-verdict.md`
+    /// counterpart). See `design-system/surfaces/05-verdict.md`
     /// §"Verdict chrome (Home)".
     @ViewBuilder
     private var homeChromeRow: some View {
-        let label = modeSnapshot.homeChromeLabel
-        let firesAdvance = modeSnapshot.chromeFiresAdvance
         HStack(alignment: .center) {
-            Button(action: { firesAdvance ? onAdvance() : onHome() }) {
-                Text(label.uppercased())
+            Button(action: onHome) {
+                Text(VerdictScreen.homeChromeLabel.uppercased())
                     .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
                     .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
                     .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
@@ -405,7 +344,7 @@ public struct VerdictScreen: View {
                     .contentShape(Rectangle())
             }
             .accessibilityIdentifier("verdict.chrome.home")
-            .accessibilityLabel(label)
+            .accessibilityLabel(VerdictScreen.homeChromeLabel)
             Spacer()
             // Trailing slot empty — S05 has no `Exit` counterpart. The
             // 44pt-square reserved frame preserves vertical rhythm on
@@ -419,7 +358,7 @@ public struct VerdictScreen: View {
 
     @ViewBuilder
     private var hero: some View {
-        let lines = VerdictScreen.heroLinesForRender(placeName: verdict.placeName, mode: mode)
+        let lines = VerdictScreen.heroLines(for: verdict.placeName)
         VStack(spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 Text(line)
@@ -434,47 +373,6 @@ public struct VerdictScreen: View {
         .offset(y: revealStep >= 2 ? 0 : 12)
         .frame(maxWidth: .infinity)
         .accessibilityIdentifier("verdict.hero")
-    }
-
-    /// Inline range-slider expansion shown when the no-survivor
-    /// primary CTA is tapped. Mirrors the JSX expansion block (sun-
-    /// filled track + ink value chip + 1..10 mi range with 0.5-mi
-    /// step). Commit happens when the user taps the primary CTA a
-    /// second time.
-    @ViewBuilder
-    private var widenRadiusExpansion: some View {
-        VStack(alignment: .leading, spacing: GTISpacing.step1) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("WIDEN TO")
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
-                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
-                Spacer()
-                Text(String(format: "%.1f MI", widenRadiusMiles))
-                    .font(.system(size: GTIFont.Size.eyebrow, weight: .medium, design: .monospaced))
-                    .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
-                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.88))
-            }
-            Slider(
-                value: $widenRadiusMiles,
-                in: VerdictScreen.widenRadiusMinMiles...VerdictScreen.widenRadiusMaxMiles,
-                step: VerdictScreen.widenRadiusStepMiles
-            )
-            .tint(GTIColor.sun)
-            .accessibilityLabel("Widen walk radius")
-            .accessibilityValue(String(format: "%.1f miles", widenRadiusMiles))
-        }
-        .padding(.horizontal, GTISpacing.step4)
-        .padding(.vertical, GTISpacing.step3)
-        .background(
-            GTIColor.Glass.fillSoft,
-            in: RoundedRectangle(cornerRadius: GTIRadii.card)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: GTIRadii.card)
-                .strokeBorder(GTIColor.Glass.stroke.opacity(0.76), lineWidth: 0.75)
-        )
-        .accessibilityIdentifier("verdict.widenRadius.slider")
     }
 
     @ViewBuilder
@@ -497,11 +395,11 @@ public struct VerdictScreen: View {
                 .tracking(GTIFont.TrackingEm.displayS * 34)
                 .foregroundStyle(GTIColor.ink)
                 .lineSpacing(0)
-            // bug-28 — solo mode (and any other caller) signals
-            // "suppress the audience subtitle" by passing an empty
-            // audience string. The subtitle Text is dropped entirely so
-            // the VStack collapses to one child — no empty placeholder
-            // row. Group modes (N ≥ 2) still surface `"ALL N OF YOU"`.
+            // bug-28 — solo flavor (and any caller) signals "suppress
+            // the audience subtitle" by passing an empty audience
+            // string. The subtitle Text is dropped entirely so the
+            // VStack collapses to one child — no empty placeholder row.
+            // Group flavors still surface `"ALL N OF YOU"`.
             if !verdict.timeBadge.audience.isEmpty {
                 Text(verdict.timeBadge.audience.uppercased())
                     .font(.system(size: 9, weight: .black))
@@ -568,48 +466,10 @@ public struct VerdictScreen: View {
     @ViewBuilder
     private var ctaDock: some View {
         VStack(spacing: 14) {
-            if mode == .noSurvivor {
-                // bug-22 — the no-survivor ghost `"Start over"` was the
-                // non-initiator's only exit; it's now replaced by the
-                // chrome-row `Home` verb above the eyebrow. The dock
-                // surfaces just the initiator-only `Widen radius` CTA.
-                noSurvivorPrimary
-            } else if mode == .solo {
+            if flavor == .solo {
                 soloCTADock
-            } else if mode == .readOnly {
-                // TB-11 — read-only late-joiner CTA. Re-invite the
-                // caller to a fresh round as the new initiator;
-                // ratification + reroll + chrome `Home` (bug-22) are
-                // ALL suppressed in this branch (they imply the
-                // late-joiner can still influence the closed verdict
-                // OR has a Plan-list destination for someone else's
-                // Plan, neither of which is true). The pre-permission
-                // line is also dropped because there's no "I'm in"
-                // tap to chase with the native push prompt.
-                //
-                // VO contract (locked in `design-system/accessibility.md`
-                // §"Verdict (`read-only` mode)"): the absent
-                // ratification path is announced as "Not available —
-                // this verdict is closed." We surface it as the
-                // accessibilityHint on the re-invite CTA so a VO
-                // user reading the focus chain hears the closure
-                // before they hear the CTA's action.
-                Button(action: onAdvance) {
-                    Text("START A NEW DECISION")
-                        .font(.system(size: GTIFont.Size.cta, weight: .black))
-                        .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
-                        .foregroundStyle(GTIColor.ink)
-                        .frame(maxWidth: .infinity, minHeight: 60)
-                        .background(
-                            GTIColor.paper,
-                            in: RoundedRectangle(cornerRadius: GTIRadii.pill)
-                        )
-                }
-                .accessibilityIdentifier("verdict.cta.primary")
-                .accessibilityLabel("Start a new decision")
-                .accessibilityHint(VerdictScreen.readOnlyRatificationVOAnnouncement)
             } else if isCommittedFlavor {
-                // Committed mode — sun-fill pill, ink check prefix,
+                // Committed flavor — sun-fill pill, ink check prefix,
                 // "You're in · N of M" label. Window countdown lives
                 // BELOW the CTA per S05 §Modes (`"Window closes in 47s"`).
                 committedPill
@@ -622,7 +482,7 @@ public struct VerdictScreen: View {
                 rerollTertiary
                 preCheckInLine
             } else {
-                // Default mode — "I'm in" white pill. bug-22 removed
+                // Default flavor — "I'm in" white pill. bug-22 removed
                 // the `"Start over"` tertiary that previously sat under
                 // the primary; the Home verb now lives in the chrome
                 // row above the eyebrow (see `homeChromeRow`).
@@ -678,8 +538,7 @@ public struct VerdictScreen: View {
     /// `default` and `committed` flavors. When the room has already
     /// burned its 3-cap (`rerollsUsed >= 3`), the button is replaced
     /// with a non-tappable `"No rerolls left"` footer per S07's
-    /// `"Edge cases"` register. Suppressed entirely in `.readOnly` and
-    /// `.noSurvivor` (those branches don't render `rerollTertiary`).
+    /// `"Edge cases"` register.
     @ViewBuilder
     private var rerollTertiary: some View {
         if rerollsUsed >= 3 {
@@ -705,7 +564,7 @@ public struct VerdictScreen: View {
     /// Copy is locked by PRD user story 38 + the TB-08 ticket:
     /// `"We'll check in tomorrow — see if you went."` Voluntary
     /// register. NEVER `"Enable notifications"`, `"Allow alerts"`,
-    /// `"Turn on push"`. Suppressed in `.readOnly` / `.noSurvivor`.
+    /// `"Turn on push"`.
     @ViewBuilder
     private var preCheckInLine: some View {
         Text(VerdictScreen.preCheckInCopy)
@@ -726,39 +585,10 @@ public struct VerdictScreen: View {
         windowSecondsRemaining = correctabilityWindowSeconds
     }
 
-    /// Test-readable: is the surface in the committed flavor (mode is
+    /// Test-readable: is the surface in the committed flavor (flavor is
     /// `.committed` OR the local "I'm in" tap has fired)?
     public var isCommittedFlavor: Bool {
-        mode == .committed || committedLocally
-    }
-
-    /// No-survivor primary CTA — sun-filled "Widen radius" (or
-    /// "Re-run · N.N mi" once the slider is open). Initiator-only;
-    /// non-initiators see the chrome-row `Home` verb as their only
-    /// exit (bug-22 — the legacy `"Start over"` ghost secondary was
-    /// removed).
-    @ViewBuilder
-    private var noSurvivorPrimary: some View {
-        if isInitiator {
-            Button {
-                if widenSliderOpen {
-                    onWidenRadius(VerdictScreen.metersForMiles(widenRadiusMiles))
-                } else {
-                    widenSliderOpen = true
-                }
-            } label: {
-                Text(noSurvivorPrimaryLabel.uppercased())
-                    .font(.system(size: GTIFont.Size.cta, weight: .black))
-                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
-                    .foregroundStyle(GTIColor.ink)
-                    .frame(maxWidth: .infinity, minHeight: 60)
-                    .background(
-                        GTIColor.sun,
-                        in: RoundedRectangle(cornerRadius: GTIRadii.pill)
-                    )
-            }
-            .accessibilityIdentifier("verdict.cta.primary")
-        }
+        flavor == .committed || committedLocally
     }
 
     /// TB-13 — solo CTA dock. Renders the same warm primary as
@@ -814,13 +644,6 @@ public struct VerdictScreen: View {
         AuthUpgradeChip(state: .defaultIdle)
             .padding(.top, GTISpacing.step1)
             .accessibilityIdentifier("verdict.solo.saveTasteProfile")
-    }
-
-    private var noSurvivorPrimaryLabel: String {
-        if widenSliderOpen {
-            return String(format: "Re-run · %.1f mi", widenRadiusMiles)
-        }
-        return "Widen radius"
     }
 
     // MARK: - choreography driver
@@ -918,64 +741,38 @@ public struct VerdictScreen: View {
         public let eyebrowCopy: String
         public let primaryCtaLabel: String
         public let secondaryLabel: String
-        /// True when the no-survivor inline range slider is expanded.
-        /// Drives the primary CTA's `Re-run · N.N mi` label switch.
-        public let widenSliderOpen: Bool
         /// True when the surface is in the committed flavor (TB-08).
-        /// Either the caller passed `.committed` mode or the local
+        /// Either the caller passed `.committed` flavor or the local
         /// "I'm in" tap has fired.
         public let isCommittedFlavor: Bool
         /// Pre-permission line copy surfaced under the CTA dock
-        /// (TB-08). Empty in modes that suppress the line.
+        /// (TB-08). Empty when suppressed (no flavor suppresses it on
+        /// the live verdict).
         public let preCheckInLine: String
-        /// TB-13 — solo mode surfaces the C-22 save-taste-profile chip
-        /// in place of the group-save affordance. The flag drives the
-        /// render gate; the actual chip state is sourced from the host's
-        /// `AuthPromptStore` (hidden when the user is already linked).
+        /// TB-13 — solo flavor surfaces the C-22 save-taste-profile
+        /// chip in place of the group-save affordance.
         public let showSaveTasteProfileChip: Bool
         /// bug-22 / wfr-16 — render gate for the top-leading chrome row.
-        /// Rendered on every iOS-reachable mode after wfr-16: `default`
-        /// / `committed` / `solo` / `no-survivor` carry the `Home` verb;
-        /// `.readOnly` carries the `Done` verb (different label,
-        /// different callback). See `design-system/surfaces/05-verdict.md`
-        /// §"Verdict chrome (Home)".
+        /// Always true on the live verdict surface (Home is always
+        /// reachable). Retained on the snapshot for backward-compatible
+        /// test reads.
         public let showHomeChrome: Bool
-        /// wfr-16 — chrome verb. `Home` on the group modes (pops to S00
-        /// Plan list); `Done` on `.readOnly` (the late-joiner has no
-        /// Plan list, so `Done` fires `onAdvance` instead — the same
-        /// re-invite path the primary CTA uses). Locked by the design-
-        /// system spec §"Verdict chrome (Home)".
+        /// bug-22 — chrome verb. Always `Home` on the live verdict
+        /// surface. (The `Done` verb belongs to `VerdictReadOnlyScreen`,
+        /// not this snapshot.)
         public let homeChromeLabel: String
-        /// wfr-16 — when true, the chrome tap fires the surface's
-        /// `onAdvance` closure rather than `onHome`. Only `.readOnly`
-        /// flips this on; every other mode pops to S00 Plan list via
-        /// `onHome`.
-        public let chromeFiresAdvance: Bool
     }
 
     /// Mode-shaped flags surfaced for the snapshot tests. Mirrors the
     /// flat flags at the top of `ScreenVerdict.jsx`'s body.
     public var modeSnapshot: ModeSnapshot {
-        let isReadOnly   = mode == .readOnly
-        let isNoSurvivor = mode == .noSurvivor
-        let isSolo       = mode == .solo
-        let isCommitted  = (mode == .committed || committedLocally)
+        let isSolo      = flavor == .solo
+        let isCommitted = (flavor == .committed || committedLocally)
 
-        let eyebrow: String
-        switch mode {
-        case .noSurvivor:                            eyebrow = "Tonight"
-        case .readOnly:                              eyebrow = "Tonight's verdict"
-        case .default, .committed, .solo:            eyebrow = "Tonight, the verdict is"
-        }
+        let eyebrow = "Tonight, the verdict is"
 
         let primaryLabel: String
-        if isReadOnly {
-            primaryLabel = "Start a new decision"
-        } else if isNoSurvivor {
-            primaryLabel = widenSliderOpen
-                ? String(format: "Re-run · %.1f mi", widenRadiusMiles)
-                : "Widen radius"
-        } else if isCommitted {
+        if isCommitted {
             primaryLabel = VerdictScreen.committedCtaLabel(
                 count: ratifiedCount,
                 total: ratifiedTotal
@@ -986,11 +783,9 @@ public struct VerdictScreen: View {
 
         // bug-22 — the dock secondary now only carries the committed
         // status line (`"Window closes in 47s"`). The retired
-        // `"Start over"` tertiary was lifted into the chrome row as
-        // the `Home` verb; pre-commit there is no dock secondary at
-        // all on default / solo / no-survivor.
+        // `"Start over"` tertiary was lifted into the chrome row.
         let secondary: String
-        if isCommitted && !isReadOnly && !isNoSurvivor {
+        if isCommitted {
             secondary = VerdictScreen.windowCountdownCopy(
                 seconds: windowSecondsRemaining
             )
@@ -998,42 +793,19 @@ public struct VerdictScreen: View {
             secondary = ""
         }
 
-        // Pre-permission line is suppressed in read-only + no-survivor
-        // modes; everywhere else it surfaces.
-        let preLine = (isReadOnly || isNoSurvivor) ? "" : VerdictScreen.preCheckInCopy
-
-        // TB-13 — solo replaces the group-save secondary with the C-22
-        // save-taste-profile chip. The flag is true ONLY for solo;
-        // group modes never surface this chip on S05 (it lives on S04
-        // for those flows per TB-12).
-        let saveChip = isSolo && !isReadOnly && !isNoSurvivor
-
-        // bug-22 + wfr-16 — chrome row renders on every iOS-reachable
-        // mode. The verb differs: `Home` on the group modes (pops to
-        // S00 Plan list via `onHome`); `Done` on `.readOnly` (the late-
-        // joiner has no Plan list, so the chrome fires `onAdvance` —
-        // the same re-invite path the primary CTA uses). See
-        // `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
-        let homeChrome = true
-        let chromeLabel = isReadOnly
-            ? VerdictScreen.readOnlyChromeLabel
-            : VerdictScreen.homeChromeLabel
-
         return ModeSnapshot(
-            showTimeBadge: !isNoSurvivor,
+            showTimeBadge: true,
             // Solo suppresses receipts — one voice doesn't need to be
             // receipted back to itself. Otherwise the row surfaces.
-            showReceipts: !isNoSurvivor && !isSolo,
+            showReceipts: !isSolo,
             eyebrowCopy: eyebrow,
             primaryCtaLabel: primaryLabel,
             secondaryLabel: secondary,
-            widenSliderOpen: widenSliderOpen,
             isCommittedFlavor: isCommitted,
-            preCheckInLine: preLine,
-            showSaveTasteProfileChip: saveChip,
-            showHomeChrome: homeChrome,
-            homeChromeLabel: chromeLabel,
-            chromeFiresAdvance: isReadOnly
+            preCheckInLine: VerdictScreen.preCheckInCopy,
+            showSaveTasteProfileChip: isSolo,
+            showHomeChrome: true,
+            homeChromeLabel: VerdictScreen.homeChromeLabel
         )
     }
 
@@ -1051,25 +823,6 @@ public struct VerdictScreen: View {
     /// pattern. NEVER paraphrase. See
     /// `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
     public static let homeChromeLabel = "Home"
-
-    /// wfr-16 — text-only verb for the `.readOnly` chrome slot. The
-    /// late-joiner has no Plan list to land on (the Plan isn't theirs),
-    /// so the chrome cannot honestly read `Home`. `Done` frames the
-    /// chrome tap as "close this read-only snapshot"; it fires
-    /// `onAdvance` (the same Solo Setup re-invite path the primary CTA
-    /// uses), giving every iOS-reachable verdict mode the same top-
-    /// leading escape slot. Same eyebrow-token treatment as `Home`.
-    /// See `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
-    public static let readOnlyChromeLabel = "Done"
-
-    /// TB-11 — VO announcement for the suppressed ratification path in
-    /// `.readOnly` mode. Locked by
-    /// `design-system/accessibility.md` §"Verdict (`read-only` mode)" —
-    /// VoiceOver users hear this when they would otherwise focus on
-    /// the (absent) "I'm in" button. Surfaced as the `accessibilityHint`
-    /// on the re-invite CTA.
-    public static let readOnlyRatificationVOAnnouncement =
-        "Not available — this verdict is closed."
 
     /// S05 §Modes — committed CTA reads `"You're in · N of M"`. We
     /// guard against `total = 0` (count snapshot hasn't loaded yet)
@@ -1091,44 +844,6 @@ public struct VerdictScreen: View {
         return "Window closes in \(s)s"
     }
 
-    // MARK: - widen-radius helpers (pure, test-readable)
-
-    /// Min / max / step for the widen slider on S05 `noSurvivor`.
-    /// Locked in `design-system/surfaces/05-verdict.md` §"no-survivor"
-    /// ("range `1–10 mi`, step `0.5`"). Exposed as static so tests
-    /// can assert against the canon without instantiating a view.
-    public static let widenRadiusMinMiles: Double  = 1.0
-    public static let widenRadiusMaxMiles: Double  = 10.0
-    public static let widenRadiusStepMiles: Double = 0.5
-
-    /// Initial slider value when the no-survivor "Widen radius" CTA
-    /// opens the expansion — `current + 1.0 mi`, clamped to the
-    /// 1..10 mi cap. The S01 default of 3219 m (~2.0 mi) suggests
-    /// 3.0 mi on first widen; a 15289 m current (9.5 mi) clamps to
-    /// 10.0 mi rather than overshooting.
-    public static func widenRadiusInitialMiles(currentRadiusMeters: Int) -> Double {
-        let currentMiles = milesForMeters(currentRadiusMeters)
-        let bumped = currentMiles + 1.0
-        return min(max(bumped, widenRadiusMinMiles), widenRadiusMaxMiles)
-    }
-
-    /// Conversion factor — exact international mile in meters.
-    /// Keeps slider math precise enough that the engine's
-    /// 805 m (0.5 mi) cascade step lines up with what the slider
-    /// emits.
-    public static let metersPerMile: Double = 1609.344
-
-    /// Convert miles to meters. The engine talks meters end-to-end;
-    /// the slider works in miles for the user-facing copy.
-    public static func metersForMiles(_ miles: Double) -> Int {
-        return Int(round(miles * metersPerMile))
-    }
-
-    /// Inverse of `metersForMiles` for default-suggestion math.
-    public static func milesForMeters(_ meters: Int) -> Double {
-        return Double(meters) / metersPerMile
-    }
-
     // MARK: - hero stacking
 
     /// Split the place name into stacked uppercase lines per S05's
@@ -1144,25 +859,7 @@ public struct VerdictScreen: View {
         default: return [tokens[0], tokens.dropFirst().joined(separator: " ")]
         }
     }
-
-    /// Hero stacking that honours the mode-specific layout. The
-    /// no-survivor hero always reads `NO SPOT / FITS` — the JSX
-    /// fixture's three-word place name ("No spot fits") would
-    /// otherwise collapse to `NO / SPOT FITS` under the generic
-    /// splitter. All other modes defer to `heroLines(for:)`.
-    public static func heroLinesForRender(placeName: String, mode: Mode) -> [String] {
-        if mode == .noSurvivor {
-            return ["NO SPOT", "FITS"]
-        }
-        return heroLines(for: placeName)
-    }
 }
-
-// MARK: - choreo durations
-//
-// Per-step durations are wired inline in the choreography driver via
-// the schedule's `.setStep(step, duration)` payloads. Kept on the public
-// `Choreo` namespace so snapshot tests can assert against them.
 
 // MARK: - FlowLayout (wrap-row used for receipts row)
 //
@@ -1171,7 +868,7 @@ public struct VerdictScreen: View {
 // re-render flicker that the `alignmentGuide` trick is famous for.
 // Mirrors the JSX `flexWrap: 'wrap'` behaviour for the receipts row.
 
-private struct FlowLayout: Layout {
+struct FlowLayout: Layout {
     var spacing: CGFloat = 6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {

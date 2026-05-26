@@ -32,7 +32,7 @@ final class VerdictScreenSnapshotTests: XCTestCase {
 
     func testDefaultModeRendersWithoutCrashing() {
         let verdict = VerdictScreen.Verdict.fixture()
-        render(VerdictScreen(verdict: verdict, mode: .default))
+        render(VerdictScreen(verdict: verdict, flavor: .default))
     }
 
     func testDefaultModeRendersWithEmptyReceiptsAndCuts() {
@@ -50,7 +50,7 @@ final class VerdictScreenSnapshotTests: XCTestCase {
             receipts: [],
             cuts: []
         )
-        render(VerdictScreen(verdict: empty, mode: .default))
+        render(VerdictScreen(verdict: empty, flavor: .default))
     }
 
     // MARK: - bug-28 · audience subtitle suppression
@@ -69,7 +69,7 @@ final class VerdictScreenSnapshotTests: XCTestCase {
             receipts: [],
             cuts: []
         )
-        render(VerdictScreen(verdict: verdict, mode: .solo))
+        render(VerdictScreen(verdict: verdict, flavor: .solo))
     }
 
     // MARK: - choreography timings (locked, ms-exact)
@@ -117,7 +117,7 @@ final class VerdictScreenSnapshotTests: XCTestCase {
 
     func testDefaultModeFlagsAreLockedToTheSpec() {
         let verdict = VerdictScreen.Verdict.fixture()
-        let snap = VerdictScreen(verdict: verdict, mode: .default).modeSnapshot
+        let snap = VerdictScreen(verdict: verdict, flavor: .default).modeSnapshot
         XCTAssertTrue(snap.showTimeBadge,    "default mode renders the time badge")
         XCTAssertTrue(snap.showReceipts,     "default mode renders voice receipts")
         XCTAssertEqual(snap.eyebrowCopy, "Tonight, the verdict is")
@@ -138,7 +138,7 @@ final class VerdictScreenSnapshotTests: XCTestCase {
         // internals.
         let snap = VerdictScreen(
             verdict: .fixture(),
-            mode: .default
+            flavor: .default
         ).modeSnapshot
         XCTAssertTrue(snap.showHomeChrome,
             "default mode surfaces the Home chrome row per bug-22")
@@ -160,7 +160,7 @@ final class VerdictScreenSnapshotTests: XCTestCase {
         var homeCalls = 0
         _ = VerdictScreen(
             verdict: .fixture(),
-            mode: .default,
+            flavor: .default,
             onHome: { homeCalls += 1 }
         )
         XCTAssertEqual(homeCalls, 0,

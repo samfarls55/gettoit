@@ -1,49 +1,35 @@
-// GetToIt — VerdictRerollHost (bug-27).
+// GetToIt — VerdictRerollHost (bug-27 + bug-34).
 //
-// Closes the bug-27 "feature unplumbed" defect: the S05 tertiary
-// "REROLL" CTA was a dead tap on the two live VerdictScreen sites
-// because `onReroll` defaulted to `{}` and no caller wired it. This
-// view is the host wrapper both live call sites now mount instead of
-// a bare `VerdictScreen(...)`. It owns the small surface of state
-// the reroll feature needs:
+// bug-27: this host wraps the live `VerdictScreen` and owns the small
+// surface of state the reroll feature needs (the `RerollStore` driving
+// `rerollsUsed`, the `RerollSheetState` that opens the S07 sheet).
 //
-//   * `@StateObject store: RerollStore` — drives the live `rerollsUsed`
-//     count that flows back into both `VerdictScreen.rerollsUsed` (so
-//     the tertiary collapses to "No rerolls left" at the 3-cap) and
-//     `RerollScreen.rerollsUsed` (the S07 sheet's "N LEFT" stamp +
-//     "Reroll · last one" copy on the 3rd burn).
-//   * `@StateObject sheetState: RerollSheetState` — the open/close
-//     flag for the S07 sheet, plus the test seam. Lifted off a bare
-//     `@State Bool` so the bug-27 "did the tap actually plumb through"
-//     contract is unit-testable without standing up a SwiftUI host.
+// bug-34 / ADR 0018: extended into a three-way dispatcher. The host
+// takes a `Surface` value naming which of the three verdict-family
+// screens to mount:
 //
-// On `.task` the host calls `await store.refreshUsedCount()` so the
-// "N LEFT" stamp and the reroll-exhausted footer copy start accurate
-// on first render — without this a returning user with 3 burns already
-// spent would briefly see the live REROLL button.
+//   * `.live(flavor:)`     → `VerdictScreen` (with reroll wired)
+//   * `.readOnly(showHomeChrome:)` → `VerdictReadOnlyScreen`
+//   * `.noSurvivor`        → `NoSurvivorScreen`
 //
-// onSubmit closure: calls `store.applyReroll(...)` then dismisses the
-// sheet. On success the existing Realtime verdict subscriber picks up
-// the new verdict and S05 re-renders. On error the store publishes
-// `lastError`; the bare error surfacing is left for a follow-up (no
-// toast/inline-banner introduced here — the spec's "agent has autonomy
-// on choice" branch resolves to "skip the optional surface" given
-// `RerollStore.lastError` is already published for a future surface to
-// observe).
+// The dispatch lets the call sites keep the same single entry point
+// while the underlying surface routing follows ADR 0018's three-intent
+// decomposition. The `RerollStore` is only consulted on `.live` — the
+// read-only and no-survivor branches never burn a reroll (read-only's
+// verdict is sealed; no-survivor's widen action is free).
 //
-// Two live mount sites:
-//   * `RootView.swift` (createdDecidedVerdict block) — `.default` mode,
-//     `isInitiator: true`. Plan list → tap a Decided-active Plan.
-//   * `PostQuizHostScreen.swift` (`.verdict` phase) — `.solo` mode for
-//     a solo session, `.default` for a group session; `isInitiator`
-//     comes from the post-Q5 session context.
+// On `.task` (live branch only) the host calls
+// `await store.refreshUsedCount()` so the "N LEFT" stamp and the
+// reroll-exhausted footer copy start accurate on first render.
 //
-// The three other VerdictScreen sites stay bare — they pass
-// `mode: .readOnly` which suppresses the reroll affordance entirely
-// (`rerollTertiary` only renders on `.default` / `.committed` / `.solo`).
-// Those call sites now pass `onReroll: { }` explicitly because bug-27
-// dropped the default value from `VerdictScreen.onReroll` so the
-// compiler catches the next bug-27-class wire-up miss at the call site.
+// Surface resolution helper:
+//   * `Surface.from(verdictView:isInitiator:)` translates a
+//     `VerdictStore.VerdictView` (carrying `.default` / `.committed` /
+//     `.solo` / `.noSurvivor`) into the matching `Surface` case. The
+//     read-only branch is NOT inferred from a VerdictView — the
+//     arrival vector (Account-member History vs Web invitee deep
+//     link) is call-site knowledge and is signalled explicitly via
+//     `.readOnly(showHomeChrome:)`.
 
 import Foundation
 import SwiftUI
@@ -80,11 +66,50 @@ public final class RerollSheetState: ObservableObject {
 @MainActor
 public struct VerdictRerollHost: View {
 
+    /// Which of the three verdict-family surfaces this mount renders.
+    /// Resolves from a combination of room state (`VerdictStore` mode)
+    /// and call-site arrival-vector knowledge (the read-only chrome
+    /// flag). See ADR 0018 §"VerdictRerollHost dispatch".
+    public enum Surface: Equatable, Sendable {
+        case live(flavor: VerdictScreen.Flavor)
+        case readOnly(showHomeChrome: Bool)
+        case noSurvivor
+
+        /// Resolve a `Surface` from a `VerdictStore.VerdictView`. Used
+        /// by the post-quiz path (where `VerdictStore` writes the
+        /// mode) to drive the dispatch. Read-only is NOT inferred from
+        /// the view — the call site signals it explicitly via
+        /// `.readOnly(showHomeChrome:)` because the arrival vector
+        /// (Account-member History vs Web invitee deep link) is
+        /// call-site knowledge, not room state. A `.readOnly` mode on
+        /// the view (set by `LateJoinerStore`) maps to the chrome-on
+        /// default; callers with the Web-invitee arrival vector pass
+        /// `.readOnly(showHomeChrome: false)` directly.
+        public static func from(
+            verdictView view: VerdictStore.VerdictView
+        ) -> Surface {
+            switch view.mode {
+            case .noSurvivor:
+                return .noSurvivor
+            case .solo:
+                return .live(flavor: .solo)
+            case .committed:
+                return .live(flavor: .committed)
+            case .default:
+                return .live(flavor: .default)
+            case .readOnly:
+                return .readOnly(showHomeChrome: true)
+            }
+        }
+    }
+
     private let verdict: VerdictScreen.Verdict
-    private let mode: VerdictScreen.Mode
+    private let surface: Surface
     private let isInitiator: Bool
+    private let currentRadiusMeters: Int
     private let onHome: () -> Void
     private let onAdvance: () -> Void
+    private let onWidenRadius: (Int) -> Void
 
     @StateObject private var store: RerollStore
     @StateObject private var sheetState: RerollSheetState
@@ -92,17 +117,21 @@ public struct VerdictRerollHost: View {
     public init(
         verdict: VerdictScreen.Verdict,
         roomID: UUID,
-        mode: VerdictScreen.Mode = .default,
+        surface: Surface = .live(flavor: .default),
         isInitiator: Bool = true,
+        currentRadiusMeters: Int = 3219, // ~2.0 mi S01 default
         client: SupabaseClient,
         onHome: @escaping () -> Void = {},
-        onAdvance: @escaping () -> Void = {}
+        onAdvance: @escaping () -> Void = {},
+        onWidenRadius: @escaping (Int) -> Void = { _ in }
     ) {
         self.verdict = verdict
-        self.mode = mode
+        self.surface = surface
         self.isInitiator = isInitiator
+        self.currentRadiusMeters = currentRadiusMeters
         self.onHome = onHome
         self.onAdvance = onAdvance
+        self.onWidenRadius = onWidenRadius
         let rerollStore = RerollStore(client: client, roomID: roomID)
         self._store = StateObject(wrappedValue: rerollStore)
         self._sheetState = StateObject(
@@ -111,10 +140,31 @@ public struct VerdictRerollHost: View {
     }
 
     public var body: some View {
+        switch surface {
+        case .live(let flavor):
+            liveSurface(flavor: flavor)
+        case .readOnly(let showHomeChrome):
+            VerdictReadOnlyScreen(
+                verdict: verdict,
+                showHomeChrome: showHomeChrome,
+                onAdvance: onAdvance
+            )
+        case .noSurvivor:
+            NoSurvivorScreen(
+                verdict: verdict,
+                isInitiator: isInitiator,
+                currentRadiusMeters: currentRadiusMeters,
+                onHome: onHome,
+                onWidenRadius: onWidenRadius
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func liveSurface(flavor: VerdictScreen.Flavor) -> some View {
         VerdictScreen(
             verdict: verdict,
-            mode: mode,
-            isInitiator: isInitiator,
+            flavor: flavor,
             rerollsUsed: store.rerollsUsed,
             onAdvance: onAdvance,
             onHome: onHome,
