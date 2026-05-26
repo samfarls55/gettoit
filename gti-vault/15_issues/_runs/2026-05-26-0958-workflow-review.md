@@ -472,3 +472,18 @@ Hand this file path to a new session running:
 
 - `/grill-with-docs` for findings #1, #2, #3, #4, #5, #32 (the cognition + nav-model + state-machine + scope grills).
 - `/to-issues` for findings #6..#31 (the 24 pattern-swap issues; the 25th is conditional via the `Blocked by` chain).
+
+---
+
+## Grill bucket progress
+
+- **#1 VerdictScreen 5-mode split** — CLOSED 2026-05-26. 3-way split (live / read-only / no-survivor). Artifacts: [[../../60_engineering/adr/0018-verdict-surface-three-way-split|ADR-0018]], CONTEXT.md §Verdict surfaces, bug-34 ([[../0.1.0/issues/bug-34-verdict-surface-three-way-split|vault]] / GH #273). Re-scoped finding #16.
+- **#2 `web/app/page.tsx` landing page** — CLOSED 2026-05-26. Real Entry surface confirmed; design + build deferred as HITL backlog. Artifacts: [[../../40_marketing_branding/landing-page-positioning|positioning doc]], bug-35 ([[../0.1.0/issues/bug-35-landing-page-pre-launch|vault]] / GH #276).
+- **#3 PlanList nav model** — CLOSED 2026-05-26. Hub-and-Spoke confirmed; top-trailing `gearshape` chrome glyph (Sign-In Tools pattern). Shipped via wfr-06 (PR #274). Workflow design landed in [[../0.1.0/issues/wfr-06-settingsscreen-entry-from-planlist|wfr-06]] + [[../../30_design/interaction-patterns/surfaces#GetToIt app shell — Hub-and-Spoke|surfaces.md app-shell note]]. Pre-decides grill #4: no Multilevel.
+- **#4 PlanList Search/Browse + History** — CLOSED 2026-05-26. History stays a fourth section under PlanList; threshold-gated `Jump to Item` search at `history.count >= 10`; Dynamic Queries deferred. Bounded sections (Pending Created / Joined / Decided) need no affordances. Artifacts: [[../../30_design/interaction-patterns/surfaces#Threshold-gated affordances|surfaces.md addendum]], bug-36 ([[../0.1.0/issues/bug-36-planlist-history-threshold-search|vault]] / GH #279).
+- **#5 WaitingScreen session-ended state machine** — CLOSED 2026-05-26. Surface-owned ownership: each screen mounting a Realtime session watches its store's `status` via `.onChange`; on `.expired` shows "Session ended" toast + fires `onSessionEnded?` callback; host (`PostQuizHostScreen` / `RootView`) tears down precedence-chain state. Rejected coordinator-owned + RootView-owned. Pattern extends to QuizScreen. Artifacts: [[../../60_engineering/adr/0019-surface-owned-session-ended-ownership|ADR-0019]], bug-37 ([[../0.1.0/issues/bug-37-waitingscreen-session-ended-handler|vault]] / GH #280), bug-38 ([[../0.1.0/issues/bug-38-quizscreen-session-ended-handler|vault]] / GH #281). Unblocks finding #17.
+- **#32 SignInScreen keyboard focus scope** — CLOSED 2026-05-26 as `deferred`. Hardware-keyboard / iPad / focus-ring support out of scope for v1.1; iPhone-only target, on-screen keyboard path only, no QA path for hardware-keyboard scenarios. Artifact: [[../../20_plan/post-launch-considerations|post-launch-considerations.md]] with revisit gates (iPad target / Catalyst / signal from real users).
+
+---
+
+**Grill bucket: ALL CLOSED 2026-05-26.** All 6 grills (#1, #2, #3, #4, #5, #32) resolved. Bucket complete.

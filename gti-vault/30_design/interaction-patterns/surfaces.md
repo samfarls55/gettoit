@@ -32,6 +32,10 @@ Source: Tidwell/Brewer/Valencia Ch.3 intro. Pick one — or knowingly mix — be
 
 Mix-and-match is normal. Cost of fully-connected nav everywhere is screen clutter and signalling that leaving the page is fine. Hide global nav inside focused flows.
 
+### GetToIt app shell — Hub-and-Spoke
+
+`PlanListScreen` is the hub. Spokes (Settings now; Profile + Help later) are reached via a top-trailing chrome glyph using the [[patterns#Sign-In Tools]] convention. Rationale: single dominant surface (PlanList), small fixed spoke set, iOS-standard placement (P-07 Habituation), consistent coordinate across empty + populated render paths (P-09 Spatial Memory). Bottom Navigation rejected as premature for one spoke; hamburger rejected as identity-hiding; Multilevel deferred until History cardinality forces a separate destination. Resolved 2026-05-26 via workflow-review grill #3.
+
 ---
 
 ## Surface playbooks
@@ -86,6 +90,10 @@ Lists, search results, feeds, grids, tables, dashboards.
 - Cards lacking timestamp, author, or affordance for inline action.
 - Post-login lands on an empty state, generic profile, or single chart.
 - Charts with truncated axes, 3D effects, or rainbow categorical palettes.
+
+### Threshold-gated affordances
+
+For multi-section Overviews where sections have asymmetric cardinality (some bounded-tiny, one unbounded-growing), the required `Feature, Search, and Browse` pattern applies **per-section, threshold-gated** rather than as a single page-level search bar. A bounded section (e.g. <10 expected rows) doesn't earn a search input; the same playbook's [[principles#P-03. Satisficing]] gate forbids shipping affordances the user can't yet use. Wire `Jump to Item` / inline search **only when row count crosses a defined threshold** (default 10 for GetToIt's PlanList History; tune per surface). Defers [[patterns#Dynamic Queries]] until usage data informs which facets matter. Resolved 2026-05-26 via workflow-review grill #4.
 
 ---
 

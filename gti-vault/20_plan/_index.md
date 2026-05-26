@@ -9,5 +9,6 @@ Roadmap, priorities, session planning.
 
 ## Contents
 
+- [[post-launch-considerations]] — Decisions consciously deferred past v1.1 / first non-self user; with revisit gates.
 - [[research-handoff-2026-05-08]] — **Superseded 2026-05-08.** Resume-from-here doc after all three research batches; synthesis now closed by [[50_product/0.1.0-design-locks]].
 - [[research-report-handoff-2026-05-08]] — **Superseded 2026-05-08.** Self-contained brief for the `/research-report` × 3 + four-deliverable session; deliverables shipped to [[50_product/_index]].

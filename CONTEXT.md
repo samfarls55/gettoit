@@ -100,6 +100,20 @@ _Avoid_: confirm sheet (only one of two consumers is a confirm; the disambig she
 
 The distinction matters because the bespoke modal-sheet container intentionally feels non-native — that is correct for the rich-editor role but **wrong** for the short-choice role, where users expect the iOS-HIG native shape. Grilling bug-24 resolved the two roles into two separate primitives instead of collapsing them.
 
+### Verdict surfaces (pre-public-launch, 2026-05-26)
+
+**Live verdict surface** (`VerdictScreen.swift`):
+The Focus surface rendered when a Plan is in `decided-active` state for an Account member who participated in the room — eyebrow + hero + time-badge + receipts + reroll + Home chrome. Carries a three-case `Flavor` enum: `default` (pre-ratify group view), `committed` (post-`I'm in` group view with dock countdown), `solo` (single-member view — suppresses receipts and time-badge audience subtitle, swaps group-save for the C-22 save-taste-profile chip). One intent: *act on this verdict before the window closes*. Reroll burns and ratify live here. See [[gti-vault/60_engineering/adr/0018-verdict-surface-three-way-split|ADR 0018]].
+_Avoid_: verdict screen (overloaded — prior name for the 5-mode unified struct, deprecated 2026-05-26), Live VerdictScreen (engineering register; "live verdict surface" is the canonical noun in design-doc voice).
+
+**Read-only verdict surface** (`VerdictReadOnlyScreen.swift`, post-ADR-0018):
+The Focus surface rendered when a viewer arrives at a `decided-expired` Plan, OR when a Web invitee deep-links into someone else's `decided-active` Plan they did not vote in. Suppresses ratify, reroll, dock countdown, save-chip; Home chrome rendering depends on arrival vector (Account member from PlanList History → yes; Web invitee from SMS → no). One intent: *show a closed verdict as a record*. Primary CTA is `Start a new decision`. Replaces the prior `.readOnly` mode case on the unified VerdictScreen.
+_Avoid_: history verdict (the surface is reachable from history but also from non-history deep links — the read-only-ness is the load-bearing property, not the history-ness), past verdict screen (uses deprecated "screen" register).
+
+**No-survivor surface** (`NoSurvivorScreen.swift`, post-ADR-0018):
+The Focus surface rendered when a Plan's quiz round produces a candidate pool that the verdict engine cannot reduce to a winner — every option vetoed, no satisficing floor survivors. NOT a verdict surface (no hero, no time-badge, no receipts). One intent: *widen the search and re-run*. Carries the inline range slider and a `Re-run · N.N mi` primary CTA. Home chrome preserved (initiator-owned, PlanList reachable). Reroll burns are not consumed by the widen action (the widen is free; only post-verdict reroll consumes a burn). Replaces the prior `.noSurvivor` mode case on the unified VerdictScreen.
+_Avoid_: no-results screen (collides with the Q5 no-results screen — that one fires on per-member empty fetch, not on post-verdict no-survivor; see [[gti-vault/60_engineering/adr/0013-no-fictitious-fallback-venues|ADR 0013]]), verdict-failure screen (overloaded — "failure" implies an error path; no-survivor is a successful quiz with a recoverable outcome).
+
 ### Candidate pool (0.1.0, 2026-05-19)
 
 **Candidate pool**:
