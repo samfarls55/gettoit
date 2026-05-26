@@ -11,6 +11,8 @@
 
 import type { CSSProperties } from "react";
 
+import { GTIMark } from "../../components/SunsetPop";
+
 export const metadata = {
   title: "Terms of Service - GetToIt",
   description:
@@ -31,6 +33,14 @@ const containerStyle: CSSProperties = {
   maxWidth: "40rem",
   margin: "0 auto",
   lineHeight: 1.55,
+};
+
+const homeLinkRowStyle: CSSProperties = {
+  // wfr-19. Mounts the GTIMark wordmark at the top of the legal page
+  // as the in-page Escape Hatch to home. The wordmark itself is a
+  // Link to `/` (wfr-18) so we just give it breathing room before the
+  // article content starts.
+  marginBottom: "var(--sp-6)",
 };
 
 const eyebrowStyle: CSSProperties = {
@@ -103,6 +113,9 @@ export default function TermsPage() {
   return (
     <main style={pageStyle}>
       <article style={containerStyle}>
+        <div style={homeLinkRowStyle}>
+          <GTIMark size={20} />
+        </div>
         <p style={eyebrowStyle}>GetToIt</p>
         <h1 style={titleStyle}>Terms of Service</h1>
         <p style={metaStyle}>Effective {EFFECTIVE_DATE}</p>
