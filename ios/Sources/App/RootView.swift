@@ -291,6 +291,22 @@ public struct RootView: View {
                                 host: host,
                                 client: coordinators.client
                             )
+                        },
+                        // bug-37 — surface-owned session-ended punt
+                        // (ADR-0019). `WaitingScreen` watches its
+                        // store; when `rooms.status` flips to
+                        // `.expired` (Plan delete, initiator Leave,
+                        // no-signal sweeper) the screen fires this
+                        // closure alongside the "session ended"
+                        // toast. We tear `postQuizHost` down so the
+                        // precedence chain returns the user to S00
+                        // Plan list — the same destination
+                        // `onEndSession` reaches, but triggered by a
+                        // server-driven state change rather than a
+                        // user tap.
+                        onSessionEnded: {
+                            host.teardown()
+                            postQuizHost = nil
                         }
                     )
                 } else if let readOnly = readOnlyView {
@@ -1131,6 +1147,15 @@ public struct RootView: View {
                 // joined-resume → waiting → verdict route.
                 client: client,
                 onEndSession: {
+                    host.teardown()
+                    joinedResume = nil
+                },
+                // bug-37 — same surface-owned session-ended punt as
+                // the primary `postQuizHost` mount above. The
+                // joined-resume branch parks on a `joinedResume`
+                // slot rather than `postQuizHost`; same teardown
+                // shape, different precedence slot to clear.
+                onSessionEnded: {
                     host.teardown()
                     joinedResume = nil
                 }

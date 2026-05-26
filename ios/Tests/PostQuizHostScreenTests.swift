@@ -185,6 +185,68 @@ final class PostQuizHostScreenTests: XCTestCase {
             "expected the waiting-Leave chrome tap to invoke onLeaveWaiting exactly once")
     }
 
+    /// bug-37 — the host screen forwards a WaitingScreen
+    /// onSessionEnded fire to the supplied `onSessionEnded` closure.
+    /// The `RootView` call site wires that closure to
+    /// `host.teardown() + postQuizHost = nil`, so the precedence
+    /// chain returns the user to S00 Plan list when the room's
+    /// status flips to `.expired` (ADR-0019).
+    func testWaitingSessionEndedInvokesOnSessionEnded() {
+        let host = PostQuizHost(
+            context: PostQuizSessionContext(
+                roomID: UUID(),
+                userID: UUID(),
+                isInitiator: true,
+                invitedShared: true
+            ),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in nil },
+            sleep: { _ in }
+        )
+        var sessionEndedCalls = 0
+        let screen = PostQuizHostScreen(
+            host: host,
+            auth: makeAuth(),
+            promptStore: makePromptStore(),
+            onSessionEnded: { sessionEndedCalls += 1 }
+        )
+        render(screen)
+        screen.simulateWaitingSessionEndedForTesting()
+        XCTAssertEqual(sessionEndedCalls, 1,
+            "expected a waiting-phase session-ended to invoke onSessionEnded exactly once")
+    }
+
+    /// bug-37 — when no `onSessionEnded` is supplied, the host
+    /// screen falls back to `onEndSession` (same precedent as
+    /// `onLeaveWaiting`). This keeps existing call sites that don't
+    /// wire the new closure compiling without behaviour drift —
+    /// they still tear down the session, just via the generic path.
+    func testWaitingSessionEndedFallsBackToOnEndSession() {
+        let host = PostQuizHost(
+            context: PostQuizSessionContext(
+                roomID: UUID(),
+                userID: UUID(),
+                isInitiator: true,
+                invitedShared: true
+            ),
+            fetchVerdict: { _ in nil },
+            fetchSnapshot: { _ in nil },
+            sleep: { _ in }
+        )
+        var endSessionCalls = 0
+        let screen = PostQuizHostScreen(
+            host: host,
+            auth: makeAuth(),
+            promptStore: makePromptStore(),
+            onEndSession: { endSessionCalls += 1 }
+            // onSessionEnded NOT supplied — should default to onEndSession
+        )
+        render(screen)
+        screen.simulateWaitingSessionEndedForTesting()
+        XCTAssertEqual(endSessionCalls, 1,
+            "expected the fallback path to invoke onEndSession when onSessionEnded is not supplied")
+    }
+
     func testWaitingPhaseRendersTheWaitingScreen() {
         // A group session opens on `.waiting` — the screen materialises
         // the S04 Waiting surface, NOT the neutral resolving hold.

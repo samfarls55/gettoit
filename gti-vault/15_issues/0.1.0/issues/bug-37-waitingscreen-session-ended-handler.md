@@ -1,7 +1,7 @@
 ---
 issue: bug-37
 title: WaitingScreen — session-ended handler on RoomStatus.expired
-status: ready
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26 grill #5
 created: 2026-05-26
@@ -56,3 +56,7 @@ None — ADR-0019 accepted, plumbing exists in WaitingStore.
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. Grill #5 outcome — see [[../_runs/2026-05-26-0958-workflow-review|run report]] grill bucket progress section.
+
+## Comments
+
+- 2026-05-26 — Implemented on `afk/bug-37`. `WaitingScreen` gains `.onChange(of: waitingStore?.status)` next to the existing `verdictReady` handler; on `.expired` it shows the inline "Session ended" toast (Capsule + Glass fill + stroke, top-edge centered, GTI tokens only, no inline px/hex/easing) for 1.5s AND fires the new `onSessionEnded?` callback. `PostQuizHostScreen` plumbs the callback up (falls back to `onEndSession` when not supplied — same idiom as `onLeaveWaiting`). `RootView` wires both `PostQuizHostScreen` mount sites (primary `postQuizHost` and joined-resume `waiting`) to tear the host down and clear their respective precedence slots; the chain falls through to PlanList. Tests cover initiator + invitee fires, non-expired status no-fire guard, locked toast copy, and the host-screen plumbing including the fallback-to-onEndSession path. ADR-0019's "implementation-time" toast primitive decision was resolved as an inline one-line toast (no reusable snackbar extracted yet — surfaces with a second consumer can extract later).

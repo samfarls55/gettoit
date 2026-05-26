@@ -62,6 +62,17 @@ public struct PostQuizHostScreen: View {
     /// reachable in code paths where a Leave tap was impossible
     /// anyway.
     private let onLeaveWaiting: () -> Void
+    /// bug-37 — invoked when `WaitingScreen`'s session-ended handler
+    /// fires (the room's status flipped to `.expired` out from under
+    /// the joiner — Plan delete, initiator Leave, etc.). The
+    /// production call site (`RootView`) wires this to a
+    /// `host.teardown() + postQuizHost = nil` sequence so the
+    /// precedence chain returns the user to S00 Plan list. Per
+    /// ADR-0019 the screen owns the toast; the host owns the
+    /// precedence-chain teardown. Defaults to `onEndSession` so call
+    /// sites that don't supply it (snapshot tests, the legacy paths
+    /// that never reach `.waiting`) keep working unchanged.
+    private let onSessionEnded: () -> Void
 
     public init(
         host: PostQuizHost,
@@ -69,7 +80,8 @@ public struct PostQuizHostScreen: View {
         promptStore: AuthPromptStore? = nil,
         client: SupabaseClient? = nil,
         onEndSession: @escaping () -> Void = {},
-        onLeaveWaiting: (() -> Void)? = nil
+        onLeaveWaiting: (() -> Void)? = nil,
+        onSessionEnded: (() -> Void)? = nil
     ) {
         self.host = host
         self.auth = auth
@@ -77,6 +89,7 @@ public struct PostQuizHostScreen: View {
         self.client = client
         self.onEndSession = onEndSession
         self.onLeaveWaiting = onLeaveWaiting ?? onEndSession
+        self.onSessionEnded = onSessionEnded ?? onEndSession
     }
 
     public var body: some View {
@@ -249,7 +262,14 @@ public struct PostQuizHostScreen: View {
                 // gates this on `store.isInitiator`, so an invitee
                 // instance never invokes it; the host screen forwards
                 // unconditionally.
-                onLeave: onLeaveWaiting
+                onLeave: onLeaveWaiting,
+                // bug-37 — session-ended handler. Fires when the
+                // room's status flips to `.expired` (Plan delete,
+                // initiator Leave, no-signal sweeper). Forwards to
+                // the host-supplied `onSessionEnded` so RootView can
+                // tear down `postQuizHost` and the precedence chain
+                // returns the user to PlanList (ADR-0019).
+                onSessionEnded: onSessionEnded
             )
         } else {
             // No chip dependencies wired — fall back to the neutral
@@ -269,6 +289,17 @@ public struct PostQuizHostScreen: View {
     /// test-only contract; production code never calls this.
     public func simulateWaitingLeaveTapForTesting() {
         onLeaveWaiting()
+    }
+
+    /// bug-37 — test seam. SwiftUI tests don't traverse the rendered
+    /// tree to observe `WaitingScreen.onSessionEnded` actually firing
+    /// when the store flips to `.expired`, so this exposes the host's
+    /// closure invocation as a public surface for the unit tests.
+    /// Mirrors `simulateWaitingLeaveTapForTesting()` (wfr-17). The
+    /// `forTesting` suffix marks it as a test-only contract;
+    /// production code never calls this.
+    public func simulateWaitingSessionEndedForTesting() {
+        onSessionEnded()
     }
 
     // MARK: - failed
