@@ -260,6 +260,34 @@ public struct SetupScreen: View {
         !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    // MARK: - input hints (wfr-24)
+
+    /// wfr-24 — adjacent hint copy under the name input. Names the
+    /// 40-char cap so users feel the limit before they hit it. This
+    /// override against `surfaces/01-setup.md` §"Name input treatment"
+    /// (which originally said "no truncation indicator — users feel
+    /// the limit by hitting it") lands per the workflow-review
+    /// Input Hints foundation gate (`patterns.md` §"Input Hints").
+    public static func nameHintCopy() -> String {
+        "Up to 40 characters"
+    }
+
+    /// wfr-24 — adjacent hint copy under the distance slider. Spells
+    /// out the unit in plain language so the slider's purpose is
+    /// unambiguous before the user drags it; the mono-tag value label
+    /// (`1.0 MI`) carries the live value.
+    public static func distanceHintCopy() -> String {
+        "From your location, in miles"
+    }
+
+    /// wfr-24 — adjacent hint copy under the Where to picker. Marks
+    /// the field optional + tells the user the app will prompt later
+    /// (matches workflow-overhaul Q10: a Plan with NULL location is a
+    /// valid `pending` row, resolved via S04).
+    public static func whereToHintCopy() -> String {
+        "Optional — we'll prompt later"
+    }
+
     /// Should the back/cancel gesture mint (or update) the Plan?
     /// Per workflow-overhaul Q11:
     ///   * `.create` with name non-empty → auto-save.
@@ -554,6 +582,13 @@ public struct SetupScreen: View {
                 RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
                     .stroke(Color.white.opacity(0.18), lineWidth: 1)
             )
+
+            // wfr-24 — visible character-limit hint. Sits adjacent
+            // (not inside) the field per `patterns.md` §"Input Hints",
+            // smaller + lighter than the eyebrow, persists with and
+            // without focus. Overrides the surface doc's original
+            // "no truncation indicator" line.
+            sectionHint(SetupScreen.nameHintCopy(), id: "setup.name.hint")
         }
     }
 
@@ -579,6 +614,11 @@ public struct SetupScreen: View {
                 onOpen: { locationSheetOpen = true }
             )
             .accessibilityIdentifier("setup.whereTo.chip")
+
+            // wfr-24 — mark the field optional + tell the user the
+            // app will prompt later (workflow-overhaul Q10 — a Plan
+            // with NULL location is a valid pending row).
+            sectionHint(SetupScreen.whereToHintCopy(), id: "setup.whereTo.hint")
         }
     }
 
@@ -647,6 +687,12 @@ public struct SetupScreen: View {
                         .accessibilityHidden(true)
                 }
             }
+
+            // wfr-24 — adjacent hint spelling out the unit in plain
+            // language. The mono-tag value label ("1.0 MI") carries
+            // the live value; this hint clarifies the slider's purpose
+            // before the user drags it.
+            sectionHint(SetupScreen.distanceHintCopy(), id: "setup.distance.hint")
         }
     }
 
@@ -736,6 +782,18 @@ public struct SetupScreen: View {
         Text(text)
             .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
             .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+            .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+            .accessibilityIdentifier(id)
+    }
+
+    /// wfr-24 — adjacent field-hint treatment. Smaller + lighter than
+    /// the eyebrow (sentence-case body register, white-tertiary), sits
+    /// directly below the control, persists with and without focus.
+    /// Matches `patterns.md` §"Input Hints" — outside the field, plain
+    /// language, second-person casual register.
+    private func sectionHint(_ text: String, id: String) -> some View {
+        Text(text)
+            .font(.system(size: GTIFont.Size.sm, weight: .regular))
             .foregroundStyle(GTIColor.TextOnGradient.tertiary)
             .accessibilityIdentifier(id)
     }

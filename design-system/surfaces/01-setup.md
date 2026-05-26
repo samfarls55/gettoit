@@ -73,7 +73,7 @@ All four chip groups are the **C-04 chip, single-select variant** — same primi
 | Border-radius | `var(--r-row)` |
 | Font (input value) | Inter 700 / 17 / white |
 | Placeholder | `"Name this plan"` in `rgba(255,255,255,0.6)` |
-| Cap | `maxLength={40}` — hard cap, no truncation indicator (the cap is light enough that users feel the limit by hitting it, not by seeing a counter) |
+| Cap | `maxLength={40}` — hard cap. **wfr-24 (2026-05-26) override:** the original "no truncation indicator" line is replaced by the Input Hints adjacent hint (see §"Input hints" below) — users see the cap before they hit it. |
 | Eyebrow | `Name this plan` in `eyebrow` token treatment, opacity `0.6`, above the row |
 
 The eyebrow doubles as the placeholder string. Voice register — sentence case in eyebrow, sentence case in placeholder. Never `"Plan name"` (form-field register) or `"Tonight's plan"` (occasion-coupling — Plans can be days out).
@@ -95,6 +95,18 @@ Range, default, snap-list, and tick position are locked. Any deviation requires 
 ### New token
 
 A new `color.slider.tick` token landed with this surface (`rgba(255,255,255,0.55)`). The value is the existing white-at-0.55 already used by S01-initiator's `SETTINGS` link and the C-04 chip outline, lifted into a semantic role so the tick has a registered home. Generated into `GTIColor.Slider.tick` (`ios/Sources/GTITokens.swift`) by `gen-swift.mjs`.
+
+## Input hints
+
+Three controls carry an adjacent **Input Hints** affordance (per `gti-vault/30_design/interaction-patterns/patterns.md` §"Input Hints" — outside the field, smaller + lighter than the eyebrow, persists with and without focus). Surfaced by `/workflow-review` 2026-05-26, finding wfr-24.
+
+| Field | Hint | Why |
+|---|---|---|
+| Name | `Up to 40 characters` | Surfaces the 40-char cap before the user hits it. Overrides the original "users feel the limit by hitting it" line. |
+| Where to | `Optional — we'll prompt later` | Marks the field optional + tells the user the app will prompt later (matches workflow-overhaul Q10 — a Plan with NULL location is a valid `pending` row). |
+| How far | `From your location, in miles` | Spells out the unit in plain language so the slider's purpose is unambiguous before the user drags it. The mono-tag value label (`1.0 MI`) carries the live value. |
+
+Hint treatment: `body` token at `14pt` regular weight, `TextOnGradient.tertiary` (white-at-0.55), sentence case, second-person casual register. Never form-field register (`required` / `error` / `field`).
 
 ## Where the LocationPicker lives
 

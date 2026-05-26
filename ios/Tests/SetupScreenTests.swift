@@ -326,4 +326,72 @@ final class SetupScreenTests: XCTestCase {
             SetupScreen.secondaryCTACopy(for: .edit)
         )
     }
+
+    // MARK: - input hints (wfr-24)
+
+    /// wfr-24 — Input Hints pattern. Each of name / distance / location
+    /// carries a visible hint adjacent to the control (per
+    /// `patterns.md` §"Input Hints" — outside the field, smaller +
+    /// lighter than the label, persists with and without focus).
+    ///
+    /// The hint copy is exposed as pure static helpers so the
+    /// canonical strings can be pinned by unit tests and reused by the
+    /// view body. Voice register matches the surface doc §"Copy register":
+    /// warm-friend, second-person, casual — never form-field register
+    /// ("required" / "error" / "field").
+
+    /// Name hint names the 40-char cap so users feel the limit before
+    /// they hit it. The surface doc originally framed the cap as
+    /// "users feel the limit by hitting it" — wfr-24 (2026-05-26)
+    /// overrides that line per the Input Hints foundation gate.
+    func testNameHintCopy() {
+        let hint = SetupScreen.nameHintCopy()
+        XCTAssertFalse(hint.isEmpty, "name hint must not be empty")
+        XCTAssertTrue(hint.contains("40"),
+            "name hint must name the 40-char cap — got \(hint)")
+    }
+
+    /// Distance hint clarifies the unit (miles) for users who can't
+    /// see the mono-tag value or who read past it. The mono-tag itself
+    /// reads "1.0 MI"; the adjacent hint spells out the unit in plain
+    /// language so the slider's purpose is unambiguous before the user
+    /// drags it.
+    func testDistanceHintCopy() {
+        let hint = SetupScreen.distanceHintCopy()
+        XCTAssertFalse(hint.isEmpty, "distance hint must not be empty")
+        let lower = hint.lowercased()
+        XCTAssertTrue(lower.contains("mile") || lower.contains("mi"),
+            "distance hint must name the unit — got \(hint)")
+    }
+
+    /// Location hint marks the field optional and tells the user the
+    /// app will prompt later — matches the workflow-overhaul Q10
+    /// validation rule (Plan can ship with NULL location).
+    func testWhereToHintCopy() {
+        let hint = SetupScreen.whereToHintCopy()
+        XCTAssertFalse(hint.isEmpty, "location hint must not be empty")
+        let lower = hint.lowercased()
+        XCTAssertTrue(lower.contains("optional"),
+            "location hint must mark the field optional — got \(hint)")
+    }
+
+    /// Voice register check — all three hints must read in the
+    /// warm-friend, casual register the surface codifies, never the
+    /// form-field register the workflow-review explicitly rejects.
+    func testHintCopyUsesWarmFriendRegister() {
+        let hints = [
+            SetupScreen.nameHintCopy(),
+            SetupScreen.distanceHintCopy(),
+            SetupScreen.whereToHintCopy(),
+        ]
+        for hint in hints {
+            let lower = hint.lowercased()
+            XCTAssertFalse(lower.contains("required"),
+                "hint copy must not use form-field register — got \(hint)")
+            XCTAssertFalse(lower.contains("error"),
+                "hint copy must not use form-field register — got \(hint)")
+            XCTAssertFalse(lower.contains(" field"),
+                "hint copy must not use form-field register — got \(hint)")
+        }
+    }
 }
