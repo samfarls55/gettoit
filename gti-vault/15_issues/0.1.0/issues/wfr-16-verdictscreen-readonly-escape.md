@@ -1,11 +1,13 @@
 ---
 issue: wfr-16
 title: Restore Escape affordance on VerdictScreen .readOnly
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
 github_issue: 257
+pr: 289
+merged: 2026-05-26
 ---
 
 # wfr-16 — VerdictScreen .readOnly mode suppresses Home chrome
@@ -16,9 +18,9 @@ github_issue: 257
 
 ## Acceptance criteria
 
-- [ ] `.readOnly` mode renders a Close/Done affordance.
-- [ ] Tap fires `onAdvance`.
-- [ ] Snapshot test covers `.readOnly` render with chrome.
+- [x] `.readOnly` mode renders a Close/Done affordance.
+- [x] Tap fires `onAdvance`.
+- [x] Snapshot test covers `.readOnly` render with chrome.
 
 ## Blocked by
 
@@ -34,3 +36,7 @@ None — ships as a chrome-only add now.
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #16.
+
+## Comments
+
+- 2026-05-26 — Shipped via PR #289 (squash-merged). `.readOnly` now renders the chrome row with a `Done` verb (not `Home`) wired to `onAdvance` — Solo Setup is the only honest destination for the late-joiner since they have no Plan list. Every iOS-reachable verdict mode now carries a top-leading escape slot. Spec amendment: `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home / Done)" replaces the prior "Home omitted on read-only" rule. No new tokens / components; reused the existing eyebrow row primitive. `ModeSnapshot` gained `homeChromeLabel` + `chromeFiresAdvance` so the view body stays free of mode branching.
