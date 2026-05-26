@@ -74,9 +74,9 @@ All four chip groups are the **C-04 chip, single-select variant** — same primi
 | Font (input value) | Inter 700 / 17 / white |
 | Placeholder | `"Name this plan"` in `rgba(255,255,255,0.6)` |
 | Cap | `maxLength={40}` — hard cap. **wfr-24 (2026-05-26) override:** the original "no truncation indicator" line is replaced by the Input Hints adjacent hint (see §"Input hints" below) — users see the cap before they hit it. |
-| Eyebrow | `Name this plan` in `eyebrow` token treatment, opacity `0.6`, above the row |
+| Eyebrow | `Name this plan` in `eyebrow` token treatment, opacity `0.6`, above the row. **wfr-26 (2026-05-26) override:** the eyebrow above the name input is replaced by a persistent **field label** (sentence case `Name this plan`, body-sm semibold, `TextOnGradient.secondary` / white-0.78) so the label can't be mistaken for a section heading. The other five rows continue to use the eyebrow treatment as section heads. |
 
-The eyebrow doubles as the placeholder string. Voice register — sentence case in eyebrow, sentence case in placeholder. Never `"Plan name"` (form-field register) or `"Tonight's plan"` (occasion-coupling — Plans can be days out).
+The label and the placeholder share the same copy (`Name this plan`). Voice register — sentence case in both. Never `"Plan name"` (form-field register) or `"Tonight's plan"` (occasion-coupling — Plans can be days out). **wfr-26 (2026-05-26):** the field label is the persistent label — it stays put during and after typing while the placeholder disappears on type. The two layers + the §"Input hints" hint compose the Input Prompt + Label + Hint group per `gti-vault/30_design/interaction-patterns/patterns.md` §"Input Prompt".
 
 ## Distance slider — C-21 variant
 

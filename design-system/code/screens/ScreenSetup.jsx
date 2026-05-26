@@ -113,9 +113,21 @@ function ScreenSetup({
               }}>One screen. Set it once. Share when you're ready.</p>
             </div>
 
-            {/* 1. Name this plan — required text input */}
+            {/* 1. Name this plan — required text input.
+                wfr-26 — eyebrow above the name input replaced by a
+                persistent field label (sentence case, body-sm
+                semibold, white-0.78) so the label doesn't read as a
+                section heading. Persists during and after typing
+                while the in-field placeholder disappears on type.
+                The other rows keep the eyebrow treatment. */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Eyebrow opacity={0.6}>Name this plan</Eyebrow>
+              <span
+                aria-hidden="true"
+                style={{
+                  fontFamily: 'var(--ff-body)', fontSize: 14, fontWeight: 600,
+                  color: 'rgba(255,255,255,0.78)',
+                }}
+              >Name this plan</span>
               <div style={{
                 width: '100%', minHeight: 56,
                 padding: '12px 16px',
