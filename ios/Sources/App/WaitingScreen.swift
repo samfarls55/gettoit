@@ -56,6 +56,15 @@ public struct WaitingScreen: View {
     /// Local state for the Nudge CTA — surfaces "tap again later"
     /// after a rate-limited press.
     @State private var nudgeMessage: String?
+    /// bug-37 — `true` while the inline "Session ended" toast is
+    /// rendered at the top edge of the surface. Flipped on by the
+    /// `.onChange(of: waitingStore?.status)` handler when status
+    /// arrives as `.expired`; auto-dismissed after
+    /// `sessionEndedToastDuration` seconds. Pure UI state — the
+    /// host's `onSessionEnded` callback fires alongside the toast so
+    /// the precedence chain teardown is in motion the moment the
+    /// toast appears.
+    @State private var sessionEndedToastVisible: Bool = false
 
     private let auth: AuthCoordinator
     private let promptStore: AuthPromptStore
@@ -83,6 +92,16 @@ public struct WaitingScreen: View {
     /// instantiations keep compiling; when `nil` (or the current role
     /// is not initiator) the chrome row is hidden.
     private let onLeave: (() -> Void)?
+    /// bug-37 — invoked when the room transitions to
+    /// `RoomStatus.expired` (the joiner-side "Plan deleted" or
+    /// initiator Leave path expired the room out from under us).
+    /// The production call site (`RootView` via
+    /// `PostQuizHostScreen.onSessionEnded`) tears down
+    /// `postQuizHost` so the precedence chain falls through to S00
+    /// Plan list. Optional so legacy / snapshot-test instantiations
+    /// keep compiling; when `nil` the toast still renders for ~1.5s
+    /// (the punt is just a no-op).
+    private let onSessionEnded: (() -> Void)?
 
     /// Designated initializer — used by TB-07 to drive the full
     /// surface against a live `WaitingStore` + `FireVerdictCoordinator`.
@@ -95,7 +114,8 @@ public struct WaitingScreen: View {
         now: @escaping () -> Date = { .now },
         onAdvanceToVerdict: ((UUID) -> Void)? = nil,
         onStartOver: (() -> Void)? = nil,
-        onLeave: (() -> Void)? = nil
+        onLeave: (() -> Void)? = nil,
+        onSessionEnded: (() -> Void)? = nil
     ) {
         self.auth = auth
         self.promptStore = promptStore
@@ -106,6 +126,7 @@ public struct WaitingScreen: View {
         self.onAdvanceToVerdict = onAdvanceToVerdict
         self.onStartOver = onStartOver
         self.onLeave = onLeave
+        self.onSessionEnded = onSessionEnded
     }
 
     public var body: some View {
@@ -114,6 +135,14 @@ public struct WaitingScreen: View {
                 .ignoresSafeArea()
 
             mainBody
+
+            // bug-37 — inline "Session ended" toast pinned to the
+            // top edge. Per ADR-0019, the surface owns the session-
+            // ended transition: the toast renders here (where the
+            // user's eyes already are) while `onSessionEnded` fires
+            // upward so the host tears down `postQuizHost` and the
+            // precedence chain lands the user on PlanList.
+            sessionEndedToastOverlay
         }
         .task {
             await refreshChipPhase()
@@ -121,6 +150,70 @@ public struct WaitingScreen: View {
         .onChange(of: waitingStore?.verdictReady ?? false) { _, ready in
             guard ready, let store = waitingStore else { return }
             onAdvanceToVerdict?(store.roomID)
+        }
+        // bug-37 — surface-owned session-ended handler. Mirrors the
+        // verdictReady .onChange above. On `.expired`: surface the
+        // inline toast for ~1.5s AND fire `onSessionEnded` so the
+        // host (PostQuizHostScreen / RootView) can tear down
+        // `postQuizHost` and route the user back to PlanList.
+        .onChange(of: waitingStore?.status) { _, newStatus in
+            guard newStatus == .expired else { return }
+            handleSessionEnded()
+        }
+    }
+
+    // MARK: - bug-37 — session-ended toast
+
+    /// bug-37 — inline session-ended toast. Pinned to the top edge,
+    /// horizontally centered, GTI-token-styled. Renders ABOVE the
+    /// main body via a top-aligned VStack inside the body's ZStack;
+    /// the ZStack ignores safe area for the gradient but we re-add
+    /// safe-area padding here so the toast lands below the status
+    /// bar on real devices. ADR-0019 explicitly notes the toast
+    /// primitive is an implementation-time call — this is the one-
+    /// line inline form (no reusable snackbar primitive extracted).
+    @ViewBuilder
+    private var sessionEndedToastOverlay: some View {
+        if sessionEndedToastVisible {
+            VStack {
+                Text(WaitingScreen.sessionEndedToastLabel)
+                    .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, GTISpacing.step5)
+                    .padding(.vertical, GTISpacing.step3)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(GTIColor.Glass.fillStrong)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(GTIColor.Glass.stroke, lineWidth: 1)
+                    )
+                    .padding(.top, GTISpacing.step4)
+                    .accessibilityIdentifier("waiting.sessionEnded.toast")
+                    .accessibilityLabel(Text(WaitingScreen.sessionEndedToastLabel))
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            .transition(.opacity)
+        }
+    }
+
+    /// bug-37 — surface-owned session-ended handler invoked when
+    /// the store transitions to `.expired`. Fires the host callback
+    /// AND shows the inline toast for `sessionEndedToastDuration`
+    /// seconds. The host teardown and the toast run in parallel —
+    /// the toast is a courtesy explanation while the precedence
+    /// chain reshuffles back to PlanList. Idempotent: if the status
+    /// flips to .expired twice, the toast just refreshes its
+    /// visibility window.
+    private func handleSessionEnded() {
+        onSessionEnded?()
+        sessionEndedToastVisible = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(WaitingScreen.sessionEndedToastDuration * 1_000_000_000))
+            sessionEndedToastVisible = false
         }
     }
 
@@ -560,6 +653,35 @@ public struct WaitingScreen: View {
     public func simulateLeaveChromeTapForTesting() {
         guard isInitiator else { return }
         onLeave?()
+    }
+
+    // MARK: - bug-37 test seams
+
+    /// bug-37 — toast copy, locked by CONTEXT.md §"Plan delete":
+    /// "joiners get a 'session ended' toast and are punted." Title-
+    /// case for the on-screen label; the locked constant defends
+    /// against future paraphrase drift (Tests pin the value).
+    public static let sessionEndedToastLabel = "Session ended"
+
+    /// bug-37 — toast visibility window. ADR-0019's AFK issue spec
+    /// says "~1.5s"; the toast is informational, not load-bearing
+    /// (the precedence-chain teardown is what actually punts the
+    /// user). Public so tests can read it if they ever need to
+    /// drive the dismissal window.
+    public static let sessionEndedToastDuration: TimeInterval = 1.5
+
+    /// bug-37 — test seam. SwiftUI tests cannot directly trigger
+    /// `.onChange(of: waitingStore?.status)` from a store mutation
+    /// inside a unit-test process (SwiftUI batches state changes on
+    /// a runloop the synchronous test can't pump). This seam runs
+    /// the same handler the production `.onChange` would invoke
+    /// when `status` arrives as `.expired`. Mirrors
+    /// `simulateLeaveChromeTapForTesting()` (wfr-17) and
+    /// `simulateResolvingCancelTapForTesting()` (wfr-13). The
+    /// `forTesting` suffix marks it as a test-only contract;
+    /// production code never calls this.
+    public func simulateSessionEndedForTesting() {
+        handleSessionEnded()
     }
 }
 

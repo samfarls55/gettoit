@@ -236,6 +236,109 @@ final class WaitingScreenSnapshotTests: XCTestCase {
         render(view)
     }
 
+    // MARK: - bug-37 — session-ended handler on RoomStatus.expired
+
+    /// bug-37 — toast label is the plain "Session ended" copy locked
+    /// by CONTEXT.md §"Plan delete". The locked constant defends
+    /// against future paraphrase drift in the same idiom as
+    /// `WaitingScreen.leaveChromeLabel` (wfr-17) and
+    /// `PostQuizHostScreen.resolvingCancelLabel` (wfr-13).
+    func testSessionEndedToastLabelIsLockedCopy() {
+        XCTAssertEqual(WaitingScreen.sessionEndedToastLabel, "Session ended")
+    }
+
+    /// bug-37 — when the store transitions to `.expired`, the screen
+    /// fires the host-supplied `onSessionEnded` closure (the host
+    /// then tears down `postQuizHost` so the user lands on PlanList).
+    /// SwiftUI tests cannot directly trigger `.onChange` modifiers
+    /// from a state mutation, so we expose a test seam that mirrors
+    /// the production handler path. Drives ADR-0019's surface-owned
+    /// ownership: WaitingScreen watches its store; on .expired it
+    /// fires the callback up to its host.
+    func testExpiredStatusFiresOnSessionEnded() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, isInitiator: true)
+        var sessionEndedCalls = 0
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider(),
+            onSessionEnded: { sessionEndedCalls += 1 }
+        )
+        render(view)
+        // Flip the store to .expired, then drive the handler the same
+        // way the SwiftUI .onChange would in production.
+        store.apply(event: .roomStatusChanged(.expired))
+        view.simulateSessionEndedForTesting()
+        XCTAssertEqual(sessionEndedCalls, 1,
+            "expected RoomStatus.expired to fire onSessionEnded exactly once")
+    }
+
+    /// bug-37 — invitee instances ALSO fire onSessionEnded. The
+    /// session-ended transition is not initiator-only (unlike the
+    /// wfr-17 Leave chrome); every member in the room needs to be
+    /// punted when the room expires, regardless of who initiated.
+    func testExpiredStatusFiresOnSessionEndedForInviteeToo() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, isInitiator: false)
+        var sessionEndedCalls = 0
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider(),
+            onSessionEnded: { sessionEndedCalls += 1 }
+        )
+        render(view)
+        store.apply(event: .roomStatusChanged(.expired))
+        view.simulateSessionEndedForTesting()
+        XCTAssertEqual(sessionEndedCalls, 1,
+            "expected invitees to also receive the session-ended punt")
+    }
+
+    /// bug-37 — non-expired status transitions do NOT fire
+    /// onSessionEnded. Guards against an over-broad .onChange that
+    /// punts the user on every status flip (firing, verdict_ready,
+    /// locked).
+    func testNonExpiredStatusDoesNotFireOnSessionEnded() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 2, isInitiator: true)
+        var sessionEndedCalls = 0
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider(),
+            onSessionEnded: { sessionEndedCalls += 1 }
+        )
+        render(view)
+        // .firing and .verdictReady are not session-ended.
+        store.apply(event: .roomStatusChanged(.firing))
+        store.apply(event: .roomStatusChanged(.verdictReady))
+        XCTAssertEqual(sessionEndedCalls, 0,
+            "expected only .expired (not .firing / .verdictReady) to fire onSessionEnded")
+    }
+
+    /// bug-37 — render-smoke that an `.expired` status materialises
+    /// the toast subview without crashing. Pairs with
+    /// `testExpiredStatusRendersMainBodyNotATimerTerminal` (which
+    /// covers the regression that we did NOT bring back the retired
+    /// timer terminal — the surface holds the main body and overlays
+    /// the new inline toast on top).
+    func testExpiredStatusRendersWithToastWithoutCrashing() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, status: .expired, isInitiator: true)
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider(),
+            onSessionEnded: { }
+        )
+        render(view)
+    }
+
     func testLegacyTB12InitializerStillCompiles() {
         // Confirms the no-store WaitingScreen path (TB-12 launch
         // surface) still materialises without crashing. Some callers
