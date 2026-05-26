@@ -319,17 +319,28 @@ public struct SetupScreen: View {
 
     /// wfr-25 — classify a raw error message into the routing bucket
     /// the view should use. Pure substring matcher — covers the known
-    /// PostgREST CHECK shapes (`plans_name_check`, `plans_distance_check`)
-    /// and the user-facing column names (`name`, `distance`). Anything
-    /// else falls through to `.crossField` so the historical
+    /// PostgREST CHECK shapes (`plans_name_check`, `plans_distance_check`),
+    /// the user-facing column names (`name`, `distance`), and the
+    /// Postgres typed-overflow shape for the name column
+    /// (`character varying(40)` — the SQL type of `plans.name`).
+    /// Anything else falls through to `.crossField` so the historical
     /// top-of-dock fallback is preserved for network / RLS / unknown
     /// failures.
     public static func classifyPersistFailure(messageLike raw: String) -> FieldError {
         let lower = raw.lowercased()
+        // Distance check first — `distance_meters` contains the
+        // substring `meter` but not `name`, so order matters only
+        // against accidental matches. The two field signals are
+        // orthogonal in practice (the column names share no tokens).
         if lower.contains("distance") || lower.contains("distance_meters") {
             return FieldError(field: .distance, message: distanceErrorCopy())
         }
-        if lower.contains("name") {
+        // Name signals: the literal word `name`, the CHECK constraint
+        // identifier, or the Postgres typed-overflow shape for the
+        // 40-char `character varying(40)` column.
+        if lower.contains("name")
+            || lower.contains("character varying(40)")
+            || lower.contains("character varying (40)") {
             return FieldError(field: .name, message: nameErrorCopy())
         }
         return FieldError(field: .crossField, message: crossFieldErrorCopy())
