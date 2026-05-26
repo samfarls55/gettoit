@@ -231,6 +231,15 @@ public struct RootView: View {
                         // (`!invitedShared` for a single-member room).
                         role: quiz.isInitiator ? .initiator : .joiner,
                         isSolo: !quiz.invitedShared,
+                        // bug-38 — passive room-status projection for
+                        // the surface-owned session-ended punt
+                        // (ADR-0019). QuizScreen watches the store's
+                        // `status`; when `rooms.status` flips to
+                        // `.expired` (Plan delete, initiator Leave,
+                        // no-signal sweeper) the screen fires
+                        // `onSessionEnded` alongside the "Session
+                        // ended" toast.
+                        roomStatusStore: quiz.roomStatusStore,
                         onClose: { activeQuiz = nil },
                         // tb-WF-2 → tb-WF-5 — Exit/Leave confirm. The
                         // host runs the member-drop write (and, on a
@@ -250,6 +259,17 @@ public struct RootView: View {
                         // resolves the verdict and routes to S05.
                         onSubmitted: {
                             enterPostQuiz(quiz: quiz, client: coordinators.client)
+                        },
+                        // bug-38 — surface-owned session-ended punt
+                        // (ADR-0019). Mirrors the bug-37 wiring on
+                        // PostQuizHostScreen: clearing `activeQuiz`
+                        // here tears the QuizScreen down and the
+                        // precedence chain falls through to S00 Plan
+                        // list — the same destination `onClose`
+                        // reaches, but triggered by a server-driven
+                        // state change rather than a user tap.
+                        onSessionEnded: {
+                            activeQuiz = nil
                         }
                     )
                 } else if let host = postQuizHost {
@@ -1110,7 +1130,12 @@ public struct RootView: View {
                         roomID: resume.roomID,
                         userID: userID,
                         isInitiator: false,
-                        invitedShared: true
+                        invitedShared: true,
+                        roomStatusStore: WaitingStore(
+                            roomID: resume.roomID,
+                            currentUserID: userID,
+                            isInitiator: false
+                        )
                     )
                     enterPostQuiz(quiz: quiz, client: client)
                     self.joinedResume = nil
@@ -1300,7 +1325,18 @@ public struct RootView: View {
                 roomID: roomID,
                 userID: userID,
                 isInitiator: isInitiator,
-                invitedShared: invitedShared
+                invitedShared: invitedShared,
+                // bug-38 — passive room-status projection for the
+                // surface-owned session-ended punt (ADR-0019). The
+                // Realtime channel wiring that drives apply(event:)
+                // is out-of-scope for this slice; the store is in
+                // place so the API surface is ready for the
+                // follow-up.
+                roomStatusStore: WaitingStore(
+                    roomID: roomID,
+                    currentUserID: userID,
+                    isInitiator: isInitiator
+                )
             )
             // Clear the deep link so closing the quiz returns to S00
             // Plan list rather than re-routing back into Join.
@@ -1630,6 +1666,17 @@ public struct RootView: View {
         /// to decide whether to skip S04 Waiting and route directly to
         /// the S05 solo variant.
         let invitedShared: Bool
+        /// bug-38 — passive projection of `rooms.status` for the room
+        /// this quiz is bound to. The QuizScreen watches the store's
+        /// `status` and fires the session-ended punt on `.expired`
+        /// (Plan delete, initiator Leave, no-signal sweeper) per
+        /// ADR-0019. Reuses `WaitingStore` rather than introducing a
+        /// new store type — only the `status` projection is consumed
+        /// here (member / answered rows are unused on the quiz path).
+        /// The Realtime channel that drives `apply(event:)` is
+        /// out-of-scope for this slice; the store is wired here so
+        /// the API is in place for the realtime hookup follow-up.
+        let roomStatusStore: WaitingStore
     }
 
     /// TB-11 — payload bundled with the room id so the read-only

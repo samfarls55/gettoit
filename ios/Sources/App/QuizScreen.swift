@@ -35,6 +35,16 @@ import SwiftUI
 public struct QuizScreen: View {
     @State private var coordinator: QuizCoordinator
     @State private var stops: [Color]
+    /// bug-38 — `true` while the inline "Session ended" toast is
+    /// rendered at the top edge of the surface. Flipped on by the
+    /// `.onChange(of: roomStatusStore?.status)` handler when status
+    /// arrives as `.expired`; auto-dismissed after
+    /// `sessionEndedToastDuration` seconds. Pure UI state — the
+    /// host's `onSessionEnded` callback fires alongside the toast so
+    /// the precedence chain teardown is in motion the moment the
+    /// toast appears. Mirrors `WaitingScreen.sessionEndedToastVisible`
+    /// (bug-37) per ADR-0019.
+    @State private var sessionEndedToastVisible: Bool = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// tb-WF-2 — the QuizChrome role (`Exit` vs `Leave` label).
@@ -66,16 +76,42 @@ public struct QuizScreen: View {
     /// chrome-aware init is the canonical surface.
     private let onClose: () -> Void
 
+    /// bug-38 — passive projection of `rooms.status` for the room
+    /// this quiz is bound to. The screen watches `status` via
+    /// `.onChange` so a server-side flip to `.expired` (Plan delete,
+    /// initiator Leave, no-signal sweeper) surfaces the inline
+    /// "Session ended" toast AND fires `onSessionEnded` upward.
+    /// Optional so legacy / snapshot-test instantiations keep
+    /// compiling; when `nil` the surface behaves exactly as it did
+    /// pre-bug-38 (no toast path, no callback fire). Reuses
+    /// `WaitingStore` rather than introducing a new store type — per
+    /// the bug-38 spec, the projection mirrors WaitingStore's
+    /// `RoomStatus` exposure. The Realtime wiring that drives
+    /// `apply(event:)` is owned by the host (RootView), not the view
+    /// — same architecture seam as `WaitingScreen.waitingStore`.
+    private let roomStatusStore: WaitingStore?
+
+    /// bug-38 — invoked when the room transitions to
+    /// `RoomStatus.expired`. The production call site (`RootView`)
+    /// wires this to `activeQuiz = nil` so the precedence chain falls
+    /// through to S00 Plan list per ADR-0019. Optional so legacy /
+    /// snapshot-test instantiations keep compiling; when `nil` the
+    /// toast still renders (the punt is just a no-op).
+    private let onSessionEnded: (() -> Void)?
+
     /// tb-WF-2 init. The chrome consumes `role` + `isSolo`; the host
     /// owns `onExit` (member-drop + route) and `onSubmitted` (Q5
-    /// success → post-Q5 router).
+    /// success → post-Q5 router). bug-38 adds `roomStatusStore` +
+    /// `onSessionEnded` for the surface-owned session-ended punt.
     public init(
         coordinator: QuizCoordinator,
         role: QuizChromeRole,
         isSolo: Bool,
+        roomStatusStore: WaitingStore? = nil,
         onClose: @escaping () -> Void = {},
         onExit: @escaping () -> Void,
-        onSubmitted: @escaping () -> Void = {}
+        onSubmitted: @escaping () -> Void = {},
+        onSessionEnded: (() -> Void)? = nil
     ) {
         self._coordinator = State(initialValue: coordinator)
         self._stops = State(initialValue: GTIGradient.colorStops(.q1))
@@ -84,6 +120,8 @@ public struct QuizScreen: View {
         self.onClose = onClose
         self.onExit = onExit
         self.onSubmitted = onSubmitted
+        self.roomStatusStore = roomStatusStore
+        self.onSessionEnded = onSessionEnded
     }
 
     /// Pre-chrome init — preserved for the snapshot harness and the
@@ -103,6 +141,8 @@ public struct QuizScreen: View {
         self.onClose = onClose
         self.onExit = onClose
         self.onSubmitted = onSubmitted
+        self.roomStatusStore = nil
+        self.onSessionEnded = nil
     }
 
     public var body: some View {
@@ -120,42 +160,124 @@ public struct QuizScreen: View {
             .ignoresSafeArea()
             .accessibilityIdentifier("quiz.gradient")
 
-            VStack(spacing: 0) {
-                // tb-WF-2 — QuizChrome row above the C-02 TopBar. The
-                // chrome owns the Exit/Leave affordance, so the TopBar's
-                // `×` is suppressed (the close button below is
-                // intentionally hidden by zero-opacity + zero-frame to
-                // preserve the progress strip's horizontal alignment
-                // without changing the layout).
-                QuizChromeView(
-                    canBack: canBackForStep(coordinator.step),
-                    role: role,
-                    isSolo: isSolo,
-                    onBack: { coordinator.back() },
-                    onExit: onExit
-                )
-                .padding(.top, GTISpacing.step4)
+            quizBody
 
-                topBar
-                    .padding(.top, GTISpacing.step3)
+            // bug-38 — inline "Session ended" toast pinned to the
+            // top edge. Per ADR-0019 the surface owns the session-
+            // ended transition: the toast renders here (where the
+            // user's eyes already are) while `onSessionEnded` fires
+            // upward so RootView clears `activeQuiz` and the
+            // precedence chain lands the user on PlanList. Mirrors
+            // `WaitingScreen.sessionEndedToastOverlay` (bug-37) —
+            // same Capsule shape, same Glass tokens, same 1.5s
+            // window, same locked copy.
+            sessionEndedToastOverlay
+        }
+        // bug-38 — surface-owned session-ended handler. Mirrors
+        // `WaitingScreen.onChange(of: waitingStore?.status)`
+        // (bug-37). On `.expired`: render the inline toast for
+        // ~1.5s AND fire `onSessionEnded` so the host (RootView)
+        // can clear `activeQuiz` and route the user back to
+        // PlanList.
+        .onChange(of: roomStatusStore?.status) { _, newStatus in
+            guard newStatus == .expired else { return }
+            handleSessionEnded()
+        }
+    }
 
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    // Re-key on the routed step so SwiftUI treats each
-                    // question as a distinct view identity and the
-                    // `.transition(.opacity)` actually fires on swap.
-                    .id(coordinator.step)
-                    .transition(.opacity)
-                    // Pair the card cross-fade with the gradient tween
-                    // ms-exact (same duration + easing) so the
-                    // foreground question and the background sunset
-                    // sweep move as one piece — `design-system/motion.md`
-                    // §"Question card cross-fade" (bug-04).
-                    .animation(cardTweenAnimation, value: coordinator.step)
-            }
+    @ViewBuilder
+    private var quizBody: some View {
+        VStack(spacing: 0) {
+            // tb-WF-2 — QuizChrome row above the C-02 TopBar. The
+            // chrome owns the Exit/Leave affordance, so the TopBar's
+            // `×` is suppressed (the close button below is
+            // intentionally hidden by zero-opacity + zero-frame to
+            // preserve the progress strip's horizontal alignment
+            // without changing the layout).
+            QuizChromeView(
+                canBack: canBackForStep(coordinator.step),
+                role: role,
+                isSolo: isSolo,
+                onBack: { coordinator.back() },
+                onExit: onExit
+            )
+            .padding(.top, GTISpacing.step4)
+
+            topBar
+                .padding(.top, GTISpacing.step3)
+
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                // Re-key on the routed step so SwiftUI treats each
+                // question as a distinct view identity and the
+                // `.transition(.opacity)` actually fires on swap.
+                .id(coordinator.step)
+                .transition(.opacity)
+                // Pair the card cross-fade with the gradient tween
+                // ms-exact (same duration + easing) so the
+                // foreground question and the background sunset
+                // sweep move as one piece — `design-system/motion.md`
+                // §"Question card cross-fade" (bug-04).
+                .animation(cardTweenAnimation, value: coordinator.step)
         }
         .onChange(of: coordinator.step) { _, newStep in
             applyTween(for: newStep)
+        }
+    }
+
+    // MARK: - bug-38 — session-ended toast
+
+    /// bug-38 — inline session-ended toast. Pinned to the top edge,
+    /// horizontally centered, GTI-token-styled. Mirrors
+    /// `WaitingScreen.sessionEndedToastOverlay` (bug-37) exactly so
+    /// the two punted-out-of-session affordances are visually
+    /// identical. Per ADR-0019 the toast primitive is an
+    /// implementation-time call — this is the one-line inline form
+    /// (no reusable snackbar primitive extracted across surfaces;
+    /// the inline-mirror keeps scope tight per the bug-38 brief).
+    @ViewBuilder
+    private var sessionEndedToastOverlay: some View {
+        if sessionEndedToastVisible {
+            VStack {
+                Text(QuizScreen.sessionEndedToastLabel)
+                    .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, GTISpacing.step5)
+                    .padding(.vertical, GTISpacing.step3)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(GTIColor.Glass.fillStrong)
+                    )
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .stroke(GTIColor.Glass.stroke, lineWidth: 1)
+                    )
+                    .padding(.top, GTISpacing.step4)
+                    .accessibilityIdentifier("quiz.sessionEnded.toast")
+                    .accessibilityLabel(Text(QuizScreen.sessionEndedToastLabel))
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            .transition(.opacity)
+        }
+    }
+
+    /// bug-38 — surface-owned session-ended handler invoked when
+    /// the store transitions to `.expired`. Fires the host callback
+    /// AND shows the inline toast for `sessionEndedToastDuration`
+    /// seconds. The host teardown and the toast run in parallel —
+    /// the toast is a courtesy explanation while the precedence
+    /// chain reshuffles back to PlanList. Idempotent: if the status
+    /// flips to .expired twice, the toast just refreshes its
+    /// visibility window. Mirrors
+    /// `WaitingScreen.handleSessionEnded()` (bug-37).
+    private func handleSessionEnded() {
+        onSessionEnded?()
+        sessionEndedToastVisible = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(QuizScreen.sessionEndedToastDuration * 1_000_000_000))
+            sessionEndedToastVisible = false
         }
     }
 
@@ -388,5 +510,34 @@ public struct QuizScreen: View {
         case .q1, .submitting, .submitted, .failed: return false
         case .q2, .q3, .q4, .q5: return true
         }
+    }
+
+    // MARK: - bug-38 test seams
+
+    /// bug-38 — toast copy. Mirrors `WaitingScreen.sessionEndedToastLabel`
+    /// (bug-37); both surfaces share the same locked copy from
+    /// CONTEXT.md §"Plan delete" ("joiners get a 'session ended'
+    /// toast and are punted"). The locked constant defends against
+    /// future paraphrase drift on either surface.
+    public static let sessionEndedToastLabel = "Session ended"
+
+    /// bug-38 — toast visibility window. Matches
+    /// `WaitingScreen.sessionEndedToastDuration` (bug-37); the AFK
+    /// brief mandates the same primitive on both surfaces. Public
+    /// so tests can read it if they ever need to drive the
+    /// dismissal window.
+    public static let sessionEndedToastDuration: TimeInterval = 1.5
+
+    /// bug-38 — test seam. SwiftUI tests cannot directly trigger
+    /// `.onChange(of: roomStatusStore?.status)` from a store
+    /// mutation inside a unit-test process (SwiftUI batches state
+    /// changes on a runloop the synchronous test can't pump). This
+    /// seam runs the same handler the production `.onChange` would
+    /// invoke when `status` arrives as `.expired`. Mirrors
+    /// `WaitingScreen.simulateSessionEndedForTesting()` (bug-37).
+    /// The `forTesting` suffix marks it as a test-only contract;
+    /// production code never calls this.
+    public func simulateSessionEndedForTesting() {
+        handleSessionEnded()
     }
 }
