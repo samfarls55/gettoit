@@ -181,6 +181,48 @@ public struct SetupScreen: View {
         }
     }
 
+    /// wfr-09 — disabled-state label for the **primary** dock CTA. When
+    /// `nameValid` is false both dock CTAs are `.disabled(...)`; opacity
+    /// alone (0.55 on the pill, 0.45 on the eyebrow link) fails low-vision
+    /// + colorblind users per `design-system/accessibility.md` §1 + §8 and
+    /// the workflow-review finding wfr-09 (2026-05-26). The disabled
+    /// label swap names what's missing in warm-friend register — same
+    /// voice as every other CTA on the surface (`README.md` invariant
+    /// #1), never `"Name required"` (form-field register).
+    public static func primaryCTADisabledCopy() -> String {
+        "Name your plan"
+    }
+
+    /// wfr-09 — disabled-state label for the **secondary** dock link.
+    /// Mirrors the primary disabled copy so VO and visual readers see a
+    /// consistent missing-input signal on both affordances. Rendered in
+    /// the same `eyebrow`-token UPPERCASE treatment as the enabled
+    /// secondary copy so the swap is a copy change, not a treatment
+    /// change.
+    public static func secondaryCTADisabledCopy() -> String {
+        "NAME YOUR PLAN"
+    }
+
+    /// Label-to-display picker for the primary CTA. The single source
+    /// of truth the view body reads when rendering the dock — gates on
+    /// the same `nameValid` predicate the `.disabled(...)` modifier
+    /// reads, so the disabled state and the disabled label never drift.
+    public static func primaryLabelToDisplay(
+        nameValid: Bool,
+        groupContext: SessionParameters.GroupContext
+    ) -> String {
+        nameValid ? primaryCTACopy(for: groupContext) : primaryCTADisabledCopy()
+    }
+
+    /// Label-to-display picker for the secondary dock link. Same
+    /// `nameValid` gate as the primary; rendered in `eyebrow` treatment.
+    public static func secondaryLabelToDisplay(
+        nameValid: Bool,
+        mode: Mode
+    ) -> String {
+        nameValid ? secondaryCTACopy(for: mode) : secondaryCTADisabledCopy()
+    }
+
     /// Map an existing Plan's `scope` to the group mode the Edit
     /// surface renders. Amendment 2026-05-20: a `solo` Plan re-opens
     /// in Solo Setup; `duo` / `group` re-open in Group Setup.
@@ -351,11 +393,11 @@ public struct SetupScreen: View {
     }
 
     private var secondaryLabel: String {
-        SetupScreen.secondaryCTACopy(for: mode)
+        SetupScreen.secondaryLabelToDisplay(nameValid: nameValid, mode: mode)
     }
 
     private var primaryLabel: String {
-        SetupScreen.primaryCTACopy(for: groupContext)
+        SetupScreen.primaryLabelToDisplay(nameValid: nameValid, groupContext: groupContext)
     }
 
     private var resolvedPlanScope: PlansStore.Scope {

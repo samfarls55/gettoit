@@ -119,4 +119,38 @@ final class SetupScreenRenderTests: XCTestCase {
         XCTAssertEqual(SetupScreen.setupMode(for: .duo),   .group)
         XCTAssertEqual(SetupScreen.setupMode(for: .group), .group)
     }
+
+    // MARK: - wfr-09 disabled/enabled CTA render coverage
+
+    /// wfr-09 acceptance criterion #2 — "Snapshot test covers disabled
+    /// + enabled states." Create-mode opens with an empty name, so the
+    /// dock CTAs render in their disabled state on first paint. This
+    /// exercises the disabled label-swap path.
+    func testCreateModeRendersDockInDisabledState() {
+        render(makeScreen(mode: .create, groupMode: .group))
+    }
+
+    /// The enabled state — an Edit-mode entry with a prefilled name —
+    /// renders the canonical primary + secondary copy. Paired with
+    /// `testCreateModeRendersDockInDisabledState` to cover both states
+    /// of the dock per wfr-09.
+    func testEditModeRendersDockInEnabledState() {
+        let plan = PlansStore.Plan(
+            id: UUID(),
+            creatorID: UUID(),
+            name: "Friday dinner",
+            category: "food",
+            scope: .group,
+            location: nil,
+            sessionParameters: SessionParameters(
+                mealTime: .dinner,
+                groupContext: .group,
+                serviceShape: .dineInIndoor,
+                transportMode: .walk
+            ),
+            distanceMeters: 1609,
+            status: .pending
+        )
+        render(makeScreen(mode: .edit, groupMode: .group, editingPlan: plan))
+    }
 }
