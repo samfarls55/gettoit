@@ -235,6 +235,43 @@ final class ActionDotMenuTests: XCTestCase {
                        "destructive items must use the same foreground color as non-destructive — no red")
     }
 
+    // MARK: - wfr-28 — closed-state trigger discoverability
+
+    /// wfr-28 — the closed-state trigger glyph foreground must be the
+    /// `secondary` text-on-gradient color (white 0.78), not `tertiary`
+    /// (white 0.6). Pre-fix the trigger painted at 0.6 which workflow-
+    /// review flagged as effectively invisible on the gradient. Open
+    /// state stays at `primary` (1.0). Locked at the type level via a
+    /// `triggerForegroundColor(isOpen:)` resolver so a future
+    /// "soften the dot to feel less busy" regression fails CI.
+    func testTriggerClosedForegroundIsSecondaryNotTertiary() {
+        let closed = ActionDotMenu.triggerForegroundColor(isOpen: false)
+        XCTAssertEqual(closed, GTIColor.TextOnGradient.secondary,
+                       "closed-state trigger must use secondary (white 0.78) for wfr-28 discoverability — not tertiary (0.6)")
+        XCTAssertNotEqual(closed, GTIColor.TextOnGradient.tertiary,
+                          "closed-state trigger must NOT use tertiary (white 0.6) — too low contrast (wfr-28)")
+    }
+
+    /// wfr-28 — open-state trigger foreground stays at `primary` (white 1.0)
+    /// per the C-25 spec. The discoverability bump only raises the *closed*
+    /// state; the open state's full-white treatment is unchanged so the
+    /// open/closed visual delta still reads.
+    func testTriggerOpenForegroundIsPrimary() {
+        let open = ActionDotMenu.triggerForegroundColor(isOpen: true)
+        XCTAssertEqual(open, GTIColor.TextOnGradient.primary,
+                       "open-state trigger must remain at primary (white 1.0)")
+    }
+
+    /// wfr-28 — the open/closed states must render in visibly distinct
+    /// foregrounds so the toggle still reads after the closed-state bump.
+    /// Locks the open > closed alpha relationship at the type level.
+    func testTriggerOpenAndClosedForegroundsDiffer() {
+        let open = ActionDotMenu.triggerForegroundColor(isOpen: true)
+        let closed = ActionDotMenu.triggerForegroundColor(isOpen: false)
+        XCTAssertNotEqual(open, closed,
+                          "open and closed trigger foregrounds must differ to preserve the toggle's visual delta")
+    }
+
     // MARK: - render harness
 
     @discardableResult
