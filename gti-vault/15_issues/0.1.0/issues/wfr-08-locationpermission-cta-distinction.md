@@ -1,11 +1,13 @@
 ---
 issue: wfr-08
 title: Distinguish primary vs secondary CTA on LocationPermissionScreen
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
+closed: 2026-05-26
 github_issue: 249
+github_pr: 277
 ---
 
 # wfr-08 — LocationPermissionScreen two CTAs share equal visual weight
@@ -16,8 +18,8 @@ Promote "Share my location" to primary pill (existing white pill). Demote "Enter
 
 ## Acceptance criteria
 
-- [ ] Primary/secondary distinction visible.
-- [ ] Snapshot test covers both states.
+- [x] Primary/secondary distinction visible.
+- [x] Snapshot test covers both states.
 
 ## Blocked by
 
@@ -32,3 +34,7 @@ None — can start immediately.
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #8.
+
+## Comments
+
+- **2026-05-26** — Closed via PR #277. The view body already rendered the spec-correct treatments (white pill primary + eyebrow text-link secondary per `design-system/surfaces/00b-location-permission.md`); finding #8 was based on a pre-fix snapshot of the screen. The PR extracts the CTA treatment into static spec data (`primaryCtaTreatment` / `secondaryCtaTreatment`) so the view body reads from it, and adds `LocationPermissionScreenSnapshotTests.swift` with a load-bearing distinct-treatment regression guard. Pixel-identical to `main`; the change is structural.
