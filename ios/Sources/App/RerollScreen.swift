@@ -502,7 +502,7 @@ public struct RerollScreen: View {
         case .diet:
             vibeOrNil = nil
             chipOrNil = selectedDietChip.rawValue
-        default:
+        case .cost, .dist, .avail:
             vibeOrNil = nil
             chipOrNil = nil
         }
