@@ -137,6 +137,65 @@ final class QuizScreenLayoutTests: XCTestCase {
             "the leading + trailing topBar spacers must both be 32x32 — asymmetric sizes still skew the strip horizontally (bug-25)")
     }
 
+    // MARK: - wfr-22 — progress strip accessibility label
+
+    /// wfr-22 — the `topBar` block must wire the
+    /// `progressAccessibilityLabel(forStep:)` helper to an
+    /// `.accessibilityLabel(` modifier so VoiceOver reads
+    /// `"Question {n} of 5"`. The source-level assertion is the same
+    /// pattern as the centering test above — SwiftUI a11y labels do
+    /// not surface into UIKit's subview tree reliably (per
+    /// `QuizScreenSnapshotTests` file header), so we pin the contract
+    /// at the source level.
+    func testTopBarBindsProgressAccessibilityLabel() throws {
+        let sourcePath = pathForRepoFile("ios/Sources/App/QuizScreen.swift")
+        let source = try String(contentsOfFile: sourcePath, encoding: .utf8)
+
+        guard let topBarRange = source.range(of: "private var topBar: some View {"),
+              let endRange = source.range(of: "\n    // MARK: - content router",
+                                          range: topBarRange.upperBound..<source.endIndex)
+        else {
+            XCTFail("could not isolate `topBar` block in QuizScreen.swift — file structure changed?")
+            return
+        }
+        let topBarBody = String(source[topBarRange.lowerBound..<endRange.lowerBound])
+
+        XCTAssertTrue(
+            topBarBody.contains("progressAccessibilityLabel("),
+            "topBar must bind QuizScreen.progressAccessibilityLabel(forStep:) so VoiceOver reads 'Question N of 5' (wfr-22 / accessibility.md §4)"
+        )
+        XCTAssertTrue(
+            topBarBody.contains(".accessibilityLabel("),
+            "topBar must apply an .accessibilityLabel(...) modifier to the progress strip (wfr-22)"
+        )
+    }
+
+    /// wfr-22 — the visible `Q{n} of 5` label must render alongside the
+    /// progress capsules. The accessibility identifier
+    /// `quiz.progress.label` is the integration-test handle.
+    func testTopBarRendersVisibleStepLabel() throws {
+        let sourcePath = pathForRepoFile("ios/Sources/App/QuizScreen.swift")
+        let source = try String(contentsOfFile: sourcePath, encoding: .utf8)
+
+        guard let topBarRange = source.range(of: "private var topBar: some View {"),
+              let endRange = source.range(of: "\n    // MARK: - content router",
+                                          range: topBarRange.upperBound..<source.endIndex)
+        else {
+            XCTFail("could not isolate `topBar` block in QuizScreen.swift — file structure changed?")
+            return
+        }
+        let topBarBody = String(source[topBarRange.lowerBound..<endRange.lowerBound])
+
+        XCTAssertTrue(
+            topBarBody.contains("progressVisibleLabel("),
+            "topBar must render the visible Q{n} of 5 text via QuizScreen.progressVisibleLabel(forStep:) (wfr-22)"
+        )
+        XCTAssertTrue(
+            topBarBody.contains("quiz.progress.label"),
+            "topBar must tag the visible step text with accessibilityIdentifier 'quiz.progress.label' for integration tests (wfr-22)"
+        )
+    }
+
     // MARK: - helpers
 
     /// Resolves an `ios/Sources/App/<name>.swift` path relative to
