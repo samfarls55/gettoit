@@ -1,7 +1,7 @@
 ---
 issue: bug-36
 title: PlanList History — threshold-gated Jump to Item search at 10 rows
-status: ready
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26 grill #4
 created: 2026-05-26
@@ -39,14 +39,18 @@ Add a threshold-gated search input to the History section in `PlanListScreen.swi
 
 ## Acceptance criteria
 
-- [ ] Search input is **absent** when `history.count < 10`.
-- [ ] Search input is **present** when `history.count >= 10` AND `historyState.isOpen == true`.
-- [ ] Search input is **hidden** when History section is collapsed (even if count >= 10).
-- [ ] Typing filters History rows in real-time (case-insensitive, matches Plan name OR place name).
-- [ ] Clear button appears when text is non-empty; tap empties the field and restores full list.
-- [ ] Empty result state shows "No matching plans".
-- [ ] Snapshot tests: (a) History section under threshold (no search); (b) History section at/over threshold expanded with empty search; (c) History section with active filter (1+ matching, 0 matching).
-- [ ] No regression on existing History section behaviour below 10 rows.
+- [x] Search input is **absent** when `history.count < 10`.
+- [x] Search input is **present** when `history.count >= 10` AND `historyState.isOpen == true`.
+- [x] Search input is **hidden** when History section is collapsed (even if count >= 10).
+- [x] Typing filters History rows in real-time (case-insensitive, matches Plan name OR place name).
+- [x] Clear button appears when text is non-empty; tap empties the field and restores full list.
+- [x] Empty result state shows "No matching plans".
+- [x] Snapshot tests: (a) History section under threshold (no search); (b) History section at/over threshold expanded with empty search; (c) History section with active filter (1+ matching, 0 matching).
+- [x] No regression on existing History section behaviour below 10 rows.
+
+## Comments
+
+- 2026-05-26 — merged via PR [#296](https://github.com/samfarls55/gettoit/pull/296) (squash `a19849e`). All CI lanes green (ios xcodebuild test 3m51s). Threshold pinned at 10 via `PlanListScreen.historySearchThreshold`; search state held in a small `@Observable HistorySearchState` mirroring the existing `HistoryCollapseState` pattern so the unit-test path can mutate the query without a `UIHostingController` mount. Copy locked: `"Search plans"` (placeholder), `"No matching plans"` (empty-result).
 
 ## Blocked by
 
