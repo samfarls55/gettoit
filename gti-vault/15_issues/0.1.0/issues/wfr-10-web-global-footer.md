@@ -1,7 +1,7 @@
 ---
 issue: wfr-10
 title: Add global footer with Privacy/Terms/Help links to web layout
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
@@ -35,3 +35,7 @@ None (soft block on support email — ships without mailto, see body).
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #10.
+
+## Comments
+
+- 2026-05-26 — Closed via AFK PR. Landed a `<Footer/>` component (`web/components/Footer.tsx`) wired into the root layout (`web/app/layout.tsx`). Renders Privacy / Terms / Help-coming-soon on every route — verified by Next.js build emitting the footer into all 7 static + dynamic routes (`/`, `/privacy`, `/terms`, `/places-fallback`, `/join/[roomId]`, `/s/[sessionId]`, `/_not-found`). Help affordance is a non-interactive `<span aria-disabled="true">Help (coming soon)</span>`; explicitly does NOT render `mailto:support@gettoit.app` until TB-16 ships the mailbox. Footer uses design-system CSS vars only (no orphan hex; `node design-system/scripts/verify.mjs` green). Body became a flex column to anchor the footer with `margin-top: auto` while still flowing inline after long legal articles.
