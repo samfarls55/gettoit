@@ -113,6 +113,19 @@ final class HistoryCollapseState {
     var isOpen: Bool = true
 }
 
+/// bug-36 — small `@Observable` holder for the History `Jump to Item`
+/// search query. Same reasoning as `HistoryCollapseState`: a class
+/// instance held by `@State` lets the unit-test path mutate the value
+/// on a struct PlanListScreen without driving the SwiftUI text-input
+/// path; SwiftUI tracks the class reference and re-renders on change.
+@MainActor
+@Observable
+final class HistorySearchState {
+    /// Current trimmed-or-raw query bound to the inline `TextField`.
+    /// Empty string means "no active filter" — the full list renders.
+    var query: String = ""
+}
+
 @MainActor
 public struct PlanListScreen: View {
 
@@ -419,6 +432,79 @@ public struct PlanListScreen: View {
     /// `"Abandon"`; the warm-friend register uses "leave."
     public static let menuLabelLeavePlan: String = "Leave plan"
 
+    // MARK: - bug-36 — History `Jump to Item` search (threshold-gated)
+
+    /// bug-36 — minimum History row count that earns an inline search
+    /// input. Per `surfaces.md §"Threshold-gated affordances"`, the
+    /// `Jump to Item` pattern is only worth its screen real estate
+    /// once the list crosses a bounded-vs-unbounded gate; below this,
+    /// scroll-and-tap is faster than typing (P-03 Satisficing).
+    /// Default 10 per the surface addendum locked 2026-05-26 in
+    /// workflow-review grill #4.
+    public static let historySearchThreshold: Int = 10
+
+    /// bug-36 — placeholder copy for the History search input. Locked
+    /// per the workflow-design hub register. NEVER `"Find"`, `"Filter"`,
+    /// `"Type to filter"`.
+    public static let historySearchPlaceholder: String = "Search plans"
+
+    /// bug-36 — body label shown in the History section content area
+    /// when an active filter matches zero rows. Distinct from the
+    /// global empty hero (`"No plans yet"`) — the user is filtering,
+    /// not empty-state. Locked per vault spec §"Empty filter result
+    /// state". NEVER `"No results"`, `"Nothing found"`.
+    public static let historySearchEmptyResultLabel: String = "No matching plans"
+
+    /// bug-36 — pure threshold + expand gate. Returns true iff the
+    /// History section earns a search input on this render. Exposed
+    /// statically so the unit-test lane pins the contract without
+    /// walking the view tree.
+    ///
+    /// - Parameters:
+    ///   - historyCount: number of rows in the History bucket.
+    ///   - isOpen: whether the History section is currently expanded.
+    /// - Returns: true when `historyCount >= historySearchThreshold`
+    ///   AND `isOpen` is true. The search input lives between the
+    ///   section header and the first row; it hides with the rest of
+    ///   the section when collapsed (P-09 Spatial Memory — one home
+    ///   for the field).
+    public static func shouldShowHistorySearch(
+        historyCount: Int,
+        isOpen: Bool
+    ) -> Bool {
+        return isOpen && historyCount >= historySearchThreshold
+    }
+
+    /// bug-36 — pure substring-match filter over the History rows.
+    /// Matches the query case-insensitively against `plan.name` OR
+    /// `verdictPlaceName` — the two strings already shown on each
+    /// row. A whitespace-only query is treated as empty and returns
+    /// the full list. Input order is preserved so the host-supplied
+    /// `sortedHistory` order survives the filter.
+    ///
+    /// - Parameters:
+    ///   - rows: the History bucket, already sorted by the host.
+    ///   - query: the raw search field text (whitespace tolerated).
+    /// - Returns: rows whose Plan name or verdict place name contains
+    ///   the trimmed query (case-insensitive). Whitespace-only /
+    ///   empty query returns all rows.
+    public static func filterHistory(
+        _ rows: [PlansStore.DecidedPlanRow],
+        query: String
+    ) -> [PlansStore.DecidedPlanRow] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return rows }
+        let needle = trimmed.lowercased()
+        return rows.filter { row in
+            if row.plan.name.lowercased().contains(needle) { return true }
+            if let place = row.verdictPlaceName,
+               place.lowercased().contains(needle) {
+                return true
+            }
+            return false
+        }
+    }
+
     /// tb-WF-8 — derive the §"Tap behavior" destination for a
     /// Decided / History card tap. Pure value — the host (RootView)
     /// pattern-matches and mounts the right view.
@@ -546,6 +632,20 @@ public struct PlanListScreen: View {
     /// session`. The init hydrates from `UserDefaults` under the
     /// per-user key; the toggle path writes back through the same key.
     @State private var historyState: HistoryCollapseState = HistoryCollapseState()
+
+    /// bug-36 — current History search query. Bound to the inline
+    /// search input rendered only when `shouldShowHistorySearch(...)`
+    /// returns true. A blank value means "no filter active" — the full
+    /// History list renders. Surface-local state; never persisted
+    /// across mounts (per surface §"Threshold-gated affordances" the
+    /// search field is a transient affordance, not a saved query).
+    ///
+    /// Held inside a small `@Observable` class (same pattern as
+    /// `historyState`) so the test-only hook
+    /// `simulateHistorySearchQueryForTest(_:)` can mutate the value
+    /// on a struct PlanListScreen value without mounting a
+    /// UIHostingController.
+    @State private var historySearchState: HistorySearchState = HistorySearchState()
 
     /// tb-WF-9 — which card has its C-25 popover open. Only one menu
     /// is ever open at a time; tapping another trigger replaces the
@@ -1053,6 +1153,13 @@ public struct PlanListScreen: View {
     /// tb-WF-8 — History section. Same 2-line card shape as Decided.
     /// Collapsible — default expanded on first viewing, persisted
     /// per-user via `UserDefaults` (see `historyState` doc).
+    ///
+    /// bug-36 — when `history.count >= historySearchThreshold` AND
+    /// the section is expanded, an inline `Jump to Item` search input
+    /// renders between the section header and the first row. Below
+    /// the threshold or when collapsed, the search input is absent
+    /// (P-03 Satisficing). The search filter is purely client-side —
+    /// the `history` array is already in memory.
     private var historySection: some View {
         VStack(alignment: .leading, spacing: GTISpacing.step3) {
             collapsibleSectionHeader(
@@ -1064,13 +1171,94 @@ public struct PlanListScreen: View {
 
             if historyState.isOpen {
                 VStack(spacing: GTISpacing.step3 - GTISpacing.step1) { // 8pt
-                    ForEach(history) { row in
-                        decidedHistoryButton(row: row)
+                    if Self.shouldShowHistorySearch(
+                        historyCount: history.count,
+                        isOpen: historyState.isOpen
+                    ) {
+                        historySearchField
+                    }
+
+                    let filtered = Self.filterHistory(history, query: historySearchState.query)
+                    if filtered.isEmpty {
+                        historyEmptyFilterPlaceholder
+                    } else {
+                        ForEach(filtered) { row in
+                            decidedHistoryButton(row: row)
+                        }
                     }
                 }
                 .padding(.horizontal, GTISpacing.step6)
             }
         }
+    }
+
+    /// bug-36 — inline `Jump to Item` search input for the History
+    /// section. Borderless `TextField` on the same glass row treatment
+    /// as `SetupScreen.nameField` so no new design primitive is
+    /// introduced. A clear glyph (`xmark.circle.fill`) appears inside
+    /// the field when the query is non-empty; tapping it clears the
+    /// query and re-shows the full History list.
+    private var historySearchField: some View {
+        HStack(spacing: GTISpacing.step3) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                .accessibilityHidden(true)
+
+            TextField(
+                "",
+                text: Binding(
+                    get: { historySearchState.query },
+                    set: { historySearchState.query = $0 }
+                ),
+                prompt: Text(Self.historySearchPlaceholder)
+                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+            )
+            .textFieldStyle(.plain)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(GTIColor.TextOnGradient.primary)
+            .autocorrectionDisabled(true)
+            .textInputAutocapitalization(.never)
+            .submitLabel(.search)
+            .accessibilityIdentifier("planList.history.search.field")
+            .accessibilityLabel(Self.historySearchPlaceholder)
+
+            if !historySearchState.query.isEmpty {
+                Button(action: { historySearchState.query = "" }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("planList.history.search.clear")
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, GTISpacing.step4)
+        .padding(.vertical, GTISpacing.step3)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                .fill(GTIColor.Glass.fillSoft)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
+        .accessibilityIdentifier("planList.history.search.container")
+    }
+
+    /// bug-36 — placeholder shown in the History section content area
+    /// when an active filter matches zero rows. Plain, centered body
+    /// copy — no glass card / icon (the section header still tells
+    /// the user where they are; the filter input is right above).
+    private var historyEmptyFilterPlaceholder: some View {
+        Text(Self.historySearchEmptyResultLabel)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(GTIColor.TextOnGradient.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, GTISpacing.step5)
+            .accessibilityIdentifier("planList.history.search.empty")
     }
 
     /// tb-WF-8 → tb-WF-9 — tappable Decided / History row with the C-25
@@ -1563,5 +1751,14 @@ extension PlanListScreen {
     func simulateLeavePlanConfirm(_ row: PlansStore.JoinedPlanRow) {
         let ctx = ConfirmContext.leave(row: row)
         fireConfirmedAction(for: ctx)
+    }
+
+    /// Test-only hook (bug-36) — seed the History search query. Drives
+    /// the same @State storage the visible TextField binds to, so a
+    /// render-smoke test can mount the filtered shape (matching or
+    /// zero-match) without walking the SwiftUI text-input path.
+    @MainActor
+    func simulateHistorySearchQueryForTest(_ query: String) {
+        historySearchState.query = query
     }
 }
