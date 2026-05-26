@@ -25,6 +25,7 @@
 
 "use client";
 
+import Link from "next/link";
 import { type CSSProperties } from "react";
 
 import {
@@ -161,7 +162,13 @@ export function WebVerdictCard({
  *
  *  `midnight` gradient — calm and final, never a red error register
  *  (Sunset Pop has no red). No CTA: there is nothing the invitee can
- *  do; the body points them at the human who shared the link. */
+ *  do; the body points them at the human who shared the link.
+ *
+ *  wfr-20 — the body still names the human as the next step, but a
+ *  quiet tertiary "Back to GetToIt" link below the body gives the
+ *  stranded invitee a contextual escape hatch to the landing surface,
+ *  duplicating the global wfr-18 GTIMark wordmark link as a
+ *  strict-secondary affordance (Escape Hatch pattern). */
 export function PlanClosedTerminal() {
   return (
     <PostFlowTerminal
@@ -179,7 +186,11 @@ export function PlanClosedTerminal() {
 /** The terminal a web invitee lands on after a confirmed leave
  *  (surface doc §E). No upsell — the web fallback is plumbing, not a
  *  growth surface. No CTA: re-clicking the link is the rejoin path,
- *  and the body copy says so. */
+ *  and the body copy says so.
+ *
+ *  wfr-20 — same quiet tertiary "Back to GetToIt" link as §D. The
+ *  rejoin path is the invite link the invitee already has; this link
+ *  is the GetToIt-home escape hatch for the invitee who is done. */
 export function PlanLeftTerminal() {
   return (
     <PostFlowTerminal
@@ -192,7 +203,21 @@ export function PlanLeftTerminal() {
 
 /** The shared §D / §E post-flow terminal shape — both are calm
  *  `midnight` dead-ends with the bare `"This plan"` eyebrow, a flat
- *  factual headline, and a one-line body. No CTA on either. */
+ *  factual headline, and a one-line body. No primary CTA on either.
+ *
+ *  wfr-20 — Below the body, a contextual "Back to GetToIt" tertiary
+ *  link gives the stranded invitee an Escape Hatch back to the
+ *  landing surface (`/`). It duplicates the destination of the global
+ *  wfr-18 GTIMark wordmark link but lives in body-flow so the user
+ *  whose eye is on the copy ("Ask whoever shared it…" / "Tap the
+ *  link again…") has the home affordance in their gaze.
+ *
+ *  Styled as an `eyebrow`-token tertiary link (uppercase, small,
+ *  white 0.6, no underline, 44pt-tall hit row) — explicitly NOT a
+ *  CTA. It does not compete with the headline for the eye; it sits
+ *  as the same quiet weight as the §E `LeaveConfirmSheet` `STAY`
+ *  dismiss row, so the visual register is consistent across the
+ *  shell's quiet exits. */
 function PostFlowTerminal({
   testId,
   headline,
@@ -207,7 +232,7 @@ function PostFlowTerminal({
       <div style={shellWrap} data-testid={testId}>
         <GTIMark size={20} />
         <div style={shellColumn}>
-          {/* eyebrow → 10 → headline → 12 → body */}
+          {/* eyebrow → 10 → headline → 12 → body → 20 → home link */}
           <div
             className="gti-eyebrow"
             style={{ opacity: 0.6, color: "var(--paper)" }}
@@ -238,6 +263,29 @@ function PostFlowTerminal({
           >
             {body}
           </p>
+          <Link
+            href="/"
+            data-testid={`${testId}-home-link`}
+            aria-label="Back to GetToIt — home"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              alignSelf: "center",
+              minHeight: 44,
+              marginTop: 20,
+              padding: "0 12px",
+              fontFamily: "var(--ff-body)",
+              fontWeight: 700,
+              fontSize: "var(--fz-eyebrow)",
+              letterSpacing: "var(--tr-eyebrow)",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.6)",
+              textDecoration: "none",
+            }}
+          >
+            Back to GetToIt
+          </Link>
         </div>
       </div>
     </GradientSurface>

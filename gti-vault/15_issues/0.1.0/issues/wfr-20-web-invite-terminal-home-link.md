@@ -1,10 +1,11 @@
 ---
 issue: wfr-20
 title: Add home link to InviteShell terminal states
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
+closed: 2026-05-26
 github_issue: 261
 ---
 
@@ -32,3 +33,7 @@ If [[wfr-18-web-gtimark-logo-home-link|wfr-18]] ships first, the global logo hom
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #20.
+
+## Comments
+
+- 2026-05-26 — Closed via PR for `afk/wfr-20`. Added a quiet tertiary `"Back to GetToIt"` link (eyebrow-token, white 0.6, `href="/"`, 44pt hit row) below the body on both `PlanClosedTerminal` (§D) and `PlanLeftTerminal` (§E) in `web/components/InviteShellSurfaces.tsx`. Implemented inside the shared `PostFlowTerminal` helper so both terminals stay byte-identical and gain the Escape Hatch in one place. Duplicates the destination of the global wfr-18 GTIMark wordmark link but lives in body-flow so a stranded invitee whose eye is on the copy ("Ask whoever shared it…" / "Tap the link again…") has the home affordance in their gaze. Same visual register as the §E `LeaveConfirmSheet` `STAY` dismiss row — explicitly NOT a CTA. Surface doc `design-system/surfaces/web-01-invitee-shell.md` §D/§E updated with the new row + amended `No primary CTA` section that distinguishes a Plan-side primary CTA (still forbidden) from a tertiary Escape Hatch link (now warranted). Tests in `web/components/InviteShellSurfaces.test.tsx` cover the link role + href.
