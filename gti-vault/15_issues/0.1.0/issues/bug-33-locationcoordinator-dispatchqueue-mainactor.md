@@ -1,10 +1,11 @@
 ---
 issue: bug-33
 title: Replace DispatchQueue.main.async with Task @MainActor in LocationCoordinator
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 242
 created: 2026-05-25
+closed: 2026-05-26
 ---
 
 # bug-33 — LocationCoordinator uses manual DispatchQueue.main.async for UI hops
@@ -55,3 +56,7 @@ Out of scope:
 ## Surfaced by
 
 `/swift-code-review` against `ios/`, 2026-05-25.
+
+## Comments
+
+- 2026-05-26 — Closed by [#246](https://github.com/samfarls55/gettoit/pull/246). All three `DispatchQueue.main.async` sites replaced with `Task { @MainActor in ... }`. Source-grep regression test added in `LocationCoordinatorTests`. All CI checks green (ios xcodebuild test 4m23s pass). Kept inline-at-each-site style and existing `[weak self]` captures per the issue's stated preference. No wholesale `@MainActor` migration on the type.
