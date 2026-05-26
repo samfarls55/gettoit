@@ -1,10 +1,11 @@
 ---
 issue: bug-30
 title: Replace force-unwraps in SetupScreen.snapDistance
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 239
 created: 2026-05-25
+merged: 2026-05-26
 ---
 
 # bug-30 — SetupScreen.snapDistance force-unwraps
@@ -64,3 +65,16 @@ Out of scope:
 ## Surfaced by
 
 `/swift-code-review` against `ios/`, 2026-05-25.
+
+## Comments
+
+### 2026-05-26 — done (PR #244)
+
+AFK execution closed via [PR #244](https://github.com/samfarls55/gettoit/pull/244) (merged 2026-05-26 00:51 UTC, squash commit `b58c739`).
+
+- Applied the spec body verbatim: `distanceSteps.first ?? 0` and `distanceSteps.last ?? Self.maxDistanceMiles`, lifted into `firstStop` / `lastStop` locals so each optional is only evaluated once.
+- Fallback constants kept inline (not hoisted) — single use, comment cites OPT-001 + bug-30 so the rationale is at the read site.
+- Added `testSnapDistance_bug30AcceptanceCriteria` in `SetupScreenTests.swift` pinning the three exact acceptance cases (`-1` → first, `100` → last, `distanceSteps[2]` passthrough). Existing `testSnapDistanceMaps_endpoints_andInterior` was not touched (regression lock, surgical-changes rule).
+- All CI gates green including `ios (xcodebuild test)`. No design-system / surface change.
+
+Next swift-code-review sweep should find this site clean.

@@ -178,6 +178,17 @@ Eight UI-specific issues from a post-tb-WF-9 dogfood pass. `/grill-with-docs` cl
 | bug-27 | [[issues/bug-27-reroll-broken\|Reroll feature unplumbed — S05 tertiary CTA is dead, S07 sheet never presented]] | done (bug) — PR #237 | AFK | [#227](https://github.com/samfarls55/gettoit/issues/227) | — |
 | bug-28 | [[issues/bug-28-solo-time-badge-audience-copy\|Drop solo audience subtitle entirely]] | done (spec-gap) | AFK | [#228](https://github.com/samfarls55/gettoit/issues/228) | — |
 
+## Swift code-review batch (2026-05-26)
+
+First `/swift-code-review` sweep against `CODING_STANDARDS.md` (just added). Run note: [[../_runs/2026-05-26-0030-swift-code-review|2026-05-26-0030-swift-code-review]]. Four issues filed — all S1 / S2, AFK-ready, independent.
+
+| # | Title | Status | Type | GitHub | Blocked by |
+|---|---|---|---|---|---|
+| bug-30 | [[issues/bug-30-setupscreen-snapdistance-force-unwraps\|Replace force-unwraps in `SetupScreen.snapDistance` (OPT-001)]] | done (bug) — PR #244 | AFK | [#239](https://github.com/samfarls55/gettoit/issues/239) | — |
+| bug-31 | [[issues/bug-31-rerollscreen-reason-switch-exhaustive\|Enumerate `Reason` cases in `RerollScreen.handleSubmit` (ENUM-002)]] | done (bug) — PR #243 | AFK | [#240](https://github.com/samfarls55/gettoit/issues/240) | — |
+| bug-32 | [[issues/bug-32-verdictscreen-mode-switch-exhaustive\|Enumerate mode-snapshot cases in `VerdictScreen.modeSnapshot` (ENUM-002)]] | ready-for-agent | AFK | [#241](https://github.com/samfarls55/gettoit/issues/241) | — |
+| bug-33 | [[issues/bug-33-locationcoordinator-dispatchqueue-mainactor\|Swap `DispatchQueue.main.async` for `Task { @MainActor in ... }` in `LocationCoordinator` (CONC-010)]] | ready-for-agent | AFK | [#242](https://github.com/samfarls55/gettoit/issues/242) | — |
+
 ## Cross-references
 
 - [[testflight-first-dogfood-2026-05-14|Source raw note]] — original first-impression observations
