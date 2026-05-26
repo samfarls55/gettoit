@@ -1,10 +1,11 @@
 ---
 issue: bug-31
 title: Enumerate Reason enum cases in RerollScreen.handleSubmit switch
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 240
 created: 2026-05-25
+merged: 2026-05-26
 ---
 
 # bug-31 — RerollScreen.handleSubmit switch uses default for in-module enum
@@ -55,3 +56,7 @@ Out of scope:
 ## Surfaced by
 
 `/swift-code-review` against `ios/`, 2026-05-25.
+
+## Comments
+
+- 2026-05-26 — AFK execution merged (PR [#243](https://github.com/samfarls55/gettoit/pull/243), squash commit `59c7530`). One-line refactor: `default:` in `RerollScreen.handleSubmit()`'s `switch reason` replaced with explicit `case .cost, .dist, .avail:` (combined-clause shape per the brief's "closer to the current shape" guidance). Behaviour unchanged — all existing reroll tests (`RerollScreenSnapshotTests`, `VerdictRerollHostTests`) pass with no edits. CI `ios (xcodebuild test)` green in 3m51s, all other lanes green. Compile-time safety net is now in place: a future `Reason` case addition will trigger a switch-exhaustiveness warning instead of silently compiling into the no-op branch.
