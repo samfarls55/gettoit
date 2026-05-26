@@ -7,6 +7,8 @@
 import type { Metadata } from "next";
 import "../../design-system/code/tokens.css";
 
+import { Footer } from "../components/Footer";
+
 // `metadataBase` anchors every relative URL emitted into <meta> tags
 // (og:image, twitter:image, canonical, etc.) to the production origin.
 // Apple iMessage's rich-link parser rejects relative paths, so anchoring
@@ -25,7 +27,24 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      {/*
+        The body is a flex column so the global <Footer/> (wfr-10) can
+        sit at the bottom of the viewport on short pages via its
+        `margin-top: auto` rule, while still flowing in source order
+        after long pages (legal docs). `min-height: 100vh` anchors the
+        flex container to the viewport.
+      */}
+      <body
+        style={{
+          margin: 0,
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {children}
+        <Footer />
+      </body>
     </html>
   );
 }
