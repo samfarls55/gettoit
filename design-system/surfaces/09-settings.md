@@ -23,16 +23,23 @@ This surface deliberately does **not** look like a typical settings screen. Ther
 
 ## Components used
 
-`GradientSurface` (midnight stop) · `GTIMark` · `Eyebrow` · display headline (smaller than S01's, 36pt) · body paragraph · `PillCTA` white (DONE primary) · `PillCTA` ghost (DELETE destructive).
+`GradientSurface` (midnight stop) · top-leading `xmark` close glyph (wfr-29) · `Eyebrow` · display headline (smaller than S01's, 36pt) · body paragraph · `PillCTA` ghost (DELETE destructive).
 
-## CTA dock hierarchy (wfr-07, 2026-05-26)
+The GTI mark used to occupy the top-leading slot in the original 0.1.0 spec; wfr-29 gives that slot to the close glyph since the iOS sheet-dismissal habit lives there. The Plan list entry path provides the brand context — there is no risk of users losing where they are after a single tap into a utility surface.
 
-The CTA dock pairs the user's exit verb above the destructive verb:
+## Surface escape — top-leading close glyph (wfr-29, 2026-05-26)
 
-1. **`DONE`** — C-05 PillCTA `white` variant. The visually dominant primary; returning to S01 is the modal action on this surface and the dock's primary slot belongs to it.
-2. **`DELETE MY DATA`** — C-05 PillCTA `ghost` variant (transparent fill, 1.5pt white-0.5 stroke, white text). The destructive treatment lives in the outline + the copy + the native two-step confirm alert, never in a colored fill. The `tokens.md §1.3` no-red contract still governs.
+The surface dismiss verb lives on a top-leading `xmark` SF Symbol icon-button, anchored above the eyebrow on the safe-area inset. Matches the iOS sheet-dismissal convention ([[../../gti-vault/30_design/interaction-patterns/principles#P-07. Habituation|P-07 Habituation]]) — the gesture/affordance users already use to dismiss every other modal-utility surface on the platform works here too. 44pt minimum tap target (Apple HIG); white-at-0.86 opacity so the glyph reads as chrome rather than competing with the eyebrow + headline.
 
-Why ghost (not the white pill, not a red token): the original 0.1.0 spec used the white pill for DELETE because DELETE was the only action on the surface. With DONE now sitting on the dock as the user's primary exit, the white pill belongs to the modal verb (DONE) and the destructive verb demotes to ghost — matching the C-05 `ghost` register PlanDisambigSheet uses for its Solo / Group affordances. The outline reads as "not the primary", the copy reads as "destructive", and the native alert is the consent gate. Sun-fill was not considered — sun is the system's signal for "the system registered your input", never for a destructive action.
+Why an icon, not a text label like the QuizChrome `Back` / `Exit` slots: Quiz is a sequential quiz step — its chrome verbs name the consequence ("back to the previous question", "exit the quiz"). Settings is a utility surface that visually steps out of the Sunset Pop ritual arc (midnight gradient) and reads as a sheet-style escape from the Plan list. The `xmark` glyph carries that "this is the sheet escape" register at a glance.
+
+## CTA dock hierarchy (wfr-07, 2026-05-26 → amended by wfr-29)
+
+After wfr-29 retired the bottom-center DONE PillCTA, the dock holds a single action:
+
+1. **`DELETE MY DATA`** — C-05 PillCTA `ghost` variant (transparent fill, 1.5pt white-0.5 stroke, white text). The destructive treatment lives in the outline + the copy + the native two-step confirm alert, never in a colored fill. The `tokens.md §1.3` no-red contract still governs.
+
+Why ghost (not the white pill, not a red token): the original 0.1.0 spec used the white pill for DELETE because DELETE was the only action on the surface. wfr-07 briefly added a white-pill DONE above it; wfr-29 then moved the dismiss to a top-leading close glyph, so the dock returns to a single action — but the ghost treatment from wfr-07 is preserved so the destructive verb still reads as destructive (not as "the surface's primary"). The outline reads as "not the primary", the copy reads as "destructive", and the native alert is the consent gate. Sun-fill was not considered — sun is the system's signal for "the system registered your input", never for a destructive action.
 
 ## Gradient choice — midnight
 
@@ -48,19 +55,19 @@ Reuses the existing `midnight` gradient stop (`tokens.json` → `gradient.surfac
 - **`"Deletes everything: your sessions, your votes, your taste profile. Rooms you joined keep going — your spot in them clears. Can't be undone."`** — body paragraph. Names exactly what gets removed and what survives (per ADR 0006: cascade-on-participated-rooms means co-participants lose your rows, but the room itself stays alive for the others). The "can't be undone" line is the regret-prevention guardrail; no "are you sure" softening.
 - **`"Delete my data"`** — CTA. First-person possessive, plain verb. Not "Delete account" (corporate), not "Erase me" (cute).
 - **`"Delete forever"` / `"Cancel"`** — native iOS alert buttons. "Forever" is the irreversibility signal in the moment of confirmation. Cancel is default; user has to traverse to the destructive button.
-- **`"Done"`** — primary CTA (returns to S01). Plain, terminal verb. Promoted from a footer mono-tag link to the C-05 white PillCTA in wfr-07.
+- **Close (`xmark`)** — surface dismiss affordance (returns to the Plan list). Top-leading glyph; no text label needed because the iOS sheet-dismissal habit already names it. Replaces the wfr-07 bottom-center "Done" PillCTA per wfr-29.
 
 ## Behavior
 
-1. **Entry:** user taps "SETTINGS" footer link on S01 Initiator (see [[01-initiator|S01 §"Settings footer link"]]).
-2. **Idle state:** surface displays headline, body paragraph, "Delete my data" CTA, "Done" footer link.
+1. **Entry:** user taps the Settings entry on the Plan list (see [[00-plan-list|S00 Plan list]]).
+2. **Idle state:** surface displays top-leading `xmark` close glyph, headline, body paragraph, and the ghost "Delete my data" CTA.
 3. **CTA tap:** native iOS `UIAlertController` (action sheet on iPad, alert on iPhone) presents:
    - Title: `"Delete your data?"`
    - Message: `"This can't be undone."` (terse — the body paragraph already spelled out the consequence)
    - Destructive button: `"Delete forever"`
    - Cancel button: `"Cancel"` (default)
-4. **Confirm:** call `supabase.auth.admin.deleteUser()` (via an Edge function — the iOS client doesn't ship a service-role key). Cascade FKs handle every dependent row. On success, the iOS app immediately bootstraps a fresh anonymous session and returns to S01. On failure, present a non-blocking error toast and stay on S09.
-5. **Cancel or Done:** dismiss back to S01. No state mutation.
+4. **Confirm:** call `supabase.auth.admin.deleteUser()` (via an Edge function — the iOS client doesn't ship a service-role key). Cascade FKs handle every dependent row. On success, the iOS app immediately bootstraps a fresh anonymous session and returns to the Plan list. On failure, present a non-blocking error toast and stay on S09.
+5. **Close glyph or Cancel:** dismiss back to the Plan list. No state mutation.
 
 ## 0.1.0 scope
 
