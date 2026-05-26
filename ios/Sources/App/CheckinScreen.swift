@@ -148,6 +148,12 @@ public struct CheckinScreen: View {
     public static let questionCopy = "Did you go?"
     public static let footerEyebrow = "ONE TAP, THEN WE'RE GONE FOR THE DAY."
 
+    /// wfr-15 — Escape Hatch cancel label for the choice phase. Plain
+    /// voluntary verb per `patterns#Escape Hatch` ("Label it plainly
+    /// — 'Cancel'…"). Matches the dialog/loader Cancel idiom already
+    /// used in JoinScreen (wfr-14) and SettingsScreen's confirm-alert.
+    public static let cancelLabel = "Cancel"
+
     /// `"☼ Got it."` for went; `"Ok — tomorrow."` for skipped;
     /// `"Ok — no worries."` for snoozed.
     ///
@@ -221,9 +227,21 @@ public struct CheckinScreen: View {
 
     @StateObject private var model: Model
     private let onAdvance: () -> Void
+    /// wfr-15 — fires when the user taps the choice-phase Cancel
+    /// chrome glyph. The host clears the check-in route (e.g. pops the
+    /// push-driven sheet) so the user lands back on whatever surface
+    /// they came from. Defaulted to `{}` so existing call sites and
+    /// the snapshot tests keep building. Mirrors `JoinScreen.onCancel`.
+    private let onCancel: () -> Void
 
-    public init(plate: Plate, writer: CheckinWriter, onAdvance: @escaping () -> Void) {
+    public init(
+        plate: Plate,
+        writer: CheckinWriter,
+        onCancel: @escaping () -> Void = {},
+        onAdvance: @escaping () -> Void
+    ) {
         _model = StateObject(wrappedValue: Model(plate: plate, writer: writer))
+        self.onCancel = onCancel
         self.onAdvance = onAdvance
     }
 
@@ -262,10 +280,40 @@ public struct CheckinScreen: View {
 
     private var topBar: some View {
         HStack {
-            Circle()
-                .fill(GTIColor.paper)
-                .frame(width: 16, height: 16)
-                .accessibilityHidden(true)
+            // wfr-15 — Escape Hatch: top-leading Cancel chrome on the
+            // choice phase only. The push-notification entry into this
+            // surface previously trapped the user with no path out
+            // until they committed an outcome; the Escape Hatch
+            // pattern (patterns#Escape Hatch) names exactly that
+            // anti-pattern. Once an outcome is selected — the chip
+            // row, the confirmation plate — the slot reverts to the
+            // decorative GTI mark so the chrome stays balanced and
+            // the user can't bail half-way through the skipped reason
+            // pick. (The skipped reason picker is a continuation of
+            // the tap, not a new commitment — the writer hasn't fired
+            // yet, but the user already chose to engage. Backing out
+            // there would muddle Escape Hatch's single-destination
+            // contract; the chip row's own Done is the commitment
+            // point.)
+            if model.selectedOutcome == nil && !model.committed {
+                Button(action: onCancel) {
+                    Text(CheckinScreen.cancelLabel.uppercased())
+                        .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                        .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                        .padding(.horizontal, 4)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("checkin.cancel")
+                .accessibilityLabel(CheckinScreen.cancelLabel)
+            } else {
+                Circle()
+                    .fill(GTIColor.paper)
+                    .frame(width: 16, height: 16)
+                    .accessibilityHidden(true)
+            }
             Spacer()
             Text("YESTERDAY'S VERDICT")
                 .font(.system(size: GTIFont.Size.eyebrow, weight: .heavy))
@@ -273,6 +321,16 @@ public struct CheckinScreen: View {
                 .foregroundStyle(GTIColor.TextOnGradient.tertiary)
                 .accessibilityIdentifier("checkin.eyebrow")
         }
+    }
+
+    // MARK: - test seams (wfr-15)
+
+    /// Drives the Cancel chrome's closure directly. SwiftUI's `Button`
+    /// doesn't expose an easy programmatic-tap path in unit tests, and
+    /// the closure is the load-bearing contract. Mirrors
+    /// `JoinScreen.simulateCancelTapForTesting`.
+    public func simulateCancelTapForTesting() {
+        onCancel()
     }
 
     private var miniatureRecall: some View {

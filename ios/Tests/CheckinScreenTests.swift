@@ -198,4 +198,58 @@ final class CheckinScreenTests: XCTestCase {
         // constant ms-exact.
         XCTAssertEqual(CheckinScreen.Choreo.fadeUpDuration, 0.320, accuracy: 0.0001)
     }
+
+    // MARK: - Cancel affordance (wfr-15)
+
+    /// Cancel chrome label matches the locked Escape Hatch register —
+    /// plain voluntary verb, same idiom as JoinScreen / SettingsScreen
+    /// alert cancel. patterns#Escape Hatch — "Label it plainly
+    /// ('Cancel', ...)" — keeps lock-step with the other limited-nav
+    /// loaders.
+    func testCancelLabelMatchesEscapeHatchRegister() {
+        XCTAssertEqual(CheckinScreen.cancelLabel, "Cancel")
+    }
+
+    /// AC1 — Cancel surface renders alongside the choice-phase chrome
+    /// without crashing. The visibility check is by-construction: the
+    /// surface's choice-phase top bar wires a Cancel button (mirrors
+    /// the wfr-14 / JoinScreen "render smoke" guard).
+    func testRendersWithCancelWired() {
+        let writer = CaptureWriter()
+        let screen = CheckinScreen(
+            plate: makePlate(),
+            writer: writer,
+            onCancel: { },
+            onAdvance: {}
+        )
+        render(screen)
+    }
+
+    /// AC2 — Tapping Cancel runs the `onCancel` closure and does NOT
+    /// fire the writer (no `check_ins` row is persisted on a cancel).
+    func testCancelTapInvokesOnCancelAndDoesNotWriteCheckin() {
+        let writer = CaptureWriter()
+        var cancelCount = 0
+        let screen = CheckinScreen(
+            plate: makePlate(),
+            writer: writer,
+            onCancel: { cancelCount += 1 },
+            onAdvance: {}
+        )
+        screen.simulateCancelTapForTesting()
+        XCTAssertEqual(cancelCount, 1, "onCancel must fire exactly once")
+        XCTAssertEqual(writer.calls.count, 0, "Cancel must not write a check_ins row")
+    }
+
+    /// Defensive — `onCancel` defaults to a no-op so pre-wfr-15 call
+    /// sites (the existing test fixtures and any future host that
+    /// hasn't wired the seam yet) keep building. Mirrors the
+    /// `LockedScreen.onHome` / `JoinScreen.onCancel` default pattern.
+    func testOnCancelDefaultsToNoOp() {
+        let writer = CaptureWriter()
+        let screen = CheckinScreen(plate: makePlate(), writer: writer, onAdvance: {})
+        // Should not crash and must not corrupt the writer.
+        screen.simulateCancelTapForTesting()
+        XCTAssertEqual(writer.calls.count, 0)
+    }
 }
