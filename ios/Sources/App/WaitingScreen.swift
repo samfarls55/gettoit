@@ -465,6 +465,23 @@ public struct WaitingScreen: View {
                     .accessibilityIdentifier("authChip.error")
             }
 
+            // wfr-27 — render a quiet loading indicator while the
+            // chip-phase is `.loading` (the AuthUpgradeChip itself is
+            // hidden in that phase, so the slot would otherwise sit
+            // empty and read as "dead"). Pattern: *Loading or Progress
+            // Indicators* (gti-vault/30_design/interaction-patterns/
+            // patterns.md). Sits in situ where the chip will appear,
+            // so the user's eye lands on the spinner exactly where
+            // the chip resolves to.
+            if WaitingScreen.shouldRenderChipLoadingIndicator(for: phase) {
+                ProgressView()
+                    .tint(GTIColor.TextOnGradient.primary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .accessibilityIdentifier(WaitingScreen.loadingChipAccessibilityIdentifier)
+                    .accessibilityLabel(Text("Loading"))
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
+
             AuthUpgradeChip(
                 state: chipState,
                 onSave: { Task { await onSaveTapped() } },
@@ -682,6 +699,29 @@ public struct WaitingScreen: View {
     /// production code never calls this.
     public func simulateSessionEndedForTesting() {
         handleSessionEnded()
+    }
+
+    // MARK: - wfr-27 — chip-phase loading indicator
+
+    /// wfr-27 — accessibility identifier locked for the in-situ
+    /// loading indicator rendered during the chip-phase `.loading`
+    /// state. Public so tests can pin the constant against future
+    /// rename drift, mirroring the `leaveChromeLabel` (wfr-17) and
+    /// `sessionEndedToastLabel` (bug-37) lock idiom.
+    public static let loadingChipAccessibilityIdentifier =
+        "waiting.chip.loading"
+
+    /// wfr-27 — pure predicate: only the `.loading` chip phase shows
+    /// the loading indicator. Every other phase (`idle`, `linking`,
+    /// `linked`, `dismissed`, `hidden`) hands the slot back to the
+    /// `AuthUpgradeChip` itself, which renders its own affordance.
+    /// Static so unit tests can exercise the rule without spinning up
+    /// a SwiftUI body, and so the view's render branch stays a single
+    /// readable boolean.
+    public static func shouldRenderChipLoadingIndicator(
+        for phase: ChipPhase
+    ) -> Bool {
+        phase == .loading
     }
 }
 

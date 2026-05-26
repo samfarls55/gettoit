@@ -339,6 +339,53 @@ final class WaitingScreenSnapshotTests: XCTestCase {
         render(view)
     }
 
+    // MARK: - wfr-27 — loading indicator during chip-phase load
+
+    /// wfr-27 — the chip slot's `.loading` phase exposes a locked
+    /// accessibility identifier so the surface signals "data coming"
+    /// instead of rendering nothing. Mirrors the locked-constant idiom
+    /// used for `leaveChromeLabel` (wfr-17) and
+    /// `sessionEndedToastLabel` (bug-37). Defends against future
+    /// rename drift.
+    func testLoadingIndicatorAccessibilityIdentifierIsLocked() {
+        XCTAssertEqual(
+            WaitingScreen.loadingChipAccessibilityIdentifier,
+            "waiting.chip.loading"
+        )
+    }
+
+    /// wfr-27 — the chip slot's `.loading` phase is the one and only
+    /// phase that should render the loading indicator. All other
+    /// phases (idle, linking, linked, dismissed, hidden) leave the
+    /// slot to the AuthUpgradeChip itself, so the spinner doesn't
+    /// leak once the chip has settled. Static predicate keeps the
+    /// rule isolated from the `@State` machinery.
+    func testLoadingIndicatorVisibleOnlyDuringLoadingPhase() {
+        XCTAssertTrue(WaitingScreen.shouldRenderChipLoadingIndicator(for: .loading))
+        XCTAssertFalse(WaitingScreen.shouldRenderChipLoadingIndicator(for: .idle))
+        XCTAssertFalse(WaitingScreen.shouldRenderChipLoadingIndicator(for: .linking))
+        XCTAssertFalse(WaitingScreen.shouldRenderChipLoadingIndicator(for: .linked))
+        XCTAssertFalse(WaitingScreen.shouldRenderChipLoadingIndicator(for: .dismissed))
+        XCTAssertFalse(WaitingScreen.shouldRenderChipLoadingIndicator(for: .hidden))
+    }
+
+    /// wfr-27 — the screen materialises the loading indicator subview
+    /// while the chip-phase is `.loading`. The unit-test auth
+    /// coordinator has no `userID`, so `refreshChipPhase` lands phase
+    /// in `.loading` per the production path. Render-smoke covers the
+    /// new ProgressView subtree without panicking on layout.
+    func testWaitingScreenRendersLoadingIndicatorDuringChipLoad() {
+        let (store, coord) = makeStore(memberCount: 3, answeredCount: 1, isInitiator: true)
+        let view = WaitingScreen(
+            auth: makeAuthCoordinator(),
+            promptStore: makePromptStore(),
+            waitingStore: store,
+            fireCoordinator: coord,
+            appleProvider: StubAppleProvider()
+        )
+        render(view)
+    }
+
     func testLegacyTB12InitializerStillCompiles() {
         // Confirms the no-store WaitingScreen path (TB-12 launch
         // surface) still materialises without crashing. Some callers
