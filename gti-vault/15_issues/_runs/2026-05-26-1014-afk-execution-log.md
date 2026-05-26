@@ -38,7 +38,7 @@ Concurrency cap: 2.
 | wfr-23 | #264 | queued | afk/wfr-23 | - | Q5 final CTA label |
 | wfr-24 | #265 | queued | afk/wfr-24 | - | SetupScreen input hints |
 | wfr-25 | #266 | queued | afk/wfr-25 | - | SetupScreen field-level errors |
-| wfr-26 | #267 | queued | afk/wfr-26 | - | SetupScreen name persistent label |
+| wfr-26 | #267 | merged | afk/wfr-26 | [#307](https://github.com/samfarls55/gettoit/pull/307) | SetupScreen name persistent label |
 | wfr-27 | #268 | queued | afk/wfr-27 | - | WaitingScreen chip-phase loading |
 | wfr-28 | #269 | queued | afk/wfr-28 | - | PlanList action-dot discoverability |
 | wfr-31 | #272 | queued | afk/wfr-31 | - | Places-fallback App Store link |
