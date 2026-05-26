@@ -288,6 +288,89 @@ public struct SetupScreen: View {
         "Optional — we'll prompt later"
     }
 
+    // MARK: - field-level error routing (wfr-25)
+
+    /// wfr-25 — which form field the failure should render against.
+    /// `crossField` keeps the historical top-of-dock placement for
+    /// network / RLS / unknown failures; `name` + `distance` route the
+    /// message inline under the offending control per `patterns.md`
+    /// §"Error Messages" + the run report finding #25.
+    public enum FieldErrorField: Equatable, Sendable {
+        case name
+        case distance
+        case crossField
+    }
+
+    /// wfr-25 — a routed error payload. The view body branches on
+    /// `field` to position the `message`. Voice register is the same
+    /// warm-friend / second-person treatment the rest of the surface
+    /// uses (`patterns.md` §"Error Messages": "name the field, name
+    /// the problem, suggest the fix" + the surface doc's §"Copy
+    /// register"). Never form-field register.
+    public struct FieldError: Equatable, Sendable {
+        public let field: FieldErrorField
+        public let message: String
+
+        public init(field: FieldErrorField, message: String) {
+            self.field = field
+            self.message = message
+        }
+    }
+
+    /// wfr-25 — classify a raw error message into the routing bucket
+    /// the view should use. Pure substring matcher — covers the known
+    /// PostgREST CHECK shapes (`plans_name_check`, `plans_distance_check`)
+    /// and the user-facing column names (`name`, `distance`). Anything
+    /// else falls through to `.crossField` so the historical
+    /// top-of-dock fallback is preserved for network / RLS / unknown
+    /// failures.
+    public static func classifyPersistFailure(messageLike raw: String) -> FieldError {
+        let lower = raw.lowercased()
+        if lower.contains("distance") || lower.contains("distance_meters") {
+            return FieldError(field: .distance, message: distanceErrorCopy())
+        }
+        if lower.contains("name") {
+            return FieldError(field: .name, message: nameErrorCopy())
+        }
+        return FieldError(field: .crossField, message: crossFieldErrorCopy())
+    }
+
+    /// `Error`-overload that forwards to the substring matcher. Uses
+    /// `String(describing:)` to capture both `LocalizedError`
+    /// descriptions and the raw type-name fallback PostgREST returns.
+    public static func classifyPersistFailure(_ error: Error) -> FieldError {
+        let raw: String
+        if let localized = error as? LocalizedError, let description = localized.errorDescription {
+            raw = description
+        } else {
+            raw = String(describing: error)
+        }
+        return classifyPersistFailure(messageLike: raw)
+    }
+
+    /// Name-field error copy. Names the field + names the problem +
+    /// suggests the fix, per `patterns.md` §"Error Messages". The
+    /// 1..40 cap is the only constraint the SQL CHECK enforces.
+    public static func nameErrorCopy() -> String {
+        "Name needs to be 1 to 40 characters."
+    }
+
+    /// Distance-field error copy. The slider's snap-list keeps the
+    /// user inside 0.25..10 mi by construction; this error fires only
+    /// if a server-side CHECK rejects the value (e.g., a future
+    /// tightening of `plans_distance_check`). Polite, plain-language,
+    /// no computerese.
+    public static func distanceErrorCopy() -> String {
+        "Distance is out of range — pick a value between 0.25 and 10 miles."
+    }
+
+    /// Cross-field / network fallback. Stays at top-of-dock per the
+    /// finding #25 routing rule. Polite, names the failure, suggests
+    /// the next step (try again).
+    public static func crossFieldErrorCopy() -> String {
+        "Something went wrong saving the plan. Try again in a moment."
+    }
+
     /// Should the back/cancel gesture mint (or update) the Plan?
     /// Per workflow-overhaul Q11:
     ///   * `.create` with name non-empty → auto-save.
@@ -356,7 +439,13 @@ public struct SetupScreen: View {
         case ready
         case savingPlan
         case launchingRoom
-        case error(String)
+        /// wfr-25 — carries a routed `FieldError` so the view body can
+        /// place the message under the offending control (`.name` /
+        /// `.distance`) or at the top of the dock (`.crossField`) per
+        /// `patterns.md` §"Error Messages". Replaces the previous
+        /// `.error(String)` shape that funnelled every failure to the
+        /// top-of-dock.
+        case error(FieldError)
     }
 
     // MARK: - init
@@ -372,7 +461,8 @@ public struct SetupScreen: View {
         telemetry: TelemetryWriter? = nil,
         onLaunched: ((UUID, UUID) -> Void)? = nil,
         onSaved: ((PlansStore.Plan) -> Void)? = nil,
-        onDiscarded: (() -> Void)? = nil
+        onDiscarded: (() -> Void)? = nil,
+        initialPhase: Phase = .ready
     ) {
         self.mode = mode
         self.groupMode = groupMode
@@ -408,6 +498,30 @@ public struct SetupScreen: View {
         let initialMeters = editingPlan?.distanceMeters ?? Int((SetupScreen.defaultDistanceMiles * SetupScreen.metersPerMile).rounded())
         let initialMiles = SetupScreen.snapDistance(Double(initialMeters) / SetupScreen.metersPerMile)
         _distanceMiles = State(initialValue: initialMiles)
+        _phase = State(initialValue: initialPhase)
+    }
+
+    /// wfr-25 — test seam. Returns a copy of the screen with the
+    /// initial `phase` pre-set to `.error(...)` so render-only tests
+    /// can exercise the field-local + cross-field placement paths
+    /// without driving the network. `internal` so production hosts
+    /// can't reach for it.
+    @MainActor
+    func injectingError(_ fieldError: FieldError) -> SetupScreen {
+        SetupScreen(
+            mode: mode,
+            groupMode: groupMode,
+            plansStore: plansStore,
+            roomStore: roomStore,
+            userID: userID,
+            locationCoordinator: locationCoordinator,
+            editingPlan: editingPlan,
+            telemetry: telemetry,
+            onLaunched: onLaunched,
+            onSaved: onSaved,
+            onDiscarded: onDiscarded,
+            initialPhase: .error(fieldError)
+        )
     }
 
     // MARK: - derived state
@@ -589,6 +703,16 @@ public struct SetupScreen: View {
             // without focus. Overrides the surface doc's original
             // "no truncation indicator" line.
             sectionHint(SetupScreen.nameHintCopy(), id: "setup.name.hint")
+
+            // wfr-25 — field-local error placement. Renders only when
+            // the active phase is `.error(FieldError)` and the routed
+            // field is `.name`. Treatment pairs an SF Symbol warning
+            // glyph (sun-tinted) with the message so the signal is not
+            // color-alone (per `patterns.md` §"Error Messages": "color,
+            // icon, inline message — not color alone").
+            if case .error(let fieldError) = phase, fieldError.field == .name {
+                fieldErrorLabel(fieldError.message, id: "setup.name.error")
+            }
         }
     }
 
@@ -693,6 +817,15 @@ public struct SetupScreen: View {
             // the live value; this hint clarifies the slider's purpose
             // before the user drags it.
             sectionHint(SetupScreen.distanceHintCopy(), id: "setup.distance.hint")
+
+            // wfr-25 — field-local error placement for the distance
+            // slider. The snap-list keeps user input inside the legal
+            // range by construction; this label fires only on a
+            // server-side CHECK rejection (e.g., a future tightening
+            // of `plans_distance_check`).
+            if case .error(let fieldError) = phase, fieldError.field == .distance {
+                fieldErrorLabel(fieldError.message, id: "setup.distance.error")
+            }
         }
     }
 
@@ -701,12 +834,14 @@ public struct SetupScreen: View {
     @ViewBuilder
     private var dock: some View {
         VStack(spacing: GTISpacing.step3) {
-            if case .error(let message) = phase {
-                Text(message)
-                    .font(.system(size: GTIFont.Size.sm, weight: .semibold))
-                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+            // wfr-25 — only cross-field / network failures render at
+            // top-of-dock now. `.name` + `.distance` errors render
+            // inline under their respective controls so the user can
+            // read the problem next to the input that needs fixing
+            // (per `patterns.md` §"Error Messages").
+            if case .error(let fieldError) = phase, fieldError.field == .crossField {
+                fieldErrorLabel(fieldError.message, id: "setup.error")
                     .multilineTextAlignment(.center)
-                    .accessibilityIdentifier("setup.error")
             }
 
             Button(action: tapPrimary) {
@@ -796,6 +931,28 @@ public struct SetupScreen: View {
             .font(.system(size: GTIFont.Size.sm, weight: .regular))
             .foregroundStyle(GTIColor.TextOnGradient.tertiary)
             .accessibilityIdentifier(id)
+    }
+
+    /// wfr-25 — field-level error label. Pairs an SF Symbol warning
+    /// glyph with the message so the signal is icon + text + brand
+    /// color, never color alone. Uses the brand `sun` token (already
+    /// the surface's accent) for the glyph and `TextOnGradient.primary`
+    /// for the body — no new design tokens required. Treatment is
+    /// `sm` semibold to read louder than the adjacent hint while
+    /// staying inside the existing type scale.
+    private func fieldErrorLabel(_ text: String, id: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: GTISpacing.step2) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: GTIFont.Size.sm, weight: .bold))
+                .foregroundStyle(GTIColor.sun)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier(id)
     }
 
     private func setupChip(
@@ -966,7 +1123,7 @@ public struct SetupScreen: View {
                     onLaunched?(room.id, plan.id)
                 }
             } catch {
-                phase = .error("Couldn't start the plan. \(String(describing: error))")
+                phase = .error(SetupScreen.classifyPersistFailure(error))
             }
         }
     }
@@ -983,7 +1140,7 @@ public struct SetupScreen: View {
                 phase = .ready
                 onSaved?(plan)
             } catch {
-                phase = .error("Couldn't save the plan. \(String(describing: error))")
+                phase = .error(SetupScreen.classifyPersistFailure(error))
             }
         }
     }

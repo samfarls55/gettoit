@@ -153,4 +153,33 @@ final class SetupScreenRenderTests: XCTestCase {
         )
         render(makeScreen(mode: .edit, groupMode: .group, editingPlan: plan))
     }
+
+    // MARK: - wfr-25 field-level error placement (snapshot-equivalent)
+
+    /// wfr-25 — each routing bucket renders without crashing. The
+    /// snapshot-equivalent gate here is "the body type-checks and
+    /// materialises with the field-level error wired into the right
+    /// section." `injectingError:` is a test-only seam that
+    /// pre-populates the phase as `.error(...)` so the view body
+    /// branches into the field-level rendering paths.
+    func testNameFieldErrorRenders() {
+        render(
+            makeScreen(mode: .create, groupMode: .group)
+                .injectingError(.init(field: .name, message: "Name needs to be 1 to 40 characters."))
+        )
+    }
+
+    func testDistanceFieldErrorRenders() {
+        render(
+            makeScreen(mode: .create, groupMode: .group)
+                .injectingError(.init(field: .distance, message: "Distance is out of range."))
+        )
+    }
+
+    func testCrossFieldErrorRendersAtDock() {
+        render(
+            makeScreen(mode: .create, groupMode: .group)
+                .injectingError(.init(field: .crossField, message: "Couldn't save the plan."))
+        )
+    }
 }

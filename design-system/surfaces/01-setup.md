@@ -128,6 +128,16 @@ Both dock affordances are inside a `CTADock`. The secondary uses the **same trea
 - **Name required for both dock CTAs.** Both `SAVE FOR LATER` (or `SAVE CHANGES` in edit mode) **and** `Drop the invite link` / `Start the quiz` are disabled until `name.trim().length > 0`.
 - **No other field is gated.** Defaults ship the screen; an initiator who types a name and taps primary mints a valid Plan + room.
 
+### Error placement (wfr-25)
+
+Persistence failures route to the field that failed — the user reads the message next to the input that needs fixing per `patterns.md` §"Error Messages". Cross-field / network failures fall back to the top-of-dock slot reserved for them.
+
+- **Name (`name`) CHECK violation** (e.g., `plans_name_check`, 1..40 char guard) → inline message beneath the name input, prefixed with a sun-tinted `exclamationmark.triangle.fill` glyph so the signal is icon + text + color, never color alone. Copy: `Name needs to be 1 to 40 characters.`
+- **Distance (`distance_meters`) CHECK violation** → inline message beneath the C-21 distance slider, same icon + text treatment. Copy: `Distance is out of range — pick a value between 0.25 and 10 miles.`
+- **Cross-field / network / RLS / unknown** → top-of-dock label, same icon + text treatment. Copy: `Something went wrong saving the plan. Try again in a moment.`
+
+Routing is encoded as a pure classifier (`SetupScreen.classifyPersistFailure(_:)`) so the view body has a single source of truth and the routing is unit-testable independent of the network. The classifier is substring-based against the raw error description (`name`, `distance`, `distance_meters`); anything else falls through to the cross-field bucket.
+
 ### Top-bar back / cancel behavior
 
 Per workflow-overhaul Q11:

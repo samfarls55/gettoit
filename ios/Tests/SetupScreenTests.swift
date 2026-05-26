@@ -394,4 +394,104 @@ final class SetupScreenTests: XCTestCase {
                 "hint copy must not use form-field register — got \(hint)")
         }
     }
+
+    // MARK: - field-level error routing (wfr-25)
+
+    /// wfr-25 — errors are routed to the field that failed (name,
+    /// distance) or kept at the top of the dock for cross-field /
+    /// network failures per `patterns.md` §"Error Messages" + the
+    /// run report finding #25. Routing is encoded as a pure
+    /// classifier so the view body has a single source of truth and
+    /// the routing is unit-testable independent of the network.
+
+    /// PostgREST CHECK violations on the `name` column (1..40 char
+    /// guard) route to the `.name` field. Match is case-insensitive
+    /// substring so any error message mentioning "name" is bucketed
+    /// to the field — the user's signal-to-noise is higher when an
+    /// ambiguous name error sits at the name field than at top-of-dock.
+    func testClassifyFailureRoutesNameErrorsToNameField() {
+        let cases: [String] = [
+            "value too long for type character varying(40)",
+            "name must be 1..40 characters",
+            "plans_name_check violated",
+            "NAME cannot be empty",
+        ]
+        for raw in cases {
+            let classified = SetupScreen.classifyPersistFailure(messageLike: raw)
+            XCTAssertEqual(classified.field, .name,
+                "expected .name routing for \(raw) — got \(classified.field)")
+            XCTAssertFalse(classified.message.isEmpty,
+                "field error message must not be empty")
+        }
+    }
+
+    /// PostgREST CHECK violations on `distance_meters` (>= 0 / sane
+    /// range) route to the `.distance` field. Substring match covers
+    /// both the column name and the user-facing word.
+    func testClassifyFailureRoutesDistanceErrorsToDistanceField() {
+        let cases: [String] = [
+            "distance_meters out of range",
+            "Distance must be positive",
+            "plans_distance_check violated",
+        ]
+        for raw in cases {
+            let classified = SetupScreen.classifyPersistFailure(messageLike: raw)
+            XCTAssertEqual(classified.field, .distance,
+                "expected .distance routing for \(raw) — got \(classified.field)")
+            XCTAssertFalse(classified.message.isEmpty,
+                "field error message must not be empty")
+        }
+    }
+
+    /// Errors that don't match a known field (network failure, RLS
+    /// deny, unknown CHECK) route to the cross-field bucket — the
+    /// top-of-dock fallback. This is the existing v1 behavior; wfr-25
+    /// preserves it for cross-field + network failures explicitly.
+    func testClassifyFailureRoutesUnknownErrorsToCrossField() {
+        let cases: [String] = [
+            "URLError: not connected to the internet",
+            "PostgrestError: row-level security policy denied",
+            "timeout while waiting for response",
+            "",
+        ]
+        for raw in cases {
+            let classified = SetupScreen.classifyPersistFailure(messageLike: raw)
+            XCTAssertEqual(classified.field, .crossField,
+                "expected .crossField routing for \(raw) — got \(classified.field)")
+            XCTAssertFalse(classified.message.isEmpty,
+                "cross-field error message must not be empty")
+        }
+    }
+
+    /// Voice register — all three error copies (name / distance /
+    /// cross-field) must stay in the warm-friend register the surface
+    /// codifies. Never `"required"` / `" field"` (form-field register).
+    /// The word `"error"` is allowed in the cross-field generic copy
+    /// since it names the failure to the user.
+    func testFieldErrorCopyUsesWarmFriendRegister() {
+        let copies = [
+            SetupScreen.classifyPersistFailure(messageLike: "name violates check").message,
+            SetupScreen.classifyPersistFailure(messageLike: "distance out of range").message,
+            SetupScreen.classifyPersistFailure(messageLike: "network down").message,
+        ]
+        for copy in copies {
+            let lower = copy.lowercased()
+            XCTAssertFalse(lower.contains("required"),
+                "error copy must not use form-field register — got \(copy)")
+            XCTAssertFalse(lower.contains(" field"),
+                "error copy must not use form-field register — got \(copy)")
+        }
+    }
+
+    /// Failure-to-route action — `classifyPersistFailure(_:)` takes a
+    /// Swift `Error` and forwards to the substring matcher. Verifies the
+    /// `Error` overload exists and matches the string overload for the
+    /// same underlying message.
+    func testClassifyPersistFailureErrorOverload() {
+        struct FakeError: LocalizedError {
+            var errorDescription: String? { "name must be 1..40 characters" }
+        }
+        let viaError = SetupScreen.classifyPersistFailure(FakeError())
+        XCTAssertEqual(viaError.field, .name)
+    }
 }
