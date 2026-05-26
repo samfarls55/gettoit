@@ -381,17 +381,22 @@ public struct VerdictScreen: View {
             .accessibilityIdentifier("verdict.eyebrow")
     }
 
-    /// bug-22 — top-leading `Home` text verb. Same eyebrow-token
+    /// bug-22 + wfr-16 — top-leading chrome verb. Same eyebrow-token
     /// treatment + 44pt hit row as the QuizChrome `Back` slot. Pure
-    /// navigation — no confirm alert, no session teardown. Top-trailing
-    /// slot is intentionally empty (S05 has no `Exit` counterpart;
-    /// the verdict is not exitable, and the Plan persists by design).
-    /// See `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
+    /// navigation: tap fires `onHome` on group modes (pops to S00 Plan
+    /// list) or `onAdvance` on `.readOnly` (the late-joiner has no
+    /// Plan list — `Done` fires the Solo Setup re-invite path). Top-
+    /// trailing slot is intentionally empty (S05 has no `Exit`
+    /// counterpart; the verdict is not exitable, and the Plan persists
+    /// by design). See `design-system/surfaces/05-verdict.md`
+    /// §"Verdict chrome (Home)".
     @ViewBuilder
     private var homeChromeRow: some View {
+        let label = modeSnapshot.homeChromeLabel
+        let firesAdvance = modeSnapshot.chromeFiresAdvance
         HStack(alignment: .center) {
-            Button(action: onHome) {
-                Text(VerdictScreen.homeChromeLabel.uppercased())
+            Button(action: { firesAdvance ? onAdvance() : onHome() }) {
+                Text(label.uppercased())
                     .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
                     .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
                     .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
@@ -400,7 +405,7 @@ public struct VerdictScreen: View {
                     .contentShape(Rectangle())
             }
             .accessibilityIdentifier("verdict.chrome.home")
-            .accessibilityLabel(VerdictScreen.homeChromeLabel)
+            .accessibilityLabel(label)
             Spacer()
             // Trailing slot empty — S05 has no `Exit` counterpart. The
             // 44pt-square reserved frame preserves vertical rhythm on
@@ -928,13 +933,24 @@ public struct VerdictScreen: View {
         /// render gate; the actual chip state is sourced from the host's
         /// `AuthPromptStore` (hidden when the user is already linked).
         public let showSaveTasteProfileChip: Bool
-        /// bug-22 — render gate for the top-leading `Home` chrome row.
-        /// Rendered on every iOS-reachable mode (`default` / `committed`
-        /// / `solo` / `no-survivor`); suppressed in `.readOnly` because
-        /// the deep-link late-joiner has no Plan-list destination for
-        /// someone else's Plan. See `design-system/surfaces/05-verdict.md`
+        /// bug-22 / wfr-16 — render gate for the top-leading chrome row.
+        /// Rendered on every iOS-reachable mode after wfr-16: `default`
+        /// / `committed` / `solo` / `no-survivor` carry the `Home` verb;
+        /// `.readOnly` carries the `Done` verb (different label,
+        /// different callback). See `design-system/surfaces/05-verdict.md`
         /// §"Verdict chrome (Home)".
         public let showHomeChrome: Bool
+        /// wfr-16 — chrome verb. `Home` on the group modes (pops to S00
+        /// Plan list); `Done` on `.readOnly` (the late-joiner has no
+        /// Plan list, so `Done` fires `onAdvance` instead — the same
+        /// re-invite path the primary CTA uses). Locked by the design-
+        /// system spec §"Verdict chrome (Home)".
+        public let homeChromeLabel: String
+        /// wfr-16 — when true, the chrome tap fires the surface's
+        /// `onAdvance` closure rather than `onHome`. Only `.readOnly`
+        /// flips this on; every other mode pops to S00 Plan list via
+        /// `onHome`.
+        public let chromeFiresAdvance: Bool
     }
 
     /// Mode-shaped flags surfaced for the snapshot tests. Mirrors the
@@ -992,10 +1008,16 @@ public struct VerdictScreen: View {
         // for those flows per TB-12).
         let saveChip = isSolo && !isReadOnly && !isNoSurvivor
 
-        // bug-22 — Home chrome row renders on every iOS-reachable mode
-        // except `.readOnly`. See `design-system/surfaces/05-verdict.md`
-        // §"Verdict chrome (Home)".
-        let homeChrome = !isReadOnly
+        // bug-22 + wfr-16 — chrome row renders on every iOS-reachable
+        // mode. The verb differs: `Home` on the group modes (pops to
+        // S00 Plan list via `onHome`); `Done` on `.readOnly` (the late-
+        // joiner has no Plan list, so the chrome fires `onAdvance` —
+        // the same re-invite path the primary CTA uses). See
+        // `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
+        let homeChrome = true
+        let chromeLabel = isReadOnly
+            ? VerdictScreen.readOnlyChromeLabel
+            : VerdictScreen.homeChromeLabel
 
         return ModeSnapshot(
             showTimeBadge: !isNoSurvivor,
@@ -1009,7 +1031,9 @@ public struct VerdictScreen: View {
             isCommittedFlavor: isCommitted,
             preCheckInLine: preLine,
             showSaveTasteProfileChip: saveChip,
-            showHomeChrome: homeChrome
+            showHomeChrome: homeChrome,
+            homeChromeLabel: chromeLabel,
+            chromeFiresAdvance: isReadOnly
         )
     }
 
@@ -1027,6 +1051,16 @@ public struct VerdictScreen: View {
     /// pattern. NEVER paraphrase. See
     /// `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
     public static let homeChromeLabel = "Home"
+
+    /// wfr-16 — text-only verb for the `.readOnly` chrome slot. The
+    /// late-joiner has no Plan list to land on (the Plan isn't theirs),
+    /// so the chrome cannot honestly read `Home`. `Done` frames the
+    /// chrome tap as "close this read-only snapshot"; it fires
+    /// `onAdvance` (the same Solo Setup re-invite path the primary CTA
+    /// uses), giving every iOS-reachable verdict mode the same top-
+    /// leading escape slot. Same eyebrow-token treatment as `Home`.
+    /// See `design-system/surfaces/05-verdict.md` §"Verdict chrome (Home)".
+    public static let readOnlyChromeLabel = "Done"
 
     /// TB-11 — VO announcement for the suppressed ratification path in
     /// `.readOnly` mode. Locked by

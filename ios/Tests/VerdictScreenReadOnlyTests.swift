@@ -100,18 +100,62 @@ final class VerdictScreenReadOnlyTests: XCTestCase {
             "read-only suppresses the 'Start over' secondary — the re-invite CTA is the only path")
     }
 
-    func testReadOnlyDoesNotShowHomeChrome() {
-        // bug-22 — Home chrome is suppressed on read-only because the
-        // iOS read-only path is reached only via a deep link to a
-        // late-joined Plan; the late-joiner has no Plan list context
-        // for that Plan (it isn't theirs). Per the grill outcome's
-        // "Modes affected" table the read-only mode is unaffected.
+    func testReadOnlyRendersChromeWithDoneLabel() {
+        // wfr-16 — workflow-review found `.readOnly` traps the late-
+        // joiner: no chrome, the primary CTA fires `onAdvance` (Solo
+        // Setup) but VO + reduced-motion users with no obvious dock CTA
+        // visibility have no escape hatch above the eyebrow. Restoring
+        // the chrome row with a `Done` verb (wired to `onAdvance`, not
+        // `onHome`) gives every mode the same top-leading escape slot.
+        // The verb is `Done` (not `Home`) because the late-joiner has
+        // no Plan-list destination — `Done` is the honest verb for
+        // "close this read-only snapshot".
         let snap = VerdictScreen(
             verdict: VerdictScreen.Verdict.fixture(),
             mode: .readOnly
         ).modeSnapshot
-        XCTAssertFalse(snap.showHomeChrome,
-            "read-only suppresses Home — late-joiner has no Plan-list destination for this Plan")
+        XCTAssertTrue(snap.showHomeChrome,
+            "read-only renders the chrome row — escape hatch above the eyebrow")
+        XCTAssertEqual(snap.homeChromeLabel, "Done",
+            "read-only chrome verb is `Done` — honest framing for the late-joiner who has no Plan list")
+    }
+
+    func testNonReadOnlyModesKeepHomeChromeLabel() {
+        // The `Home` verb stays on every iOS-reachable group mode. Only
+        // `.readOnly` swaps to `Done` because it has no Plan-list
+        // destination (per wfr-16 + the design-system spec).
+        for mode in [VerdictScreen.Mode.default, .committed, .solo, .noSurvivor] {
+            let snap = VerdictScreen(
+                verdict: VerdictScreen.Verdict.fixture(),
+                mode: mode
+            ).modeSnapshot
+            XCTAssertEqual(snap.homeChromeLabel, "Home",
+                "non-read-only modes keep the `Home` chrome verb (mode = \(mode))")
+        }
+    }
+
+    func testReadOnlyChromeFiresAdvanceClosure() {
+        // The read-only chrome's `Done` verb is wired to `onAdvance`
+        // (Solo Setup for the late-joiner branch), NOT `onHome`. The
+        // snapshot exposes this so the renderer can pick the right
+        // closure without leaking call-site knowledge into the view.
+        let snap = VerdictScreen(
+            verdict: VerdictScreen.Verdict.fixture(),
+            mode: .readOnly
+        ).modeSnapshot
+        XCTAssertTrue(snap.chromeFiresAdvance,
+            "read-only chrome tap fires `onAdvance` — Home has no honest destination for the late-joiner")
+    }
+
+    func testNonReadOnlyChromeFiresHomeClosure() {
+        for mode in [VerdictScreen.Mode.default, .committed, .solo, .noSurvivor] {
+            let snap = VerdictScreen(
+                verdict: VerdictScreen.Verdict.fixture(),
+                mode: mode
+            ).modeSnapshot
+            XCTAssertFalse(snap.chromeFiresAdvance,
+                "non-read-only chrome (mode = \(mode)) fires `onHome` — pops to S00 Plan list")
+        }
     }
 
     func testReadOnlySuppressesPreCheckInLine() {
@@ -171,6 +215,19 @@ final class VerdictScreenReadOnlyTests: XCTestCase {
             "read-only fixture has 3 receipts when a 4th member (late-joiner) is excluded")
         XCTAssertFalse(v.receipts.contains(where: { $0.name == "you" }),
             "the late-joiner ('you' chip) is not in receipts")
+    }
+
+    // MARK: - snapshot · read-only with chrome rendered (wfr-16)
+
+    func testReadOnlyModeRendersWithChromeRowVisible() {
+        // wfr-16 acceptance — `.readOnly` renders the chrome row above
+        // the eyebrow. Smoke-tests the body materialisation in the
+        // updated mode shape (chrome visible, `Done` verb).
+        let verdict = VerdictScreen.Verdict.fixture()
+        let view = VerdictScreen(verdict: verdict, mode: .readOnly)
+        render(view)
+        XCTAssertTrue(view.modeSnapshot.showHomeChrome)
+        XCTAssertEqual(view.modeSnapshot.homeChromeLabel, "Done")
     }
 
     // MARK: - re-invite CTA wiring
