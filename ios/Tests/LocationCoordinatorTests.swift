@@ -146,4 +146,30 @@ final class LocationCoordinatorTests: XCTestCase {
         XCTAssertEqual(LocationCoordinator.staleAfter, 30 * 60,
             "C-23 spec § Visual spec/States — stale at > 30 min")
     }
+
+    // MARK: - bug-33 — CONC-010 main-actor hop hygiene
+
+    /// bug-33: the three MapKit / CoreLocation callback bodies in
+    /// `LocationCoordinator.swift` used to hop to main via
+    /// `DispatchQueue.main.async`. CODING_STANDARDS rule CONC-010 wants
+    /// structured concurrency (`Task { @MainActor in ... }`) at those
+    /// sites instead. This guards against regression by scanning the
+    /// source file directly — the enclosing class is already
+    /// `@MainActor`, so any manual main-queue hop here is by definition
+    /// a CONC-010 violation.
+    func testLocationCoordinatorHasNoManualMainQueueHops() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()   // ios/Tests
+            .deletingLastPathComponent()   // ios
+            .appendingPathComponent("Sources")
+            .appendingPathComponent("App")
+            .appendingPathComponent("LocationCoordinator.swift")
+
+        let contents = try String(contentsOf: sourceURL, encoding: .utf8)
+        XCTAssertFalse(
+            contents.contains("DispatchQueue.main.async"),
+            "bug-33: LocationCoordinator.swift must not contain DispatchQueue.main.async; "
+                + "use `Task { @MainActor in ... }` per CONC-010."
+        )
+    }
 }
