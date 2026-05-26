@@ -78,11 +78,21 @@ export default function JoinPage({
 }: {
   params: { roomId: string };
 }) {
+  // wfr-30 — <main> flows as a flex child of the body column instead of
+  // sitting `position: fixed; inset: 0` over the page. The wfr-10 global
+  // Footer is a sibling below this <main> in the body's flex column; a
+  // fixed-positioned <main> sat in a separate stacking context and
+  // visually covered the footer, defeating wfr-10's "footer visible on
+  // every web route" acceptance for `/join/[roomId]`. Sized as
+  // `flex: 1; position: relative; min-height: 0` so the absolutely-
+  // positioned `GradientSurface` (`inset: 0`) inside InviteShell still
+  // fills <main> while the Footer renders in the column slot below it.
   return (
     <main
       style={{
-        position: "fixed",
-        inset: 0,
+        flex: 1,
+        position: "relative",
+        minHeight: 0,
       }}
     >
       <InviteShell roomId={params.roomId} />
