@@ -114,6 +114,16 @@ describe("PlanClosedTerminal (web-01 §D)", () => {
       screen.getByTestId("gradient-surface-midnight"),
     ).toBeInTheDocument();
   });
+
+  // wfr-20 — contextual escape hatch back to the landing surface, in
+  // addition to the global GTIMark wordmark home link (wfr-18). Quiet
+  // tertiary link below the body, not a CTA.
+  it("renders a contextual 'Back to GetToIt' link to /", () => {
+    render(<PlanClosedTerminal />);
+    const link = screen.getByTestId("plan-closed-terminal-home-link");
+    expect(link).toHaveAttribute("href", "/");
+    expect(link).toHaveTextContent(/back to gettoit/i);
+  });
 });
 
 // ── §E PlanLeftTerminal ─────────────────────────────────────────────
@@ -137,6 +147,16 @@ describe("PlanLeftTerminal (web-01 §E)", () => {
     expect(
       screen.getByTestId("gradient-surface-midnight"),
     ).toBeInTheDocument();
+  });
+
+  // wfr-20 — contextual escape hatch back to the landing surface, in
+  // addition to the global GTIMark wordmark home link (wfr-18). Quiet
+  // tertiary link below the body, not a CTA.
+  it("renders a contextual 'Back to GetToIt' link to /", () => {
+    render(<PlanLeftTerminal />);
+    const link = screen.getByTestId("plan-left-terminal-home-link");
+    expect(link).toHaveAttribute("href", "/");
+    expect(link).toHaveTextContent(/back to gettoit/i);
   });
 });
 

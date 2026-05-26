@@ -356,14 +356,25 @@ Behavior is locked in the decision doc §Q6.
 | Eyebrow | `eyebrow` token, white 0.6, label `"This plan"` |
 | Headline | `gti-display` (Inter 900), 32px on web, white, `text-wrap: balance`, label `"This plan is closed"` |
 | Body | Inter 600 / 15 / line 1.4, white 0.78, `max-width: 280`, `text-wrap: balance`, label `"This invite has wrapped up. Ask whoever shared it to start a new one."` |
-| Vertical rhythm | wordmark → auto → eyebrow → 10 → headline → 12 → body → auto |
+| Home link (wfr-20) | `eyebrow`-token tertiary link, white 0.6, label `"Back to GetToIt"`, `href="/"`, 44pt-tall hit row, centered |
+| Vertical rhythm | wordmark → auto → eyebrow → 10 → headline → 12 → body → 20 → home link → auto |
 
-### No CTA
+### No primary CTA
 
 Like §C, the terminal has **no primary CTA**. There is nothing the invitee can
-do — no Plan to resume, no account to recover into. A CTA would imply a path
-that does not exist. The body copy points the invitee at the human who shared
-the link, which is the only real next step. Closing the tab is the exit.
+do for *this* Plan — no Plan to resume, no account to recover into. A primary
+CTA would imply a Plan-side path that does not exist. The body copy points the
+invitee at the human who shared the link, which is the only real next step for
+the invite.
+
+The tertiary `Back to GetToIt` link (wfr-20) is a strict-secondary
+[[../../gti-vault/30_design/interaction-patterns/patterns#Escape Hatch|Escape Hatch]]
+back to the landing surface — it duplicates the destination of the global
+wfr-18 GTIMark wordmark link in body-flow so a stranded invitee whose eye is
+on the body copy has the affordance in their gaze. It is not a CTA: same
+visual register as the §E `LeaveConfirmSheet` `STAY` dismiss row
+(eyebrow-token uppercase, white 0.6, no underline), explicitly not the sun
+pill / white pill register reserved for primary actions.
 
 ### Copy register
 
@@ -442,8 +453,9 @@ upsell.** The web fallback is plumbing, not a growth surface
 | Eyebrow | `eyebrow` token, white 0.6, label `"This plan"` |
 | Headline | `gti-display` (Inter 900), 32px on web, white, `text-wrap: balance`, label `"You left this plan"` |
 | Body | Inter 600 / 15 / line 1.4, white 0.78, `max-width: 280`, `text-wrap: balance`, label `"Your answers were removed. Tap the link again any time to rejoin."` |
-| CTA | none — re-clicking the link is the rejoin path (see below); a button here would duplicate the link the invitee already has |
-| Vertical rhythm | wordmark → auto → eyebrow → 10 → headline → 12 → body → auto |
+| CTA | none — re-clicking the invite link is the rejoin path (see below); a button here would duplicate the link the invitee already has |
+| Home link (wfr-20) | `eyebrow`-token tertiary link, white 0.6, label `"Back to GetToIt"`, `href="/"`, 44pt-tall hit row, centered. Shared with §D — same Escape Hatch shape on both post-flow terminals. |
+| Vertical rhythm | wordmark → auto → eyebrow → 10 → headline → 12 → body → 20 → home link → auto |
 
 ### Soft rejoin
 
