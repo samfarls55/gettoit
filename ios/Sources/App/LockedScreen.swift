@@ -27,6 +27,12 @@
 // Reduced motion: force the `fade` variant (no shutter slides, no
 // stamp pop) per `motion.md` §"Reduced motion fallback". The veil +
 // plate still appear, just instantly.
+//
+// wfr-12 — adds a top-leading `Home` text-verb chrome row above every
+// other layer so the user is never trapped on the locked verdict.
+// Foundation P-01 *Safe Exploration*, pattern *Escape Hatch*. Mirrors
+// `VerdictScreen.homeChromeRow` (bug-22) — pure navigation, no
+// session teardown (the verdict is sealed by design).
 
 import SwiftUI
 
@@ -99,10 +105,26 @@ public struct LockedScreen: View {
 
     private let plate: Plate
     private let motionOverride: CloseMotion?
+    /// wfr-12 — fires when the user taps the top-leading `Home` text
+    /// verb in the locked-screen chrome row. Pure navigation: returns
+    /// control to the post-sign-in S00 Plan list via the RootView
+    /// precedence-chain fallback. The locked verdict persists by
+    /// design — `CONTEXT.md` → *Plan / Room lifecycle*: a verdict that
+    /// has locked is sealed against re-litigation, but the user is
+    /// not trapped on the surface (foundation P-01 *Safe Exploration*,
+    /// pattern *Escape Hatch*). Defaults to no-op so the existing
+    /// `LockedScreen(plate:)` and `LockedScreen(plate:motion:)` call
+    /// shapes stay compatible.
+    private let onHome: () -> Void
 
-    public init(plate: Plate, motion: CloseMotion? = nil) {
+    public init(
+        plate: Plate,
+        motion: CloseMotion? = nil,
+        onHome: @escaping () -> Void = {}
+    ) {
         self.plate = plate
         self.motionOverride = motion
+        self.onHome = onHome
     }
 
     /// Resolve which motion variant we play. `reduceMotion` forces
@@ -167,6 +189,24 @@ public struct LockedScreen: View {
                     .padding(.horizontal, GTISpacing.step6)
             }
             .zIndex(5)
+
+            // wfr-12 — Home chrome row. Top-leading text verb mirroring
+            // the VerdictScreen `Home` slot (bug-22 / S05 §"Verdict
+            // chrome (Home)") and the QuizChrome `Back` slot. Sits
+            // above every other surface layer (including the shutters)
+            // so the user is never trapped on the locked verdict.
+            // Foundation P-01 *Safe Exploration*, pattern *Escape
+            // Hatch* — the verdict is sealed against re-litigation
+            // (CONTEXT.md → *Plan / Room lifecycle*) but the user is
+            // not stranded on the surface. Top-trailing slot is
+            // intentionally empty, mirroring S05.
+            VStack(spacing: 0) {
+                homeChromeRow
+                    .padding(.top, GTISpacing.step3)
+                    .padding(.horizontal, GTISpacing.step5)
+                Spacer(minLength: 0)
+            }
+            .zIndex(6)
         }
         .task {
             await runChoreo()
@@ -174,6 +214,35 @@ public struct LockedScreen: View {
     }
 
     // MARK: - subviews
+
+    /// wfr-12 — Home chrome row. Same `Text(...).uppercased()` +
+    /// eyebrow-token treatment as `VerdictScreen.homeChromeRow`, with a
+    /// 44pt hit row (Apple HIG min) and a `Color.clear` reserved
+    /// trailing 44pt frame so the row keeps its vertical rhythm if a
+    /// future affordance lands there.
+    private var homeChromeRow: some View {
+        HStack(alignment: .center) {
+            Button(action: onHome) {
+                Text(LockedScreen.homeChromeLabel.uppercased())
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.78))
+                    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                    .padding(.horizontal, 4)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityIdentifier("locked.chrome.home")
+            .accessibilityLabel(LockedScreen.homeChromeLabel)
+            Spacer()
+            // Trailing slot empty — mirrors S05 verdict chrome. The
+            // 44pt-square reserved frame preserves vertical rhythm on
+            // surfaces that might later acquire a trailing affordance.
+            Color.clear
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 44)
+    }
 
     private var topShutter: some View {
         VStack(spacing: 0) {
@@ -357,5 +426,22 @@ public struct LockedScreen: View {
         if mins < 60 { return mins == 1 ? "1 minute" : "\(mins) minutes" }
         let hrs = mins / 60
         return hrs == 1 ? "1 hour" : "\(hrs) hours"
+    }
+
+    /// wfr-12 — text-only verb on the top-leading chrome slot. Matches
+    /// `VerdictScreen.homeChromeLabel` and the QuizChrome `Back`
+    /// pattern. NEVER paraphrase — the Sunset Pop chrome-row idiom is
+    /// text-only across every reachable surface. See
+    /// `design-system/surfaces/06-hard-close.md` §"Locked chrome (Home)".
+    public static let homeChromeLabel = "Home"
+
+    /// wfr-12 — test seam. The chrome row is a SwiftUI Button bound to
+    /// the private `onHome` closure; SwiftUI tests don't traverse the
+    /// rendered tree to hit-test buttons, so this exposes the closure
+    /// invocation as a public surface for the unit tests. The
+    /// `forTesting` suffix marks it as a test-only contract; the
+    /// production code never calls this.
+    public func simulateHomeTapForTesting() {
+        onHome()
     }
 }

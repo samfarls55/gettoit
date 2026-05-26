@@ -52,6 +52,14 @@ For reduced-motion: omit the shutter slides; the veil + stamp still appear. See 
 - **Punitive feeling.** Sun-yellow edge (not red), mono receipt (not bold warning), language pointing to a path forward.
 - **Confusion.** Lock plate states what happened, when, and how to re-open. The verdict itself is restated so the commitment is intact.
 
+## Locked chrome (Home)
+
+The surface carries a single top-leading `Home` text-verb in the eyebrow-token chrome row, mirroring `surfaces/05-verdict.md` §"Verdict chrome (Home)" and the QuizChrome `Back` slot. Pure navigation — the tap pops the locked screen and returns the user to S00 Plan list via the RootView precedence-chain fallback. No session teardown, no membership mutation: the verdict is sealed by design (`CONTEXT.md` → *Plan / Room lifecycle*), but the user is not trapped on the surface.
+
+The top-trailing slot is intentionally empty — the locked verdict has no `Exit` counterpart because there is nothing to exit (the session already ended). The 44pt-square reserved frame preserves vertical rhythm.
+
+Foundation: P-01 *Safe Exploration*. Pattern: *Escape Hatch* (`patterns#Escape Hatch`).
+
 ## Edge cases
 
 - **All rerolls used.** Footer becomes `"No rerolls left. Tonight is locked."` — flat statement. No re-opening path.

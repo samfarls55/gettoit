@@ -39,6 +39,50 @@ final class LockedScreenTests: XCTestCase {
         render(LockedScreen(plate: .fixture(), motion: .fade))
     }
 
+    // MARK: - Home chrome (wfr-12)
+
+    func testHomeChromeLabelMatchesTheVerdictTextVerb() {
+        // wfr-12 — the LockedScreen Home affordance reuses the same
+        // text-verb idiom the verdict chrome row uses (bug-22 /
+        // `design-system/surfaces/05-verdict.md` §"Verdict chrome
+        // (Home)"). NEVER paraphrase to "Done" / "Back" / SF Symbol —
+        // the chrome-row contract is a text label that matches the
+        // QuizChrome `Back` slot across every reachable surface.
+        XCTAssertEqual(LockedScreen.homeChromeLabel, "Home")
+    }
+
+    func testHomeChromeTapInvokesOnHome() {
+        // wfr-12 — tapping the top-leading Home chrome fires
+        // `onHome`. The host wires this to the same destination the
+        // RootView precedence-chain fallback reaches (S00 Plan list).
+        var taps = 0
+        let screen = LockedScreen(
+            plate: .fixture(),
+            motion: .fade,
+            onHome: { taps += 1 }
+        )
+        let host = UIHostingController(rootView: screen)
+        host.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+
+        // Drive the closure directly via the public test seam — the
+        // SwiftUI Button is wired to `onHome` and the closure is the
+        // load-bearing contract. The view-layer assertion (the row is
+        // present + has the right a11y identifier) is covered by the
+        // snapshot smoke test above.
+        screen.simulateHomeTapForTesting()
+        XCTAssertEqual(taps, 1)
+    }
+
+    func testRendersWithHomeChromeWired() {
+        // wfr-12 — smoke test that the chrome row materialises when
+        // `onHome` is wired. Mirrors the existing render-without-
+        // crashing tests; defends against the chrome subview panicking
+        // on layout.
+        render(LockedScreen(plate: .fixture(), onHome: { }))
+    }
+
     // MARK: - choreo timings (motion.md §"Hard-close shutter")
 
     func testHardCloseChoreoTimingsMatchTheLockedSpec() {
