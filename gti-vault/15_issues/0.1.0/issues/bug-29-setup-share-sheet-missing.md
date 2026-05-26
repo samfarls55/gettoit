@@ -1,12 +1,13 @@
 ---
 issue: bug-29
 title: Group Plan setup never presents share sheet — invitees can never join
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 236
 created: 2026-05-25
 grilled: 2026-05-25
 diagnosed: 2026-05-25
+merged: 2026-05-25
 ---
 
 # bug-29 — Setup share sheet missing
@@ -111,3 +112,7 @@ CI notes (re: `[[feedback_pr_merge_no_ci_gate]]`): no branch protection. Confirm
 ## Surfaced by
 
 User dogfood, 2026-05-25. Diagnosed via iOS source grep + commit history, 2026-05-25.
+
+## Comments
+
+- 2026-05-25 — AFK execution merged (PR [#238](https://github.com/samfarls55/gettoit/pull/238), squash commit `5af039d`). Re-ported `PendingShare` + `ShareSheet` into SetupScreen via a small `@MainActor` test seam (`SetupShareSheetState`, sibling pattern to bug-27's `RerollSheetState`). Solo path unchanged; group / duo path now mints Plan + Room, presents the iOS share sheet, and fires `onLaunched` + `TelemetryWriter.inviteShared(...)` on dismiss (share completed + canceled both advance to Waiting — matches retired InitiatorScreen). `RootView.swift` fossil comment referencing `pendingSetupShare` removed. Placeholder invite token (`UUID().uuidString`) carried forward verbatim from the retired pattern — no `rooms.invite_token` schema column exists, so an edit-mode re-share regenerates the token (URL host + roomID stable, only the query param changes). Cancel-counts-as-shared telemetry quirk left as-is per spec (flag-not-file). New unit tests in `ios/Tests/SetupShareSheetStateTests.swift`. Manual TestFlight smoke verification still pending per `[[project_no_mac_ci_only_ios]]`.
