@@ -31,6 +31,12 @@ import SwiftUI
 
 @MainActor
 public struct QuizQ5NoResults: View {
+    /// wfr-23 — the Q5 no-results primary CTA copy. Pinned to the spec
+    /// in `design-system/surfaces/03-quiz.md` §Q5 ("Head to the
+    /// verdict"). Finish-shaped — differs from the generic Q1..Q4 `Next`
+    /// CTA. `QuizScreenSnapshotTests` defends against paraphrase drift.
+    public static let primaryCTALabel = "Head to the verdict"
+
     let onAdvance: () -> Void
 
     public init(onAdvance: @escaping () -> Void) {
@@ -68,7 +74,7 @@ public struct QuizQ5NoResults: View {
             // Action-shaped per the design system's ban on generic
             // Next / Continue / OK CTAs. Runs the same submit-then-route
             // path as the normal Q5 CTA.
-            QuizPrimaryCTA(label: "Head to the verdict", fill: .sun, action: onAdvance)
+            QuizPrimaryCTA(label: Self.primaryCTALabel, fill: .sun, action: onAdvance)
         }
         .accessibilityIdentifier("quiz.q5.noResults")
     }

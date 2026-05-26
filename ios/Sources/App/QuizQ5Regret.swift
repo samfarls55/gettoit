@@ -17,6 +17,13 @@ import SwiftUI
 
 @MainActor
 public struct QuizQ5Regret: View {
+    /// wfr-23 — the Q5 default-state primary CTA copy. Pinned to the
+    /// spec in `design-system/surfaces/03-quiz.md` §Q5 ("Drop the
+    /// verdict"). The label is finish-shaped — it differs from the
+    /// generic Q1..Q4 `Next` CTA so the final step reads as terminal.
+    /// `QuizScreenSnapshotTests` defends against paraphrase drift.
+    public static let primaryCTALabel = "Drop the verdict"
+
     let coordinator: QuizCoordinator
     let onSubmit: () -> Void
 
@@ -47,7 +54,7 @@ public struct QuizQ5Regret: View {
             Spacer(minLength: 0)
 
             // placeholder: marketing-branding pass
-            QuizPrimaryCTA(label: "Drop the verdict", fill: .sun, action: onSubmit)
+            QuizPrimaryCTA(label: Self.primaryCTALabel, fill: .sun, action: onSubmit)
         }
     }
 

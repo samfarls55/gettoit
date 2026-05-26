@@ -1,7 +1,7 @@
 ---
 issue: wfr-23
 title: Label Q5 final CTA as Get Verdict / Submit
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
@@ -33,3 +33,7 @@ None — can start immediately.
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #23.
+
+## Comments
+
+- 2026-05-26 — Closed via `afk/wfr-23`. Investigated and confirmed both iOS (`QuizQ5Regret.swift`, `QuizQ5NoResults.swift`) and web (`web/components/QuizScreens.tsx`) already render the finish-shaped Q5 CTA copy specced in `design-system/surfaces/03-quiz.md` §Q5 — `"Drop the verdict"` for the default state and `"Head to the verdict"` for the no-results mode. AC #1 (differs from Q1..Q4 generic `Next`) and AC #2 (aligns with marketing-voice / locked design-system copy) were already satisfied in source — the runtime gap was AC #3 (missing test coverage on the literal CTA label that would catch a paraphrase regression). Pinned the two iOS CTA labels as `public static let primaryCTALabel` constants on `QuizQ5Regret` / `QuizQ5NoResults` (mirrors the `QuizScreen.sessionEndedToastLabel` convention introduced for bug-38) and added two locked-copy tests in `ios/Tests/QuizScreenSnapshotTests.swift` under a new `wfr-23 — Q5 final CTA copy is finish-shaped` MARK. Added a paired RTL test in `web/components/QuizScreens.test.tsx` asserting the Q5 default state renders the `"Drop the verdict"` button and never the generic `Next`. No marketing-voice copy change was needed — `40_marketing_branding/` does not yet exist beyond the landing-page positioning note, and the design-system already owns the canonical Q5 copy.
