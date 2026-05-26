@@ -194,6 +194,25 @@ public struct PlanListScreen: View {
     public static let settingsGlyphAccessibilityHint: String =
         "Opens the Settings screen."
 
+    /// wfr-11 — eyebrow copy for the cold-load skeleton. Sentence-case in
+    /// source; the surface renders uppercase via the eyebrow token.
+    /// Neutral verb tense — `"Loading"` does not telegraph "you have
+    /// nothing" the way the empty-state `"No plans yet"` would; the
+    /// register matches the LocationPicker chip's `LOCATING…`
+    /// loading mono-tag.
+    public static let loadingEyebrow: String = "Loading"
+
+    /// wfr-11 — VoiceOver label for the cold-load skeleton container.
+    /// Plain English so a VoiceOver user knows the surface is mid-fetch,
+    /// not empty.
+    public static let loadingAccessibilityLabel: String = "Loading your plans"
+
+    /// wfr-11 — stable accessibility identifier for the cold-load
+    /// skeleton container. UI test harnesses + future audits pin this
+    /// string.
+    public static let loadingContainerAccessibilityIdentifier: String =
+        "planList.loading.container"
+
     // MARK: - pure helpers
 
     /// Empty-state detection (pre-tb-WF-8 shape). Retained for the
@@ -223,6 +242,30 @@ public struct PlanListScreen: View {
             && joined.isEmpty
             && decided.isEmpty
             && history.isEmpty
+    }
+
+    /// wfr-11 — cold-load detection. The skeleton branch renders only
+    /// when (a) the host is mid-fetch AND (b) no rows are cached on
+    /// screen yet. A hot reload (any bucket already populated) keeps
+    /// showing the cached rows — per the pattern-hub guidance, the
+    /// skeleton is for content "that has a known shape" and a known-
+    /// shape miss is the empty-screen-during-fetch anti-pattern. Once
+    /// rows are on screen the user already has the shape; swapping
+    /// them for a skeleton would be a regression, not a fix.
+    public static func isColdLoading(
+        isLoading: Bool,
+        pending: [PlansStore.Plan],
+        joined: [PlansStore.JoinedPlanRow],
+        decided: [PlansStore.DecidedPlanRow],
+        history: [PlansStore.DecidedPlanRow]
+    ) -> Bool {
+        return isLoading
+            && isEmpty(
+                pending: pending,
+                joined: joined,
+                decided: decided,
+                history: history
+            )
     }
 
     /// tb-WF-7 — pure helper that derives the §Q8 destination from a
@@ -443,6 +486,15 @@ public struct PlanListScreen: View {
     /// don't have a real user id can still mount the view (they fall
     /// back to a stable test key).
     private let signedInUserID: UUID?
+    /// wfr-11 — true while the host is mid-fetch on the four Plan-list
+    /// queries (Pending / Joined / Decided / History). Cold-load (this
+    /// flag set + every bucket empty) flips the body to a skeleton
+    /// branch so the user sees motion-free placeholders instead of an
+    /// empty screen. Hot reload (this flag set with cached rows
+    /// already in state) is a no-op visually — the cached rows stay
+    /// on screen, matching the pattern-hub guidance to avoid swapping
+    /// already-painted content for a loader.
+    private let isLoading: Bool
     private let onRequestDisambig: () -> Void
     private let onPickGroupMode: (SetupScreen.GroupMode) -> Void
     private let onTapPlan: (PlansStore.Plan) -> Void
@@ -573,6 +625,7 @@ public struct PlanListScreen: View {
         decided: [PlansStore.DecidedPlanRow] = [],
         history: [PlansStore.DecidedPlanRow] = [],
         signedInUserID: UUID? = nil,
+        isLoading: Bool = false,
         onRequestDisambig: @escaping () -> Void,
         onPickGroupMode: @escaping (SetupScreen.GroupMode) -> Void,
         onTapPlan: @escaping (PlansStore.Plan) -> Void,
@@ -587,6 +640,7 @@ public struct PlanListScreen: View {
         self.decided = decided
         self.history = history
         self.signedInUserID = signedInUserID
+        self.isLoading = isLoading
         self.onRequestDisambig = onRequestDisambig
         self.onPickGroupMode = onPickGroupMode
         self.onTapPlan = onTapPlan
@@ -631,7 +685,21 @@ public struct PlanListScreen: View {
             GTIGradient.surface(.initiator)
                 .ignoresSafeArea()
 
-            if Self.isEmpty(pending: pending, joined: joined, decided: decided, history: history) {
+            if Self.isColdLoading(
+                isLoading: isLoading,
+                pending: pending,
+                joined: joined,
+                decided: decided,
+                history: history
+            ) {
+                // wfr-11 — cold load: rows haven't arrived yet on first
+                // mount (or a refresh after a sign-out/sign-in). Render
+                // skeleton placeholders in the Pending slot so the user
+                // sees motion-free `glass` rows instead of an empty
+                // screen. Suppress the FAB — there's nothing to act on
+                // and an early tap would race the fetch.
+                loadingState
+            } else if Self.isEmpty(pending: pending, joined: joined, decided: decided, history: history) {
                 emptyState
             } else {
                 populatedState
@@ -692,6 +760,68 @@ public struct PlanListScreen: View {
                   case (nil, nil):       return false
                   }
               }
+    }
+
+    // MARK: - loading state
+
+    /// wfr-11 — cold-load skeleton. Renders the standard top chrome
+    /// (GTI mark + settings glyph) so the user can still reach
+    /// Settings during a slow fetch, then a `Pending` section header
+    /// over three glass placeholder rows. The rows match the 1-line
+    /// Pending card shape (`64pt minHeight`, `GTIRadii.card`,
+    /// `GTIColor.Glass.fillSoft`) so the layout doesn't visibly jump
+    /// when the real rows arrive. No animation — the surface honours
+    /// motion.md's no-pulse register; the visual hierarchy (eyebrow
+    /// label + glass rows) carries the "mid-fetch" moment without
+    /// competing for attention.
+    private var loadingState: some View {
+        VStack(spacing: 0) {
+            topBar
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(Self.loadingEyebrow.uppercased())
+                    .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                    .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                    .padding(.horizontal, GTISpacing.step6)
+                    .padding(.top, GTISpacing.step5)
+                    .accessibilityIdentifier("planList.loading.eyebrow")
+
+                VStack(spacing: GTISpacing.step3 - GTISpacing.step1) { // 8pt — matches Pending row gap
+                    ForEach(0..<3, id: \.self) { _ in
+                        skeletonRow
+                    }
+                }
+                .padding(.horizontal, GTISpacing.step6)
+                .padding(.top, GTISpacing.step3)
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityIdentifier(Self.loadingContainerAccessibilityIdentifier)
+        .accessibilityLabel(Self.loadingAccessibilityLabel)
+        .accessibilityAddTraits(.updatesFrequently)
+    }
+
+    /// wfr-11 — single skeleton row matching the 1-line Pending card
+    /// envelope (`GTIRadii.card`, `GTIColor.Glass.fillSoft`, 64pt
+    /// min-height). No inner glyph or text — the shape itself is the
+    /// placeholder; this keeps the load state visually quiet next to
+    /// the empty hero, and avoids the "per-pixel skeleton that
+    /// misleads the user about content shape" anti-pattern called out
+    /// in the pattern-hub spec.
+    private var skeletonRow: some View {
+        RoundedRectangle(cornerRadius: GTIRadii.card, style: .continuous)
+            .fill(GTIColor.Glass.fillSoft)
+            .frame(minHeight: 64)
+            .frame(height: 64)
+            .overlay(
+                RoundedRectangle(cornerRadius: GTIRadii.card, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            )
+            .accessibilityHidden(true)
     }
 
     // MARK: - empty state
