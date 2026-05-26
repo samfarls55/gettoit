@@ -23,13 +23,15 @@ const VERDICT_CHOREO = {
 // path produces the same suppressed-receipt-row + save-taste-profile
 // render. See `surfaces/05-verdict.md` §"solo".
 //
-// bug-22 — the `Home` chrome row (top-leading text verb) renders on
-// every iOS-reachable mode (`default` / `committed` / `solo` /
-// `no-survivor`). Suppressed on `read-only` because the late-joiner
-// has no Plan-list destination for someone else's Plan. Pure
-// navigation — the tap pops the caller back to S00 Plan list with no
-// session teardown, no membership mutation. Spec: `surfaces/05-verdict.md`
-// §"Verdict chrome (Home)".
+// bug-22 + wfr-16 — the chrome row (top-leading text verb) renders on
+// every iOS-reachable mode. The verb differs: `Home` on the group
+// modes (`default` / `committed` / `solo` / `no-survivor`) — tap pops
+// to S00 Plan list via `onHome`, pure navigation, no session teardown,
+// no membership mutation. `Done` on `read-only` — the late-joiner has
+// no Plan-list destination for someone else's Plan, so the chrome
+// can't honestly read `Home`; tap fires `onAdvance` (same Solo Setup
+// re-invite path as the primary `Start a new decision` CTA). Spec:
+// `surfaces/05-verdict.md` §"Verdict chrome (Home / Done)".
 function ScreenVerdict({
   mode = 'default',
   isInitiator = true,
@@ -99,15 +101,15 @@ function ScreenVerdict({
   // Solo suppresses receipts — one voice doesn't need to be receipted
   // back to itself. The group-default still surfaces the row.
   const showReceipts = !isNoSurvivor && !isSolo;
-  // bug-22 — `Home` chrome row surfaces on every iOS-reachable mode
-  // except `read-only`. Web `read-only` invitees have no Plan-list
-  // destination per the Web invitee definition in CONTEXT.md, and the
-  // iOS `read-only` mode (deep-link late-joiner) is reached only for a
-  // Plan that does not belong to the late-joiner, so a Home verb has
-  // no honest target there either. The retired `Start over` tertiary
-  // is removed in every mode — the affordance moves into the chrome
-  // row, never duplicated.
-  const showHomeChrome = !isReadOnly;
+  // bug-22 + wfr-16 — chrome row surfaces on every iOS-reachable mode.
+  // The verb differs: `Home` on the group modes (pops to S00 Plan list
+  // via `onHome`); `Done` on `read-only` (fires `onAdvance` — the late-
+  // joiner has no Plan-list destination, so the chrome runs Solo Setup
+  // instead). The retired `Start over` tertiary is removed in every
+  // mode — the affordance moves into the chrome row, never duplicated.
+  const showHomeChrome = true;
+  const chromeLabel = isReadOnly ? 'Done' : 'Home';
+  const onChromeTap = isReadOnly ? onAdvance : onHome;
   // Solo replaces the group-save affordance with the C-22 save-taste-
   // profile chip. The chip surfaces under the primary CTA when the user
   // is anonymous; the host hides it for already-linked users.
@@ -118,16 +120,17 @@ function ScreenVerdict({
       <div className="gti-canvas">
         <div className="content">
 
-          {/* bug-22 — Home chrome row. Top-leading text verb sitting
+          {/* bug-22 + wfr-16 — chrome row. Top-leading text verb sitting
               above the eyebrow, mirroring the `Back` slot in the quiz
               chrome (surfaces/03-quiz.md §"Quiz chrome (Back + Exit)").
               Same eyebrow-token treatment (Inter 700 / 11 / 0.18em /
               UPPERCASE / white 0.78), pure text label, 44pt min hit
-              row. Pure navigation — no confirm alert, no session
-              teardown. Top-trailing slot is intentionally absent
-              (S05 has no `Exit` counterpart; the verdict is not
-              exitable, and the Plan persists by design).
-              Suppressed on `read-only`. */}
+              row. `Home` on group modes (pure navigation back to S00
+              Plan list — no confirm alert, no session teardown). `Done`
+              on `read-only` (fires Solo Setup re-invite — the late-
+              joiner has no Plan-list destination). Top-trailing slot is
+              intentionally absent (S05 has no `Exit` counterpart; the
+              verdict is not exitable). */}
           {showHomeChrome && (
             <div
               role="navigation"
@@ -140,8 +143,8 @@ function ScreenVerdict({
               }}
             >
               <button
-                onClick={onHome}
-                aria-label="Home"
+                onClick={onChromeTap}
+                aria-label={chromeLabel}
                 style={{
                   appearance: 'none', background: 'transparent', border: 0, cursor: 'pointer',
                   minHeight: 44, minWidth: 44,
@@ -153,7 +156,7 @@ function ScreenVerdict({
                   lineHeight: 1,
                   textAlign: 'left',
                 }}
-              >Home</button>
+              >{chromeLabel}</button>
             </div>
           )}
 

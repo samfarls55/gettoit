@@ -13,19 +13,19 @@ jsx:
 
 The screen this whole product exists to deliver. One verdict, where + when + who, with the rule that produced it and the receipts that prove it came from the inputs.
 
-## Verdict chrome (Home)
+## Verdict chrome (Home / Done)
 
-Every iOS-reachable verdict mode carries a single text-label affordance above the eyebrow: a `Home` link top-leading, mirroring the `Back` slot in the quiz `QuizChrome` (`surfaces/03-quiz.md` §"Quiz chrome (Back + Exit)"). The top-trailing slot is intentionally empty — S05 has no `Exit` counterpart because the verdict is not exitable; the Plan persists by design (per `CONTEXT.md` → *Plan / Room lifecycle*).
+Every iOS-reachable verdict mode carries a single text-label affordance above the eyebrow, mirroring the `Back` slot in the quiz `QuizChrome` (`surfaces/03-quiz.md` §"Quiz chrome (Back + Exit)"). The top-trailing slot is intentionally empty — S05 has no `Exit` counterpart because the verdict is not exitable; the Plan persists by design (per `CONTEXT.md` → *Plan / Room lifecycle*).
 
 ### Per-mode render rules
 
-| Mode | Home chrome |
-|---|---|
-| `default` | Rendered |
-| `committed` | Rendered |
-| `solo` | Rendered |
-| `no-survivor` | Rendered |
-| `read-only` | **Omitted** — the iOS read-only path is reached only via a deep link to someone else's Plan and the Web invitee has no Plan list (per the *Web invitee* definition in `CONTEXT.md`); a Home verb has no honest destination in either branch |
+| Mode | Chrome verb | Tap |
+|---|---|---|
+| `default` | `Home` | Pops to S00 Plan list (`onHome`) |
+| `committed` | `Home` | Pops to S00 Plan list (`onHome`) |
+| `solo` | `Home` | Pops to S00 Plan list (`onHome`) |
+| `no-survivor` | `Home` | Pops to S00 Plan list (`onHome`) |
+| `read-only` | `Done` | Fires Solo Setup re-invite (`onAdvance`) — the late-joiner has no Plan-list destination for someone else's Plan, so the chrome cannot honestly read `Home`. `Done` frames the chrome as "close this read-only snapshot"; tap lands the late-joiner on Solo Setup as initiator of their own next session (wfr-16) |
 
 ### Placement + treatment
 
@@ -42,8 +42,9 @@ Every iOS-reachable verdict mode carries a single text-label affordance above th
 
 ### Behavior
 
-- **`Home`.** Tap **pops to S00 Plan list**. Pure navigation — no confirm alert, no session teardown, no membership mutation. The room is already closed at verdict (per `CONTEXT.md` → *Plan / Room lifecycle*), so there is nothing to tear down. The verdicted Plan stays on the user's list in the **Decided** section in `decided-active` state — tapping it from the Plan list returns the user to this same verdict surface.
-- **No correctability impact.** Home does not consume a reroll budget and is not a re-decide path. The reroll path (with its 3-burn cap, stated-reason friction, and initiator-only gate per S07) remains the only way to re-decide a Plan after the verdict.
+- **`Home`** (group modes — `default` / `committed` / `solo` / `no-survivor`). Tap **pops to S00 Plan list**. Pure navigation — no confirm alert, no session teardown, no membership mutation. The room is already closed at verdict (per `CONTEXT.md` → *Plan / Room lifecycle*), so there is nothing to tear down. The verdicted Plan stays on the user's list in the **Decided** section in `decided-active` state — tapping it from the Plan list returns the user to this same verdict surface.
+- **`Done`** (`.readOnly` only). Tap fires `onAdvance` — the same Solo Setup re-invite path the primary `Start a new decision` CTA uses. There is no Plan list to pop to (the Plan isn't the late-joiner's); `Done` is the honest verb. No confirm alert, no session teardown.
+- **No correctability impact.** Neither verb consumes a reroll budget and neither is a re-decide path. The reroll path (with its 3-burn cap, stated-reason friction, and initiator-only gate per S07) remains the only way to re-decide a Plan after the verdict.
 - **No-survivor is no exception.** Even though `no-survivor` is the terminal failure mode, Home is pure navigation: the Plan returns to the user's list in its decided-failure state. The initiator's `Widen radius` CTA (and any subsequent re-run) is the only path that mutates the Plan's verdict.
 
 ### What this affordance replaces
@@ -88,7 +89,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 |---|---|
 | `default` | Home chrome row above the eyebrow. CTA reads `"I'm in"`, white fill. CTA dock secondary slot empty pre-commit. |
 | `committed` | Home chrome row above the eyebrow. CTA flipped to `"You're in · 3 of 4"`, **sun fill** with ink check prefix. Below: `"Window closes in 47s"` (status, not a verb). |
-| `read-only` | Late-joiner mode. **No chrome row** (Home omitted — see §"Verdict chrome (Home)"). Eyebrow `"Tonight's verdict"` (past-tense-implicit). Hero + meta + time badge + rule chip + voice receipts (late-joiner not in receipts — they didn't contribute). Suppressed: ratification CTA, reroll affordance. Primary CTA is `"Start a new decision"` (white pill). |
+| `read-only` | Late-joiner mode. Chrome row reads `Done` (wfr-16 — fires `onAdvance` / Solo Setup; see §"Verdict chrome (Home / Done)"). Eyebrow `"Tonight's verdict"` (past-tense-implicit). Hero + meta + time badge + rule chip + voice receipts (late-joiner not in receipts — they didn't contribute). Suppressed: ratification CTA, reroll affordance. Primary CTA is `"Start a new decision"` (white pill). |
 | `no-survivor` | Terminal — engine exited with no candidates after soft-pref relax. Home chrome row above the eyebrow. Eyebrow `"Tonight"`. Hero `"NO SPOT / FITS"` (one word per line). Meta line names the hard-need vetoes that survived (`"Vegan options · $$ cap · 15 min walk"`). No time badge. Rule chip is the load-bearing message in aggregate-rule register. Suppressed: voice receipts, ratification CTA, reroll. Primary CTA `"Widen radius"` (sun-fill, initiator-only); non-initiators see the chrome `Home` as their only exit. |
 | `solo` | Single-member room. Triggered when `members.length === 1` AND the initiator did not share an invite (the share sheet never opened). Home chrome row above the eyebrow. Eyebrow `"Tonight, the verdict is"` (same definite article as `default` — the singular voice still produced a verdict). Hero + meta + time badge + rule chip + `I'm in` CTA + reroll tertiary all present. **Suppressed:** voice-receipt row (one voice doesn't need to be receipted back to itself). **Replaced:** the `default` mode's save-group affordance is replaced with the **save-taste-profile** affordance (the C-22 Auth Upgrade Chip from TB-12, copy `"Save this taste profile"`). The chip surfaces under the primary CTA in `default-idle` state for anonymous users; suppressed for already-linked users. Time badge renders the timestamp only — no audience subtitle. The communal frame self-cancels with `N = 1`; the solo voter already knows it's them. |
 
@@ -126,7 +127,7 @@ In `read-only` mode the sequence is the same except the CTA fade-up at 1380ms la
 
 ### `read-only`
 
-- The Home chrome row is **omitted** — see §"Verdict chrome (Home)". The iOS read-only path is reached only via a deep link to someone else's Plan (the Plan is not on the late-joiner's list), and the Web invitee has no Plan list at all (per the *Web invitee* definition in `CONTEXT.md`).
+- The chrome row reads `Done`, not `Home` — see §"Verdict chrome (Home / Done)". The iOS read-only path is reached only via a deep link to someone else's Plan (the Plan is not on the late-joiner's list), and the Web invitee has no Plan list at all (per the *Web invitee* definition in `CONTEXT.md`), so a `Home` verb has no honest destination. `Done` fires `onAdvance` — the same Solo Setup re-invite path the primary `Start a new decision` CTA uses. Restoring this chrome closed the workflow-review wfr-16 finding (the late-joiner had no escape hatch above the eyebrow before that fix).
 - Triggered when a user taps the invite link **after** `rooms.verdict_committed_at` is non-null.
 - Voice-receipt row shows only members who answered before commit. The late-joiner's chip does not appear.
 - Primary CTA `"Start a new decision"` returns the user to S01 as the new initiator. Defaults are pre-populated from the prior room's `timer_minutes` + `radius_meters` (saves a tap; they're likely planning a similar outing).
