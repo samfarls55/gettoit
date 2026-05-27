@@ -7,21 +7,26 @@
 // `design-system/code/screens/ScreenSettings.jsx`.
 //
 // Visual: midnight gradient (reuses the registered `midnight` stop —
-// no new tokens), GTI mark top-left, eyebrow + smaller display
-// headline + body paragraph + CTA dock.
+// no new tokens), top-leading `xmark` close glyph (wfr-29), eyebrow +
+// smaller display headline + body paragraph + CTA dock.
 //
-// CTA dock (wfr-07, 2026-05-26): DONE is the visually dominant white
-// PillCTA (C-05 white variant); DELETE MY DATA renders below it in the
-// C-05 ghost destructive treatment (transparent fill, 1.5pt white-0.5
-// stroke, white text). The no-red contract from `tokens.md §1.3`
-// governs — destructive weight lives in the outline + copy + the
-// native two-step confirm alert, never in a colored fill.
+// Surface escape (wfr-29, 2026-05-26): a top-leading `xmark` SF Symbol
+// icon-button replaces the prior bottom-center DONE PillCTA. Matches
+// the iOS sheet-dismissal convention (P-07 Habituation); the close
+// glyph owns the dismiss verb so the bottom dock holds only the
+// destructive action.
+//
+// CTA dock (wfr-07, 2026-05-26 → amended by wfr-29): DELETE MY DATA
+// renders alone in the C-05 ghost destructive treatment (transparent
+// fill, 1.5pt white-0.5 stroke, white text). The no-red contract from
+// `tokens.md §1.3` governs — destructive weight lives in the outline +
+// copy + the native two-step confirm alert, never in a colored fill.
 //
 // Behavior: tap "Delete my data" → native iOS confirm alert → on
 // confirm: `AuthCoordinator.deleteAndReboot()` (calls the delete-user
 // Edge function, bootstraps a fresh anonymous session) → host
-// navigates back to S01. On failure: present a non-blocking error
-// message on the surface; user can retry or tap Done.
+// navigates back to S00. On failure: present a non-blocking error
+// message on the surface; user can retry or tap the close glyph.
 //
 // All color, type, spacing, motion comes from `GTITokens.swift` — per
 // repo CLAUDE.md, never inline hex/px/easing.
@@ -57,19 +62,43 @@ public struct SettingsScreen: View {
         case error(String)
     }
 
-    /// Locked visual hierarchy contract for S09 (wfr-07). Encoded on
-    /// the type so SettingsScreenTests can pin the post-wfr-07 register
-    /// without walking the view tree. A regression that re-promotes
-    /// DELETE to the white-pill register cannot ship without flipping
-    /// these flags — at which point the tests fail and reviewers can
-    /// challenge the change against `surfaces/09-settings.md`.
+    /// Locked visual hierarchy contract for S09 (wfr-07, wfr-29).
+    /// Encoded on the type so SettingsScreenTests can pin the surface
+    /// register without walking the view tree. A regression that
+    /// re-promotes DELETE to the white-pill register, drops the
+    /// top-leading close glyph, or re-introduces a bottom DONE pill
+    /// cannot ship without flipping these flags — at which point the
+    /// tests fail and reviewers can challenge the change against
+    /// `surfaces/09-settings.md`.
     public enum Style {
-        /// C-05 PillCTA variants used on S09 after wfr-07.
+        /// C-05 PillCTA variants used on S09.
         public enum PillFill: Equatable { case white, ghost }
 
-        /// DONE renders as the C-05 white PillCTA — the visually
-        /// dominant primary that returns the user to S01.
-        public static let donePillFill: PillFill = .white
+        /// wfr-29 — the close-affordance anchor on the surface. Encoded
+        /// as a plain enum (not SwiftUI's `Alignment`) so the contract
+        /// is testable without view-tree introspection.
+        public enum CloseAnchor: Equatable { case topLeading, topTrailing }
+
+        // MARK: wfr-29 — top-leading close affordance
+
+        /// SF Symbol used for the top-leading close glyph. `xmark` is
+        /// the iOS sheet-dismissal convention (P-07 Habituation).
+        public static let closeSymbolName: String = "xmark"
+
+        /// Anchor for the close affordance. Top-leading matches the
+        /// iOS sheet-dismissal convention; a regression that flips it
+        /// to top-trailing (Quiz `Exit` slot) must trip this contract.
+        public static let closeAlignment: CloseAnchor = .topLeading
+
+        /// Apple HIG minimum tap-target — 44pt. Matches the
+        /// QuizChrome / VerdictReadOnly chrome convention.
+        public static let closeMinTapTarget: CGFloat = 44
+
+        /// wfr-29 retired the bottom-center DONE PillCTA. The
+        /// top-leading close glyph owns the dismiss verb.
+        public static let rendersBottomDonePill: Bool = false
+
+        // MARK: wfr-07 — DELETE ghost destructive treatment
 
         /// DELETE MY DATA renders in the C-05 ghost destructive
         /// treatment — transparent fill, 1.5pt white-0.5 stroke, white
@@ -89,15 +118,11 @@ public struct SettingsScreen: View {
         /// only state color in Sunset Pop.
         public static let usesRedDestructiveColor: Bool = false
 
-        /// CTA dock render order — lower = closer to the top of the
-        /// dock. DONE (primary) renders above DELETE (secondary) so
-        /// the dominant action sits closest to the thumb dock.
-        public static let donePrimaryOrder: Int = 0
-        public static let deleteSecondaryOrder: Int = 1
+        // MARK: copy register
 
         /// Two-step confirm alert copy preserved from the original
-        /// surface spec — wfr-07 changes the visual register of the
-        /// trigger only, never the consent flow.
+        /// surface spec — wfr-07 / wfr-29 change the visual register
+        /// of the surface only, never the consent flow.
         public static let confirmAlertTitle: String = "Delete your data?"
         public static let confirmAlertMessage: String = "This can't be undone."
         public static let confirmAlertDestructiveLabel: String = "Delete forever"
@@ -105,7 +130,7 @@ public struct SettingsScreen: View {
     }
 
     public var body: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             GTIGradient.surface(.midnight)
                 .ignoresSafeArea()
 
@@ -146,6 +171,12 @@ public struct SettingsScreen: View {
             .padding(.top, GTISpacing.step16)
             .padding(.bottom, GTISpacing.step6)
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            // wfr-29 — top-leading `xmark` close glyph owns the
+            // surface dismiss. Replaces the prior bottom-center DONE
+            // PillCTA so the iOS sheet-dismissal habit (P-07
+            // Habituation) governs the escape verb on S09.
+            closeButton
         }
         .alert(
             Style.confirmAlertTitle,
@@ -174,36 +205,37 @@ public struct SettingsScreen: View {
                     .accessibilityIdentifier("settings.error")
             }
 
-            // DONE — C-05 white PillCTA, the visually dominant primary.
-            // wfr-07 promoted this from the mono-tag footer link to the
-            // canonical white pill so the user's exit verb is the most
-            // prominent action on the surface.
-            donePill
-
             // DELETE MY DATA — C-05 ghost destructive treatment. The
             // outline + copy + native two-step confirm alert carry the
             // destructive weight per `tokens.md §1.3` (no red).
+            // wfr-29: this is now the sole dock occupant; the dismiss
+            // verb moved to the top-leading `xmark` close glyph.
             deletePill
         }
     }
 
-    /// C-05 white PillCTA — `var(--paper)` fill, ink text, 60pt tall,
-    /// radius 999. The visually dominant primary on S09 after wfr-07.
+    /// wfr-29 — top-leading `xmark` close glyph. Matches the iOS
+    /// sheet-dismissal convention (P-07 Habituation). 44pt tap target;
+    /// eyebrow-token white opacity so the glyph carries the same
+    /// visual weight as the QuizChrome / VerdictReadOnly chrome
+    /// affordances. Tap fires `onDone` — the same callback the retired
+    /// bottom-center DONE pill used.
     @ViewBuilder
-    private var donePill: some View {
+    private var closeButton: some View {
         Button(action: onDone) {
-            ZStack {
-                RoundedRectangle(cornerRadius: GTIRadii.pill, style: .continuous)
-                    .fill(GTIColor.paper)
-                    .frame(height: 60)
-                Text("DONE")
-                    .font(.system(size: GTIFont.Size.cta, weight: .black))
-                    .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
-                    .foregroundStyle(GTIColor.ink)
-            }
+            Image(systemName: Style.closeSymbolName)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(GTIColor.TextOnGradient.primary.opacity(0.86))
+                .frame(
+                    minWidth: Style.closeMinTapTarget,
+                    minHeight: Style.closeMinTapTarget
+                )
+                .contentShape(Rectangle())
         }
-        .accessibilityIdentifier("settings.done")
-        .accessibilityLabel("Done. Return to start.")
+        .padding(.leading, GTISpacing.step3)
+        .padding(.top, GTISpacing.step6)
+        .accessibilityIdentifier("settings.close")
+        .accessibilityLabel("Close. Return to plans.")
         .disabled(phase == .deleting)
     }
 

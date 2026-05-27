@@ -1,16 +1,19 @@
-// GetToIt — SettingsScreen render-hierarchy tests (wfr-07).
+// GetToIt — SettingsScreen render-hierarchy tests (wfr-07, wfr-29).
 //
 // Pins the visual hierarchy of S09 Settings per
-// `surfaces/09-settings.md` after the wfr-07 demotion: the white-pill
-// primary CTA is `DONE` (return to start), and `DELETE MY DATA` renders
-// in the C-05 `ghost` destructive treatment (transparent fill + 1.5pt
-// white-0.5 stroke). The no-red contract (`tokens.md §1.3`) still
-// governs — the destructive weight lives in copy + outline + the native
-// two-step confirm alert, never in color.
+// `surfaces/09-settings.md`:
+//   * wfr-07 — `DELETE MY DATA` renders in the C-05 `ghost` destructive
+//     treatment (transparent fill + 1.5pt white-0.5 stroke). The no-red
+//     contract (`tokens.md §1.3`) still governs — the destructive weight
+//     lives in copy + outline + the native two-step confirm alert, never
+//     in color.
+//   * wfr-29 — the surface escape is a top-leading `xmark` icon (iOS
+//     sheet-dismissal convention, P-07 Habituation). The bottom-center
+//     `DONE` PillCTA is retired; the close glyph owns the dismiss.
 //
 // The visual contract is encoded as `SettingsScreen.Style` constants
 // so a regression cannot silently re-promote DELETE to the white-pill
-// register without flipping these flags.
+// register or re-introduce a bottom DONE without flipping these flags.
 
 import XCTest
 import SwiftUI
@@ -54,18 +57,46 @@ final class SettingsScreenTests: XCTestCase {
         render(makeScreen())
     }
 
-    // MARK: - wfr-07 visual hierarchy contract
+    // MARK: - wfr-29 top-leading close affordance
 
-    /// `DONE` is the visually dominant primary — renders as the C-05
-    /// white PillCTA per `surfaces/09-settings.md` after wfr-07.
-    func testDoneIsTheWhitePillPrimary() {
-        XCTAssertEqual(SettingsScreen.Style.donePillFill, .white,
-                       "DONE must be the visually dominant C-05 white PillCTA")
+    /// wfr-29 — the surface escape is a top-leading icon-button using
+    /// the SF Symbol `xmark`. Matches the iOS sheet-dismissal
+    /// convention (P-07 Habituation) and visually distinguishes the
+    /// Settings utility surface from the Sunset Pop ritual arc.
+    func testCloseAffordanceUsesXmarkSymbol() {
+        XCTAssertEqual(SettingsScreen.Style.closeSymbolName, "xmark",
+                       "Top-leading close affordance must use the `xmark` SF Symbol per iOS sheet-dismissal convention")
     }
 
-    /// `DELETE MY DATA` is demoted to the C-05 `ghost` destructive
+    /// wfr-29 — the close glyph anchors top-leading. A regression that
+    /// flips it to top-trailing (Quiz `Exit` slot) or back to a
+    /// bottom-dock pill must trip this contract.
+    func testCloseAffordanceAnchorsTopLeading() {
+        XCTAssertEqual(SettingsScreen.Style.closeAlignment, .topLeading,
+                       "Close affordance must anchor top-leading (iOS sheet-dismissal convention)")
+    }
+
+    /// wfr-29 — the close glyph carries a 44pt minimum tap target.
+    /// Matches the QuizChrome / VerdictReadOnly chrome convention and
+    /// the Apple HIG minimum touch dimension.
+    func testCloseAffordanceMeetsMinTapTarget() {
+        XCTAssertGreaterThanOrEqual(SettingsScreen.Style.closeMinTapTarget, 44,
+                                    "Close affordance must meet the 44pt minimum tap target")
+    }
+
+    /// wfr-29 — the bottom-center DONE PillCTA is retired. The
+    /// surface escape lives on the top-leading close glyph; no DONE
+    /// pill renders in the CTA dock.
+    func testNoBottomDonePillRenders() {
+        XCTAssertFalse(SettingsScreen.Style.rendersBottomDonePill,
+                       "Bottom-center DONE PillCTA must be removed per wfr-29 — the top-leading close glyph owns the dismiss")
+    }
+
+    // MARK: - wfr-07 visual hierarchy contract
+
+    /// `DELETE MY DATA` renders in the C-05 `ghost` destructive
     /// treatment — transparent fill + 1.5pt white-0.5 stroke, white
-    /// text — per the issue spec.
+    /// text — per `surfaces/09-settings.md`.
     func testDeleteIsGhostDestructive() {
         XCTAssertEqual(SettingsScreen.Style.deletePillFill, .ghost,
                        "DELETE MY DATA must render in the C-05 ghost destructive treatment")
@@ -86,17 +117,6 @@ final class SettingsScreenTests: XCTestCase {
     func testDestructivePillUsesNoRedToken() {
         XCTAssertFalse(SettingsScreen.Style.usesRedDestructiveColor,
                        "S09 destructive treatment must never use a red token — sun is the only state color")
-    }
-
-    /// DONE must visually outrank DELETE — encoded as an order
-    /// constant so the CTA dock orders the primary above the
-    /// secondary action.
-    func testDoneRendersAboveDeleteInTheCTADock() {
-        XCTAssertLessThan(
-            SettingsScreen.Style.donePrimaryOrder,
-            SettingsScreen.Style.deleteSecondaryOrder,
-            "DONE (primary) must render above DELETE (secondary) in the CTA dock so the dominant action sits closest to the thumb dock"
-        )
     }
 
     // MARK: - confirm-alert preservation

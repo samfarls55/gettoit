@@ -5,11 +5,15 @@
 // Reuses the registered `midnight` gradient so this surface visually
 // steps out of the Sunset Pop ritual arc.
 //
-// CTA dock hierarchy (wfr-07, 2026-05-26): DONE is the visually dominant
-// C-05 white PillCTA; DELETE MY DATA renders below it in the C-05 ghost
-// destructive treatment. The no-red contract from `tokens.md §1.3`
-// governs — destructive weight lives in the outline + copy + native
-// confirm alert, never in a colored fill.
+// Surface escape (wfr-29, 2026-05-26): a top-leading `xmark` close glyph
+// owns the dismiss verb (iOS sheet-dismissal convention, P-07
+// Habituation). Replaces the prior bottom-center DONE PillCTA from
+// wfr-07; the dock now holds only the destructive action.
+//
+// CTA dock (wfr-07 → wfr-29): DELETE MY DATA renders alone in the C-05
+// ghost destructive treatment. The no-red contract from `tokens.md
+// §1.3` governs — destructive weight lives in the outline + copy +
+// native confirm alert, never in a colored fill.
 
 function ScreenSettings({ onDelete, onDone }) {
   return (
@@ -19,7 +23,22 @@ function ScreenSettings({ onDelete, onDone }) {
         padding: '64px 22px 24px',
         display: 'flex', flexDirection: 'column', color: '#fff',
       }}>
-        <GTIMark size={22} />
+        {/* wfr-29 — top-leading close glyph owns the dismiss. */}
+        <button
+          type="button"
+          onClick={onDone}
+          aria-label="Close. Return to plans."
+          style={{
+            position: 'absolute', top: 16, left: 16,
+            width: 44, height: 44,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 0, padding: 0,
+            color: 'rgba(255,255,255,0.86)',
+            fontSize: 17, fontWeight: 600, cursor: 'pointer',
+          }}
+        >
+          ×
+        </button>
 
         <div style={{ marginTop: 56 }}>
           <Eyebrow style={{ marginBottom: 14 }}>Your account</Eyebrow>
@@ -41,7 +60,6 @@ function ScreenSettings({ onDelete, onDone }) {
         </p>
 
         <CTADock>
-          <PillCTA label="Done" fill="white" onClick={onDone} />
           <PillCTA label="Delete my data" fill="ghost" onClick={onDelete} />
         </CTADock>
       </div>
