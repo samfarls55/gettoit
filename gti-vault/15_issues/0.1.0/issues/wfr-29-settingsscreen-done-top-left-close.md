@@ -1,7 +1,7 @@
 ---
 issue: wfr-29
 title: Switch SettingsScreen DONE to iOS top-left close convention
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
@@ -33,3 +33,7 @@ Replace the bottom-center plain-text "DONE" with a top-leading X icon (or "Close
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #29.
+
+## Comments
+
+- **2026-05-26 (AFK close)** — Shipped on `afk/wfr-29` (PR [#309](https://github.com/samfarls55/gettoit/pull/309)). Replaces the bottom-center `DONE` PillCTA on S09 Settings with a top-leading `xmark` SF Symbol close glyph — iOS sheet-dismissal convention, P-07 Habituation. The wfr-07 ghost-destructive treatment on `DELETE MY DATA` is preserved verbatim; the CTA dock now holds only that one action. The close glyph fires the same `onDone` callback the retired DONE pill used, so RootView wiring is unchanged. Decisions: chose the SF Symbol glyph over a text `CLOSE` label (the issue allowed either; glyph reads "sheet escape" at a glance and visually distinguishes the Settings utility surface from the Sunset Pop ritual arc); dropped the previously-rendered top-leading `GTIMark` from the JSX (the Swift never had it — the slot now belongs to the close glyph); style contract amended, not extended (removed the wfr-07 `donePillFill` / `donePrimaryOrder` / `deleteSecondaryOrder` flags since there's no primary/secondary pair to order anymore, added four wfr-29 flags `closeSymbolName`, `closeAlignment`, `closeMinTapTarget`, `rendersBottomDonePill`); glyph styling 17pt semibold, white-at-0.86 opacity (matches VerdictReadOnly home chrome), 44pt minimum tap target, no new tokens; accessibility label `"Close. Return to plans."` (terminal verb + destination, matching the cadence of the retired pill). Tests pin all four wfr-29 flags and preserve the wfr-07 ghost-destructive + no-red contract + confirm-alert copy tests. `design-system/surfaces/09-settings.md` updated with the new surface-escape section.
