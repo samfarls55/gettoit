@@ -27,6 +27,16 @@ Diagnostic notes captured outside the issue files themselves but still relevant 
 - [[ios-integration-tests-flaky-on-shared-db|ios-integration-tests-flaky-on-shared-db]] — flaky integration tests against the shared live Supabase DB.
 - [[verdict-pipeline-pool-manager-unwired|verdict-pipeline-pool-manager-unwired]] — `RunningUnionPoolManager` not-wired-in smell on the verdict side.
 
+## Founder pre-launch HITL bucket
+
+Founder-flagged pre-launch must-addresses captured 2026-05-26. All `status: needs-triage`, `type: HITL`, deferred to future grills.
+
+- [[issues/bug-39-design-ui-tweaks|bug-39]] (GH #311) — Design/UI tweaks, founder polish pass.
+- [[issues/bug-40-im-in-button-broken|bug-40]] (GH #312) — "I'm In" button doesn't work correctly.
+- [[issues/bug-41-additional-user-settings|bug-41]] (GH #313) — Additional user settings on SettingsScreen.
+- [[issues/bug-42-app-rename-and-logo|bug-42]] (GH #314) — App rename and logo before v1.
+- [[issues/bug-43-marketing-and-messaging|bug-43]] (GH #315) — Marketing and messaging (positioning, voice, copy).
+
 ## Workflow-review batches
 
 - [[../_runs/2026-05-26-0958-workflow-review|2026-05-26 whole-app workflow-review]] — 32 findings against `gti-vault/30_design/interaction-patterns/`. Issue bucket #6..#31 published as `wfr-06`..`wfr-31` (GitHub #247-#272). Grill bucket FULLY CLOSED 2026-05-26: #1 → [[../../60_engineering/adr/0018-verdict-surface-three-way-split|ADR-0018]] + [[issues/bug-34-verdict-surface-three-way-split|bug-34]] (GH #273), re-scopes finding #16. #2 → [[../../40_marketing_branding/landing-page-positioning|landing-page-positioning.md]] + [[issues/bug-35-landing-page-pre-launch|bug-35]] (GH #276) HITL deferred. #3 → Hub-and-Spoke locked; wfr-06 already shipped (PR #274). #4 → threshold-gated History search at 10 rows, [[issues/bug-36-planlist-history-threshold-search|bug-36]] (GH #279). #5 → [[../../60_engineering/adr/0019-surface-owned-session-ended-ownership|ADR-0019]] + [[issues/bug-37-waitingscreen-session-ended-handler|bug-37]] (GH #280) + [[issues/bug-38-quizscreen-session-ended-handler|bug-38]] (GH #281), unblocks finding #17. #32 → deferred to [[../../20_plan/post-launch-considerations|post-launch]] (iPhone-only, no hardware-keyboard QA path).
