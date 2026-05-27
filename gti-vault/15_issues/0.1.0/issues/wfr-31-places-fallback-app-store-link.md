@@ -1,10 +1,11 @@
 ---
 issue: wfr-31
 title: Add App Store link to places-fallback install copy
-status: ready-for-agent
+status: done
 type: AFK
 surfaced_by: workflow-review 2026-05-26
 created: 2026-05-26
+closed: 2026-05-26
 github_issue: 272
 ---
 
@@ -31,3 +32,7 @@ None — can start immediately.
 ## Surfaced by
 
 `/workflow-review` whole-app audit, 2026-05-26. See run report at [[../_runs/2026-05-26-0958-workflow-review|2026-05-26-0958-workflow-review]] finding #31.
+
+## Comments
+
+- 2026-05-26 — Closed via afk/wfr-31. Wrapped the word "iOS" in the `PlacesEmptyState` body copy as an inline `<a>` to the existing `APP_STORE_URL` constant in `web/lib/app-store.ts` (the same placeholder S04 / SessionRoom already uses; the real Apple ID swaps centrally there once allocated). Inline-link CTA shape chosen over a dedicated button so the existing "Try again" / "Start over" remains the dominant action on the terminal fallback. `target="_blank"` + `rel="noopener noreferrer"` matches the SessionRoom S04 affordance (download CTA opens in a new tab so the verdict context isn't lost). New `PlacesEmptyState.test.tsx` covers the link `href`/`target`/`rel`.
