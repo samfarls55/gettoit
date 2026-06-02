@@ -8,7 +8,7 @@
 //
 // Spec: `design-system/components.md §C-26` + JSX reference in
 // `design-system/code/components.jsx` (`FloatingActionButton`). Visual
-// values lift from `GTITokens.swift` per repo CLAUDE.md — no inline
+// values lift from `GTITokens.swift` per repo AGENTS.md — no inline
 // hex / px / easing.
 //
 // Visual register: T1 ink-fill (bug-23, 2026-05-24). Replaces the

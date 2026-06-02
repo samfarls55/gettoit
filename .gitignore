@@ -1,8 +1,5 @@
-# Local Claude Code config (agent definitions, skills, local settings)
+# Local legacy Claude Code config (agent definitions, skills, local settings)
 .claude/
-
-# Agent instructions — machine-specific, not for humans reading the repo
-CLAUDE.md
 
 # Obsidian local workspace state (per-machine window layout, recents)
 **/.obsidian/workspace.json

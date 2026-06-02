@@ -23,7 +23,7 @@
 //     surfaces/04-waiting.md §"`Decide now` CTA (initiator-only)".
 //
 // Tokens consumed: GTIColor / GTIGradient / GTIFont / GTISpacing /
-// GTIRadii / GTIMotion. Per repo CLAUDE.md no inline hex / px / easing.
+// GTIRadii / GTIMotion. Per repo AGENTS.md no inline hex / px / easing.
 //
 // What this view DOES NOT own:
 //   * Wiring the Realtime channel to `WaitingStore.apply(event:)` —

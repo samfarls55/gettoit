@@ -5,7 +5,7 @@ status: active
 created: 2026-05-13
 related:
   - "[[../15_issues/0.1.0/issues/tb-00-external-accounts]]"
-  - "[[devcontainer-setup]]"
+  - "[[github-actions-secrets]]"
   - "[[apple-keys-setup]]"
   - "[[adr/0001-ios-tech-stack-supabase]]"
   - "[[adr/0005-telemetry-supabase-event-store]]"
@@ -14,7 +14,7 @@ related:
 
 # Supabase — setup runbook
 
-Step-by-step for provisioning the 0.1.0 production Supabase project and wiring it everywhere it needs to go. Pairs with [[devcontainer-setup|devcontainer-setup.md]] (Step 4 lists every `gh secret set`) and [[apple-keys-setup|apple-keys-setup.md]] (Apple provider wiring lives there). Originating issue: [[../15_issues/0.1.0/issues/tb-00-external-accounts|TB-00]] AC #4.
+Step-by-step for provisioning the 0.1.0 production Supabase project and wiring it everywhere it needs to go. Pairs with [[github-actions-secrets|github-actions-secrets.md]] for the CI secret roster and [[apple-keys-setup|apple-keys-setup.md]] (Apple provider wiring lives there). Originating issue: [[../15_issues/0.1.0/issues/tb-00-external-accounts|TB-00]] AC #4.
 
 ## Summary — what 0.1.0 needs
 
@@ -60,7 +60,7 @@ Dashboard → Settings (gear) → API. Paste into `.env`:
 
 ## Step 3 — Personal Access Token (CLI auth)
 
-The PAT lets the `supabase` CLI in the container act on your behalf.
+The PAT lets the `supabase` CLI act on your behalf.
 
 1. Top-right avatar → Account → **Access Tokens**.
 2. **Generate new token**, name it `gettoit-cli`.
@@ -87,7 +87,7 @@ Sidebar → **Database → Extensions**. Search and enable each:
 
 If `pgmq` doesn't appear in the list, the project is on a Postgres version older than 15.6 — file a Supabase support ticket. Projects provisioned 2025+ on Pro should have it by default.
 
-## Step 6 — Verify from the container
+## Step 6 — Verify from a local shell
 
 ```bash
 set -a && source /workspace/.env && set +a
@@ -131,16 +131,16 @@ Verify:
 gh secret list | grep SUPABASE
 ```
 
-See [[devcontainer-setup#step-4--set-github-actions-secrets|devcontainer-setup §Step 4]] for the full secret roster.
+See [[github-actions-secrets|github-actions-secrets.md]] for the full secret roster.
 
 ## Gotchas
 
 - **`supabase link` writes `supabase/.temp/pooler-url` in plaintext, password and all.** Ensure `supabase/.temp/` and `supabase/.branches/` are in `.gitignore` *before* running `link`. (Already added to `.gitignore` 2026-05-13.)
-- **`GH_TOKEN` in `.env` overrides gh CLI's stored auth.** If `gh secret set` returns `403 Resource not accessible by personal access token`, the fine-grained PAT in `.env` is missing the **Secrets: read/write** permission. Either bump the PAT permissions OR run the secret-set commands in a subshell with `unset GH_TOKEN GITHUB_TOKEN` so gh falls back to its OAuth login. See [[devcontainer-setup#step-4--set-github-actions-secrets|devcontainer-setup §Step 4]].
+- **`GH_TOKEN` in `.env` overrides gh CLI's stored auth.** If `gh secret set` returns `403 Resource not accessible by personal access token`, the fine-grained PAT in `.env` is missing the **Secrets: read/write** permission. Either bump the PAT permissions OR run the secret-set commands in a subshell with `unset GH_TOKEN GITHUB_TOKEN` so gh falls back to its OAuth login. See [[github-actions-secrets|github-actions-secrets.md]].
 - **Region is sticky.** No move button. Migrating regions = new project + `pg_dump` / `pg_restore`. Pick once.
 - **DB password is one-shot.** Lose it = reset via dashboard, then update every place it's cached (`.env`, `gh secret`, any local `supabase/.temp/`).
 - **`service_role` key in client-side code is catastrophic.** It bypasses RLS. Audit `.env` reads — only Edge Functions and CI should see it.
-- **`supabase db query` defaults to local.** Always pass `--linked` for remote ops, or set up `supabase start` for genuine local dev (Docker required; not available inside the devcontainer per [[devcontainer-setup|devcontainer-setup.md §Step 1 gotcha]]).
+- **`supabase db query` defaults to local.** Always pass `--linked` for remote ops, or set up `supabase start` for genuine local dev when Docker is available.
 - **Anonymous users count toward MAU billing.** Pro plan includes 100k MAU; the pre-S00a anonymous-default path makes every visitor a MAU. Watch the [Auth dashboard usage panel] once the app is live — if MAU growth outpaces conversion, consider rate-limiting anon signup at the Edge.
 - **Pooler vs direct connection**: `supabase link` uses the transaction-pooler URL (port 6543) by default; CI migrations need the direct connection (port 5432). The `supabase db push` CLI handles the switch; raw `psql` callers don't.
 

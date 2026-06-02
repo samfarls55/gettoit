@@ -16,7 +16,7 @@ matrix (the iOS lane alone is ~10 min).
 paths-ignore:
   - 'gti-vault/**'   # Obsidian vault — issue files, AFK run logs, _index churn
   - 'docs/**'        # agent / runbook docs
-  - '*.md'           # root-only: CLAUDE.md, CONTEXT.md, README
+  - '*.md'           # root-only: AGENTS.md, CLAUDE.md shim, CONTEXT.md, README
 ```
 
 ## Why these three and not a blanket `**/*.md`

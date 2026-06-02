@@ -29,7 +29,7 @@
 //     Plan), so the empty-discard branch is impossible from edit.
 //
 // All visual values come from `GTITokens.swift`. No inline hex / px /
-// easing per repo CLAUDE.md. The chip primitive matches today's S01b
+// easing per repo AGENTS.md. The chip primitive matches today's S01b
 // chips (sun fill / ink text on selected, glass row default), the
 // LocationPicker is the existing C-23 chip, and the slider is the
 // platform `Slider` (tinted sun) wrapped with the non-uniform snap

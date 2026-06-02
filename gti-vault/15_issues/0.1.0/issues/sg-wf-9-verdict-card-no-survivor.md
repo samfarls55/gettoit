@@ -125,9 +125,9 @@ web code describe the same surface regardless of which merges first:
   is added here: a layout note / sub-table for the no-survivor case, the card
   copy, the eyebrow decision, and the copy-register entry. The doc is
   `status: locked`; this is a deliberate amendment to a locked surface — follow
-  `design-system/CLAUDE.md` for how the `locked-date` is handled.
+  `design-system/AGENTS.md` for how the `locked-date` is handled.
 - `design-system/CHANGELOG.md` — a one-line entry (date, what, why) for the §C
-  amendment, per `design-system/CLAUDE.md`.
+  amendment, per `design-system/AGENTS.md`.
 
 **Acceptance criteria:**
 

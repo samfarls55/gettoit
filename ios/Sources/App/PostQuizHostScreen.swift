@@ -24,7 +24,7 @@
 // S00 Plan list — now the correct destination, not a dead-end.
 //
 // Tokens: GTIGradient / GTIColor / GTIFont / GTISpacing. Per repo
-// CLAUDE.md — no inline hex / px / easing literals.
+// AGENTS.md — no inline hex / px / easing literals.
 
 import SwiftUI
 import Supabase

@@ -18,7 +18,7 @@
 // Spec: `design-system/components.md §C-25` + JSX reference in
 // `design-system/code/components.jsx` (`ActionDotMenuTrigger` +
 // `ActionDotMenu`). Visual values lift from `GTITokens.swift` per the
-// repo CLAUDE.md — no inline hex / px / easing.
+// repo AGENTS.md — no inline hex / px / easing.
 //
 // The primitive ships as a pair of nested types so call sites read
 // `ActionDotMenu.Trigger(...)` + `ActionDotMenu.Popover(...)` and the

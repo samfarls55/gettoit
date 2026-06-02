@@ -14,7 +14,7 @@
 // resolve to a Linked-Apple session by the time S00a dismisses.
 //
 // Tokens consumed: GTIColor / GTIGradient / GTIFont / GTISpacing /
-// GTIRadii / GTIMotion. Per repo CLAUDE.md no inline hex / px / easing.
+// GTIRadii / GTIMotion. Per repo AGENTS.md no inline hex / px / easing.
 //
 // Copy register (LOCKED per `design-system/surfaces/00a-signin.md`):
 //   * Eyebrow:        "Tonight's session"  (reuses S01 verbatim)

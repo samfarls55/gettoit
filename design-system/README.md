@@ -2,7 +2,7 @@
 
 Production design system for **GetToIt**, the iOS app that kills group decision paralysis in 60 seconds.
 
-This is the handoff package for Claude Code → SwiftUI implementation. Tokens, components, motion, surfaces, and accessibility are speccated against the locked Sunset Pop direction. Every screen ships with **real JSX source** alongside the markdown spec — drop the JSX into your iframe/preview environment to see the canonical state, lift the values into SwiftUI.
+This is the handoff package for agent-assisted SwiftUI implementation. Tokens, components, motion, surfaces, and accessibility are speccated against the locked Sunset Pop direction. Every screen ships with **real JSX source** alongside the markdown spec — drop the JSX into your iframe/preview environment to see the canonical state, lift the values into SwiftUI.
 
 ---
 
@@ -18,7 +18,7 @@ This is the handoff package for Claude Code → SwiftUI implementation. Tokens, 
 | [`surfaces/`](./surfaces/) | 8 surface docs — purpose, defenses, copy register, edge cases. Each links to its JSX. |
 | [`code/`](./code/) | **Clean React/JSX source for every screen.** No tweak machinery. This is what to port. |
 | [`scripts/`](./scripts/) | `gen-css.mjs` (tokens.json → tokens.css), `gen-swift.mjs` (tokens.json → `ios/Sources/GTITokens.swift`), `verify.mjs` (drift gate + orphan-hex sweep — covers both generated outputs). |
-| [`CLAUDE.md`](./CLAUDE.md) | Editing rules for agents working in this directory. Read before changing anything here. |
+| [`AGENTS.md`](./AGENTS.md) | Editing rules for agents working in this directory. Read before changing anything here. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Append-only log of spec changes. Every user-visible change adds a line. |
 
 ---

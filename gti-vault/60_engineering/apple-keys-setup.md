@@ -5,14 +5,14 @@ created: 2026-05-13
 related:
   - "[[../15_issues/0.1.0/issues/tb-00-external-accounts]]"
   - "[[../15_issues/0.1.0/issues/tb-12-apple-signin-upgrade]]"
-  - "[[devcontainer-setup]]"
+  - "[[github-actions-secrets]]"
   - "[[adr/0002-places-data-foursquare-mapkit]]"
   - "[[adr/0007-auth-anonymous-default-apple-upgrade]]"
 ---
 
 # Apple keys — setup runbook
 
-Step-by-step for obtaining and wiring the Apple credentials 0.1.0 needs. Pairs with [[devcontainer-setup|devcontainer-setup.md]] (which covers the `gh secret set` commands) and the issues above.
+Step-by-step for obtaining and wiring the Apple credentials 0.1.0 needs. Pairs with [[github-actions-secrets|github-actions-secrets.md]] for the `gh secret set` roster and the issues above.
 
 ## Summary — what 0.1.0 actually needs
 
@@ -62,10 +62,9 @@ Never commit. Never email/Slack/Drive.
 Run from your local machine (`gh` authenticated):
 
 ```bash
-gh secret set APPLE_TEAM_ID --body "<team id>"
-gh secret set APPLE_API_KEY_ID --body "<key id>"
-gh secret set APPLE_API_ISSUER_ID --body "<issuer id>"
-gh secret set APPLE_API_PRIVATE_KEY < ~/.appstoreconnect/AuthKey_XXXXX.p8
+gh secret set APP_STORE_CONNECT_API_KEY_ID --body "<key id>"
+gh secret set APP_STORE_CONNECT_API_KEY_ISSUER_ID --body "<issuer id>"
+gh secret set APP_STORE_CONNECT_API_KEY_CONTENT --body "$(base64 -i ~/.appstoreconnect/AuthKey_XXXXX.p8)"
 ```
 
 Verify:
@@ -74,7 +73,7 @@ Verify:
 gh secret list | grep APPLE
 ```
 
-These four are referenced by the iOS workflow when it lands (see [[devcontainer-setup|devcontainer-setup.md]] Step 4 for the full secret roster).
+These are referenced by the TestFlight workflow. See [[github-actions-secrets|github-actions-secrets.md]] for the full secret roster.
 
 ### Rotation
 

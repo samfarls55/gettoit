@@ -23,7 +23,8 @@ Accepted — 2026-05-12.
 
 ```
 GetToIt/
-  CLAUDE.md
+  AGENTS.md
+  CLAUDE.md            # compatibility shim: Read AGENTS.md
   CONTEXT.md
   README.md
   design-system/        # authoritative UI spec (tokens, components, surfaces)
@@ -67,4 +68,4 @@ GetToIt/
 
 - [[0001-ios-tech-stack-supabase|ADR 0001]]
 - [[0003-web-fallback-nextjs-vercel|ADR 0003]]
-- [[../../../design-system/CLAUDE|design-system/CLAUDE.md]] (editing rules for the spec dir)
+- [[../../../design-system/AGENTS|design-system/AGENTS.md]] (editing rules for the spec dir)

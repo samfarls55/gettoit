@@ -169,7 +169,7 @@ public struct JoinScreen: View {
 
     /// Recovery label during `.error`. Names the fix (re-invite) per
     /// the Error Messages pattern instead of a sterile "Back" /
-    /// "Retry," and keeps the warm-friend register (CLAUDE.md product
+    /// "Retry," and keeps the warm-friend register (AGENTS.md product
     /// invariant #1).
     public static let backLabel = "Try another link"
 

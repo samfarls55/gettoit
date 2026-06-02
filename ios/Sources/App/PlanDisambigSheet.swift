@@ -20,7 +20,7 @@
 // `design-system/code/screens/ScreenPlanList.jsx` (`DisambigSheet`
 // inline composition over the C-27 ActionSheet primitive).
 //
-// All visual values come from `GTITokens.swift` per repo CLAUDE.md —
+// All visual values come from `GTITokens.swift` per repo AGENTS.md —
 // no inline hex / px / easing.
 
 import SwiftUI

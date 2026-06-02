@@ -19,7 +19,7 @@ GetToIt 0.1.0 is a group-first decision-paralysis killer with food as the first 
 
 Constraints driving this decision:
 
-- **Solo dev with Claude Code**, 1–3 month MVP target.
+- **Solo dev with Codex**, 1–3 month MVP target.
 - **iOS-only 0.1.0.** Android path is deferred but not ruled out — the stack must not foreclose it.
 - **Balanced priority lens:** ship 0.1.0 fastest *without* painting into a corner. Performance-per-dollar weighs heavily in the 0–10k DAU range.
 - **Cross-platform stacks dropped** (React Native, Flutter) — Swift + SwiftUI is the chosen client.
@@ -31,7 +31,7 @@ Constraints driving this decision:
 
 **Swift + SwiftUI + Supabase.**
 
-Supabase provides Postgres + Realtime + Auth + Storage + Edge Functions. The Swift SDK (`supabase-swift`) mirrors `supabase-js` and has strong Claude Code training-data coverage.
+Supabase provides Postgres + Realtime + Auth + Storage + Edge Functions. The Swift SDK (`supabase-swift`) mirrors `supabase-js` and has strong Codex/LLM coding-agent coverage.
 
 ## Why Supabase
 
@@ -51,7 +51,7 @@ Supabase provides Postgres + Realtime + Auth + Storage + Edge Functions. The Swi
 - PostGIS, pg_cron, pgmq are gravy once oriented.
 - Sign in with Apple + anonymous auth are first-class Swift SDK calls.
 - Self-host or migrate path keeps the Android door open and survives vendor-failure scenarios.
-- Strong Claude Code coverage compounds solo-dev velocity.
+- Strong Codex/LLM coverage compounds solo-dev velocity.
 
 ### Negative / accepted tradeoffs
 

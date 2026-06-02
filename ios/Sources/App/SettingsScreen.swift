@@ -29,7 +29,7 @@
 // message on the surface; user can retry or tap the close glyph.
 //
 // All color, type, spacing, motion comes from `GTITokens.swift` — per
-// repo CLAUDE.md, never inline hex/px/easing.
+// repo AGENTS.md, never inline hex/px/easing.
 
 import SwiftUI
 

@@ -41,7 +41,7 @@ The four external accounts and assets that every later tracer bullet depends on.
 ## References
 
 - [[../../../60_engineering/apple-keys-setup|apple-keys-setup.md]] — full step-by-step for the three Apple keys (and why MapKit JS is skipped).
-- [[../../../60_engineering/devcontainer-setup|devcontainer-setup.md]] — Step 4 lists every `gh secret set` command the project uses.
+- [[../../../60_engineering/github-actions-secrets|github-actions-secrets.md]] — lists every `gh secret set` command the project uses.
 
 ## Blocked by
 
@@ -57,7 +57,7 @@ Added after TB-00 was closed, in the same session, to clear the remaining hard b
 - Supabase Edge Function secrets: `APNS_AUTH_KEY_ID`, `APNS_AUTH_KEY`, `APNS_TEAM_ID`, `APNS_TOPIC` set via Management API.
 - **Foursquare key fanout**: `FOURSQUARE_API_KEY` also added to GitHub Actions secrets (was only in `.env`) and Supabase Edge Function secrets.
 
-Runbook updates: [[../../../60_engineering/apple-keys-setup#key-3--apns-auth-key|apple-keys-setup §Key 3]] and [[../../../60_engineering/devcontainer-setup|devcontainer-setup §Step 4]].
+Runbook updates: [[../../../60_engineering/apple-keys-setup#key-3--apns-auth-key|apple-keys-setup §Key 3]] and [[../../../60_engineering/github-actions-secrets|github-actions-secrets]].
 
 ## Post-completion addendum (2026-05-14) — Vercel framework-preset gotcha
 

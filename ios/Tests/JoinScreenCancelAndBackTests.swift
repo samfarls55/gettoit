@@ -60,7 +60,7 @@ final class JoinScreenCancelAndBackTests: XCTestCase {
         // Error Messages pattern (patterns#Error Messages) — name the
         // fix, not just the failure. The invite link is dead end; the
         // recovery is "try a different one." Re-invite framing keeps
-        // the warm-friend register (CLAUDE.md product invariant #1) —
+        // the warm-friend register (AGENTS.md product invariant #1) —
         // never sterile "Back" or "Retry."
         XCTAssertEqual(JoinScreen.backLabel, "Try another link")
     }

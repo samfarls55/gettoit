@@ -26,7 +26,7 @@ Per-screen / per-primitive surgical fix to align the gradient curve's duration w
 
 - Identify the offending `CHOREO` constants in `design-system/code/screens/` — likely in the question-screen primitives (the shared transition wrapper if one exists, or each `ScreenQNN.jsx` if duplicated).
 - Adjust the gradient interpolation duration to match the card transition duration exactly. Match `ms` values, do not round.
-- Per [[../../../../CLAUDE|root CLAUDE.md]] design-system rules: never inline raw durations / easing literals — values come from existing tokens or, if a new motion token is needed, register in `tokens.json` first.
+- Per [[../../../../AGENTS|root AGENTS.md]] design-system rules: never inline raw durations / easing literals — values come from existing tokens or, if a new motion token is needed, register in `tokens.json` first.
 
 If verification (below) surfaces another offender, fold into the same fix. This is NOT a broader motion review — that would be a separate issue.
 

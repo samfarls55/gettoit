@@ -41,8 +41,8 @@ on:
     # docs-only push can't cancel a code build already in flight via the
     # `concurrency` group below. `gti-vault/**` is the Obsidian knowledge
     # base (issue files, AFK run logs, _index.md churn — never source);
-    # `docs/**` is agent/runbook docs; `*.md` is root-only (CLAUDE.md,
-    # CONTEXT.md, README) — deliberately NOT `**/*.md`, because
+    # `docs/**` is agent/runbook docs; `*.md` is root-only (AGENTS.md,
+    # CLAUDE.md shim, CONTEXT.md, README) — deliberately NOT `**/*.md`, because
     # `design-system/surfaces/*.md` feeds verify.mjs surface↔jsx pairing.
     paths-ignore:
       - 'gti-vault/**'

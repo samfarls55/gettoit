@@ -49,7 +49,7 @@
 //     routes to `SetupScreen(mode: .solo)` or `SetupScreen(mode: .group)`.
 //
 // All color / type / spacing / radii come from `GTITokens.swift` per
-// repo CLAUDE.md — no inline hex / px / easing.
+// repo AGENTS.md — no inline hex / px / easing.
 
 import SwiftUI
 
