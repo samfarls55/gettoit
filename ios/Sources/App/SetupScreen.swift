@@ -37,6 +37,7 @@
 //
 import SwiftUI
 import UIKit
+import MapKit
 
 @MainActor
 public struct SetupScreen: View {
@@ -168,6 +169,162 @@ public struct SetupScreen: View {
 
     public static func searchAreaRadiusBadgeCopy(radiusMeters: Int) -> String {
         "\(searchAreaRadiusMilesCopy(radiusMeters: radiusMeters)) MI RADIUS"
+    }
+
+    /// First-open editor radius when current location is available and
+    /// no Search area has been committed yet. This is intentionally
+    /// separate from `defaultDistanceMiles`, which remains the pending
+    /// Plan storage fallback for Save-for-later without Search area.
+    public static let firstOpenSearchAreaRadiusMiles: Double = 2.0
+
+    /// Minimal viewport value used to keep MapKit camera math testable
+    /// without instantiating a SwiftUI `Map`.
+    public struct SearchAreaViewport: Equatable, Sendable {
+        public let centerLat: Double
+        public let centerLng: Double
+        public let latitudeDelta: Double
+        public let longitudeDelta: Double
+
+        public init(
+            centerLat: Double,
+            centerLng: Double,
+            latitudeDelta: Double,
+            longitudeDelta: Double
+        ) {
+            self.centerLat = centerLat
+            self.centerLng = centerLng
+            self.latitudeDelta = latitudeDelta
+            self.longitudeDelta = longitudeDelta
+        }
+    }
+
+    /// Close behavior for the Search area editor. Clean drafts dismiss;
+    /// dirty drafts require the Use / Discard prompt.
+    public enum SearchAreaCloseDecision: Equatable, Sendable {
+        case dismiss
+        case prompt
+    }
+
+    /// Compute Search area radius as the distance from camera center to
+    /// the nearest visible map edge.
+    public static func searchAreaRadiusMeters(from viewport: SearchAreaViewport) -> Int {
+        let center = CLLocation(latitude: viewport.centerLat, longitude: viewport.centerLng)
+        let halfLatitude = abs(viewport.latitudeDelta) / 2.0
+        let halfLongitude = abs(viewport.longitudeDelta) / 2.0
+        let edgePoints = [
+            CLLocation(latitude: viewport.centerLat + halfLatitude, longitude: viewport.centerLng),
+            CLLocation(latitude: viewport.centerLat - halfLatitude, longitude: viewport.centerLng),
+            CLLocation(latitude: viewport.centerLat, longitude: viewport.centerLng + halfLongitude),
+            CLLocation(latitude: viewport.centerLat, longitude: viewport.centerLng - halfLongitude),
+        ]
+        let radius = edgePoints.map { center.distance(from: $0) }.min() ?? 0
+        return max(0, Int(radius.rounded()))
+    }
+
+    /// Build the draft Search area from the current MapKit viewport.
+    /// Existing source/timezone metadata is retained because map
+    /// movement changes geometry, not persistence schema semantics.
+    public static func searchArea(
+        fromViewport viewport: SearchAreaViewport,
+        previousDraft: SearchArea?,
+        fallbackTimeZoneIdentifier: String = TimeZone.current.identifier
+    ) -> SearchArea {
+        let center = CLLocation(latitude: viewport.centerLat, longitude: viewport.centerLng)
+        let previousCenter = previousDraft.map {
+            CLLocation(latitude: $0.lat, longitude: $0.lng)
+        }
+        let centerMoved = previousCenter.map { center.distance(from: $0) > 25 } ?? true
+        return SearchArea(
+            centerLabel: centerMoved ? "Map center" : (previousDraft?.centerLabel ?? "Map center"),
+            lat: viewport.centerLat,
+            lng: viewport.centerLng,
+            source: previousDraft?.source ?? "manual",
+            timeZoneIdentifier: previousDraft?.timeZoneIdentifier ?? fallbackTimeZoneIdentifier,
+            radiusMeters: searchAreaRadiusMeters(from: viewport)
+        )
+    }
+
+    /// Return a copy of `searchArea` with its radius stepped through the
+    /// locked C-28 radius stops.
+    public static func searchAreaAfterRadiusStep(
+        _ searchArea: SearchArea,
+        offset: Int
+    ) -> SearchArea {
+        SearchArea(
+            centerLabel: searchArea.centerLabel,
+            lat: searchArea.lat,
+            lng: searchArea.lng,
+            source: searchArea.source,
+            timeZoneIdentifier: searchArea.timeZoneIdentifier,
+            radiusMeters: steppedSearchAreaRadiusMeters(
+                currentRadiusMeters: searchArea.radiusMeters,
+                offset: offset
+            )
+        )
+    }
+
+    /// Step a radius through the locked C-28 stop list, clamping at the
+    /// endpoints.
+    public static func steppedSearchAreaRadiusMeters(
+        currentRadiusMeters: Int,
+        offset: Int
+    ) -> Int {
+        let currentMiles = snapDistance(milesFromMeters(currentRadiusMeters))
+        let index = distanceSteps.firstIndex(of: currentMiles) ?? 0
+        let nextIndex = min(max(index + offset, 0), distanceSteps.count - 1)
+        return metersFromMiles(distanceSteps[nextIndex])
+    }
+
+    /// Decide whether closing the editor can dismiss immediately or
+    /// needs the dirty-close prompt.
+    public static func searchAreaCloseDecision(
+        draft: SearchArea?,
+        committed: SearchArea?
+    ) -> SearchAreaCloseDecision {
+        searchAreasMatchForDraftClose(draft, committed) ? .dismiss : .prompt
+    }
+
+    /// Commit the current draft Search area. Nil stays nil so the
+    /// commit button remains a no-op until the editor has a draft.
+    public static func committedSearchArea(fromDraft draft: SearchArea?) -> SearchArea? {
+        draft
+    }
+
+    /// Tolerant equality for map-derived drafts. MapKit camera round
+    /// trips can shift by a few meters when region spans are normalized;
+    /// those shifts should not make a clean editor look dirty.
+    public static func searchAreasMatchForDraftClose(
+        _ lhs: SearchArea?,
+        _ rhs: SearchArea?
+    ) -> Bool {
+        switch (lhs, rhs) {
+        case (.none, .none):
+            return true
+        case (.some(let lhs), .some(let rhs)):
+            let lhsCenter = CLLocation(latitude: lhs.lat, longitude: lhs.lng)
+            let rhsCenter = CLLocation(latitude: rhs.lat, longitude: rhs.lng)
+            return lhsCenter.distance(from: rhsCenter) <= 25
+                && abs(lhs.radiusMeters - rhs.radiusMeters) <= 25
+                && lhs.source == rhs.source
+                && lhs.timeZoneIdentifier == rhs.timeZoneIdentifier
+        case (.some, .none), (.none, .some):
+            return false
+        }
+    }
+
+    /// Build a MapKit region whose nearest edge matches the Search area
+    /// radius closely enough for camera-step synchronization.
+    static func mapRegion(for searchArea: SearchArea) -> MKCoordinateRegion {
+        let radiusMeters = max(Double(searchArea.radiusMeters), 1)
+        let metersPerDegreeLatitude = 111_320.0
+        let latitudeRadians = searchArea.lat * .pi / 180
+        let longitudeScale = max(cos(latitudeRadians), 0.01)
+        let latitudeDelta = max((radiusMeters / metersPerDegreeLatitude) * 2.0, 0.001)
+        let longitudeDelta = max((radiusMeters / (metersPerDegreeLatitude * longitudeScale)) * 2.0, 0.001)
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: searchArea.lat, longitude: searchArea.lng),
+            span: MKCoordinateSpan(latitudeDelta: latitudeDelta, longitudeDelta: longitudeDelta)
+        )
     }
 
     public static func shouldOpenSearchAreaEditorOnLaunch(
@@ -713,8 +870,8 @@ public struct SetupScreen: View {
         .fullScreenCover(isPresented: $searchAreaEditorOpen) {
             SearchAreaEditor(
                 draft: $draftSearchArea,
+                committed: committedSearchArea,
                 currentPlace: locationCoordinator.place,
-                onUseCurrentLocation: seedDraftFromCurrentLocation,
                 onCommit: { area in
                     committedSearchArea = area
                     distanceMiles = SetupScreen.snapDistance(SetupScreen.milesFromMeters(area.radiusMeters))
@@ -1101,7 +1258,8 @@ public struct SetupScreen: View {
 
     private func seedDraftFromCurrentLocation() {
         guard let place = locationCoordinator.place else { return }
-        let radius = committedSearchArea?.radiusMeters ?? SetupScreen.metersFromMiles(2.0)
+        let radius = committedSearchArea?.radiusMeters
+            ?? SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
         draftSearchArea = SetupScreen.searchArea(from: place, radiusMeters: radius)
     }
 
@@ -1355,22 +1513,21 @@ private struct SearchAreaPickerChip: View {
 
 private struct SearchAreaEditor: View {
     @Binding var draft: SetupScreen.SearchArea?
+    let committed: SetupScreen.SearchArea?
     let currentPlace: ResolvedPlace?
-    let onUseCurrentLocation: () -> Void
     let onCommit: (SetupScreen.SearchArea) -> Void
     let onDismiss: () -> Void
+    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var searchQuery: String = ""
+    @State private var showDirtyClosePrompt = false
 
     var body: some View {
         ZStack {
-            GTIGradient.surface(.initiator)
+            mapSurface
                 .ignoresSafeArea()
 
             VStack(spacing: GTISpacing.step4) {
                 topChrome
-
-                Spacer()
-
-                selectedAreaReadout
 
                 Spacer()
 
@@ -1381,12 +1538,44 @@ private struct SearchAreaEditor: View {
             .padding(.top, GTISpacing.step8)
             .padding(.bottom, GTISpacing.step6)
         }
+        .onAppear(perform: syncCameraToDraft)
+        .alert("Use this search area?", isPresented: $showDirtyClosePrompt) {
+            Button("Use this area") {
+                commitDraftAndDismiss()
+            }
+            Button("Discard changes", role: .destructive) {
+                onDismiss()
+            }
+        } message: {
+            Text("You have uncommitted map changes.")
+        }
         .accessibilityIdentifier("setup.searchArea.editor")
+    }
+
+    private var mapSurface: some View {
+        Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
+            if let draft {
+                MapCircle(
+                    center: CLLocationCoordinate2D(latitude: draft.lat, longitude: draft.lng),
+                    radius: CLLocationDistance(draft.radiusMeters)
+                )
+                .foregroundStyle(GTIColor.sun.opacity(0.16))
+                MapCircle(
+                    center: CLLocationCoordinate2D(latitude: draft.lat, longitude: draft.lng),
+                    radius: CLLocationDistance(draft.radiusMeters)
+                )
+                .stroke(GTIColor.sun, lineWidth: 2)
+            }
+        }
+        .mapStyle(.standard)
+        .onMapCameraChange(frequency: .continuous) { context in
+            updateDraft(from: context.region)
+        }
     }
 
     private var topChrome: some View {
         HStack(spacing: GTISpacing.step3) {
-            Button(action: onDismiss) {
+            Button(action: requestClose) {
                 Image(systemName: "xmark")
                     .font(.system(size: 17, weight: .black))
                     .foregroundStyle(GTIColor.TextOnGradient.primary)
@@ -1395,22 +1584,31 @@ private struct SearchAreaEditor: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Close")
 
-            Text("Search city, neighborhood, or address")
-                .font(.system(size: GTIFont.Size.sm, weight: .semibold))
-                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                .padding(.horizontal, GTISpacing.step3)
-                .background(
-                    RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
-                        .fill(GTIColor.Glass.fillSoft)
+            TextField(
+                "",
+                text: $searchQuery,
+                prompt: Text("Search city, neighborhood, or address")
+                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+            )
+            .textInputAutocapitalization(.words)
+            .autocorrectionDisabled(true)
+            .submitLabel(.search)
+            .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+            .foregroundStyle(GTIColor.TextOnGradient.primary)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, GTISpacing.step3)
+            .background(
+                RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                    .fill(GTIColor.Glass.fillSoft)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
                 )
-                .overlay(
-                    RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
-                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
-                )
+            .accessibilityLabel("Search area jump")
 
-            Button(action: onUseCurrentLocation) {
+            Button(action: jumpToCurrentLocation) {
                 Image(systemName: "location.fill")
                     .font(.system(size: 17, weight: .black))
                     .foregroundStyle(currentLocationIconColor)
@@ -1423,34 +1621,6 @@ private struct SearchAreaEditor: View {
             .buttonStyle(.plain)
             .disabled(!hasCurrentPlace)
             .accessibilityLabel("Use current location")
-        }
-    }
-
-    private var selectedAreaReadout: some View {
-        VStack(spacing: GTISpacing.step3) {
-            ZStack {
-                Circle()
-                    .fill(GTIColor.sun.opacity(0.16))
-                    .overlay(Circle().stroke(GTIColor.sun, lineWidth: 2))
-                Image(systemName: "mappin.and.ellipse")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(GTIColor.sun)
-                    .accessibilityHidden(true)
-            }
-            .frame(width: 190, height: 190)
-            .accessibilityHidden(true)
-
-            Text(selectedAreaTitle)
-                .font(.system(size: GTIFont.Size.displayM, weight: .black))
-                .foregroundStyle(GTIColor.TextOnGradient.primary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-
-            Text(selectedAreaInstruction)
-                .font(.system(size: GTIFont.Size.body, weight: .semibold))
-                .foregroundStyle(GTIColor.TextOnGradient.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 300)
         }
     }
 
@@ -1517,17 +1687,6 @@ private struct SearchAreaEditor: View {
         hasCurrentPlace ? GTIColor.sun : GTIColor.Glass.fillSoft
     }
 
-    private var selectedAreaTitle: String {
-        draft?.centerLabel ?? SetupScreen.emptySearchAreaMainCopy()
-    }
-
-    private var selectedAreaInstruction: String {
-        guard draft != nil else {
-            return "Search or use current location to choose the center."
-        }
-        return "Adjust the radius, then use this area."
-    }
-
     private var radiusBadgeCopy: String {
         guard let draft else { return "SET AREA" }
         return SetupScreen.searchAreaRadiusBadgeCopy(radiusMeters: draft.radiusMeters)
@@ -1554,25 +1713,50 @@ private struct SearchAreaEditor: View {
 
     private func adjustRadius(by offset: Int) {
         guard let current = draft else { return }
-        let currentMiles = SetupScreen.snapDistance(SetupScreen.milesFromMeters(current.radiusMeters))
-        let index = SetupScreen.distanceSteps.firstIndex(of: currentMiles) ?? 0
-        let nextIndex = min(max(index + offset, 0), SetupScreen.distanceSteps.count - 1)
-        let nextRadius = SetupScreen.metersFromMiles(SetupScreen.distanceSteps[nextIndex])
-        draft = copySearchArea(current, radiusMeters: nextRadius)
+        let next = SetupScreen.searchAreaAfterRadiusStep(current, offset: offset)
+        draft = next
+        cameraPosition = .region(SetupScreen.mapRegion(for: next))
     }
 
-    private func copySearchArea(
-        _ searchArea: SetupScreen.SearchArea,
-        radiusMeters: Int
-    ) -> SetupScreen.SearchArea {
-        SetupScreen.SearchArea(
-            centerLabel: searchArea.centerLabel,
-            lat: searchArea.lat,
-            lng: searchArea.lng,
-            source: searchArea.source,
-            timeZoneIdentifier: searchArea.timeZoneIdentifier,
-            radiusMeters: radiusMeters
+    private func updateDraft(from region: MKCoordinateRegion) {
+        let viewport = SetupScreen.SearchAreaViewport(
+            centerLat: region.center.latitude,
+            centerLng: region.center.longitude,
+            latitudeDelta: region.span.latitudeDelta,
+            longitudeDelta: region.span.longitudeDelta
         )
+        let next = SetupScreen.searchArea(fromViewport: viewport, previousDraft: draft)
+        if !SetupScreen.searchAreasMatchForDraftClose(next, draft) {
+            draft = next
+        }
+    }
+
+    private func syncCameraToDraft() {
+        guard let draft else { return }
+        cameraPosition = .region(SetupScreen.mapRegion(for: draft))
+    }
+
+    private func jumpToCurrentLocation() {
+        guard let currentPlace else { return }
+        let radius = draft?.radiusMeters
+            ?? SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
+        let next = SetupScreen.searchArea(from: currentPlace, radiusMeters: radius)
+        draft = next
+        cameraPosition = .region(SetupScreen.mapRegion(for: next))
+    }
+
+    private func requestClose() {
+        switch SetupScreen.searchAreaCloseDecision(draft: draft, committed: committed) {
+        case .dismiss:
+            onDismiss()
+        case .prompt:
+            showDirtyClosePrompt = true
+        }
+    }
+
+    private func commitDraftAndDismiss() {
+        guard let committed = SetupScreen.committedSearchArea(fromDraft: draft) else { return }
+        onCommit(committed)
     }
 }
 

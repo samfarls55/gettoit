@@ -84,6 +84,165 @@ final class SetupScreenTests: XCTestCase {
         )
     }
 
+    func testSearchAreaViewportRadiusUsesNearestVisibleEdge() {
+        let viewport = SetupScreen.SearchAreaViewport(
+            centerLat: 37.7767,
+            centerLng: -122.4241,
+            latitudeDelta: 0.04,
+            longitudeDelta: 0.20
+        )
+
+        let radius = SetupScreen.searchAreaRadiusMeters(from: viewport)
+
+        let center = CLLocation(latitude: viewport.centerLat, longitude: viewport.centerLng)
+        let nearestVerticalEdge = CLLocation(
+            latitude: viewport.centerLat + viewport.latitudeDelta / 2.0,
+            longitude: viewport.centerLng
+        )
+        XCTAssertEqual(radius, Int(center.distance(from: nearestVerticalEdge).rounded()))
+    }
+
+    func testSearchAreaViewportDraftUpdatesCenterAndRadiusOnly() {
+        let committed = SetupScreen.SearchArea(
+            centerLabel: "Hayes Valley",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(2.0)
+        )
+        let viewport = SetupScreen.SearchAreaViewport(
+            centerLat: 37.7599,
+            centerLng: -122.4148,
+            latitudeDelta: 0.03,
+            longitudeDelta: 0.12
+        )
+
+        let draft = SetupScreen.searchArea(fromViewport: viewport, previousDraft: committed)
+
+        XCTAssertEqual(draft.lat, viewport.centerLat, accuracy: 0.0001)
+        XCTAssertEqual(draft.lng, viewport.centerLng, accuracy: 0.0001)
+        XCTAssertEqual(draft.radiusMeters, SetupScreen.searchAreaRadiusMeters(from: viewport))
+        XCTAssertEqual(draft.source, committed.source)
+        XCTAssertEqual(draft.timeZoneIdentifier, committed.timeZoneIdentifier)
+        XCTAssertEqual(committed.centerLabel, "Hayes Valley", "viewport movement must not mutate the committed value")
+    }
+
+    func testSearchAreaRadiusStepControlsUseLockedStops() {
+        let area = SetupScreen.SearchArea(
+            centerLabel: "Hayes Valley",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(2.0)
+        )
+
+        XCTAssertEqual(
+            SetupScreen.searchAreaAfterRadiusStep(area, offset: 1).radiusMeters,
+            SetupScreen.metersFromMiles(2.5)
+        )
+        XCTAssertEqual(
+            SetupScreen.searchAreaAfterRadiusStep(area, offset: -1).radiusMeters,
+            SetupScreen.metersFromMiles(1.5)
+        )
+
+        let minArea = SetupScreen.SearchArea(
+            centerLabel: "Min",
+            lat: 0,
+            lng: 0,
+            source: "manual",
+            timeZoneIdentifier: "UTC",
+            radiusMeters: SetupScreen.metersFromMiles(0.25)
+        )
+        let maxArea = SetupScreen.SearchArea(
+            centerLabel: "Max",
+            lat: 0,
+            lng: 0,
+            source: "manual",
+            timeZoneIdentifier: "UTC",
+            radiusMeters: SetupScreen.metersFromMiles(10.0)
+        )
+        XCTAssertEqual(
+            SetupScreen.searchAreaAfterRadiusStep(minArea, offset: -1).radiusMeters,
+            SetupScreen.metersFromMiles(0.25)
+        )
+        XCTAssertEqual(
+            SetupScreen.searchAreaAfterRadiusStep(maxArea, offset: 1).radiusMeters,
+            SetupScreen.metersFromMiles(10.0)
+        )
+    }
+
+    func testFirstOpenSearchAreaDefaultUsesCurrentLocationPlusTwoMiles() {
+        let place = ResolvedPlace(
+            id: "current:hayes",
+            name: "Current location",
+            sub: "San Francisco",
+            coordinate: .init(latitude: 37.7767, longitude: -122.4241),
+            source: .gps,
+            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+        )
+
+        let draft = SetupScreen.searchArea(
+            from: place,
+            radiusMeters: SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
+        )
+
+        XCTAssertEqual(draft.centerLabel, "Current location")
+        XCTAssertEqual(draft.radiusMeters, SetupScreen.metersFromMiles(2.0))
+    }
+
+    func testSearchAreaCloseDecisionCleanVsDirty() {
+        let committed = SetupScreen.SearchArea(
+            centerLabel: "Hayes Valley",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(2.0)
+        )
+        let pannedDraft = SetupScreen.SearchArea(
+            centerLabel: "Map center",
+            lat: 37.7599,
+            lng: -122.4148,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(2.0)
+        )
+        let steppedDraft = SetupScreen.searchAreaAfterRadiusStep(committed, offset: 1)
+
+        XCTAssertEqual(
+            SetupScreen.searchAreaCloseDecision(draft: committed, committed: committed),
+            .dismiss
+        )
+        XCTAssertEqual(
+            SetupScreen.searchAreaCloseDecision(draft: pannedDraft, committed: committed),
+            .prompt
+        )
+        XCTAssertEqual(
+            SetupScreen.searchAreaCloseDecision(draft: steppedDraft, committed: committed),
+            .prompt
+        )
+        XCTAssertEqual(
+            SetupScreen.searchAreaCloseDecision(draft: nil, committed: nil),
+            .dismiss
+        )
+    }
+
+    func testSearchAreaCommitUsesDraftOnly() {
+        let draft = SetupScreen.SearchArea(
+            centerLabel: "Map center",
+            lat: 37.7599,
+            lng: -122.4148,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(2.5)
+        )
+
+        XCTAssertEqual(SetupScreen.committedSearchArea(fromDraft: draft), draft)
+        XCTAssertNil(SetupScreen.committedSearchArea(fromDraft: nil))
+    }
+
     func testLaunchWithoutSearchAreaOpensEditorGate() {
         XCTAssertTrue(
             SetupScreen.shouldOpenSearchAreaEditorOnLaunch(
