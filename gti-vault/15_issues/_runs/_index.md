@@ -4,6 +4,7 @@ Live + archived progress logs from `/execute-issues` runs. One file per run, nam
 
 | Run | Status | Log |
 |---|---|---|
+| 2026-06-03-1258 | running | [[2026-06-03-1258-afk-execution-log]] - search-area-picker wave, 1 ready + 5 waiting |
 | 2026-05-16-0424 | done | [[2026-05-16-0424-afk-execution-log]] — 12/12 merged, 0 escalated |
 | 2026-05-16-0744 | done | [[2026-05-16-0744-afk-execution-log]] — Q5-wiring batch (tb-14–tb-17), 4/4 merged, 0 escalated |
 | 2026-05-18-1306 | done | [[2026-05-18-1306-afk-execution-log]] — 1/1 merged (tb-24, iOS Q5 factorial-ratings wire), 0 escalated |

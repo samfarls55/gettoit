@@ -14,6 +14,11 @@
     "web:typecheck": "npm run typecheck --prefix web",
     "web:test": "npm test --prefix web",
     "web:build": "npm run build --prefix web",
-    "web:dev": "npm run dev --prefix web"
+    "web:dev": "npm run dev --prefix web",
+    "sandcastle": "npx tsx .sandcastle/main.mts"
+  },
+  "dependencies": {
+    "@ai-hero/sandcastle": "^0.7.0",
+    "zod": "^4.4.3"
   }
 }
