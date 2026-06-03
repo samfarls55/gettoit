@@ -49,19 +49,18 @@ assert(/^---\r?\n[\s\S]*?surface:\s*01-setup/m.test(surface),
   '01-setup.md frontmatter: surface = 01-setup');
 assert(/^---\r?\n[\s\S]*?status:\s*locked/m.test(surface),
   '01-setup.md frontmatter: status = locked');
-assert(/locked-date:\s*2026-05-19/.test(surface),
-  '01-setup.md frontmatter: locked-date = 2026-05-19');
+assert(/locked-date:\s*2026-06-03/.test(surface),
+  '01-setup.md frontmatter: locked-date = 2026-06-03');
 assert(/jsx:[\s\S]*?-\s*code\/screens\/ScreenSetup\.jsx/.test(surface),
   '01-setup.md frontmatter claims code/screens/ScreenSetup.jsx');
 
-// Six locked controls — every eyebrow must appear verbatim somewhere in the doc
+// Five locked controls — every eyebrow must appear verbatim somewhere in the doc
 for (const eyebrow of [
   'Name this plan',
   "Who's coming",
-  'Where to',
+  'Search area',
   'When are you eating',
   'How you want to eat',
-  'How far',
 ]) {
   assert(surface.includes(eyebrow),
     `01-setup.md mentions eyebrow "${eyebrow}"`);
@@ -72,7 +71,6 @@ for (const def of [
   /A group/,                    // group context default
   /Dinner/,                     // meal time default
   /Dine in/,                    // service shape default
-  /1\.0\s*mi/i,                 // distance default
 ]) {
   assert(def.test(surface), `01-setup.md documents default matching ${def}`);
 }
@@ -101,13 +99,15 @@ assert(/required/i.test(surface) && /name/i.test(surface),
 assert(/40[\s-]?char/i.test(surface),
   '01-setup.md documents 40-char cap');
 
-// Distance slider semantics
-assert(/0\.25/.test(surface) && /10\.0/.test(surface),
-  '01-setup.md documents 0.25–10.0 mi range');
-assert(/non-uniform/i.test(surface),
-  '01-setup.md documents non-uniform step schedule');
-assert(/tick/i.test(surface),
-  '01-setup.md documents 1.0 mi visual tick');
+// Search area semantics
+assert(/C-28\s+SearchAreaPicker/.test(surface),
+  '01-setup.md documents C-28 SearchAreaPicker as active geography');
+assert(/Set search area/.test(surface) && /Search area - N\.N mi/.test(surface),
+  '01-setup.md documents Search area chip empty and committed copy');
+assert(/distance from the map camera center to the nearest visible map edge/i.test(surface),
+  '01-setup.md documents viewport-derived Search area radius');
+assert(/USE THIS AREA/.test(surface) && /dirty close/i.test(surface),
+  '01-setup.md documents explicit commit and dirty close prompt');
 
 // Mode prop is documented
 assert(/`mode`/.test(surface) && /create/.test(surface) && /edit/.test(surface),
@@ -139,13 +139,15 @@ assert(/['"]Edit your plan['"]/.test(jsx) && /['"]Start a new plan['"]/.test(jsx
 assert(/['"]SAVE FOR LATER['"]/.test(jsx) && /['"]SAVE CHANGES['"]/.test(jsx),
   'ScreenSetup.jsx switches secondary CTA by mode');
 
-// Composition — uses existing primitives only
-assert(/<LocationPickerChip\b/.test(jsx),
-  'ScreenSetup.jsx imports the existing C-23 LocationPickerChip');
+// Composition
+assert(/<SearchAreaPickerChip\b/.test(jsx),
+  'ScreenSetup.jsx uses the C-28 SearchAreaPickerChip');
+assert(!/<LocationPickerChip\b/.test(jsx),
+  'ScreenSetup.jsx no longer uses the historical C-23 LocationPickerChip for active Setup');
 assert(/<Chip\b/.test(jsx),
   'ScreenSetup.jsx uses the existing C-04 Chip');
-assert(/<RangeSlider\b/.test(jsx),
-  'ScreenSetup.jsx uses the C-21 RangeSlider');
+assert(!/<RangeSlider\b/.test(jsx),
+  'ScreenSetup.jsx no longer renders the separate C-21 RangeSlider for active Setup');
 assert(/<PillCTA\b/.test(jsx),
   'ScreenSetup.jsx uses the C-05 PillCTA');
 assert(/<CTADock\b/.test(jsx),
@@ -153,22 +155,8 @@ assert(/<CTADock\b/.test(jsx),
 assert(/<GradientSurface[^>]*stop=['"]initiator['"]/.test(jsx),
   'ScreenSetup.jsx renders on the initiator gradient surface');
 
-// Distance slider — snap list + tick must be wired
-assert(/steps\s*=\s*\{DISTANCE_STEPS\}|steps=\{\[/.test(jsx),
-  'ScreenSetup.jsx passes the non-uniform `steps` array to RangeSlider');
-assert(/tickAt\s*=\s*\{?1\.0\}?/.test(jsx),
-  'ScreenSetup.jsx passes tickAt={1.0} to RangeSlider');
-
-// All 17 snap values present in the list literal
-const distanceLine = jsx.match(/DISTANCE_STEPS\s*=\s*\[([\s\S]*?)\]/);
-if (distanceLine) {
-  const vals = distanceLine[1].split(',').map(s => s.trim()).filter(Boolean).map(Number);
-  const expected = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-  assert(vals.length === expected.length && expected.every((v, i) => vals[i] === v),
-    `ScreenSetup.jsx DISTANCE_STEPS matches the locked 17-value snap list`);
-} else {
-  failures.push('ScreenSetup.jsx exposes a DISTANCE_STEPS array literal');
-}
+assert(/initialSearchArea/.test(jsx),
+  'ScreenSetup.jsx accepts an initialSearchArea prop');
 
 // Chip options — all locked options for each group must appear as literals
 for (const opt of ['Just me', 'Two of us', 'A group',
@@ -214,6 +202,10 @@ assert(/tickAt|anchor tick/.test(compMd),
   'components.md C-21 documents the tickAt prop');
 assert(/color\.slider\.tick|slider\.tick/.test(compMd),
   'components.md C-21 references the new color.slider.tick token');
+assert(/##\s*C-28\b[\s\S]*SearchAreaPicker/.test(compMd),
+  'components.md has a C-28 SearchAreaPicker section');
+assert(/historical|superseded/i.test(compMd) && /active Setup/i.test(compMd),
+  'components.md marks C-23 historical/superseded for active Setup use');
 
 // ── 5. tokens.json — new color.slider.tick token ───────────
 const tokens = JSON.parse(read(tokensJson));

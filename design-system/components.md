@@ -337,7 +337,7 @@ Treat as **not final** — real wordmark is owned by `40_marketing_branding/`.
 
 ## C-21 · Range Slider
 
-Continuous numeric input on a gradient surface. Used by S01-setup (distance) and S05 verdict's "Widen radius" branch. Single primitive — no min/max chips, no end labels, no histogram. The current value renders as a readable label in the row above the slider (e.g. `"2.0 mi"`).
+Continuous numeric input on a gradient surface. Previously used by S01 Setup's separate distance control; active Setup geography now uses C-28 SearchAreaPicker. Still used by S05 verdict's "Widen radius" branch. Single primitive — no min/max chips, no end labels, no histogram. The current value renders as a readable label in the row above the slider (e.g. `"2.0 mi"`).
 
 | Element | Spec |
 |---|---|
@@ -364,7 +364,7 @@ The C-08 vibe slider already uses sun-fill for its selected stop. Continuity wit
 
 **Non-uniform `steps` array + anchor tick** *(added 2026-05-19 for sg-WF-1):* Pass `steps={[…]}` instead of `min`/`max`/`step`. The slider derives `min` / `max` from the first / last entries; the native overlay uses the smallest gap between adjacent entries as its step resolution; on `onChange`, the JSX snaps the raw value to the nearest entry in the list. The optional `tickAt={value}` prop renders a subtle 2 × 10 px anchor mark on the track at the given value (color: `color.slider.tick` → white 0.55). The tick is purely visual — no words, no label — and does not interact with snap behavior.
 
-Used by S01-setup distance slider:
+Historical S01 Setup distance-slider configuration, retained as the non-uniform variant reference:
 - `steps={[0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]}` — granularity tracks the walk/drive cognitive shift (0.25 below 1 mi, 0.5 between 1 and 5, 1.0 above 5).
 - `tickAt={1.0}` — anchors the implicit walk/drive boundary without resurrecting the rejected transport-mode question (workflow-overhaul Q8).
 
@@ -460,6 +460,8 @@ The register is voluntary warm-friend per ADR 0007 §"Why" — anything that fra
 ---
 
 ## C-23 · LocationPicker
+
+**Historical / superseded for active Setup use (2026-06-03):** C-23 remains in this file as historical context and as a reusable source of typeahead/current-location internals. It is no longer the active Setup geography primitive. Active S01 Setup geography uses [[#C-28 · SearchAreaPicker|C-28 SearchAreaPicker]], which owns the Search area chip, map editor, radius, Search area jump, and Density preview pin language.
 
 Reusable location selector. Bundled **readout chip** + tap-to-open **bottom sheet** containing a **typeahead input**, a **use-current-location** affordance, and a **suggestion list**. Decision recorded in [[../gti-vault/60_engineering/adr/0009-locationpicker-as-reusable-component|ADR 0009]] (Path B — reusable primitive, not ad-hoc composition).
 
@@ -637,6 +639,126 @@ The data layer is supplied by `tb-03` — `MKLocalSearchCompleter` for typeahead
 - Picker still hosted only on S01 after pre-public-launch milestone → reconsider whether `C-23` should be folded back into a single-surface composition.
 - Multi-geo handling lands and the picker needs to render per-room rather than per-user → may force a `C-23` re-spec.
 - Map thumbnail proves needed by a future consumer → un-defer the composite, add a `composite` variant.
+
+---
+
+## C-28 · SearchAreaPicker
+
+Active Setup geography primitive. Replaces the old active S01 split of `Where to` (C-23 LocationPicker) plus `How far` (C-21 RangeSlider) with one compact **Search area chip** and a full-screen **Search area editor**.
+
+This is a product/design contract, not iOS behavior implementation. The iOS tracer bullets supply MapKit camera binding, draft/committed state, search providers, persistence, and tests. The design contract pins what those slices must render and what language they must use.
+
+### Sub-components
+
+`C-28` ships as two JSX exports that compose into one conceptual primitive:
+
+- **`SearchAreaPickerChip`** — the always-visible Setup readout. Empty state reads `Set search area`. Committed state uses the best available human center label as the main line and `Search area - N.N mi` as supporting text.
+- **`SearchAreaEditor`** — the full-screen map editor opened from the chip. It edits a draft Search area until the user taps `USE THIS AREA`.
+
+### Search area model
+
+- **Center:** the map camera center.
+- **Search area radius:** the distance from the map camera center to the nearest visible map edge.
+- **Pan:** changes the draft center.
+- **Pinch:** changes the draft radius by changing the visible map span.
+- **Minus / plus radius controls:** step through the same allowed radius stops as the gesture path and keep the map zoom in sync. Use them for accessibility parity, not as a second model.
+- **Draft vs. committed:** map movement, radius steps, typed Search area jumps, and current-location jumps update draft state only. `USE THIS AREA` commits the draft back to Setup.
+
+Allowed radius stops inherit the locked S01 distance schedule so the control change does not create a new product range: `0.25, 0.50, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0` miles. Default first-open radius is `2.0 mi` when current location is available. Saved pending Plans open from their committed Search area.
+
+Search area has **no timezone or timing semantics**. It is center + radius only. The known stale reroll-window "search-area timezone" language is separate follow-up work and must not be deepened here.
+
+### Visual spec — `SearchAreaPickerChip`
+
+| Element | Spec |
+|---|---|
+| Container | Full-width row, min-height `var(--sp-16)`, padding `var(--sp-3) var(--sp-4)`, radius `var(--r-row)`, soft-glass `var(--glass-fill-soft)` background, white-at-0.18 token stroke, `blur(var(--sp-3)) saturate(160%)` backdrop. |
+| Leading mark | Sun pill/circle using `var(--sun)` fill and `var(--ink)` text/glyph. Decorative; `aria-hidden`. |
+| Main line | Body family, semibold/bold, `var(--paper)`, one line with ellipsis. Empty: `Set search area`. Committed: best available center label (`Mission, San Francisco`, neighborhood, city, or address label). |
+| Supporting line | Eyebrow token treatment, white-at-0.6. Empty: `Tap to choose on map`. Committed: `Search area - N.N mi`. |
+| Trailing affordance | Low-emphasis chevron/glyph in white-at-0.55. |
+| Press state | Background -> `var(--glass-fill-soft-press)`, `var(--ease-out)` duration. |
+| Tap target | Whole row, clears HIG 44pt minimum. |
+
+The chip is not a place-only picker. Do not label it `Location`, `Where to`, `Distance`, or `Radius`.
+
+### Visual spec — `SearchAreaEditor`
+
+The editor is full-screen, not a bottom sheet. The point is to give the map enough room for pan/pinch selection and density feedback.
+
+| Element | Spec |
+|---|---|
+| Full-screen map | Apple MapKit surface fills the viewport. JSX uses a neutral map stand-in; iOS renders real MapKit. |
+| Close/back | Top-leading icon button, HIG 44pt minimum. Clean close exits. Dirty close prompt appears when draft differs from committed. |
+| Top search field | Centered in the top chrome. Placeholder: `Search city, neighborhood, or address`. This is a Search area jump input, not the committed value. |
+| Current-location button | Top-trailing icon button. Performs a current-location Search area jump when current location is available. |
+| Selected circle | Visible circle centered on the map camera center, stroked with `var(--sun)`, lightly sun-filled. It shows the exact draft Search area. |
+| Bottom radius badge | Bottom-centered pill, sun fill, eyebrow treatment, copy such as `2.0 MI RADIUS`. |
+| Minus / plus controls | Flank the badge. Each has HIG 44pt minimum and steps the draft radius through the allowed stops. |
+| Commit | Bottom `PillCTA` white with locked label `USE THIS AREA`. Commits the draft Search area. |
+| Dirty close prompt | Center alert/dialog over the map. Actions: `Use this area` and `Discard changes`. Never silently drops uncommitted map movement. |
+
+### Search area jump
+
+A **Search area jump** recenters the map without committing. Typed search result selection and the current-location button both update draft center/radius state and leave the user inside the editor. The user still pans/pinches if needed and must tap `USE THIS AREA` to commit.
+
+Use Search area / Search area jump language in user-facing strings and tests. Reusing C-23 current-location or typeahead internals is allowed, but C-23's user-facing `LocationPicker` language is historical for active Setup.
+
+### Density preview pins
+
+Density preview pins are broad food/dining density feedback only:
+
+- Source is broad Apple MapKit food/dining search around the draft Search area.
+- Rendered pins must be filtered to **inside the selected circle**.
+- Visible pins are capped around 20.
+- Pins are non-interactive and pointer-inert. They do not open cards, venue details, filters, ranking, or recommendations.
+- Pins are not the final Candidate pool and do not imply eligibility for the verdict.
+- Empty preview results or preview fetch failure is non-blocking. The user can still tap `USE THIS AREA`.
+
+### Copy register (LOCKED)
+
+- Empty chip: `Set search area`.
+- Committed chip support: `Search area - N.N mi`.
+- Editor search placeholder: `Search city, neighborhood, or address`.
+- Radius badge: `N.N MI RADIUS`.
+- Commit CTA: `USE THIS AREA`.
+- Dirty prompt actions: `Use this area` and `Discard changes`.
+
+Avoid `Location required`, `Pick a location`, `Walking distance`, `Driving distance`, and any copy that implies timing, timezone, recommendations, or candidate eligibility.
+
+### Accessibility
+
+- Chip announces as `Set search area` when empty, or `Search area, {center label}, {N.N miles}` when committed.
+- Editor opens as a modal/dialog. Initial focus lands on close/back, then top search field, current-location button, map/radius controls, `USE THIS AREA`.
+- Minus/plus controls announce `Decrease Search area radius` / `Increase Search area radius`; radius badge is exposed as the current draft radius.
+- Density preview pins are decorative and non-interactive (`aria-hidden` / no accessibility element in SwiftUI).
+- Dirty close prompt uses alert-dialog semantics and moves focus to `Use this area`.
+- Reduced motion: keep map camera movement system-native; flatten prompt fade/rise if reduce-motion is enabled.
+
+### SwiftUI primitive
+
+```swift
+// Shell only. Map camera binding, MapKit search, persistence, and tests land
+// in tb-SA-1..tb-SA-4.
+struct SearchAreaPickerChip: View {
+  let committed: SearchArea?
+  let onOpen: () -> Void
+}
+
+struct SearchAreaEditor: View {
+  @Binding var draft: SearchArea
+  let committed: SearchArea?
+  let densityPins: [DensityPreviewPin]
+  let onCommit: (SearchArea) -> Void
+  let onDiscard: () -> Void
+}
+```
+
+### When NOT to use
+
+- Non-editable place labels. Use a plain glass row.
+- Candidate browsing or restaurant discovery. Density preview pins are sizing feedback, not venue cards.
+- Quiz, waiting, verdict, reroll, or timezone/timing surfaces. Search area is a Setup geography primitive only.
 
 ---
 

@@ -34,7 +34,7 @@ Decomposed from [[search-area-picker-prd|Search area picker PRD]] on 2026-06-03 
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|
-| sg-SA-1 | [[issues/sg-sa-1-searchareapicker-design-system-spec|SearchAreaPicker design-system spec]] | AFK | [#317](https://github.com/samfarls55/gettoit/issues/317) | — |
+| sg-SA-1 | [[issues/sg-sa-1-searchareapicker-design-system-spec|SearchAreaPicker design-system spec]] | AFK (done) | [#317](https://github.com/samfarls55/gettoit/issues/317) | — |
 | tb-SA-1 | [[issues/tb-sa-1-search-area-chip-persistence-foundation|Search area chip + persistence foundation]] | AFK | [#318](https://github.com/samfarls55/gettoit/issues/318) | sg-SA-1 |
 | tb-SA-2 | [[issues/tb-sa-2-map-viewport-selection-editor|Map viewport selection editor]] | AFK | [#319](https://github.com/samfarls55/gettoit/issues/319) | tb-SA-1 |
 | tb-SA-3 | [[issues/tb-sa-3-search-area-jumps|Search area jumps]] | AFK | [#320](https://github.com/samfarls55/gettoit/issues/320) | tb-SA-2 |

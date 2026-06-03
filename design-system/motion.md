@@ -154,6 +154,10 @@ The shutters are **dark blue-black** (`#0A0A0F`) with **sun-yellow hairline edge
 | LocationPicker suggestion row press (C-23) | background-color | 140ms | ease-out |
 | LocationPicker typeahead focus (C-23) | border 1px → 1.5px sun | 180ms | ease-out |
 | LocationPicker chip `loading` shimmer (C-23) | opacity 0.5 ↔ 1.0 pulse | 1400ms | ease-in-out |
+| SearchAreaPicker chip press (C-28) | background-color | 140ms | ease-out |
+| SearchAreaPicker editor present (C-28) | native full-screen push / opacity settle | system / 280ms | ease-out |
+| SearchAreaPicker selected circle update (C-28) | MapKit camera + overlay redraw | system-native | system-native |
+| SearchAreaPicker dirty prompt (C-28) | opacity + slight scale | 180ms | ease-out |
 
 ---
 
@@ -165,7 +169,7 @@ When `prefers-reduced-motion: reduce`:
 2. **Verdict reveal:** force `verdictReveal = 'off'` — everything appears at once.
 3. **Hard-close:** force `closeMotion = 'fade'`, drop the stamp pop animation.
 4. **Receipt stagger:** flatten to simultaneous.
-6. **Sheet open:** drop the translateY rise; opacity fade only.
+6. **Sheet / editor open:** drop translateY or scale flourish; opacity fade only for custom chrome. Map camera movement stays system-native.
 7. **Chip / CTA press scale:** keep (it's a press-feedback, not parallax).
 
 SwiftUI: read `@Environment(\.accessibilityReduceMotion)` and gate the `withAnimation` wrappers.
