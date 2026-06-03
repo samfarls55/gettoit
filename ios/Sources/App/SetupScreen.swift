@@ -198,6 +198,44 @@ public struct SetupScreen: View {
         )
     }
 
+    /// Build a `PlansStore.Location` from the committed Search area.
+    /// Returns nil when no area is committed: Save for later may write
+    /// a pending Plan without Search area, but launch is gated.
+    static func planLocation(fromCommittedSearchArea searchArea: SearchArea?) -> PlansStore.Location? {
+        guard let searchArea else { return nil }
+        return PlansStore.Location(
+            name: searchArea.centerLabel,
+            lat: searchArea.lat,
+            lng: searchArea.lng,
+            source: searchArea.source,
+            timeZoneIdentifier: searchArea.timeZoneIdentifier
+        )
+    }
+
+    /// Build the matching `RoomStore.RoomLocation` for the room mint
+    /// from the committed Search area.
+    static func roomLocation(fromCommittedSearchArea searchArea: SearchArea?) -> RoomStore.RoomLocation? {
+        guard let searchArea else { return nil }
+        let source = RoomStore.RoomLocation.Source(rawValue: searchArea.source) ?? .manual
+        return RoomStore.RoomLocation(
+            name: searchArea.centerLabel,
+            lat: searchArea.lat,
+            lng: searchArea.lng,
+            source: source,
+            timeZoneIdentifier: searchArea.timeZoneIdentifier
+        )
+    }
+
+    /// Choose the radius value to write to existing `distance_meters`
+    /// storage: committed Search area radius when present, otherwise
+    /// the fallback Setup default for pending-save without Search area.
+    static func payloadDistanceMeters(
+        committedSearchArea: SearchArea?,
+        fallbackDistanceMiles: Double
+    ) -> Int {
+        committedSearchArea?.radiusMeters ?? metersFromMiles(fallbackDistanceMiles)
+    }
+
     // MARK: - pure mode helpers
 
     /// How many controls render for a given group mode. Used by tests
@@ -1079,13 +1117,16 @@ public struct SetupScreen: View {
             // the canonical default so legacy readers stay coherent.
             transportMode: SessionParameters.default.transportMode
         )
-        let planLocation = planLocationFromSearchArea(committedSearchArea)
+        let planLocation = SetupScreen.planLocation(fromCommittedSearchArea: committedSearchArea)
         return PlanPayload(
             name: name,
             scope: resolvedPlanScope,
             location: planLocation,
             sessionParameters: session,
-            distanceMeters: committedSearchArea?.radiusMeters ?? SetupScreen.metersFromMiles(distanceMiles)
+            distanceMeters: SetupScreen.payloadDistanceMeters(
+                committedSearchArea: committedSearchArea,
+                fallbackDistanceMiles: distanceMiles
+            )
         )
     }
 
@@ -1109,34 +1150,6 @@ public struct SetupScreen: View {
         case .duo:   return .duo
         case .group: return .group
         }
-    }
-
-    /// Build a `PlansStore.Location` from the committed Search area.
-    /// Returns nil when no area is committed: Save for later may write
-    /// a pending Plan without Search area, but launch is gated.
-    private func planLocationFromSearchArea(_ searchArea: SearchArea?) -> PlansStore.Location? {
-        guard let searchArea else { return nil }
-        return PlansStore.Location(
-            name: searchArea.centerLabel,
-            lat: searchArea.lat,
-            lng: searchArea.lng,
-            source: searchArea.source,
-            timeZoneIdentifier: searchArea.timeZoneIdentifier
-        )
-    }
-
-    /// Build the matching `RoomStore.RoomLocation` for the room mint
-    /// from the committed Search area.
-    private func roomLocationFromSearchArea(_ searchArea: SearchArea?) -> RoomStore.RoomLocation? {
-        guard let searchArea else { return nil }
-        let source = RoomStore.RoomLocation.Source(rawValue: searchArea.source) ?? .manual
-        return RoomStore.RoomLocation(
-            name: searchArea.centerLabel,
-            lat: searchArea.lat,
-            lng: searchArea.lng,
-            source: source,
-            timeZoneIdentifier: searchArea.timeZoneIdentifier
-        )
     }
 
     /// Primary CTA — mints (or updates) the Plan AND mints the Room
@@ -1176,7 +1189,7 @@ public struct SetupScreen: View {
                 let room = try await roomStore.createRoom(
                     as: userID,
                     radiusMeters: payload.distanceMeters,
-                    location: roomLocationFromSearchArea(committedSearchArea),
+                    location: SetupScreen.roomLocation(fromCommittedSearchArea: committedSearchArea),
                     sessionParameters: payload.sessionParameters,
                     planID: plan.id
                 )

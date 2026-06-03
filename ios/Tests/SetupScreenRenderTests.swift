@@ -6,9 +6,10 @@
 //
 // Coverage:
 //   * Create mode opens with default chip selections + empty name.
-//   * Create mode + solo group mode → 5 controls rendered (no
-//     `Who's coming` row).
-//   * Create mode + group group mode → 6 controls rendered.
+//   * Create mode + solo group mode → one Search area control and no
+//     `Who's coming` row.
+//   * Create mode + group group mode → one Search area control plus
+//     the group-context row.
 //   * Edit mode prefilled from an existing pending Plan.
 //   * Mode pre-selection — a `.duo` Plan re-opens in `.group` setup
 //     with the `Two of us` chip selected.

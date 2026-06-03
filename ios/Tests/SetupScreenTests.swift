@@ -124,6 +124,36 @@ final class SetupScreenTests: XCTestCase {
         XCTAssertEqual(payload.distanceMeters, SetupScreen.metersFromMiles(2.5))
     }
 
+    func testCommittedSearchAreaCompilesToExistingLocationAndRadiusStorage() {
+        let searchArea = SetupScreen.SearchArea(
+            centerLabel: "Hayes Valley",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(3.0)
+        )
+
+        let planLocation = SetupScreen.planLocation(fromCommittedSearchArea: searchArea)
+        let roomLocation = SetupScreen.roomLocation(fromCommittedSearchArea: searchArea)
+        let radius = SetupScreen.payloadDistanceMeters(
+            committedSearchArea: searchArea,
+            fallbackDistanceMiles: SetupScreen.defaultDistanceMiles
+        )
+
+        XCTAssertEqual(planLocation?.name, "Hayes Valley")
+        XCTAssertEqual(planLocation?.lat ?? .nan, 37.7767, accuracy: 0.0001)
+        XCTAssertEqual(planLocation?.lng ?? .nan, -122.4241, accuracy: 0.0001)
+        XCTAssertEqual(planLocation?.source, "manual")
+        XCTAssertEqual(planLocation?.timeZoneIdentifier, "America/Los_Angeles")
+        XCTAssertEqual(roomLocation?.name, "Hayes Valley")
+        XCTAssertEqual(roomLocation?.lat ?? .nan, 37.7767, accuracy: 0.0001)
+        XCTAssertEqual(roomLocation?.lng ?? .nan, -122.4241, accuracy: 0.0001)
+        XCTAssertEqual(roomLocation?.source, .manual)
+        XCTAssertEqual(roomLocation?.timeZoneIdentifier, "America/Los_Angeles")
+        XCTAssertEqual(radius, SetupScreen.metersFromMiles(3.0))
+    }
+
     func testFreshPlanDoesNotInheritLocationCoordinatorPlaceAsCommittedSearchArea() {
         let coordinator = LocationCoordinator()
         coordinator.commit(place: ResolvedPlace(
