@@ -176,6 +176,7 @@ public struct SetupScreen: View {
     /// separate from `defaultDistanceMiles`, which remains the pending
     /// Plan storage fallback for Save-for-later without Search area.
     public static let firstOpenSearchAreaRadiusMiles: Double = 2.0
+    private static let searchAreaDraftToleranceMeters: CLLocationDistance = 25
 
     /// Minimal viewport value used to keep MapKit camera math testable
     /// without instantiating a SwiftUI `Map`.
@@ -230,12 +231,17 @@ public struct SetupScreen: View {
         fallbackTimeZoneIdentifier: String = TimeZone.current.identifier
     ) -> SearchArea {
         let center = CLLocation(latitude: viewport.centerLat, longitude: viewport.centerLng)
-        let previousCenter = previousDraft.map {
-            CLLocation(latitude: $0.lat, longitude: $0.lng)
+        let centerLabel: String
+        if let previousDraft {
+            let previousCenter = CLLocation(latitude: previousDraft.lat, longitude: previousDraft.lng)
+            let centerMoved = center.distance(from: previousCenter) > searchAreaDraftToleranceMeters
+            centerLabel = centerMoved ? "Map center" : previousDraft.centerLabel
+        } else {
+            centerLabel = "Map center"
         }
-        let centerMoved = previousCenter.map { center.distance(from: $0) > 25 } ?? true
+
         return SearchArea(
-            centerLabel: centerMoved ? "Map center" : (previousDraft?.centerLabel ?? "Map center"),
+            centerLabel: centerLabel,
             lat: viewport.centerLat,
             lng: viewport.centerLng,
             source: previousDraft?.source ?? "manual",
@@ -284,12 +290,6 @@ public struct SetupScreen: View {
         searchAreasMatchForDraftClose(draft, committed) ? .dismiss : .prompt
     }
 
-    /// Commit the current draft Search area. Nil stays nil so the
-    /// commit button remains a no-op until the editor has a draft.
-    public static func committedSearchArea(fromDraft draft: SearchArea?) -> SearchArea? {
-        draft
-    }
-
     /// Tolerant equality for map-derived drafts. MapKit camera round
     /// trips can shift by a few meters when region spans are normalized;
     /// those shifts should not make a clean editor look dirty.
@@ -303,8 +303,8 @@ public struct SetupScreen: View {
         case (.some(let lhs), .some(let rhs)):
             let lhsCenter = CLLocation(latitude: lhs.lat, longitude: lhs.lng)
             let rhsCenter = CLLocation(latitude: rhs.lat, longitude: rhs.lng)
-            return lhsCenter.distance(from: rhsCenter) <= 25
-                && abs(lhs.radiusMeters - rhs.radiusMeters) <= 25
+            return lhsCenter.distance(from: rhsCenter) <= searchAreaDraftToleranceMeters
+                && CLLocationDistance(abs(lhs.radiusMeters - rhs.radiusMeters)) <= searchAreaDraftToleranceMeters
                 && lhs.source == rhs.source
                 && lhs.timeZoneIdentifier == rhs.timeZoneIdentifier
         case (.some, .none), (.none, .some):
@@ -1755,8 +1755,8 @@ private struct SearchAreaEditor: View {
     }
 
     private func commitDraftAndDismiss() {
-        guard let committed = SetupScreen.committedSearchArea(fromDraft: draft) else { return }
-        onCommit(committed)
+        guard let draft else { return }
+        onCommit(draft)
     }
 }
 

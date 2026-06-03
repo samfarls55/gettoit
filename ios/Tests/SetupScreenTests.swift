@@ -229,20 +229,6 @@ final class SetupScreenTests: XCTestCase {
         )
     }
 
-    func testSearchAreaCommitUsesDraftOnly() {
-        let draft = SetupScreen.SearchArea(
-            centerLabel: "Map center",
-            lat: 37.7599,
-            lng: -122.4148,
-            source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
-            radiusMeters: SetupScreen.metersFromMiles(2.5)
-        )
-
-        XCTAssertEqual(SetupScreen.committedSearchArea(fromDraft: draft), draft)
-        XCTAssertNil(SetupScreen.committedSearchArea(fromDraft: nil))
-    }
-
     func testLaunchWithoutSearchAreaOpensEditorGate() {
         XCTAssertTrue(
             SetupScreen.shouldOpenSearchAreaEditorOnLaunch(
