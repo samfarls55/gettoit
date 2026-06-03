@@ -335,12 +335,12 @@ public struct RootView: View {
                     // re-invite CTA opens a fresh Setup surface so
                     // the user can start a brand-new Plan. The
                     // legacy timer + radius prefill (TB-11) is dropped
-                    // by tb-WF-4 — Setup uses the distance slider, not
-                    // the retired timer chip group, and lifts the
-                    // radius onto a per-Plan column. Reading those
-                    // values back into the Setup defaults would re-
-                    // introduce the contract the workflow-overhaul
-                    // phase deliberately retired.
+                    // by tb-SA-1 — fresh Setup opens with an empty
+                    // Search area chip, then commits center + radius
+                    // together through the existing Plan storage.
+                    // Reading sealed verdict values back into Setup
+                    // defaults would re-introduce the carryover
+                    // contract this phase deliberately retired.
                     // bug-34 / ADR 0018 — the sealed-deep-link branch
                     // mounts `VerdictReadOnlyScreen` directly. Web
                     // invitees have no Plan list to land on; the

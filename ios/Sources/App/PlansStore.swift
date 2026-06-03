@@ -83,7 +83,7 @@ public final class PlansStore {
 
     /// The shape of `plans.location` (jsonb). Mirrors `RoomLocation`
     /// from `RoomStore` so the Setup screen can read a Plan back and
-    /// hydrate the C-23 LocationPicker without a translation step.
+    /// hydrate the committed Search area without a translation step.
     /// `source` is plain `String` rather than a typed enum because the
     /// underlying value space ("gps" / "manual") is owned by
     /// `RoomStore.RoomLocation.Source`; the Plan-side decoder is
