@@ -47,7 +47,7 @@ const planSchema = z.object({
 const MAX_ITERATIONS = 10;
 
 const HOST_CODEX_AUTH_PATH = join(homedir(), ".codex", "auth.json");
-const SANDBOX_CODEX_AUTH_MOUNT_PATH = "/tmp/codex-auth.json";
+const SANDBOX_CODEX_AUTH_MOUNT_PATH = "/home/agent/codex-auth.json";
 const SANDBOX_CODEX_HOME = "/home/agent/workspace/.sandcastle/codex-home";
 const SANDBOX_GIT_CONFIG_GLOBAL = "/home/agent/workspace/.sandcastle/gitconfig";
 
