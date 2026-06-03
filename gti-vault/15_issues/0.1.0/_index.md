@@ -14,6 +14,7 @@ The phases below are organizational only — same cycle, distinct decomposition 
 - [[prd-phase|PRD phase (formerly the "v1" batch)]] — 18 tracer-bullet build slices (TB-00 → TB-17) decomposed from the [[../../10_prds/0.1.0-prd|0.1.0 PRD]] plus 5 design-system spec-gap issues. All merged 2026-05-12 → 2026-05-14.
 - [[dogfood-phase|Dogfood follow-ups (formerly the "v1.1" batch)]] — first-install TestFlight feedback (2026-05-14), the quiz-redesign + verdict-engine PRD ([[../../10_prds/0.1.0-quiz-redesign-prd|0.1.0 Quiz Redesign PRD]]), Q5-wiring fix, premium-data follow-ups, post-Q5 router fix, verdict-pipeline integration, candidate-pool floor, verdict-spinner diagnosis, solo-session post-mortem, AFK-run follow-ups, UI dogfood batch.
 - [[workflow-overhaul-phase|Workflow overhaul (formerly "workflow-overhaul")]] — Plans as persistent named items, list-as-landing, collapsed Setup screen, three nav verbs (Back/Exit/Delete), web invitee shell + account-claim bridge.
+- [[search-area-picker-prd|Search area picker PRD]] (GH [#316](https://github.com/samfarls55/gettoit/issues/316)) — replace active Setup `Where to` + `How far` controls with C-28 SearchAreaPicker.
 
 All `tb-NN-*` / `bug-NN-*` / `sg-NN-*` / `tb-wf-N-*` / `sg-wf-N-*` / `wfr-NN-*` issue files live flat in [[issues|0.1.0/issues/]].
 
@@ -26,6 +27,19 @@ Diagnostic notes captured outside the issue files themselves but still relevant 
 - [[service-shape-attributes-unbacked|service-shape-attributes-unbacked]] — Foursquare `attributes` adjacency for the service-shape session parameter.
 - [[ios-integration-tests-flaky-on-shared-db|ios-integration-tests-flaky-on-shared-db]] — flaky integration tests against the shared live Supabase DB.
 - [[verdict-pipeline-pool-manager-unwired|verdict-pipeline-pool-manager-unwired]] — `RunningUnionPoolManager` not-wired-in smell on the verdict side.
+
+## Search area picker issues
+
+Decomposed from [[search-area-picker-prd|Search area picker PRD]] on 2026-06-03 after splitting the original iOS core slice into smaller vertical slices.
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|
+| sg-SA-1 | [[issues/sg-sa-1-searchareapicker-design-system-spec|SearchAreaPicker design-system spec]] | AFK | [#317](https://github.com/samfarls55/gettoit/issues/317) | — |
+| tb-SA-1 | [[issues/tb-sa-1-search-area-chip-persistence-foundation|Search area chip + persistence foundation]] | AFK | [#318](https://github.com/samfarls55/gettoit/issues/318) | sg-SA-1 |
+| tb-SA-2 | [[issues/tb-sa-2-map-viewport-selection-editor|Map viewport selection editor]] | AFK | [#319](https://github.com/samfarls55/gettoit/issues/319) | tb-SA-1 |
+| tb-SA-3 | [[issues/tb-sa-3-search-area-jumps|Search area jumps]] | AFK | [#320](https://github.com/samfarls55/gettoit/issues/320) | tb-SA-2 |
+| tb-SA-4 | [[issues/tb-sa-4-density-preview-pins|Density preview pins]] | AFK | [#321](https://github.com/samfarls55/gettoit/issues/321) | tb-SA-2 |
+| tb-SA-5 | [[issues/tb-sa-5-retire-active-c23-setup-semantics|Retire active C-23 Setup semantics]] | AFK | [#322](https://github.com/samfarls55/gettoit/issues/322) | tb-SA-1, tb-SA-2, tb-SA-3, tb-SA-4 |
 
 ## Founder pre-launch HITL bucket
 

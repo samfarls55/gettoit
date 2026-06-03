@@ -1,17 +1,23 @@
 ---
 adr: 0009
 title: LocationPicker — reusable design-system component, not a one-off composite
-status: accepted
+status: superseded
 date: 2026-05-14
 supersedes: null
-superseded_by: null
+superseded_by: 0020-search-area-picker-replaces-locationpicker
 ---
 
 # 0009 — LocationPicker as a reusable design-system component
 
+> **SUPERSEDED — DO NOT BUILD NEW WORK AGAINST C-23.**
+> ADR 0020 replaces the active Setup control with `C-28 SearchAreaPicker`.
+> C-23 LocationPicker is historical context only until the design-system and iOS cleanup removes active references.
+
 ## Status
 
-Accepted — 2026-05-14.
+Superseded by [[0020-search-area-picker-replaces-locationpicker|ADR 0020 — SearchAreaPicker replaces LocationPicker as the active Setup geography control]] on 2026-06-03.
+
+Original status: accepted — 2026-05-14.
 
 ## Context
 
@@ -30,6 +36,8 @@ The original sg-04 issue body framed the alternative as "extend `MapKitPlacesFal
 ## Decision
 
 **Path B — add `C-23 LocationPicker` as a reusable design-system component.**
+
+**Superseded decision:** the active Setup geography control is now `C-28 SearchAreaPicker`, not `C-23 LocationPicker`. See ADR 0020 before changing related code.
 
 ## Why
 

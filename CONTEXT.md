@@ -60,6 +60,38 @@ _Avoid_: cuisine dislike (too soft; NEVER is hard veto), cuisine veto (collides 
 The user-facing persistent unit of intent — a named item the user creates ("Thursday dinner with the crew") and later returns to. Carries a name, a category (food only in 0.1.0), a participant scope (solo / duo / group — the *occasion* signal, not a headcount), a location, and the rest of the session parameters. A Plan is **stateful**: it moves through `pending` → `decided-active` (verdict stamped on, reroll allowed) → `decided-expired` (read-only history). Replaces the prior loose product term *decision*.
 _Avoid_: decision (deprecated — too many syllables, awkward in copy), session (engineering-only term for the room+quiz run that a Plan instantiates), task (collides with Reminders-app borrow without naming the GetToIt-specific shape).
 
+**Search area**:
+A Plan-level geographic constraint composed of a map-selected center and radius, edited together as one user-facing map control; the radius follows the visible map area and is shown with a circle plus distance label, and carries no timezone or timing semantics.
+_Avoid_: location (when radius is also meant), distance (when the center is also meant), geo (engineering register).
+
+When rendered as a Setup chip, a committed **Search area** shows the center's best human place label as the main line and the radius as supporting text (for example, "Search area · 1.5 mi"). An uncommitted value reads "Set search area."
+
+On first open with no committed value, the **Search area editor** centers on current location with a 2.0 mi radius when permission is granted, or opens in a search-first state when permission is denied/not granted. Editing an existing Plan starts from the saved Search area. New Plans do not default to a prior Plan's area; they start from current location.
+
+Saving a pending Plan does not require a **Search area**. Launching a Room from Setup does require a committed **Search area**; if missing, the primary action opens the **Search area editor** instead of minting the Room.
+
+**Search area radius**:
+The distance from the map camera center to the nearest visible map edge; pan changes the center, pinch zoom changes the radius, and the committed value is still persisted as center coordinate plus radius.
+_Avoid_: distance slider, zoom level (implementation detail), viewport bounds (backend-inconvenient shape).
+
+In the **Search area editor**, the radius value appears as a floating badge near the bottom center above the commit action (for example, "2.0 MI RADIUS"), outside the circle so it does not read as a map marker.
+
+The radius badge is flanked by visible minus/plus step buttons for users who cannot comfortably pinch; the buttons use the same allowed radius stops and keep the map zoom in sync.
+
+**Search area jump**:
+A typed place search or current-location action that recenters the map before the user commits the Search area; it is navigation inside the selector, not a separate final selection mode.
+_Avoid_: manual location (old C-23 language), typeahead selection (sounds final), address picker (too narrow).
+
+**Search area editor**:
+The full-screen map surface opened from the Setup chip where a member pans, pinches, jumps, and explicitly commits a Search area; leaving with uncommitted map changes prompts to commit or cancel.
+_Avoid_: location sheet (old C-23 shape), map picker (underspecified), radius picker (only half the control).
+
+The **Search area editor** chrome is intentionally minimal: close/back, a top search field, full-screen map, floating current-location button, bottom-center radius badge, and bottom primary action "USE THIS AREA." Dirty close prompts offer "Use this area" or "Discard changes."
+
+**Density preview pin**:
+A non-interactive map marker inside the selected circle for a broad Apple MapKit food/dining place shown only to help a member size the Search area; it refreshes after map movement settles, caps around 20 visible pins, and is not a candidate, recommendation, or venue detail entry point.
+_Avoid_: candidate pin, result pin, restaurant pin (over-promises category/detail).
+
 **Plan reroll window**:
 The interval during which a Plan in `decided-active` state may have its verdict replaced in place. The window closes at **23:59:59 in the Plan's search-area timezone on the calendar day *after* the verdict fired** — the search-area zone is `plans.location.timeZoneIdentifier` (the IANA id the C-23 LocationPicker resolves when the coordinate is committed), NOT the creator's device timezone (locked in the sg-WF-6 grill, 2026-05-21 — the device zone is never stored, and for the common near-home Plan the two are identical anyway). E.g. a Tuesday 5 PM verdict closes Wednesday 23:59:59 (~31h); a Tuesday 11:30 PM verdict closes Wednesday 23:59:59 (~24.5h). Acceptably asymmetric — the boundary tracks the today/tomorrow mental model of the meal's location rather than a uniform clock interval. The window inherits the existing 0.1.0 reroll friction model from `surfaces/07-reroll.md` intact: **max 3 rerolls** ("burns") per Plan, each requires a **stated reason that becomes a new constraint**, initiator-only. The time window is an *outer* bound: unused burns expire when the window closes. The Plan transitions to `decided-expired` on whichever happens first — window close, third burn used, or check-in completed.
 _Avoid_: reroll timer (collides with the 0.1.0-retired session timer), verdict TTL (engineering register), 24-hour window (the boundary is calendar-day-anchored, not a rolling 24h).
@@ -133,6 +165,10 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 - A **Parameter** is set on session setup and constrains the entire quiz that follows. A **Scenario question** is asked of every member during the quiz, and its answer is per-member. A **Profile** value is read silently per member without re-asking.
 - The conditional Q3 structure (indoor/outdoor only if dine-in **Parameter**) means quiz question identity depends on session parameters. Schema must support per-session question-slot variability.
 - The **Q5 preference probe** draws its three cards from the **Candidate pool**; the verdict engine ranks the same **Candidate pool**. They are one set — the **Candidate-pool floor** is what guarantees they cannot diverge.
+- A **Search area** supplies only the geo/radius portion of the **Candidate pool** fetch; it does not decide Plan timing or timezone behavior.
+- A **Search area jump** can change the center of a **Search area**, but the committed **Search area** remains the map's current center plus **Search area radius**.
+- The **Search area editor** is opened from one compact Setup chip; the map does not render inline on Setup.
+- **Density preview pins** can appear inside the **Search area editor**, but they do not define or promise membership in the **Candidate pool**.
 - The **Candidate-pool floor** is a fetch-time (Stage 1) venue-*class* hard filter, applied alongside geo / radius / price / meal-time. It is orthogonal to cuisine, which is a Stage-2 soft scoring axis in the verdict engine and never strict-filters the fetch.
 - A **Plan** is the durable owner; a **Room** is the ephemeral container for one quiz round. A Plan owns at most one active Room (the in-flight round). Launching a `pending` Plan mints a new Room. On verdict, the Room closes and the Plan transitions to `decided-active`. A reroll re-runs the verdict on that **same** Room in place — it does not mint a new Room (the 3-burn cap is per-Room). Once the Plan transitions to `decided-expired`, no new Rooms may be minted against it. Plan name, status, params, and the stamped verdict survive Room lifecycle; the Room's `votes` / `options` rows do not.
 - A **Modal sheet** and an **Action sheet** are distinct primitives, not visual variants. They differ in *role* (rich editor vs short choice), in container shape (bespoke dark-glass vs native-iOS), and in HIG semantics. C-16 (reroll) and C-23 LocationPicker are Modal sheets. The S00 disambig (Solo / Group) and delete-confirm sheets are Action sheets. A future surface that needs to host a richer single-choice picker (e.g. a long list) belongs in the Modal sheet family, not the Action sheet family — the choice is editor-vs-choice, not list-length.
@@ -149,6 +185,8 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 - "S01 + S04 surface specs are stale on timer/countdown": `design-system/surfaces/01-initiator.md` (locked 2026-05-12) and `design-system/surfaces/04-waiting.md` describe a timer chip group + `"Auto-fires in 7:42"` countdown that the 0.1.0 PRD (2026-05-15) explicitly retired (US34, US35, §115). Surfaces need a sweep to remove the timer chip, the countdown mono-tag, the `"Auto-fires"` copy, and any related state in `code/screens/Screen*.jsx` + `tb-03` / `tb-07` carryover. Workflow-overhaul setup screen (post-grill) does not include a Timer control.
 - "sign-up" vs "sign-in": product / founder voice uses "sign-up page" loosely for any account-creation moment. Engineering uses "sign-in gate" because the surface only ever signs in with an existing Apple identity (Apple owns account creation; the app never sees a "new vs returning" distinction). When the founder says "sign-up page," they almost always mean the **S00a Sign-in Gate**.
 - "anonymous user" vs "no user": pre-S00a these were the same in practice (every iOS install minted an anonymous user on launch). Post-S00a they diverge - no user = pre-S00a state; anonymous user = legacy carryover that must pass through S00a via `linkApple`.
+- "Search-area timezone" conflict: the existing **Plan reroll window** definition says the close boundary uses `plans.location.timeZoneIdentifier`, but the Search area grill on 2026-06-03 clarified that **Search area** has no timing or timezone semantics. The timing model needs a separate correction; do not use the map selector work to reinforce the old search-area-timezone language.
+- "C-23 LocationPicker" vs "C-28 SearchAreaPicker": the 2026-06-03 Search area grill clarified that the active Setup component should be a new **C-28 SearchAreaPicker**, not a relabeled C-23 LocationPicker. C-23 remains historical until the design-system and iOS cleanup retires its active references.
 
 ## See also
 
