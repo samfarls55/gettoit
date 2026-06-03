@@ -49,6 +49,7 @@ const MAX_ITERATIONS = 10;
 const HOST_CODEX_AUTH_PATH = join(homedir(), ".codex", "auth.json");
 const SANDBOX_CODEX_AUTH_MOUNT_PATH = "/home/agent/codex-auth.json";
 const SANDBOX_CODEX_HOME = "/home/agent/workspace/.sandcastle/codex-home";
+const SANDBOX_CODEX_SESSIONS_DIR = `${SANDBOX_CODEX_HOME}/sessions`;
 const SANDBOX_GIT_CONFIG_GLOBAL = "/home/agent/workspace/.sandcastle/gitconfig";
 
 if (!existsSync(HOST_CODEX_AUTH_PATH)) {
@@ -72,6 +73,17 @@ const createDockerSandbox = () =>
     },
   });
 
+const codexAgent = (
+  model: string,
+  options?: { effort?: "low" | "medium" | "high" | "xhigh" },
+) =>
+  sandcastle.codex(model, {
+    ...options,
+    sessionStorage: {
+      sandboxSessionsDir: SANDBOX_CODEX_SESSIONS_DIR,
+    },
+  });
+
 // Hooks run inside the sandbox before the agent starts each iteration.
 // npm install ensures the sandbox always has fresh dependencies.
 const hooks = {
@@ -87,11 +99,6 @@ const hooks = {
     ],
   },
 };
-
-// Copy node_modules from the host into the worktree before each sandbox
-// starts. Avoids a full npm install from scratch; the hook above handles
-// platform-specific binaries and any packages added since the last copy.
-const copyToWorktree = ["node_modules"];
 
 // ---------------------------------------------------------------------------
 // Main loop
@@ -117,7 +124,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     // not write code. (Structured output requires maxIterations: 1.)
     maxIterations: 1,
     // Opus for planning: dependency analysis benefits from deeper reasoning.
-    agent: sandcastle.codex("gpt-5.4-mini"),
+    agent: codexAgent("gpt-5.4-mini"),
     promptFile: "./.sandcastle/plan-prompt.md",
     // Extract and validate the <plan> JSON into a typed object. Throws
     // StructuredOutputError if the tag is missing, the JSON is malformed, or
@@ -156,7 +163,6 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         branch: issue.branch,
         sandbox: createDockerSandbox(),
         hooks,
-        copyToWorktree,
       });
 
       try {
@@ -164,7 +170,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         const implement = await sandbox.run({
           name: "implementer",
           maxIterations: 100,
-          agent: sandcastle.codex("gpt-5.5", { effort: "high" }),
+          agent: codexAgent("gpt-5.5", { effort: "high" }),
           promptFile: "./.sandcastle/implement-prompt.md",
           promptArgs: {
             TASK_ID: issue.id,
@@ -178,7 +184,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           const review = await sandbox.run({
             name: "reviewer",
             maxIterations: 1,
-            agent: sandcastle.codex("gpt-5.5", { effort: "high" }),
+            agent: codexAgent("gpt-5.5", { effort: "high" }),
             promptFile: "./.sandcastle/review-prompt.md",
             promptArgs: {
               BRANCH: issue.branch,
@@ -249,7 +255,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     sandbox: createDockerSandbox(),
     name: "merger",
     maxIterations: 1,
-    agent: sandcastle.codex("gpt-5.4-mini"),
+    agent: codexAgent("gpt-5.4-mini"),
     promptFile: "./.sandcastle/merge-prompt.md",
     promptArgs: {
       // A markdown list of branch names, one per line.
