@@ -78,6 +78,10 @@ final class SetupScreenTests: XCTestCase {
             SetupScreen.searchAreaSupportCopy(radiusMeters: SetupScreen.metersFromMiles(2.0)),
             "Search area - 2.0 mi"
         )
+        XCTAssertEqual(
+            SetupScreen.searchAreaRadiusBadgeCopy(radiusMeters: SetupScreen.metersFromMiles(2.0)),
+            "2.0 MI RADIUS"
+        )
     }
 
     func testLaunchWithoutSearchAreaOpensEditorGate() {

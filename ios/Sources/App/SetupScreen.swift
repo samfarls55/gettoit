@@ -149,6 +149,11 @@ public struct SetupScreen: View {
         Double(meters) / metersPerMile
     }
 
+    /// Radius value formatted for Search area UI copy.
+    public static func searchAreaRadiusMilesCopy(radiusMeters: Int) -> String {
+        String(format: "%.1f", milesFromMeters(radiusMeters))
+    }
+
     public static func emptySearchAreaMainCopy() -> String {
         "Set search area"
     }
@@ -158,11 +163,11 @@ public struct SetupScreen: View {
     }
 
     public static func searchAreaSupportCopy(radiusMeters: Int) -> String {
-        String(format: "Search area - %.1f mi", milesFromMeters(radiusMeters))
+        "Search area - \(searchAreaRadiusMilesCopy(radiusMeters: radiusMeters)) mi"
     }
 
     public static func searchAreaRadiusBadgeCopy(radiusMeters: Int) -> String {
-        String(format: "%.1f MI RADIUS", milesFromMeters(radiusMeters))
+        "\(searchAreaRadiusMilesCopy(radiusMeters: radiusMeters)) MI RADIUS"
     }
 
     public static func shouldOpenSearchAreaEditorOnLaunch(
@@ -1344,7 +1349,7 @@ private struct SearchAreaPickerChip: View {
 
     private var accessibilityCopy: String {
         guard let searchArea else { return SetupScreen.emptySearchAreaMainCopy() }
-        return "Search area, \(searchArea.centerLabel), \(String(format: "%.1f", SetupScreen.milesFromMeters(searchArea.radiusMeters))) miles"
+        return "Search area, \(searchArea.centerLabel), \(SetupScreen.searchAreaRadiusMilesCopy(radiusMeters: searchArea.radiusMeters)) miles"
     }
 }
 
@@ -1408,15 +1413,15 @@ private struct SearchAreaEditor: View {
             Button(action: onUseCurrentLocation) {
                 Image(systemName: "location.fill")
                     .font(.system(size: 17, weight: .black))
-                    .foregroundStyle(currentPlace == nil ? GTIColor.TextOnGradient.tertiary : GTIColor.ink)
+                    .foregroundStyle(currentLocationIconColor)
                     .frame(width: 44, height: 44)
                     .background(
                         Circle()
-                            .fill(currentPlace == nil ? GTIColor.Glass.fillSoft : GTIColor.sun)
+                            .fill(currentLocationBackgroundColor)
                     )
             }
             .buttonStyle(.plain)
-            .disabled(currentPlace == nil)
+            .disabled(!hasCurrentPlace)
             .accessibilityLabel("Use current location")
         }
     }
@@ -1435,13 +1440,13 @@ private struct SearchAreaEditor: View {
             .frame(width: 190, height: 190)
             .accessibilityHidden(true)
 
-            Text(draft?.centerLabel ?? "Set search area")
+            Text(selectedAreaTitle)
                 .font(.system(size: GTIFont.Size.displayM, weight: .black))
                 .foregroundStyle(GTIColor.TextOnGradient.primary)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
 
-            Text(draft == nil ? "Search or use current location to choose the center." : "Adjust the radius, then use this area.")
+            Text(selectedAreaInstruction)
                 .font(.system(size: GTIFont.Size.body, weight: .semibold))
                 .foregroundStyle(GTIColor.TextOnGradient.secondary)
                 .multilineTextAlignment(.center)
@@ -1456,7 +1461,7 @@ private struct SearchAreaEditor: View {
             }
             .disabled(draft == nil)
 
-            Text(draft.map { SetupScreen.searchAreaRadiusBadgeCopy(radiusMeters: $0.radiusMeters) } ?? "SET AREA")
+            Text(radiusBadgeCopy)
                 .font(.system(size: GTIFont.Size.eyebrow, weight: .black))
                 .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
                 .foregroundStyle(GTIColor.ink)
@@ -1497,7 +1502,35 @@ private struct SearchAreaEditor: View {
 
     private var radiusAccessibility: String {
         guard let draft else { return "Search area radius not set" }
-        return "\(String(format: "%.1f", SetupScreen.milesFromMeters(draft.radiusMeters))) miles"
+        return "\(SetupScreen.searchAreaRadiusMilesCopy(radiusMeters: draft.radiusMeters)) miles"
+    }
+
+    private var hasCurrentPlace: Bool {
+        currentPlace != nil
+    }
+
+    private var currentLocationIconColor: Color {
+        hasCurrentPlace ? GTIColor.ink : GTIColor.TextOnGradient.tertiary
+    }
+
+    private var currentLocationBackgroundColor: Color {
+        hasCurrentPlace ? GTIColor.sun : GTIColor.Glass.fillSoft
+    }
+
+    private var selectedAreaTitle: String {
+        draft?.centerLabel ?? SetupScreen.emptySearchAreaMainCopy()
+    }
+
+    private var selectedAreaInstruction: String {
+        guard draft != nil else {
+            return "Search or use current location to choose the center."
+        }
+        return "Adjust the radius, then use this area."
+    }
+
+    private var radiusBadgeCopy: String {
+        guard let draft else { return "SET AREA" }
+        return SetupScreen.searchAreaRadiusBadgeCopy(radiusMeters: draft.radiusMeters)
     }
 
     private func radiusButton(
@@ -1525,13 +1558,20 @@ private struct SearchAreaEditor: View {
         let index = SetupScreen.distanceSteps.firstIndex(of: currentMiles) ?? 0
         let nextIndex = min(max(index + offset, 0), SetupScreen.distanceSteps.count - 1)
         let nextRadius = SetupScreen.metersFromMiles(SetupScreen.distanceSteps[nextIndex])
-        draft = SetupScreen.SearchArea(
-            centerLabel: current.centerLabel,
-            lat: current.lat,
-            lng: current.lng,
-            source: current.source,
-            timeZoneIdentifier: current.timeZoneIdentifier,
-            radiusMeters: nextRadius
+        draft = copySearchArea(current, radiusMeters: nextRadius)
+    }
+
+    private func copySearchArea(
+        _ searchArea: SetupScreen.SearchArea,
+        radiusMeters: Int
+    ) -> SetupScreen.SearchArea {
+        SetupScreen.SearchArea(
+            centerLabel: searchArea.centerLabel,
+            lat: searchArea.lat,
+            lng: searchArea.lng,
+            source: searchArea.source,
+            timeZoneIdentifier: searchArea.timeZoneIdentifier,
+            radiusMeters: radiusMeters
         )
     }
 }
