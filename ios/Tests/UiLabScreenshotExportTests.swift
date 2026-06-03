@@ -69,12 +69,14 @@ final class UiLabScreenshotExportTests: XCTestCase {
 
     private func render<V: View>(_ view: V) async throws -> UIImage {
         let root = view
-            .environment(\.accessibilityReduceMotion, true)
+            .transaction { transaction in
+                transaction.disablesAnimations = true
+            }
             .frame(width: canvasSize.width, height: canvasSize.height)
         let host = UIHostingController(rootView: root)
         host.view.frame = CGRect(origin: .zero, size: canvasSize)
         host.view.bounds = CGRect(origin: .zero, size: canvasSize)
-        host.view.backgroundColor = .clear
+        host.view.backgroundColor = UIColor.clear
 
         let window = UIWindow(frame: CGRect(origin: .zero, size: canvasSize))
         window.rootViewController = host

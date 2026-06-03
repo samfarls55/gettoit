@@ -71,6 +71,7 @@ Native iOS reference screenshots are a development aid for any local UI lab, not
 
 - Generate native screenshots without a local Mac by running the `ios-ui-snapshots` GitHub Actions workflow.
 - The workflow runs `GetToItTests/UiLabScreenshotExportTests/testExportUiLabScreenshots` on a macOS runner and uploads the `ios-ui-lab-screenshots` artifact.
+- The local `/ui-lab` slash command is expected to dispatch that workflow, wait for completion, download the artifact into `web/public/ui-lab-ios/`, then start or reuse the Next dev server and open the lab. It should stop on workflow failure rather than opening stale screenshots silently.
 - Download that artifact into the ignored local folder `web/public/ui-lab-ios/` when a local UI lab needs side-by-side native references.
 - On a local Mac, run the iOS test target with `GTI_UI_LAB_SCREENSHOT_DIR` pointed at `../web/public/ui-lab-ios/` and `-only-testing:GetToItTests/UiLabScreenshotExportTests/testExportUiLabScreenshots`.
 - Use these screenshots for layout, copy, spacing, visual hierarchy, and quick visual comparison before porting chosen changes into SwiftUI/TestFlight.
