@@ -31,6 +31,13 @@ secrets/
 supabase/.temp/
 supabase/.branches/
 
+# Sandcastle local state (secrets, sandbox worktrees, logs, sandbox-local auth)
+.sandcastle/.env
+.sandcastle/codex-home/
+.sandcastle/gitconfig
+.sandcastle/logs/
+.sandcastle/worktrees/
+
 # Deno-generated lockfile (deno 2.x writes one at the repo root when
 # tests run from a subdir without an explicit deno.json). CI generates
 # its own; we don't pin transitive versions here.
