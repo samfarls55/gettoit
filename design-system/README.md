@@ -12,7 +12,7 @@ This is the handoff package for agent-assisted SwiftUI implementation. Tokens, c
 |---|---|
 | [`tokens.json`](./tokens.json) | **Canonical source of truth** for all tokens. `code/tokens.css` is generated from this. Future `GTITokens.swift` will be too. |
 | [`tokens.md`](./tokens.md) | Human-readable tokens reference: color, gradient, type, spacing, radii, shadow, motion. SwiftUI primitive map. |
-| [`components.md`](./components.md) | Every component (C-01…C-26) — states, sizes, tap targets, SwiftUI primitives. |
+| [`components.md`](./components.md) | Every component (C-01…C-28) — states, sizes, tap targets, SwiftUI primitives. |
 | [`motion.md`](./motion.md) | Per-component motion timings, verdict-reveal choreography, reduced-motion. |
 | [`accessibility.md`](./accessibility.md) | Contrast tables on every gradient, tap-target audit, focus order, VO, Dynamic Type. |
 | [`surfaces/`](./surfaces/) | 8 surface docs — purpose, defenses, copy register, edge cases. Each links to its JSX. |

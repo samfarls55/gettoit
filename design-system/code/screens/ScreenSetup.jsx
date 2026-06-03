@@ -6,30 +6,19 @@
 // `mode` prop. Both modes share layout; only the headline + secondary CTA
 // label differ.
 //
-// Inventory (six controls, flat eyebrow-per-control rhythm):
+// Inventory (five controls, flat eyebrow-per-control rhythm):
 //   1. Name this plan       — required text input, 40-char cap
 //   2. Who's coming         — single-select chips (occasion framing, not headcount)
-//   3. Where to             — C-23 LocationPicker (existing)
+//   3. Search area          — C-28 SearchAreaPicker chip
 //   4. When are you eating  — single-select chips
 //   5. How you want to eat  — single-select chips
-//   6. How far              — C-21 RangeSlider variant (non-uniform steps + 1.0 mi tick)
 //
-// Built from existing primitives only — the only spec deepening is the
-// C-21 variant (optional `steps` array + `tickAt` prop). See the surface
-// doc `surfaces/01-setup.md` for the full contract, including the spec
-// exception against S01-initiator's "no name your night" defense.
+// sg-SA-1 replaces the old active Setup `Where to` + `How far` split with
+// one Search area chip. The full-screen editor is C-28; iOS wiring lands in
+// the paired tracer bullets. See `surfaces/01-setup.md` for the full contract.
 //
 // iOS wiring is the paired tracer-bullet tb-WF-4; this JSX is the
 // design-system contract only.
-
-// Distance slider snap-list (workflow-overhaul Q8) — non-uniform:
-// 0.25 mi step under 1 mi (walking range), 0.5 mi from 1–5 mi, 1.0 mi
-// from 5–10 mi. Tick anchors the implicit walk/drive boundary at 1.0 mi.
-const DISTANCE_STEPS = [
-  0.25, 0.5, 0.75,
-  1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
-  6.0, 7.0, 8.0, 9.0, 10.0,
-];
 
 const GROUP_CONTEXTS  = ['Just me', 'Two of us', 'A group'];
 const MEAL_TIMES      = ['Breakfast', 'Lunch', 'Dinner', 'Late night'];
@@ -44,12 +33,11 @@ function ScreenSetup({
   initialGroupContext = 'A group',
   initialMealTime = 'Dinner',
   initialServiceShape = 'Dine in',
-  initialDistance = 1.0,
-  // C-23 LocationPicker wiring — host surface supplies state + place.
-  // Defaults model the canonical post-pre-prime granted state for preview.
-  locationState = 'auto',                       // 'auto' | 'manual' | 'stale' | 'empty' | 'loading'
-  locationPlace = { name: 'Mission · San Francisco', sub: 'San Francisco, CA' },
-  onLocationOpen = () => {},
+  initialSearchArea = {
+    label: 'Mission, San Francisco',
+    radiusMiles: 2.0,
+  },
+  onSearchAreaOpen = () => {},
   // Callbacks
   onPrimary = () => {},                         // Drop the invite link / Start the quiz
   onSecondary = () => {},                       // SAVE FOR LATER / SAVE CHANGES
@@ -58,7 +46,7 @@ function ScreenSetup({
   const [groupContext, setGroupContext] = React.useState(initialGroupContext);
   const [mealTime, setMealTime]         = React.useState(initialMealTime);
   const [serviceShape, setServiceShape] = React.useState(initialServiceShape);
-  const [distance, setDistance]         = React.useState(initialDistance);
+  const [searchArea]                    = React.useState(initialSearchArea);
 
   // Validation — workflow-overhaul Q10: name required for BOTH dock CTAs.
   const nameValid = name.trim().length > 0;
@@ -172,21 +160,17 @@ function ScreenSetup({
               onPick={setGroupContext}
             />
 
-            {/* 3. Where to — existing C-23 LocationPicker */}
+            {/* 3. Search area — C-28 SearchAreaPicker chip */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Eyebrow opacity={0.6}>Where to</Eyebrow>
-              <LocationPickerChip
-                state={locationState}
-                place={locationPlace}
-                onOpen={onLocationOpen}
+              <Eyebrow opacity={0.6}>Search area</Eyebrow>
+              <SearchAreaPickerChip
+                searchArea={searchArea}
+                onOpen={onSearchAreaOpen}
               />
-              {/* wfr-24 — optional + we'll-prompt-later hint
-                  (Input Hints pattern). Matches workflow-overhaul
-                  Q10 — Plan can ship with NULL location. */}
               <span style={{
                 fontFamily: 'var(--ff-body)', fontSize: 13, fontWeight: 400,
                 color: 'rgba(255,255,255,0.55)',
-              }}>Optional — we'll prompt later</span>
+              }}>Choose the map area GetToIt should search.</span>
             </div>
 
             {/* 4. When are you eating — single-select chips */}
@@ -204,36 +188,6 @@ function ScreenSetup({
               value={serviceShape}
               onPick={setServiceShape}
             />
-
-            {/* 6. How far — C-21 RangeSlider variant with non-uniform steps + 1.0 mi tick */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <div style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-              }}>
-                <Eyebrow opacity={0.6}>How far</Eyebrow>
-                <span style={{
-                  fontFamily: 'var(--ff-mono)', fontSize: 11, fontWeight: 500,
-                  letterSpacing: '0.18em', textTransform: 'uppercase',
-                  color: 'rgba(255,255,255,0.88)',
-                }}>{distance.toFixed(1)} MI</span>
-              </div>
-              <RangeSlider
-                value={distance}
-                steps={DISTANCE_STEPS}
-                tickAt={1.0}
-                onChange={setDistance}
-                ariaLabel="Plan distance"
-                valueLabel={`${distance.toFixed(1)} miles`}
-              />
-              {/* wfr-24 — adjacent unit hint (Input Hints pattern).
-                  The mono-tag value label carries the live value;
-                  this clarifies the slider's purpose in plain language. */}
-              <span style={{
-                fontFamily: 'var(--ff-body)', fontSize: 13, fontWeight: 400,
-                color: 'rgba(255,255,255,0.55)',
-                marginTop: 4,
-              }}>From your location, in miles</span>
-            </div>
 
             <div style={{ height: 4 }} />
 

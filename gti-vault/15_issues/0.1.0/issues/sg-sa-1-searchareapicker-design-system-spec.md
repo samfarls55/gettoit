@@ -1,7 +1,7 @@
 ---
 issue: sg-SA-1
 title: SearchAreaPicker design-system spec
-status: ready-for-agent
+status: done
 type: AFK
 feature: 0.1.0
 artifact: spec-gap
@@ -43,3 +43,7 @@ Update the Setup surface contract so `Where to` plus `How far` are replaced by o
 ## Blocked by
 
 None - can start immediately.
+
+## Comments
+
+- 2026-06-03 — Implemented C-28 SearchAreaPicker design-system contract, updated active Setup geography docs/JSX, marked C-23 historical for active Setup use, and verified `npm run verify:design-system` plus SearchAreaPicker/Setup structural tests.

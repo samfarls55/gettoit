@@ -877,6 +877,361 @@ function LocationPickerSheet({
 }
 
 // ────────────────────────────────────────────────────────────
+// SearchAreaPicker (C-28) — active Setup geography primitive.
+//
+// C-28 replaces the active S01 `Where to` LocationPicker + separate `How far`
+// slider with one compact Search area chip and a full-screen map editor.
+// This JSX is a design-system shell only. iOS tracer bullets supply MapKit
+// camera binding, draft/committed state, search providers, and persistence.
+// ────────────────────────────────────────────────────────────
+const SEARCH_AREA_RADIUS_STOPS = [
+  0.25, 0.5, 0.75,
+  1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
+  6.0, 7.0, 8.0, 9.0, 10.0,
+];
+
+const SEARCH_AREA_SAMPLE_PINS = [
+  { id: 'p1', x: '42%', y: '36%' },
+  { id: 'p2', x: '55%', y: '31%' },
+  { id: 'p3', x: '61%', y: '48%' },
+  { id: 'p4', x: '47%', y: '57%' },
+  { id: 'p5', x: '36%', y: '50%' },
+  { id: 'p6', x: '54%', y: '63%' },
+  { id: 'p7', x: '65%', y: '39%' },
+  { id: 'p8', x: '43%', y: '45%' },
+];
+
+function formatSearchAreaRadius(miles) {
+  const n = Number.isFinite(miles) ? miles : 2.0;
+  return `${n.toFixed(1)} mi`;
+}
+
+function SearchAreaPickerChip({
+  searchArea = null,
+  onOpen = () => {},
+}) {
+  const hasArea = Boolean(searchArea);
+  const title = hasArea ? searchArea.label : 'Set search area';
+  const subtitle = hasArea
+    ? `Search area - ${formatSearchAreaRadius(searchArea.radiusMiles)}`
+    : 'Tap to choose on map';
+
+  return (
+    <button
+      onClick={onOpen}
+      aria-label={hasArea
+        ? `Search area, ${title}, ${formatSearchAreaRadius(searchArea.radiusMiles)}`
+        : 'Set search area'}
+      style={{
+        appearance: 'none',
+        border: 'calc(var(--sp-1) / 4) solid rgba(255,255,255,0.18)',
+        background: 'var(--glass-fill-soft)',
+        backdropFilter: 'blur(var(--sp-3)) saturate(160%)',
+        WebkitBackdropFilter: 'blur(var(--sp-3)) saturate(160%)',
+        borderRadius: 'var(--r-row)',
+        width: '100%',
+        minHeight: 'var(--sp-16)',
+        padding: 'var(--sp-3) var(--sp-4)',
+        color: 'var(--paper)',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--sp-3)',
+        textAlign: 'left',
+        transition: 'background 140ms var(--ease-out)',
+      }}
+    >
+      <span
+        aria-hidden="true"
+        style={{
+          width: 'var(--sp-8)',
+          height: 'var(--sp-8)',
+          borderRadius: 'var(--r-chip)',
+          display: 'grid',
+          placeItems: 'center',
+          color: 'var(--ink)',
+          background: 'var(--sun)',
+          fontFamily: 'var(--ff-body)',
+          fontWeight: 900,
+          fontSize: 'var(--fz-sm)',
+          flex: '0 0 auto',
+        }}
+      >SA</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          display: 'block',
+          fontFamily: 'var(--ff-body)',
+          fontSize: 'var(--fz-body)',
+          fontWeight: 700,
+          lineHeight: 1.2,
+          color: 'var(--paper)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>{title}</span>
+        <span className="gti-eyebrow" style={{
+          display: 'block',
+          color: 'rgba(255,255,255,0.6)',
+          marginTop: 'var(--sp-1)',
+        }}>{subtitle}</span>
+      </span>
+      <span aria-hidden="true" style={{
+        color: 'rgba(255,255,255,0.55)',
+        fontFamily: 'var(--ff-body)',
+        fontWeight: 900,
+        fontSize: 'var(--fz-body)',
+      }}>›</span>
+    </button>
+  );
+}
+
+function SearchAreaEditor({
+  draftArea = { label: 'Mission, San Francisco', radiusMiles: 2.0 },
+  query = '',
+  densityPins = SEARCH_AREA_SAMPLE_PINS,
+  dirty = false,
+  showDirtyPrompt = false,
+  onQueryChange = () => {},
+  onCurrentLocation = () => {},
+  onRadiusStep = () => {},
+  onClose = () => {},
+  onCommit = () => {},
+  onDiscard = () => {},
+}) {
+  const radiusLabel = `${formatSearchAreaRadius(draftArea.radiusMiles).toUpperCase()} RADIUS`;
+  const visiblePins = densityPins.slice(0, 20);
+
+  const iconButton = {
+    appearance: 'none',
+    border: 'calc(var(--sp-1) / 4) solid rgba(255,255,255,0.18)',
+    background: 'rgba(20,20,30,0.72)',
+    color: 'var(--paper)',
+    borderRadius: 'var(--r-chip)',
+    minWidth: 'var(--sp-12)',
+    minHeight: 'var(--sp-12)',
+    display: 'grid',
+    placeItems: 'center',
+    cursor: 'pointer',
+    fontFamily: 'var(--ff-body)',
+    fontWeight: 900,
+    fontSize: 'var(--fz-title)',
+    backdropFilter: 'blur(calc(var(--sp-1) * 4.5)) saturate(160%)',
+    WebkitBackdropFilter: 'blur(calc(var(--sp-1) * 4.5)) saturate(160%)',
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search area editor"
+      data-dirty={dirty ? 'true' : 'false'}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 60,
+        background: 'var(--ink-3)',
+        color: 'var(--paper)',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        aria-label="Full-screen map"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'radial-gradient(circle at 48% 44%, rgba(255,210,63,0.16), transparent 38%), linear-gradient(135deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03)), var(--ink-2)',
+        }}
+      >
+        <div aria-hidden="true" style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(90deg, transparent 0 46%, rgba(255,255,255,0.10) 46% 47%, transparent 47% 100%), linear-gradient(0deg, transparent 0 54%, rgba(255,255,255,0.08) 54% 55%, transparent 55% 100%)',
+          opacity: 0.9,
+        }} />
+
+        <div
+          aria-label={`Selected circle, ${radiusLabel}`}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: '72vmin',
+            aspectRatio: '1 / 1',
+            borderRadius: '50%',
+            border: 'calc(var(--sp-1) / 2) solid var(--sun)',
+            background: 'rgba(255,210,63,0.10)',
+            transform: 'translate(-50%, -50%)',
+            boxShadow: '0 0 0 calc(var(--sp-1) / 4) rgba(14,16,17,0.35), 0 0 var(--sp-12) rgba(255,210,63,0.22)',
+          }}
+        >
+          {visiblePins.map(pin => (
+            <span
+              key={pin.id}
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                left: pin.x,
+                top: pin.y,
+                width: 'var(--sp-2)',
+                height: 'var(--sp-2)',
+                borderRadius: 'var(--r-chip)',
+                background: 'var(--paper)',
+                boxShadow: '0 0 0 calc(var(--sp-1) / 2) rgba(20,20,30,0.56)',
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'none',
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: 0,
+        padding: 'var(--sp-12) var(--sp-4) var(--sp-4)',
+        display: 'grid',
+        gridTemplateColumns: 'var(--sp-12) 1fr var(--sp-12)',
+        gap: 'var(--sp-2)',
+        alignItems: 'center',
+      }}>
+        <button onClick={onClose} aria-label={dirty ? 'Close search area editor with changes' : 'Close search area editor'} style={iconButton}>
+          ×
+        </button>
+        <label style={{
+          minHeight: 'var(--sp-12)',
+          borderRadius: 'var(--r-row)',
+          background: 'rgba(20,20,30,0.72)',
+          border: 'calc(var(--sp-1) / 4) solid rgba(255,255,255,0.18)',
+          backdropFilter: 'blur(calc(var(--sp-1) * 4.5)) saturate(160%)',
+          WebkitBackdropFilter: 'blur(calc(var(--sp-1) * 4.5)) saturate(160%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--sp-2)',
+          padding: '0 var(--sp-3)',
+        }}>
+          <span aria-hidden="true" style={{ color: 'rgba(255,255,255,0.6)' }}>⌕</span>
+          <input
+            value={query}
+            onChange={e => onQueryChange(e.target.value)}
+            placeholder="Search city, neighborhood, or address"
+            aria-label="Top search field, Search area jump"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              appearance: 'none',
+              border: 0,
+              outline: 0,
+              background: 'transparent',
+              color: 'var(--paper)',
+              caretColor: 'var(--sun)',
+              fontFamily: 'var(--ff-body)',
+              fontSize: 'var(--fz-sm)',
+              fontWeight: 700,
+            }}
+          />
+        </label>
+        <button onClick={onCurrentLocation} aria-label="Current-location button, Search area jump" style={iconButton}>
+          ⌖
+        </button>
+      </div>
+
+      <div style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        padding: 'var(--sp-4) var(--sp-4) var(--sp-6)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--sp-3)',
+      }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: 'var(--sp-3)',
+        }}>
+          <button onClick={() => onRadiusStep(-1)} aria-label="Decrease Search area radius" style={iconButton}>
+            −
+          </button>
+          <div className="gti-eyebrow" style={{
+            minHeight: 'var(--sp-12)',
+            padding: '0 var(--sp-4)',
+            borderRadius: 'var(--r-chip)',
+            display: 'grid',
+            placeItems: 'center',
+            color: 'var(--ink)',
+            background: 'var(--sun)',
+            boxShadow: '0 var(--sp-3) var(--sp-6) rgba(255,210,63,0.30)',
+          }}>{radiusLabel}</div>
+          <button onClick={() => onRadiusStep(1)} aria-label="Increase Search area radius" style={iconButton}>
+            +
+          </button>
+        </div>
+        <PillCTA label="USE THIS AREA" fill="white" onClick={onCommit} />
+      </div>
+
+      {showDirtyPrompt && (
+        <div role="alertdialog" aria-modal="true" aria-label="Use or discard Search area changes" style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.42)',
+          display: 'grid',
+          placeItems: 'center',
+          padding: 'var(--sp-5)',
+        }}>
+          <div style={{
+            width: 'min(100%, calc(var(--sp-16) * 5.625))',
+            borderRadius: 'var(--r-card-lg)',
+            background: 'rgba(20,20,30,0.92)',
+            border: 'calc(var(--sp-1) / 4) solid rgba(255,255,255,0.14)',
+            boxShadow: '0 calc(var(--sp-1) * -5) calc(var(--sp-1) * 15) rgba(0,0,0,0.5)',
+            padding: 'var(--sp-5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 'var(--sp-3)',
+          }}>
+            <div className="gti-eyebrow" style={{ color: 'var(--sun)' }}>Unsaved search area</div>
+            <div style={{
+              fontFamily: 'var(--ff-body)',
+              fontSize: 'var(--fz-title)',
+              fontWeight: 900,
+              lineHeight: 1.05,
+              textTransform: 'uppercase',
+            }}>Use this area?</div>
+            <p style={{
+              margin: 0,
+              fontFamily: 'var(--ff-body)',
+              fontSize: 'var(--fz-sm)',
+              lineHeight: 1.4,
+              color: 'rgba(255,255,255,0.72)',
+            }}>Your map moved. Commit the draft area or discard the changes before closing.</p>
+            <PillCTA label="Use this area" fill="white" onClick={onCommit} />
+            <button onClick={onDiscard} style={{
+              appearance: 'none',
+              border: 0,
+              background: 'transparent',
+              minHeight: 'var(--sp-12)',
+              color: 'rgba(255,255,255,0.72)',
+              fontFamily: 'var(--ff-body)',
+              fontWeight: 800,
+              fontSize: 'var(--fz-cta)',
+              letterSpacing: 'var(--tr-cta)',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+            }}>Discard changes</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
 // Quiz chrome (sg-WF-2) — Back + Exit affordances on every Qn screen.
 //
 // Two text labels sitting above the C-02 TopBar:
@@ -1308,6 +1663,7 @@ Object.assign(window, {
   CTADock, Eyebrow, Glass, GTIMark,
   RangeSlider, AuthUpgradeChip,
   LocationPickerChip, LocationPickerSheet,
+  SearchAreaPickerChip, SearchAreaEditor,
   QuizChrome,
   ActionDotMenuTrigger, ActionDotMenu,
   FloatingActionButton,

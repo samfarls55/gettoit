@@ -1,7 +1,7 @@
 ---
 surface: 01-setup
 status: locked
-locked-date: 2026-05-19
+locked-date: 2026-06-03
 supersedes:
   - 01-initiator
   - 01b-parameters
@@ -13,7 +13,7 @@ jsx:
 
 > **Code:** [`../code/screens/ScreenSetup.jsx`](../code/screens/ScreenSetup.jsx)
 
-The canonical **Plan creation + Plan edit** surface — one screen that collapses today's S01 (Initiator landing) + S01b (Pre-quiz parameters) into a single Setup screen. Lands the design-system contract for the workflow-overhaul phase per [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] (the locked outcomes of the 2026-05-19 `/grill-with-docs` session).
+The canonical **Plan creation + Plan edit** surface — one screen that collapses today's S01 (Initiator landing) + S01b (Pre-quiz parameters) into a single Setup screen. Lands the design-system contract for the workflow-overhaul phase per [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] (the locked outcomes of the 2026-05-19 `/grill-with-docs` session), amended by sg-SA-1 to replace active Setup geography with **C-28 SearchAreaPicker**.
 
 This surface ships once; the iOS wiring (replacing the existing `ScreenInitiator` + `ScreenParameters` paths) lives in the paired tracer-bullet **tb-WF-4**. Until that lands, the legacy S01 + S01b surfaces remain in the tree, marked `superseded`.
 
@@ -38,28 +38,28 @@ This spec exception is the only intentional override against the locked S01 rule
 - **Group-size friction** — still suppressed. The `Who's coming` chip group is **occasion framing**, not headcount; actual group size is inferred from who accepts the invite.
 - **Pre-commitment paralysis** — still defended. Every control except `Name this plan` opens on a sensible default; an initiator can ship a valid Plan by typing a name and tapping the primary CTA.
 
-If a future spec change wants to add a seventh control, it has to justify the addition against the same locked rule: every knob beyond name must either ship a sensible default or be explicitly load-bearing.
+If a future spec change wants to add a sixth control, it has to justify the addition against the same locked rule: every knob beyond name must either ship a sensible default or be explicitly load-bearing.
 
-## Locked inventory — six controls, flat eyebrow-per-control rhythm
+## Locked inventory — five controls, flat eyebrow-per-control rhythm
 
 | # | Eyebrow | Control | Default |
 |---|---|---|---|
 | 1 | `Name this plan` | Text input, **required**, 40-char cap, placeholder `"Name this plan"` | empty |
 | 2 | `Who's coming` | Single-select chips (C-04): `Just me · Two of us · A group` | `A group` |
-| 3 | `Where to` | `C-23 LocationPicker` chip (existing) | resolved GPS / `empty` |
+| 3 | `Search area` | `C-28 SearchAreaPicker` chip | empty / committed Search area |
 | 4 | `When are you eating` | Single-select chips (C-04): `Breakfast · Lunch · Dinner · Late night` | `Dinner` |
 | 5 | `How you want to eat` | Single-select chips (C-04): `Dine in · Outdoor seating · Takeout · Delivery` | `Dine in` |
-| 6 | `How far` | Distance slider (C-21 variant — see below) | `1.0 mi` |
 
 **Removed from the merged S01 + S01b inventory:**
 
 - **Category picker** — food only in 0.1.0, so no picker rendered (S01-initiator's drinks/movie placeholder rows are not carried forward).
 - **Timer chip group** — retired by 0.1.0 PRD US34 / US35 / §line 115. There is no session timer in 0.1.0+.
-- **Transport mode chips** (S01b's `Walking / Driving`) — collapsed into the distance slider. The walk-vs-drive cognitive shift is signaled implicitly by the tick at 1.0 mi (see §Distance slider).
+- **Split geography controls** (`Where to` C-23 LocationPicker + `How far` C-21 distance slider) — replaced by one C-28 SearchAreaPicker chip and full-screen Search area editor. The user selects center + radius together on the map.
+- **Transport mode chips** (S01b's `Walking / Driving`) — not resurrected. Search area radius is visual map geometry, not a walking/driving mode.
 
 ### Chip group treatment
 
-All four chip groups are the **C-04 chip, single-select variant** — same primitive as today's S01 timer chips and S01b parameter chips. Selected: sun-yellow fill, ink text, `scale 1.02`, `shadow-chip-selected`. Default: glass row (white 0.04 bg, white 0.55 outline, `blur(4px)`). Tap target ≥ 48. Chips wrap to as many rows as the labels need.
+All three chip groups are the **C-04 chip, single-select variant** — same primitive as today's S01 timer chips and S01b parameter chips. Selected: sun-yellow fill, ink text, `scale 1.02`, `shadow-chip-selected`. Default: glass row (white 0.04 bg, white 0.55 outline, `blur(var(--sp-1))`). Tap target ≥ 48. Chips wrap to as many rows as the labels need.
 
 ### Name input treatment
 
@@ -78,41 +78,56 @@ All four chip groups are the **C-04 chip, single-select variant** — same primi
 
 The label and the placeholder share the same copy (`Name this plan`). Voice register — sentence case in both. Never `"Plan name"` (form-field register) or `"Tonight's plan"` (occasion-coupling — Plans can be days out). **wfr-26 (2026-05-26):** the field label is the persistent label — it stays put during and after typing while the placeholder disappears on type. The two layers + the §"Input hints" hint compose the Input Prompt + Label + Hint group per `gti-vault/30_design/interaction-patterns/patterns.md` §"Input Prompt".
 
-## Distance slider — C-21 variant
+## Search area — C-28 SearchAreaPicker
 
-The `How far` slider is a **non-uniform-step variant of C-21 Range Slider** (see `components.md §C-21`). Same visual primitive — sun-filled left of thumb, white disk thumb, 6px track inside a 44pt hit row — with two added behaviors:
+The `Search area` row renders one **C-28 SearchAreaPicker** chip. It replaces the previous active `Where to` LocationPicker row and `How far` distance slider with a single geography primitive: a committed center + radius edited together on a map.
 
-- **Step schedule:** non-uniform. The allowed values shrink below 1 mi (the walking range) and grow above 5 mi (the suburban-drive range):
-  - **0.25–1.0 mi:** `0.25, 0.50, 0.75, 1.00`
-  - **1.0–5.0 mi:** `1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0`
-  - **5.0–10.0 mi:** `5.0, 6.0, 7.0, 8.0, 9.0, 10.0`
-  - Composed: `[0.25, 0.50, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]` (17 stops). The native `<input type="range">` slides through the smallest gap (0.25); on `onChange`, the JSX snaps to the nearest entry in the list.
-- **Anchor tick at 1.0 mi:** a 2 × 10 px rounded rect (radius 1px) in the `color.slider.tick` token (`rgba(255,255,255,0.55)`), centered on the 6px track at the 1.0 mi position. Purely visual — no words, no label. Anchors the implicit walk/drive cognitive boundary without resurrecting the rejected transport-mode question.
-- **Mono-tag value label** above the row, top-right, aligned with the `How far` eyebrow on the left: `"1.0 MI"` (`{value.toFixed(1)} MI` rendered in `mono-tag` token treatment — Inter 500 / 11 / tracking 0.18em / UPPERCASE / white 0.88). **Never** `"WALKING DISTANCE"` or `"DRIVING DISTANCE"` — those labels would re-introduce the transport-mode binary the slider replaces.
+### Search area chip
 
-Range, default, snap-list, and tick position are locked. Any deviation requires re-grilling Q8 of [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]].
+| State | Main line | Supporting line |
+|---|---|---|
+| Empty | `Set search area` | `Tap to choose on map` |
+| Committed | Best available center label | `Search area - N.N mi` |
 
-### New token
+The chip opens the full-screen **Search area editor**. It never opens the historical C-23 LocationPicker sheet and never exposes a separate distance slider on Setup.
 
-A new `color.slider.tick` token landed with this surface (`rgba(255,255,255,0.55)`). The value is the existing white-at-0.55 already used by S01-initiator's `SETTINGS` link and the C-04 chip outline, lifted into a semantic role so the tick has a registered home. Generated into `GTIColor.Slider.tick` (`ios/Sources/GTITokens.swift`) by `gen-swift.mjs`.
+### Search area editor
+
+The editor contract is owned by C-28:
+
+- Full-screen Apple MapKit surface.
+- Close/back button in the top chrome.
+- Top search field with placeholder `Search city, neighborhood, or address`.
+- Current-location button.
+- Visible selected circle centered on the map camera center.
+- Bottom radius badge such as `2.0 MI RADIUS`.
+- Minus/plus controls that step through the same allowed radius stops as gesture-driven zoom.
+- Bottom `USE THIS AREA` commit CTA.
+- Dirty close prompt when draft map state differs from the committed Search area, with actions `Use this area` and `Discard changes`.
+
+### Radius and draft model
+
+Search area radius is the **distance from the map camera center to the nearest visible map edge**. Pan changes the draft center. Pinch changes the draft radius. Minus/plus controls update the draft radius and keep the map zoom in sync. None of those draft changes commit until `USE THIS AREA`.
+
+A **Search area jump** recenters the map without committing. Typed search result selection and the current-location button are both Search area jumps; after either jump, the user can still pan/pinch and must tap `USE THIS AREA` to commit.
+
+### Density preview pins
+
+Density preview pins are broad food/dining density feedback only. They render inside the selected circle, cap around 20 visible pins, are non-interactive, and are non-blocking. Empty preview results or preview fetch failure must not block `USE THIS AREA`. They are not candidate cards, recommendations, venue details, rankings, or final Candidate pool membership.
+
+### Timing boundary
+
+Search area has **no timezone or timing semantics**. It is only center + radius. The stale reroll-window "search-area timezone" language is separate follow-up work and must not be expanded in this surface.
 
 ## Input hints
 
-Three controls carry an adjacent **Input Hints** affordance (per `gti-vault/30_design/interaction-patterns/patterns.md` §"Input Hints" — outside the field, smaller + lighter than the eyebrow, persists with and without focus). Surfaced by `/workflow-review` 2026-05-26, finding wfr-24.
+One control carries an adjacent **Input Hints** affordance (per `gti-vault/30_design/interaction-patterns/patterns.md` §"Input Hints" — outside the field, smaller + lighter than the label, persists with and without focus). Surfaced by `/workflow-review` 2026-05-26, finding wfr-24.
 
 | Field | Hint | Why |
 |---|---|---|
 | Name | `Up to 40 characters` | Surfaces the 40-char cap before the user hits it. Overrides the original "users feel the limit by hitting it" line. |
-| Where to | `Optional — we'll prompt later` | Marks the field optional + tells the user the app will prompt later (matches workflow-overhaul Q10 — a Plan with NULL location is a valid `pending` row). |
-| How far | `From your location, in miles` | Spells out the unit in plain language so the slider's purpose is unambiguous before the user drags it. The mono-tag value label (`1.0 MI`) carries the live value. |
 
 Hint treatment: `body` token at `14pt` regular weight, `TextOnGradient.tertiary` (white-at-0.55), sentence case, second-person casual register. Never form-field register (`required` / `error` / `field`).
-
-## Where the LocationPicker lives
-
-The `C-23 LocationPicker` (existing) renders as control #3 under the `Where to` eyebrow. It follows the locked state table from `01-initiator.md §"Persistent location selector"` (`auto / manual / stale / empty / loading`) — no surface-level changes to the chip's behavior.
-
-Validation note: per workflow-overhaul Q10, **location is not gated separately on this screen**. The picker's existing `empty` state surfaces visually; the user can ship a Plan with `null` location and resolve it via the existing S04 mechanism. This is a deliberate departure from S01-initiator, where `empty` disabled the primary CTA — the workflow overhaul splits Plan minting (here) from room minting (on tap), and a Plan with no location is a valid `pending` row.
 
 ## Dock
 
@@ -126,17 +141,17 @@ Both dock affordances are inside a `CTADock`. The secondary uses the **same trea
 ### Validation
 
 - **Name required for both dock CTAs.** Both `SAVE FOR LATER` (or `SAVE CHANGES` in edit mode) **and** `Drop the invite link` / `Start the quiz` are disabled until `name.trim().length > 0`.
-- **No other field is gated.** Defaults ship the screen; an initiator who types a name and taps primary mints a valid Plan + room.
+- **Search area launch gating is owned by tb-SA-1.** This surface locks the C-28 visual and interaction contract; the persistence slice owns the exact Room-minting guard when no Search area is committed.
 
 ### Error placement (wfr-25)
 
 Persistence failures route to the field that failed — the user reads the message next to the input that needs fixing per `patterns.md` §"Error Messages". Cross-field / network failures fall back to the top-of-dock slot reserved for them.
 
 - **Name (`name`) CHECK violation** (e.g., `plans_name_check`, 1..40 char guard) → inline message beneath the name input, prefixed with a sun-tinted `exclamationmark.triangle.fill` glyph so the signal is icon + text + color, never color alone. Copy: `Name needs to be 1 to 40 characters.`
-- **Distance (`distance_meters`) CHECK violation** → inline message beneath the C-21 distance slider, same icon + text treatment. Copy: `Distance is out of range — pick a value between 0.25 and 10 miles.`
+- **Search area radius (`distance_meters` / radius storage) CHECK violation** → inline message beneath the C-28 Search area chip, same icon + text treatment. Copy: `Search area radius is out of range — pick a value between 0.25 and 10 miles.`
 - **Cross-field / network / RLS / unknown** → top-of-dock label, same icon + text treatment. Copy: `Something went wrong saving the plan. Try again in a moment.`
 
-Routing is encoded as a pure classifier (`SetupScreen.classifyPersistFailure(_:)`) so the view body has a single source of truth and the routing is unit-testable independent of the network. The classifier is substring-based against the raw error description (`name`, `distance`, `distance_meters`); anything else falls through to the cross-field bucket.
+Routing is encoded as a pure classifier (`SetupScreen.classifyPersistFailure(_:)`) so the view body has a single source of truth and the routing is unit-testable independent of the network. The classifier is substring-based against the raw error description (`name`, `distance`, `distance_meters`, `radius`); anything else falls through to the cross-field bucket.
 
 ### Top-bar back / cancel behavior
 
@@ -150,9 +165,9 @@ The top-bar itself is supplied by the surrounding navigation chrome (Plan list �
 
 ## Components used
 
-`GradientSurface` (initiator stop) · `GTIMark` · `Eyebrow` · display headline · Glass row (name input) · `Chip` (C-04 single-select) ×3 groups · `LocationPickerChip` (C-23, existing) · `RangeSlider` (C-21 with non-uniform `steps` + `tickAt`) · `CTADock` · `PillCTA` white · `eyebrow`-styled `<button>` secondary text link.
+`GradientSurface` (initiator stop) · `GTIMark` · `Eyebrow` · display headline · Glass row (name input) · `Chip` (C-04 single-select) ×3 groups · `SearchAreaPickerChip` (C-28) · `SearchAreaEditor` (C-28, opened by the chip) · `CTADock` · `PillCTA` white · `eyebrow`-styled `<button>` secondary text link.
 
-No new component is introduced. The existing C-21 gained an optional non-uniform-step + tick variant — documented in `components.md §C-21` — but it remains the same primitive.
+C-28 is the active Setup geography component. C-23 LocationPicker remains historical/superseded for active Setup use, and C-21 remains available for non-Setup radius controls such as Verdict widening.
 
 ## Copy register
 
@@ -160,7 +175,8 @@ Carries S01b's voice forward — second-person, casual, never form-field registe
 
 - **`Start a new plan` / `Edit your plan`** — present-tense, declarative. Not `"Create a session"` (procedural) or `"Plan details"` (form-field).
 - **`One screen. Set it once. Share when you're ready.`** — three short declarative sentences. Names the contract (one screen) and the asynchronous nature (share when ready, not on submit).
-- **Eyebrows** — second-person and casual: `Name this plan`, `Who's coming`, `Where to`, `When are you eating`, `How you want to eat`, `How far`. Never `Plan name` / `Group size` / `Meal time` / `Service type` / `Distance` (form-field register).
+- **Eyebrows** — second-person and casual: `Name this plan`, `Who's coming`, `Search area`, `When are you eating`, `How you want to eat`. Never `Plan name` / `Group size` / `Meal time` / `Service type` / `Distance` (form-field register).
+- **Search area chip** — empty `Set search area`; committed support line `Search area - N.N mi`. The editor commit is `USE THIS AREA`.
 - **`Drop the invite link` / `Start the quiz`** — voluntary verb, casual register. The label swaps on `groupContext` — solo gets `Start the quiz` (no one to invite); group gets `Drop the invite link`.
 - **`SAVE FOR LATER` / `SAVE CHANGES`** — eyebrow-token mono-tag treatment, deliberately understated. Mirrors `SETTINGS` on S01-initiator.
 
@@ -168,23 +184,24 @@ Carries S01b's voice forward — second-person, casual, never form-field registe
 
 The Setup surface is the **Plan** surface, not the room surface. Persistence rules:
 
-- **Save for later** (secondary tap, or back-out with name non-empty): mints a `plans` row with `status: 'pending'`, captures all six controls onto the Plan, returns to the Plan list. No room created.
+- **Save for later** (secondary tap, or back-out with name non-empty): mints a `plans` row with `status: 'pending'`, captures the five Setup controls onto the Plan, returns to the Plan list. No room created.
 - **Primary CTA tap** (`Drop the invite link` / `Start the quiz`): mints the `plans` row as above **and** immediately mints the `rooms` row from the Plan's captured controls + fires the existing invite / quiz flow.
 - **Edit mode primary tap**: writes back to the existing `plans` row, then immediately mints the room + fires the invite/quiz.
 - **Edit mode secondary (`SAVE CHANGES`) tap**: writes back to the existing `plans` row, returns to the list. No room created.
 
-Column-level mapping (Plan → captured controls) is owned by [[../../gti-vault/15_issues/0.1.0/issues/tb-wf-1-plans-table-schema|tb-WF-1]] (Plans table schema). The room-level mapping inherits today's `rooms.session_params` jsonb shape (from S01b) plus a new `rooms.distance_mi` derived from the slider value — see tb-WF-4 for the room-side wiring.
+Column-level mapping (Plan → captured controls) is owned by [[../../gti-vault/15_issues/0.1.0/issues/tb-wf-1-plans-table-schema|tb-WF-1]] (Plans table schema) plus the Search area persistence tracer bullet [[../../gti-vault/15_issues/0.1.0/issues/tb-sa-1-search-area-chip-persistence-foundation|tb-SA-1]]. Search area persists through existing center/radius storage; this design-system slice introduces no schema change.
 
 ## Accessibility
 
-- **Tab/focus order:** Name input → Who's coming chip group → LocationPicker chip → When chip group → How you want to eat chip group → How far slider → primary CTA → secondary text link.
+- **Tab/focus order:** Name input → Who's coming chip group → SearchAreaPicker chip → When chip group → How you want to eat chip group → primary CTA → secondary text link.
 - **VoiceOver:**
   - Name input: announces the eyebrow as the field label ("Name this plan, text field").
   - Chip groups: VO announces selected state via `aria-pressed`.
-  - LocationPicker: inherits its existing VO contract from C-23.
-  - Slider: `aria-label="Plan distance"`, `aria-valuetext={value.toFixed(1) + " miles"}` so VO reads `"1.0 miles"` rather than `"1"`.
-- **Dynamic Type:** the screen is scrollable; all six rows tolerate text scaling up to AX5. The slider mono-tag value stays at its locked size (mono-tag treatment is intentionally non-scaling — same rule as the rest of the system).
+  - SearchAreaPicker chip: empty announces `"Set search area, button"`; committed announces `"Search area, {center label}, {N.N miles}, button"`.
+  - SearchAreaEditor: inherits the C-28 modal/editor VO contract from `components.md`.
+- **Dynamic Type:** the screen is scrollable; all five rows tolerate text scaling up to AX5. The Search area chip uses one-line ellipsis for the center label and keeps the radius support line in eyebrow treatment.
 
 ## Versions / history
 
+- `2026-06-03` — sg-SA-1 amendment: active Setup geography changed to C-28 SearchAreaPicker. The previous active `Where to` C-23 LocationPicker + `How far` C-21 distance slider split is superseded for Setup; C-23 remains historical in `components.md`, and Search area explicitly has no timezone or timing semantics.
 - `2026-05-19` — surface specified per [[../../gti-vault/15_issues/0.1.0/issues/sg-wf-1-plan-setup-surface|sg-WF-1]] (#154). Locked from the 2026-05-19 `/grill-with-docs` decisions in [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]]. iOS wiring deferred to tb-WF-4 (gated on sg-WF-4 Plan list landing). Until tb-WF-4 lands, `01-initiator.md` and `01b-parameters.md` remain in the tree marked `superseded`.

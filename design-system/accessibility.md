@@ -96,6 +96,12 @@ iOS HIG minimum: **44×44pt**. We hit this almost everywhere — exceptions are 
 | LocationPicker suggestion row (C-23) | min-height 52 | ✅ |
 | LocationPicker "Use current location" row (C-23) | min-height 52 | ✅ |
 | LocationPicker Settings deep-link (C-23) | C-05 ghost height 48 | ✅ |
+| SearchAreaPicker chip (C-28) | min-height 56 / token row | ✅ |
+| SearchAreaPicker editor close/back (C-28) | 44pt minimum icon button | ✅ |
+| SearchAreaPicker top search field (C-28) | 44pt minimum input row | ✅ |
+| SearchAreaPicker current-location button (C-28) | 44pt minimum icon button | ✅ |
+| SearchAreaPicker minus/plus radius controls (C-28) | 44pt minimum icon buttons | ✅ |
+| SearchAreaPicker `USE THIS AREA` (C-28) | C-05 white pill height 60 | ✅ |
 
 **Fixes for the SwiftUI port:**
 1. **Regret rating row** — bump min-height to 44. Reduces vertical density slightly; acceptable trade.
@@ -114,6 +120,17 @@ Per surface, the focus order ladders from top → bottom, with the primary CTA a
 4. Eyebrow / Title / Sub (read together as the screen header)
 5. Each chip / picker / control in source order
 6. Primary CTA
+
+### Setup (S01)
+1. Name input
+2. `Who's coming` chip group
+3. SearchAreaPicker chip (C-28)
+4. `When are you eating` chip group
+5. `How you want to eat` chip group
+6. Primary CTA
+7. Secondary text link
+
+When the SearchAreaPicker editor opens, focus is trapped in the full-screen editor: close/back → top search field → current-location button → minus radius → radius badge/readout → plus radius → `USE THIS AREA`. Density preview pins are decorative and skipped. Dirty close prompt moves focus to `Use this area`, then `Discard changes`.
 
 ### Verdict (default / committed)
 1. **Chrome row** (bug-22) — `Home` text verb, top-leading. Announced as `"Home, button"`; activates the pop to S00 Plan list. The chrome row reads first so VO users land on the navigation affordance before the choreographed reveal.
@@ -176,6 +193,10 @@ Per-component:
 | Receipt chip | `"{name}: {action}"` |
 | Timer chip (S01) | `"{N} minute timer"` `state: aria-pressed` (selected/not) |
 | Range slider (C-21) | `aria-label` = control name (e.g. `"Walk radius"`); `aria-valuetext` = live label (`"2.0 miles"`) |
+| SearchAreaPicker chip empty (C-28) | `"Set search area, button"` |
+| SearchAreaPicker chip committed (C-28) | `"Search area, {center label}, {N.N miles}, button"` |
+| SearchAreaPicker editor radius controls (C-28) | `"Decrease Search area radius"` / `"Increase Search area radius"`; radius badge exposes `"{N.N miles} radius"` |
+| SearchAreaPicker density preview pins (C-28) | Decorative / hidden from VoiceOver; they are broad density feedback, not candidates. |
 | I'm in (default) | `"I'm in. Double tap to commit to this verdict."` |
 | I'm in (committed) | `"You're in. 3 of 4 committed."` |
 | Locked plate | `"Verdict locked at 6:48 PM. Re-opening requires a reroll. {n} of 3 rerolls remain."` |
