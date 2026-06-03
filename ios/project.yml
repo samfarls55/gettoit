@@ -145,3 +145,5 @@ schemes:
       gatherCoverageData: false
       targets:
         - GetToItTests
+      environmentVariables:
+        GTI_UI_LAB_SCREENSHOT_DIR: "$(GTI_UI_LAB_SCREENSHOT_DIR)"

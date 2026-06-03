@@ -64,6 +64,7 @@ jobs:
             -scheme GetToIt \
             -destination "platform=iOS Simulator,name=iPhone 15,OS=$RUNTIME" \
             -only-testing:GetToItTests/UiLabScreenshotExportTests/testExportUiLabScreenshots \
+            GTI_UI_LAB_SCREENSHOT_DIR="$GTI_UI_LAB_SCREENSHOT_DIR" \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Upload UI lab screenshots
