@@ -1,11 +1,11 @@
 // GetToIt — SetupScreen pure-logic tests (tb-WF-4).
 //
 // Coverage:
-//   * Distance slider — non-uniform snap-list per workflow-overhaul Q8
-//     (`design-system/surfaces/01-setup.md` § "Distance slider").
+//   * Search area — C-28 chip copy, radius formatting, and persistence
+//     through existing Plan location + distance storage.
 //   * Mode-conditional rendering count — solo path omits the `Who's
-//     coming` chip row entirely (5 controls); group path renders all
-//     6 with `Just me` removed from the chip options.
+//     coming` chip row entirely (4 controls); group path renders 5
+//     with `Just me` removed from the chip options.
 //   * Name validation — empty trims → CTAs disabled, non-empty → enabled.
 //   * Primary CTA copy swaps on the group scope (solo → "Start the
 //     quiz", duo/group → "Drop the invite link") — same JSX contract.
@@ -19,12 +19,138 @@
 // `PlansStoreTests` (already cover the insert payload shape).
 
 import XCTest
+import CoreLocation
+import Supabase
 @testable import GetToIt
 
 @MainActor
 final class SetupScreenTests: XCTestCase {
 
-    // MARK: - distance slider — snap-list (workflow-overhaul Q8)
+    private func makeClient() -> SupabaseClient {
+        SupabaseClient(
+            supabaseURL: URL(string: "https://example.supabase.co")!,
+            supabaseKey: "test-anon-key"
+        )
+    }
+
+    private func makeScreen(
+        mode: SetupScreen.Mode = .create,
+        groupMode: SetupScreen.GroupMode = .group,
+        locationCoordinator: LocationCoordinator = LocationCoordinator(),
+        editingPlan: PlansStore.Plan? = nil
+    ) -> SetupScreen {
+        let client = makeClient()
+        return SetupScreen(
+            mode: mode,
+            groupMode: groupMode,
+            plansStore: PlansStore(client: client),
+            roomStore: RoomStore(client: client),
+            userID: UUID(),
+            locationCoordinator: locationCoordinator,
+            editingPlan: editingPlan
+        )
+    }
+
+    private func makePlan(
+        name: String,
+        location: PlansStore.Location?,
+        distanceMeters: Int
+    ) -> PlansStore.Plan {
+        PlansStore.Plan(
+            id: UUID(),
+            creatorID: UUID(),
+            name: name,
+            category: "food",
+            scope: .group,
+            location: location,
+            sessionParameters: SessionParameters.default,
+            distanceMeters: distanceMeters,
+            status: .pending
+        )
+    }
+
+    // MARK: - search area chip + radius foundation (tb-SA-1)
+
+    func testSearchAreaChipCopy() {
+        XCTAssertEqual(SetupScreen.emptySearchAreaMainCopy(), "Set search area")
+        XCTAssertEqual(SetupScreen.emptySearchAreaSupportCopy(), "Tap to choose on map")
+        XCTAssertEqual(
+            SetupScreen.searchAreaSupportCopy(radiusMeters: SetupScreen.metersFromMiles(2.0)),
+            "Search area - 2.0 mi"
+        )
+    }
+
+    func testLaunchWithoutSearchAreaOpensEditorGate() {
+        XCTAssertTrue(
+            SetupScreen.shouldOpenSearchAreaEditorOnLaunch(
+                nameValid: true,
+                hasCommittedSearchArea: false
+            )
+        )
+        XCTAssertFalse(
+            SetupScreen.shouldOpenSearchAreaEditorOnLaunch(
+                nameValid: true,
+                hasCommittedSearchArea: true
+            )
+        )
+        XCTAssertFalse(
+            SetupScreen.shouldOpenSearchAreaEditorOnLaunch(
+                nameValid: false,
+                hasCommittedSearchArea: false
+            ),
+            "empty-name launch stays on the name gate, not the search-area editor"
+        )
+    }
+
+    func testEditPlanReloadsCommittedSearchAreaThroughExistingStorage() {
+        let plan = makePlan(
+            name: "Friday dinner",
+            location: PlansStore.Location(
+                name: "Mission District",
+                lat: 37.7599,
+                lng: -122.4148,
+                source: "manual",
+                timeZoneIdentifier: "America/Los_Angeles"
+            ),
+            distanceMeters: SetupScreen.metersFromMiles(2.5)
+        )
+        let screen = makeScreen(mode: .edit, editingPlan: plan)
+
+        let payload = screen.snapshotPayload()
+
+        XCTAssertEqual(payload.location?.name, "Mission District")
+        XCTAssertEqual(payload.location?.lat ?? .nan, 37.7599, accuracy: 0.0001)
+        XCTAssertEqual(payload.location?.lng ?? .nan, -122.4148, accuracy: 0.0001)
+        XCTAssertEqual(payload.distanceMeters, SetupScreen.metersFromMiles(2.5))
+    }
+
+    func testFreshPlanDoesNotInheritLocationCoordinatorPlaceAsCommittedSearchArea() {
+        let coordinator = LocationCoordinator()
+        coordinator.commit(place: ResolvedPlace(
+            id: "manual:previous",
+            name: "Previous plan area",
+            sub: "San Francisco",
+            coordinate: .init(latitude: 37.77, longitude: -122.42),
+            source: .manual,
+            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+        ))
+        let screen = makeScreen(mode: .create, locationCoordinator: coordinator)
+
+        let payload = screen.snapshotPayload()
+
+        XCTAssertNil(payload.location, "fresh Plans must not silently reuse a prior Plan's search area")
+    }
+
+    func testFreshPlanPayloadAllowsSaveForLaterWithoutSearchArea() {
+        let screen = makeScreen(mode: .create)
+
+        let payload = screen.snapshotPayload()
+
+        XCTAssertNil(payload.location)
+        XCTAssertEqual(payload.distanceMeters, SetupScreen.metersFromMiles(SetupScreen.defaultDistanceMiles))
+    }
+
+    // MARK: - distance/radius snap-list (workflow-overhaul Q8)
 
     /// The 17-stop schedule locked in `surfaces/01-setup.md` §"Distance
     /// slider". Mirrors the JSX `DISTANCE_STEPS` constant. Order
@@ -90,28 +216,6 @@ final class SetupScreenTests: XCTestCase {
             "an exact stop passes through unchanged")
     }
 
-    /// The mono-tag value label format. `String(format:)` mirrors the
-    /// JSX `distance.toFixed(1)` so the slider label reads `"1.0 MI"`
-    /// (never `"1 MI"` or `"1.00 MI"`).
-    ///
-    /// Note: `String(format: "%.1f", 0.25)` uses banker's rounding and
-    /// resolves to `"0.2"` (round-half-to-even — 2 is even, so the tie
-    /// breaks down). `toFixed(1)` in JS rounds 0.25 to `"0.3"` on most
-    /// engines (V8 / SpiderMonkey) — but the small mismatch on the
-    /// 0.25-stop is acceptable because the live slider label always
-    /// hits the legal snap-list values (0.25 / 0.5 / 0.75 / ...).
-    /// Users see `0.2 MI` on iOS at the 0.25-stop; the canonical
-    /// integer-mile stops (1.0 / 2.0 / 5.0 / 10.0) are stable across
-    /// both engines and that is what users actually move between.
-    func testFormatDistanceLabel() {
-        XCTAssertEqual(SetupScreen.formatDistanceLabel(0.5), "0.5 MI")
-        XCTAssertEqual(SetupScreen.formatDistanceLabel(0.75), "0.8 MI")
-        XCTAssertEqual(SetupScreen.formatDistanceLabel(1.0), "1.0 MI")
-        XCTAssertEqual(SetupScreen.formatDistanceLabel(2.0), "2.0 MI")
-        XCTAssertEqual(SetupScreen.formatDistanceLabel(5.0), "5.0 MI")
-        XCTAssertEqual(SetupScreen.formatDistanceLabel(10.0), "10.0 MI")
-    }
-
     /// `metersFromMiles` — uses the same canonical conversion as the
     /// existing radius column writer (1609.344). The Plan column is
     /// `distance_meters`, default 1609 (≈ 1.0 mi).
@@ -122,23 +226,16 @@ final class SetupScreenTests: XCTestCase {
         XCTAssertEqual(SetupScreen.metersFromMiles(10.0), 16093)
     }
 
-    /// Tick anchor lives at 1.0 mi per the spec ("anchors the implicit
-    /// walk/drive cognitive boundary").
-    func testTickAnchorIsOneMile() {
-        XCTAssertEqual(SetupScreen.tickAtMiles, 1.0, accuracy: 0.001)
-        XCTAssertTrue(SetupScreen.distanceSteps.contains(SetupScreen.tickAtMiles))
-    }
-
     // MARK: - mode-conditional rendering
 
-    /// Per the Amendment 2026-05-20 in the issue body: solo path
-    /// omits the `Who's coming` row → 5 controls; group path renders
-    /// 6 with `Just me` removed.
+    /// Per tb-SA-1: the separate location + distance controls collapse
+    /// into one Search area chip. Solo omits `Who's coming`; group
+    /// keeps that row but still renders one geography control.
     func testControlsRenderedSoloOmitsWhosComing() {
-        XCTAssertEqual(SetupScreen.controlsRendered(for: .solo), 5,
-            "solo path omits Who's coming → 5 controls")
-        XCTAssertEqual(SetupScreen.controlsRendered(for: .group), 6,
-            "group path renders all 6 controls")
+        XCTAssertEqual(SetupScreen.controlsRendered(for: .solo), 4,
+            "solo path omits Who's coming and has one Search area control")
+        XCTAssertEqual(SetupScreen.controlsRendered(for: .group), 5,
+            "group path renders one Search area control instead of separate location and distance")
     }
 
     /// `Who's coming` chip options on the group path drop `Just me`
@@ -341,17 +438,6 @@ final class SetupScreenTests: XCTestCase {
 
     // MARK: - input hints (wfr-24)
 
-    /// wfr-24 — Input Hints pattern. Each of name / distance / location
-    /// carries a visible hint adjacent to the control (per
-    /// `patterns.md` §"Input Hints" — outside the field, smaller +
-    /// lighter than the label, persists with and without focus).
-    ///
-    /// The hint copy is exposed as pure static helpers so the
-    /// canonical strings can be pinned by unit tests and reused by the
-    /// view body. Voice register matches the surface doc §"Copy register":
-    /// warm-friend, second-person, casual — never form-field register
-    /// ("required" / "error" / "field").
-
     /// Name hint names the 40-char cap so users feel the limit before
     /// they hit it. The surface doc originally framed the cap as
     /// "users feel the limit by hitting it" — wfr-24 (2026-05-26)
@@ -363,39 +449,11 @@ final class SetupScreenTests: XCTestCase {
             "name hint must name the 40-char cap — got \(hint)")
     }
 
-    /// Distance hint clarifies the unit (miles) for users who can't
-    /// see the mono-tag value or who read past it. The mono-tag itself
-    /// reads "1.0 MI"; the adjacent hint spells out the unit in plain
-    /// language so the slider's purpose is unambiguous before the user
-    /// drags it.
-    func testDistanceHintCopy() {
-        let hint = SetupScreen.distanceHintCopy()
-        XCTAssertFalse(hint.isEmpty, "distance hint must not be empty")
-        let lower = hint.lowercased()
-        XCTAssertTrue(lower.contains("mile") || lower.contains("mi"),
-            "distance hint must name the unit — got \(hint)")
-    }
-
-    /// Location hint marks the field optional and tells the user the
-    /// app will prompt later — matches the workflow-overhaul Q10
-    /// validation rule (Plan can ship with NULL location).
-    func testWhereToHintCopy() {
-        let hint = SetupScreen.whereToHintCopy()
-        XCTAssertFalse(hint.isEmpty, "location hint must not be empty")
-        let lower = hint.lowercased()
-        XCTAssertTrue(lower.contains("optional"),
-            "location hint must mark the field optional — got \(hint)")
-    }
-
-    /// Voice register check — all three hints must read in the
+    /// Voice register check — the name hint must read in the
     /// warm-friend, casual register the surface codifies, never the
     /// form-field register the workflow-review explicitly rejects.
     func testHintCopyUsesWarmFriendRegister() {
-        let hints = [
-            SetupScreen.nameHintCopy(),
-            SetupScreen.distanceHintCopy(),
-            SetupScreen.whereToHintCopy(),
-        ]
+        let hints = [SetupScreen.nameHintCopy()]
         for hint in hints {
             let lower = hint.lowercased()
             XCTAssertFalse(lower.contains("required"),

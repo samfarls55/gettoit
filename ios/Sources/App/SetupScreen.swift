@@ -11,9 +11,9 @@
 //     (existing pending Plan). Drives headline + secondary CTA copy.
 //   * Group mode (`GroupMode`) — `.solo` vs `.group`. Amendment
 //     2026-05-20 lifted the `Who's coming` choice out of Setup into a
-//     pre-Setup disambig sheet (tb-WF-6). The solo path renders 5
+//     pre-Setup disambig sheet (tb-WF-6). The solo path renders 4
 //     controls (no `Who's coming` row at all); the group path renders
-//     6 controls with the `Just me` chip option dropped.
+//     5 controls with the `Just me` chip option dropped.
 //
 // Persistence + behavior (per `surfaces/01-setup.md` §"Persistence +
 // behavior"):
@@ -31,17 +31,10 @@
 // All visual values come from `GTITokens.swift`. No inline hex / px /
 // easing per repo AGENTS.md. The chip primitive matches today's S01b
 // chips (sun fill / ink text on selected, glass row default), the
-// LocationPicker is the existing C-23 chip, and the slider is the
-// platform `Slider` (tinted sun) wrapped with the non-uniform snap
-// schedule.
+// Search area is the C-28 chip + full-screen editor shell. It persists
+// through the existing Plan location + distance columns; the full map
+// pan/pinch behavior lands in tb-SA-2.
 //
-// Tick rendering note: the spec asks for a `2 × 10` px rounded rect at
-// the 1.0 mi position on the 6 px track. SwiftUI's stock `Slider`
-// doesn't expose the track for overlay decorations; we render the tick
-// as a thin marker bar in a 2 × 10 capsule overlay aligned to the
-// computed 1.0 mi fractional position. The position is purely visual —
-// no value is bound to the tick.
-
 import SwiftUI
 import UIKit
 
@@ -68,6 +61,34 @@ public struct SetupScreen: View {
         case group
     }
 
+    /// C-28 committed Search area value. The storage stays on the
+    /// existing Plan/Room fields: `location` carries center metadata
+    /// and `distance_meters` carries radius.
+    public struct SearchArea: Equatable, Sendable {
+        public let centerLabel: String
+        public let lat: Double
+        public let lng: Double
+        public let source: String
+        public let timeZoneIdentifier: String
+        public let radiusMeters: Int
+
+        public init(
+            centerLabel: String,
+            lat: Double,
+            lng: Double,
+            source: String,
+            timeZoneIdentifier: String,
+            radiusMeters: Int
+        ) {
+            self.centerLabel = centerLabel
+            self.lat = lat
+            self.lng = lng
+            self.source = source
+            self.timeZoneIdentifier = timeZoneIdentifier
+            self.radiusMeters = radiusMeters
+        }
+    }
+
     // MARK: - locked schedule + helpers (workflow-overhaul Q8)
 
     /// Composed non-uniform snap-list — 17 stops. Mirrors the JSX's
@@ -84,18 +105,13 @@ public struct SetupScreen: View {
     /// `1609` (≈ 1.0 mi).
     public static let defaultDistanceMiles: Double = 1.0
 
-    /// Visual tick anchor — purely decorative; no value semantics.
-    /// Anchors the implicit walk/drive cognitive boundary at 1.0 mi.
-    public static let tickAtMiles: Double = 1.0
-
-    /// Slider min / max for the platform `Slider`. Min/max match the
-    /// schedule's endpoints; the snap helper handles out-of-range
-    /// values defensively.
+    /// Radius min / max. Min/max match the schedule's endpoints; the
+    /// snap helper handles out-of-range values defensively.
     public static let minDistanceMiles: Double = 0.25
     public static let maxDistanceMiles: Double = 10.0
 
-    /// Snap a continuous value (the platform `Slider`'s output) to the
-    /// nearest stop in `distanceSteps`. Out-of-range values clamp to
+    /// Snap a continuous radius value to the nearest stop in
+    /// `distanceSteps`. Out-of-range values clamp to
     /// the nearest endpoint. On a tie (equidistant from two stops),
     /// the lower-index (smaller) stop wins — same behavior as the JSX
     /// reduce (`Math.abs(stop - v) <` is strict).
@@ -121,17 +137,65 @@ public struct SetupScreen: View {
         return best
     }
 
-    /// `"1.0 MI"` mono-tag format. Mirrors the JSX `toFixed(1)`.
-    public static func formatDistanceLabel(_ miles: Double) -> String {
-        String(format: "%.1f MI", miles)
-    }
-
     /// Canonical miles → meters conversion. Same factor `RoomStore` /
     /// `InitiatorScreen` historically used (1609.344). The Plan
     /// column is `distance_meters int default 1609`.
     public static let metersPerMile: Double = 1609.344
     public static func metersFromMiles(_ miles: Double) -> Int {
         Int((miles * metersPerMile).rounded())
+    }
+
+    public static func milesFromMeters(_ meters: Int) -> Double {
+        Double(meters) / metersPerMile
+    }
+
+    public static func emptySearchAreaMainCopy() -> String {
+        "Set search area"
+    }
+
+    public static func emptySearchAreaSupportCopy() -> String {
+        "Tap to choose on map"
+    }
+
+    public static func searchAreaSupportCopy(radiusMeters: Int) -> String {
+        String(format: "Search area - %.1f mi", milesFromMeters(radiusMeters))
+    }
+
+    public static func searchAreaRadiusBadgeCopy(radiusMeters: Int) -> String {
+        String(format: "%.1f MI RADIUS", milesFromMeters(radiusMeters))
+    }
+
+    public static func shouldOpenSearchAreaEditorOnLaunch(
+        nameValid: Bool,
+        hasCommittedSearchArea: Bool
+    ) -> Bool {
+        nameValid && !hasCommittedSearchArea
+    }
+
+    public static func searchArea(from plan: PlansStore.Plan) -> SearchArea? {
+        guard let location = plan.location else { return nil }
+        return SearchArea(
+            centerLabel: location.name,
+            lat: location.lat,
+            lng: location.lng,
+            source: location.source,
+            timeZoneIdentifier: location.timeZoneIdentifier,
+            radiusMeters: plan.distanceMeters
+        )
+    }
+
+    public static func searchArea(
+        from place: ResolvedPlace,
+        radiusMeters: Int
+    ) -> SearchArea {
+        SearchArea(
+            centerLabel: place.name,
+            lat: place.coordinate.latitude,
+            lng: place.coordinate.longitude,
+            source: place.source.rawValue,
+            timeZoneIdentifier: place.timeZone.identifier,
+            radiusMeters: radiusMeters
+        )
     }
 
     // MARK: - pure mode helpers
@@ -141,8 +205,8 @@ public struct SetupScreen: View {
     /// this implicitly by branching on the GroupMode in the body.
     public static func controlsRendered(for mode: GroupMode) -> Int {
         switch mode {
-        case .solo:  return 5
-        case .group: return 6
+        case .solo:  return 4
+        case .group: return 5
         }
     }
 
@@ -292,22 +356,6 @@ public struct SetupScreen: View {
         "Up to 40 characters"
     }
 
-    /// wfr-24 — adjacent hint copy under the distance slider. Spells
-    /// out the unit in plain language so the slider's purpose is
-    /// unambiguous before the user drags it; the mono-tag value label
-    /// (`1.0 MI`) carries the live value.
-    public static func distanceHintCopy() -> String {
-        "From your location, in miles"
-    }
-
-    /// wfr-24 — adjacent hint copy under the Where to picker. Marks
-    /// the field optional + tells the user the app will prompt later
-    /// (matches workflow-overhaul Q10: a Plan with NULL location is a
-    /// valid `pending` row, resolved via S04).
-    public static func whereToHintCopy() -> String {
-        "Optional — we'll prompt later"
-    }
-
     // MARK: - field-level error routing (wfr-25)
 
     /// wfr-25 — which form field the failure should render against.
@@ -392,7 +440,7 @@ public struct SetupScreen: View {
     /// tightening of `plans_distance_check`). Polite, plain-language,
     /// no computerese.
     public static func distanceErrorCopy() -> String {
-        "Distance is out of range — pick a value between 0.25 and 10 miles."
+        "Search area radius is out of range — pick a value between 0.25 and 10 miles."
     }
 
     /// Cross-field / network fallback. Stays at top-of-dock per the
@@ -452,8 +500,10 @@ public struct SetupScreen: View {
     @State private var mealTime: SessionParameters.MealTime
     @State private var serviceShape: SessionParameters.ServiceShape
     @State private var distanceMiles: Double
+    @State private var committedSearchArea: SearchArea?
+    @State private var draftSearchArea: SearchArea?
     @State private var phase: Phase = .ready
-    @State private var locationSheetOpen: Bool = false
+    @State private var searchAreaEditorOpen: Bool = false
     /// bug-29 — owns the open/close flag for the iOS share sheet
     /// presented in group/duo mode after Plan + Room mint. Lifted off
     /// a bare `@State` so the bug-29 contract is unit-testable. See
@@ -529,6 +579,8 @@ public struct SetupScreen: View {
         let initialMeters = editingPlan?.distanceMeters ?? Int((SetupScreen.defaultDistanceMiles * SetupScreen.metersPerMile).rounded())
         let initialMiles = SetupScreen.snapDistance(Double(initialMeters) / SetupScreen.metersPerMile)
         _distanceMiles = State(initialValue: initialMiles)
+        _committedSearchArea = State(initialValue: editingPlan.flatMap(SetupScreen.searchArea(from:)))
+        _draftSearchArea = State(initialValue: nil)
         _phase = State(initialValue: initialPhase)
     }
 
@@ -596,17 +648,14 @@ public struct SetupScreen: View {
                         whosComingSection
                     }
 
-                    // 3. Where to — existing C-23 LocationPicker
-                    whereToSection
+                    // 3. Search area — C-28 chip + editor shell
+                    searchAreaSection
 
                     // 4. When are you eating — single-select chips
                     mealTimeSection
 
                     // 5. How you want to eat — single-select chips
                     serviceShapeSection
-
-                    // 6. How far — distance slider with non-uniform snap + tick
-                    distanceSection
 
                     Spacer(minLength: GTISpacing.step6)
 
@@ -618,10 +667,17 @@ public struct SetupScreen: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .sheet(isPresented: $locationSheetOpen) {
-            LocationPickerSheet(
-                coordinator: locationCoordinator,
-                onDismiss: { locationSheetOpen = false }
+        .fullScreenCover(isPresented: $searchAreaEditorOpen) {
+            SearchAreaEditor(
+                draft: $draftSearchArea,
+                currentPlace: locationCoordinator.place,
+                onUseCurrentLocation: seedDraftFromCurrentLocation,
+                onCommit: { area in
+                    committedSearchArea = area
+                    distanceMiles = SetupScreen.snapDistance(SetupScreen.milesFromMeters(area.radiusMeters))
+                    searchAreaEditorOpen = false
+                },
+                onDismiss: { searchAreaEditorOpen = false }
             )
         }
         // bug-29 — re-ports the share-sheet wiring deleted with
@@ -771,20 +827,18 @@ public struct SetupScreen: View {
         )
     }
 
-    private var whereToSection: some View {
+    private var searchAreaSection: some View {
         VStack(alignment: .leading, spacing: GTISpacing.step2) {
-            sectionEyebrow("WHERE TO", id: "setup.whereTo.eyebrow")
-            LocationPickerChip(
-                state: locationCoordinator.pickerState,
-                place: locationCoordinator.place,
-                onOpen: { locationSheetOpen = true }
+            sectionEyebrow("SEARCH AREA", id: "setup.searchArea.eyebrow")
+            SearchAreaPickerChip(
+                searchArea: committedSearchArea,
+                onOpen: openSearchAreaEditor
             )
-            .accessibilityIdentifier("setup.whereTo.chip")
+            .accessibilityIdentifier("setup.searchArea.chip")
 
-            // wfr-24 — mark the field optional + tell the user the
-            // app will prompt later (workflow-overhaul Q10 — a Plan
-            // with NULL location is a valid pending row).
-            sectionHint(SetupScreen.whereToHintCopy(), id: "setup.whereTo.hint")
+            if case .error(let fieldError) = phase, fieldError.field == .distance {
+                fieldErrorLabel(fieldError.message, id: "setup.searchArea.error")
+            }
         }
     }
 
@@ -808,67 +862,6 @@ public struct SetupScreen: View {
             label: { $0.label },
             select: { serviceShape = $0 }
         )
-    }
-
-    // MARK: - distance slider
-
-    private var distanceSection: some View {
-        VStack(alignment: .leading, spacing: GTISpacing.step1) {
-            HStack(alignment: .firstTextBaseline) {
-                sectionEyebrow("HOW FAR", id: "setup.distance.eyebrow")
-                Spacer()
-                Text(SetupScreen.formatDistanceLabel(distanceMiles))
-                    .font(.system(size: GTIFont.Size.monoTag, weight: .medium, design: .monospaced))
-                    .tracking(GTIFont.TrackingEm.monoTag * GTIFont.Size.monoTag)
-                    .foregroundStyle(GTIColor.TextOnBrightGradient.secondary)
-                    .accessibilityIdentifier("setup.distance.value")
-            }
-
-            // The tick marker sits in an overlay above the platform
-            // `Slider` aligned to the 1.0 mi fractional position. The
-            // slider itself keeps the platform behavior (drag latency,
-            // tap-to-position) — we just snap the value onChange.
-            Slider(
-                value: Binding(
-                    get: { distanceMiles },
-                    set: { raw in distanceMiles = SetupScreen.snapDistance(raw) }
-                ),
-                in: SetupScreen.minDistanceMiles...SetupScreen.maxDistanceMiles
-            )
-            .tint(GTIColor.sun)
-            .frame(minHeight: 44)
-            .accessibilityIdentifier("setup.distance.slider")
-            .accessibilityLabel("Plan distance")
-            .accessibilityValue("\(String(format: "%.1f", distanceMiles)) miles")
-            .overlay(alignment: .leading) {
-                GeometryReader { proxy in
-                    let fraction = (SetupScreen.tickAtMiles - SetupScreen.minDistanceMiles) /
-                        (SetupScreen.maxDistanceMiles - SetupScreen.minDistanceMiles)
-                    let offset = proxy.size.width * fraction
-                    Capsule(style: .continuous)
-                        .fill(GTIColor.Slider.tick)
-                        .frame(width: 2, height: 10)
-                        .position(x: offset, y: proxy.size.height / 2)
-                        .accessibilityIdentifier("setup.distance.tick")
-                        .accessibilityHidden(true)
-                }
-            }
-
-            // wfr-24 — adjacent hint spelling out the unit in plain
-            // language. The mono-tag value label ("1.0 MI") carries
-            // the live value; this hint clarifies the slider's purpose
-            // before the user drags it.
-            sectionHint(SetupScreen.distanceHintCopy(), id: "setup.distance.hint")
-
-            // wfr-25 — field-local error placement for the distance
-            // slider. The snap-list keeps user input inside the legal
-            // range by construction; this label fires only on a
-            // server-side CHECK rejection (e.g., a future tightening
-            // of `plans_distance_check`).
-            if case .error(let fieldError) = phase, fieldError.field == .distance {
-                fieldErrorLabel(fieldError.message, id: "setup.distance.error")
-            }
-        }
     }
 
     // MARK: - dock
@@ -1053,6 +1046,22 @@ public struct SetupScreen: View {
 
     // MARK: - actions
 
+    private func openSearchAreaEditor() {
+        if committedSearchArea == nil {
+            draftSearchArea = nil
+            seedDraftFromCurrentLocation()
+        } else {
+            draftSearchArea = committedSearchArea
+        }
+        searchAreaEditorOpen = true
+    }
+
+    private func seedDraftFromCurrentLocation() {
+        guard let place = locationCoordinator.place else { return }
+        let radius = committedSearchArea?.radiusMeters ?? SetupScreen.metersFromMiles(2.0)
+        draftSearchArea = SetupScreen.searchArea(from: place, radiusMeters: radius)
+    }
+
     /// Compile the current state into a value type carrying everything
     /// PlansStore needs to insert or update. Exposed as `internal` so
     /// unit tests can assert the compile is correct without driving
@@ -1066,17 +1075,17 @@ public struct SetupScreen: View {
             groupContext: groupContextForSession(),
             serviceShape: serviceShape,
             // Transport mode is no longer surfaced on Setup; the
-            // distance slider replaces the walk/drive binary. Persist
+            // Search area radius replaces the walk/drive binary. Persist
             // the canonical default so legacy readers stay coherent.
             transportMode: SessionParameters.default.transportMode
         )
-        let planLocation = planLocationFromCoordinator()
+        let planLocation = planLocationFromSearchArea(committedSearchArea)
         return PlanPayload(
             name: name,
             scope: resolvedPlanScope,
             location: planLocation,
             sessionParameters: session,
-            distanceMeters: SetupScreen.metersFromMiles(distanceMiles)
+            distanceMeters: committedSearchArea?.radiusMeters ?? SetupScreen.metersFromMiles(distanceMiles)
         )
     }
 
@@ -1102,32 +1111,31 @@ public struct SetupScreen: View {
         }
     }
 
-    /// Build a `PlansStore.Location` from the live LocationCoordinator
-    /// pick. Returns nil when no place is committed (the Setup screen
-    /// does NOT gate the CTA on location per workflow-overhaul Q10 —
-    /// a `pending` Plan with a NULL location is a valid row).
-    private func planLocationFromCoordinator() -> PlansStore.Location? {
-        guard let place = locationCoordinator.place else { return nil }
+    /// Build a `PlansStore.Location` from the committed Search area.
+    /// Returns nil when no area is committed: Save for later may write
+    /// a pending Plan without Search area, but launch is gated.
+    private func planLocationFromSearchArea(_ searchArea: SearchArea?) -> PlansStore.Location? {
+        guard let searchArea else { return nil }
         return PlansStore.Location(
-            name: place.name,
-            lat: place.coordinate.latitude,
-            lng: place.coordinate.longitude,
-            source: place.source.rawValue,
-            timeZoneIdentifier: place.timeZone.identifier
+            name: searchArea.centerLabel,
+            lat: searchArea.lat,
+            lng: searchArea.lng,
+            source: searchArea.source,
+            timeZoneIdentifier: searchArea.timeZoneIdentifier
         )
     }
 
-    /// Build the matching `RoomStore.RoomLocation` for the room mint.
-    /// Returns nil under the same conditions as `planLocationFromCoordinator()`.
-    private func roomLocationFromCoordinator() -> RoomStore.RoomLocation? {
-        guard let place = locationCoordinator.place else { return nil }
-        let source: RoomStore.RoomLocation.Source = place.source == .gps ? .gps : .manual
+    /// Build the matching `RoomStore.RoomLocation` for the room mint
+    /// from the committed Search area.
+    private func roomLocationFromSearchArea(_ searchArea: SearchArea?) -> RoomStore.RoomLocation? {
+        guard let searchArea else { return nil }
+        let source = RoomStore.RoomLocation.Source(rawValue: searchArea.source) ?? .manual
         return RoomStore.RoomLocation(
-            name: place.name,
-            lat: place.coordinate.latitude,
-            lng: place.coordinate.longitude,
+            name: searchArea.centerLabel,
+            lat: searchArea.lat,
+            lng: searchArea.lng,
             source: source,
-            timeZoneIdentifier: place.timeZone.identifier
+            timeZoneIdentifier: searchArea.timeZoneIdentifier
         )
     }
 
@@ -1149,6 +1157,13 @@ public struct SetupScreen: View {
     /// share completes / cancels.
     private func tapPrimary() {
         guard nameValid else { return }
+        if SetupScreen.shouldOpenSearchAreaEditorOnLaunch(
+            nameValid: nameValid,
+            hasCommittedSearchArea: committedSearchArea != nil
+        ) {
+            openSearchAreaEditor()
+            return
+        }
         let payload = snapshotPayload()
         phase = .launchingRoom
         let presentsShareSheet = (resolvedPlanScope != .solo)
@@ -1161,7 +1176,7 @@ public struct SetupScreen: View {
                 let room = try await roomStore.createRoom(
                     as: userID,
                     radiusMeters: payload.distanceMeters,
-                    location: roomLocationFromCoordinator(),
+                    location: roomLocationFromSearchArea(committedSearchArea),
                     sessionParameters: payload.sessionParameters,
                     planID: plan.id
                 )
@@ -1250,6 +1265,261 @@ public struct SetupScreen: View {
         } else {
             onDiscarded?()
         }
+    }
+}
+
+// MARK: - C-28 SearchAreaPicker shell
+
+private struct SearchAreaPickerChip: View {
+    let searchArea: SetupScreen.SearchArea?
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: GTISpacing.step3) {
+                ZStack {
+                    Circle()
+                        .fill(GTIColor.sun)
+                    Image(systemName: "scope")
+                        .font(.system(size: 16, weight: .black))
+                        .foregroundStyle(GTIColor.ink)
+                        .accessibilityHidden(true)
+                }
+                .frame(width: 34, height: 34)
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: GTISpacing.step1) {
+                    Text(searchArea?.centerLabel ?? SetupScreen.emptySearchAreaMainCopy())
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(GTIColor.TextOnGradient.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Text(supportCopy)
+                        .font(.system(size: GTIFont.Size.eyebrow, weight: .bold))
+                        .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                        .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: GTISpacing.step2)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, GTISpacing.step4)
+            .padding(.vertical, GTISpacing.step3)
+            .frame(maxWidth: .infinity, minHeight: GTISpacing.step16, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                    .fill(GTIColor.Glass.fillSoft)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityCopy)
+    }
+
+    private var supportCopy: String {
+        guard let searchArea else { return SetupScreen.emptySearchAreaSupportCopy() }
+        return SetupScreen.searchAreaSupportCopy(radiusMeters: searchArea.radiusMeters)
+    }
+
+    private var accessibilityCopy: String {
+        guard let searchArea else { return SetupScreen.emptySearchAreaMainCopy() }
+        return "Search area, \(searchArea.centerLabel), \(String(format: "%.1f", SetupScreen.milesFromMeters(searchArea.radiusMeters))) miles"
+    }
+}
+
+private struct SearchAreaEditor: View {
+    @Binding var draft: SetupScreen.SearchArea?
+    let currentPlace: ResolvedPlace?
+    let onUseCurrentLocation: () -> Void
+    let onCommit: (SetupScreen.SearchArea) -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            GTIGradient.surface(.initiator)
+                .ignoresSafeArea()
+
+            VStack(spacing: GTISpacing.step4) {
+                topChrome
+
+                Spacer()
+
+                selectedAreaReadout
+
+                Spacer()
+
+                radiusControls
+                commitButton
+            }
+            .padding(.horizontal, GTISpacing.step6)
+            .padding(.top, GTISpacing.step8)
+            .padding(.bottom, GTISpacing.step6)
+        }
+        .accessibilityIdentifier("setup.searchArea.editor")
+    }
+
+    private var topChrome: some View {
+        HStack(spacing: GTISpacing.step3) {
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(GTIColor.TextOnGradient.primary)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
+
+            Text("Search city, neighborhood, or address")
+                .font(.system(size: GTIFont.Size.sm, weight: .semibold))
+                .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .padding(.horizontal, GTISpacing.step3)
+                .background(
+                    RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                        .fill(GTIColor.Glass.fillSoft)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                )
+
+            Button(action: onUseCurrentLocation) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(currentPlace == nil ? GTIColor.TextOnGradient.tertiary : GTIColor.ink)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(currentPlace == nil ? GTIColor.Glass.fillSoft : GTIColor.sun)
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(currentPlace == nil)
+            .accessibilityLabel("Use current location")
+        }
+    }
+
+    private var selectedAreaReadout: some View {
+        VStack(spacing: GTISpacing.step3) {
+            ZStack {
+                Circle()
+                    .fill(GTIColor.sun.opacity(0.16))
+                    .overlay(Circle().stroke(GTIColor.sun, lineWidth: 2))
+                Image(systemName: "mappin.and.ellipse")
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(GTIColor.sun)
+                    .accessibilityHidden(true)
+            }
+            .frame(width: 190, height: 190)
+            .accessibilityHidden(true)
+
+            Text(draft?.centerLabel ?? "Set search area")
+                .font(.system(size: GTIFont.Size.displayM, weight: .black))
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+
+            Text(draft == nil ? "Search or use current location to choose the center." : "Adjust the radius, then use this area.")
+                .font(.system(size: GTIFont.Size.body, weight: .semibold))
+                .foregroundStyle(GTIColor.TextOnGradient.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 300)
+        }
+    }
+
+    private var radiusControls: some View {
+        HStack(spacing: GTISpacing.step3) {
+            radiusButton(systemName: "minus", label: "Decrease Search area radius") {
+                adjustRadius(by: -1)
+            }
+            .disabled(draft == nil)
+
+            Text(draft.map { SetupScreen.searchAreaRadiusBadgeCopy(radiusMeters: $0.radiusMeters) } ?? "SET AREA")
+                .font(.system(size: GTIFont.Size.eyebrow, weight: .black))
+                .tracking(GTIFont.TrackingEm.eyebrow * GTIFont.Size.eyebrow)
+                .foregroundStyle(GTIColor.ink)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(GTIColor.sun)
+                )
+                .accessibilityLabel(radiusAccessibility)
+
+            radiusButton(systemName: "plus", label: "Increase Search area radius") {
+                adjustRadius(by: 1)
+            }
+            .disabled(draft == nil)
+        }
+    }
+
+    private var commitButton: some View {
+        Button {
+            guard let draft else { return }
+            onCommit(draft)
+        } label: {
+            Text("USE THIS AREA")
+                .font(.system(size: GTIFont.Size.cta, weight: .black))
+                .tracking(GTIFont.TrackingEm.cta * GTIFont.Size.cta)
+                .foregroundStyle(GTIColor.ink)
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(GTIColor.paper)
+                        .opacity(draft == nil ? 0.55 : 1.0)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(draft == nil)
+        .accessibilityIdentifier("setup.searchArea.useThisArea")
+    }
+
+    private var radiusAccessibility: String {
+        guard let draft else { return "Search area radius not set" }
+        return "\(String(format: "%.1f", SetupScreen.milesFromMeters(draft.radiusMeters))) miles"
+    }
+
+    private func radiusButton(
+        systemName: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle()
+                        .fill(GTIColor.Glass.fillSoft)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private func adjustRadius(by offset: Int) {
+        guard let current = draft else { return }
+        let currentMiles = SetupScreen.snapDistance(SetupScreen.milesFromMeters(current.radiusMeters))
+        let index = SetupScreen.distanceSteps.firstIndex(of: currentMiles) ?? 0
+        let nextIndex = min(max(index + offset, 0), SetupScreen.distanceSteps.count - 1)
+        let nextRadius = SetupScreen.metersFromMiles(SetupScreen.distanceSteps[nextIndex])
+        draft = SetupScreen.SearchArea(
+            centerLabel: current.centerLabel,
+            lat: current.lat,
+            lng: current.lng,
+            source: current.source,
+            timeZoneIdentifier: current.timeZoneIdentifier,
+            radiusMeters: nextRadius
+        )
     }
 }
 
