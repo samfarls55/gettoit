@@ -1,7 +1,7 @@
 ---
 title: Web fallback setup — Vercel env vars + Realtime contract
 status: living
-last-updated: 2026-05-21
+last-updated: 2026-06-03
 related: tb-15, tb-WF-10, adr-0003, adr-0013, adr-0014
 ---
 
@@ -64,6 +64,16 @@ Per [[adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] §"Web fallback v
 `design-system/scripts/verify.mjs` now sweeps `web/**/*.{ts,tsx,js,jsx,css}` for orphan hex codes alongside the iOS / JSX sweep. Every hex in the web source must be present in `design-system/tokens.json` — extend `tokens.json` first if you need a new color.
 
 The web build pulls `design-system/code/tokens.css` directly via `app/layout.tsx`, so token mutations flow into the web surface without a code change.
+
+## Native UI reference screenshots
+
+Native iOS reference screenshots are a development aid for any local UI lab, not production app code. Local preview routes, UI-lab API helpers, downloaded PNGs, and the optional `/ui-lab` agent skill are ignored by Git.
+
+- Generate native screenshots without a local Mac by running the `ios-ui-snapshots` GitHub Actions workflow.
+- The workflow runs `GetToItTests/UiLabScreenshotExportTests/testExportUiLabScreenshots` on a macOS runner and uploads the `ios-ui-lab-screenshots` artifact.
+- Download that artifact into the ignored local folder `web/public/ui-lab-ios/` when a local UI lab needs side-by-side native references.
+- On a local Mac, run the iOS test target with `GTI_UI_LAB_SCREENSHOT_DIR` pointed at `../web/public/ui-lab-ios/` and `-only-testing:GetToItTests/UiLabScreenshotExportTests/testExportUiLabScreenshots`.
+- Use these screenshots for layout, copy, spacing, visual hierarchy, and quick visual comparison before porting chosen changes into SwiftUI/TestFlight.
 
 ## 0.1.0 quiz port (tb-WF-10)
 

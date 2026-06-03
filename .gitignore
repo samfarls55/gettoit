@@ -65,3 +65,9 @@ coverage/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Local UI lab (development-only, per-machine)
+web/app/ui-lab/
+web/app/api/ui-lab/
+web/public/ui-lab-ios/
+.agents/skills/ui-lab/
