@@ -2,7 +2,7 @@
 
 Fix issue {{TASK_ID}}: {{ISSUE_TITLE}}
 
-Pull in the issue using `gh issue view <ID>`. If it has a parent PRD, pull that in too.
+Pull in the issue using `gh issue view {{TASK_ID}} --comments`. If it has a parent PRD, pull that in too.
 
 Only work on the issue specified.
 
@@ -20,9 +20,15 @@ Here are the last 10 commits:
 
 # EXPLORATION
 
-Explore the repo and fill your context window with relevant information that will allow you to complete the task.
+Explore only issue-relevant files. Start with:
 
-Pay extra attention to test files that touch the relevant parts of the code.
+1. `gh issue view {{TASK_ID}} --comments`
+2. `docs/agents/verification.md`
+3. `AGENTS.md`
+4. `CONTEXT.md`
+5. Directly relevant package docs and tests
+
+Avoid broad repo scans. Exclude `.sandcastle/**`, `node_modules/**`, `.next/**`, build outputs, generated caches, and prior worktrees.
 
 # EXECUTION
 
@@ -35,7 +41,7 @@ If applicable, use RGR to complete the task.
 
 # FEEDBACK LOOPS
 
-Before committing, run `npm run typecheck` and `npm run test` to ensure the tests pass.
+Before committing, use `docs/agents/verification.md` to choose the narrowest checks that prove the change. Run those checks.
 
 # COMMIT
 

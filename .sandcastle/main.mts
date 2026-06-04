@@ -47,8 +47,9 @@ const planSchema = z.object({
 const MAX_ITERATIONS = 10;
 
 const HOST_CODEX_AUTH_PATH = join(homedir(), ".codex", "auth.json");
+const HOST_CODEX_SESSIONS_DIR = join(homedir(), ".sandcastle", "codex-sessions");
 const SANDBOX_CODEX_AUTH_MOUNT_PATH = "/home/agent/codex-auth.json";
-const SANDBOX_CODEX_HOME = "/home/agent/workspace/.sandcastle/codex-home";
+const SANDBOX_CODEX_HOME = "/home/agent/.codex";
 const SANDBOX_CODEX_SESSIONS_DIR = `${SANDBOX_CODEX_HOME}/sessions`;
 const SANDBOX_GIT_CONFIG_GLOBAL = "/home/agent/workspace/.sandcastle/gitconfig";
 
@@ -83,6 +84,7 @@ const codexAgent = (model: string, options?: CodexAgentOptions) => {
   const agent = sandcastle.codex(model, {
     ...codexOptions,
     sessionStorage: {
+      hostSessionsDir: HOST_CODEX_SESSIONS_DIR,
       sandboxSessionsDir: SANDBOX_CODEX_SESSIONS_DIR,
     },
   });
@@ -106,21 +108,44 @@ const codexAgent = (model: string, options?: CodexAgentOptions) => {
   };
 };
 
-// Hooks run inside the sandbox before the agent starts each iteration.
-// npm install ensures the sandbox always has fresh dependencies.
-const hooks = {
-  sandbox: {
-    onSandboxReady: [
-      { command: 'mkdir -p "$CODEX_HOME"' },
-      {
-        command: `cp ${SANDBOX_CODEX_AUTH_MOUNT_PATH} "$CODEX_HOME/auth.json"`,
-      },
-      { command: 'chmod 600 "$CODEX_HOME/auth.json"' },
-      { command: 'touch "$GIT_CONFIG_GLOBAL"' },
-      { command: "npm install" },
-    ],
+const authAndGitHooks = [
+  {
+    command: [
+      'mkdir -p "$CODEX_HOME"',
+      `cp ${SANDBOX_CODEX_AUTH_MOUNT_PATH} "$CODEX_HOME/auth.json"`,
+      'chmod 600 "$CODEX_HOME/auth.json"',
+      'touch "$GIT_CONFIG_GLOBAL"',
+      'git config --global --replace-all safe.directory /home/agent/workspace',
+    ].join(" && "),
   },
-};
+];
+
+const dependencyHooks = [
+  { command: "npm ci --prefer-offline --no-audit", timeoutMs: 300_000 },
+  {
+    command:
+      "test ! -f web/package-lock.json || npm ci --prefix web --prefer-offline --no-audit",
+    timeoutMs: 300_000,
+  },
+  {
+    command:
+      "test ! -f mobile/package-lock.json || npm ci --prefix mobile --prefer-offline --no-audit",
+    timeoutMs: 300_000,
+  },
+];
+
+// Hooks run inside the sandbox before the agent starts.
+const createHooks = (options: { installDependencies: boolean }) => ({
+  sandbox: {
+    onSandboxReady: options.installDependencies
+      ? [...authAndGitHooks, ...dependencyHooks]
+      : authAndGitHooks,
+  },
+});
+
+const plannerHooks = createHooks({ installDependencies: false });
+const workerHooks = createHooks({ installDependencies: true });
+const mergerHooks = createHooks({ installDependencies: false });
 
 // ---------------------------------------------------------------------------
 // Main loop
@@ -139,7 +164,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // It outputs a <plan> JSON block — Output.object parses and validates it.
   // -------------------------------------------------------------------------
   const plan = await sandcastle.run({
-    hooks,
+    hooks: plannerHooks,
     sandbox: createDockerSandbox(),
     name: "planner",
     // One iteration is enough: the planner just needs to read and reason,
@@ -184,7 +209,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
       const sandbox = await sandcastle.createSandbox({
         branch: issue.branch,
         sandbox: createDockerSandbox(),
-        hooks,
+        hooks: workerHooks,
       });
 
       try {
@@ -193,8 +218,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           name: "implementer",
           maxIterations: 100,
           agent: codexAgent("gpt-5.5", {
-            effort: "medium",
-            serviceTier: "fast",
+            effort: "medium"
           }),
           promptFile: "./.sandcastle/implement-prompt.md",
           promptArgs: {
@@ -276,7 +300,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // uses to know which branches to merge and which issues to close.
   // -------------------------------------------------------------------------
   await sandcastle.run({
-    hooks,
+    hooks: mergerHooks,
     sandbox: createDockerSandbox(),
     name: "merger",
     maxIterations: 1,

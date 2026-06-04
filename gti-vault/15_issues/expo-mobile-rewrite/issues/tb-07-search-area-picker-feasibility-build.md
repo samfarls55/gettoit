@@ -32,4 +32,3 @@ Build the first Expo-managed Search area picker implementation and web mock. It 
 - The Expo slice adds a pure Search area state model for committed center + radius, draft movement, radius stops, dirty detection, commit, and cancel.
 - The preview surface is deterministic on Expo web and keeps current-location, typed place search, and density preview pins behind a `SearchAreaAdapter` so tests can use fakes.
 - Known Expo-managed gaps for the next native pass: the current build uses a mock map surface instead of a real native map camera, so actual iOS camera-region math, gesture-derived nearest-edge radius, native current-location permission flow, geocoding/place-search provider choice, and native density-pin rendering still need runtime validation.
-

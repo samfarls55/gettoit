@@ -1,20 +1,18 @@
 # TASK
 
-Review the code changes on branch `{{BRANCH}}` and improve code clarity, consistency, and maintainability while preserving exact functionality.
+Review only the code changes on branch `{{BRANCH}}` and improve code clarity, consistency, and maintainability while preserving exact functionality.
 
 # CONTEXT
 
-## Branch diff
+Use `git diff --stat {{TARGET_BRANCH}}...{{BRANCH}}` first, then inspect only changed files and focused hunks.
 
-!`git diff {{TARGET_BRANCH}}...{{BRANCH}}`
+Exclude `.sandcastle/**`, `node_modules/**`, `.next/**`, build outputs, generated caches, and prior worktrees.
 
-## Commits on this branch
-
-!`git log {{TARGET_BRANCH}}..{{BRANCH}} --oneline`
+To inspect commits, use `git log {{TARGET_BRANCH}}..{{BRANCH}} --oneline`.
 
 # REVIEW PROCESS
 
-1. **Understand the change**: Read the diff and commits above to understand the intent.
+1. **Understand the change**: Read the branch stat, commits, and changed files to understand the intent.
 
 2. **Analyze for improvements**: Look for opportunities to:
    - Reduce unnecessary complexity and nesting
@@ -24,6 +22,7 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
    - Remove unnecessary comments that describe obvious code
    - Avoid nested ternary operators - prefer switch statements or if/else chains
    - Choose clarity over brevity - explicit code is often better than overly compact code
+   - Keep review edits surgical; avoid style churn outside changed files
 
 3. **Check correctness**:
    - Does the implementation match the intent? Are edge cases handled?
@@ -47,7 +46,7 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 If you find improvements to make:
 
 1. Make the changes directly on this branch
-2. Run tests and type checking to ensure nothing is broken
+2. Use `docs/agents/verification.md` to choose and run the narrowest checks that prove nothing is broken
 3. Commit describing the refinements
 
 If the code is already clean and well-structured, do nothing.
