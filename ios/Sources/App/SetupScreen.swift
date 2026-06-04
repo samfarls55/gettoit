@@ -247,7 +247,7 @@ public struct SetupScreen: View {
         private let searcher: any SearchAreaDensityPreviewSearching
         private let sleep: DensityPreviewSleep
         private var refreshTask: Task<Void, Never>?
-        private var generation = 0
+        private var refreshGeneration = 0
 
         public init(
             searcher: any SearchAreaDensityPreviewSearching,
@@ -267,8 +267,8 @@ public struct SetupScreen: View {
         /// idle long enough. A newer draft cancels and supersedes the
         /// older pending refresh.
         public func scheduleRefresh(for area: SearchArea) {
-            generation += 1
-            let scheduledGeneration = generation
+            refreshGeneration += 1
+            let scheduledRefreshGeneration = refreshGeneration
             let searcher = searcher
             let sleep = sleep
             pins = SetupScreen.densityPreviewPins(for: area, candidates: pins)
@@ -285,15 +285,13 @@ public struct SetupScreen: View {
                     try Task.checkCancellation()
                     let pins = SetupScreen.densityPreviewPins(for: area, candidates: candidates)
                     await MainActor.run {
-                        guard self?.generation == scheduledGeneration else { return }
-                        self?.pins = pins
+                        self?.setPins(pins, ifCurrent: scheduledRefreshGeneration)
                     }
                 } catch is CancellationError {
                     return
                 } catch {
                     await MainActor.run {
-                        guard self?.generation == scheduledGeneration else { return }
-                        self?.pins = []
+                        self?.setPins([], ifCurrent: scheduledRefreshGeneration)
                     }
                 }
             }
@@ -301,9 +299,14 @@ public struct SetupScreen: View {
 
         /// Cancel any pending preview refresh and remove visible pins.
         public func clear() {
-            generation += 1
+            refreshGeneration += 1
             refreshTask?.cancel()
             pins = []
+        }
+
+        private func setPins(_ pins: [DensityPreviewPin], ifCurrent generation: Int) {
+            guard refreshGeneration == generation else { return }
+            self.pins = pins
         }
     }
 
@@ -405,13 +408,11 @@ public struct SetupScreen: View {
         candidates: [DensityPreviewPin]
     ) -> [DensityPreviewPin] {
         let center = CLLocation(latitude: searchArea.lat, longitude: searchArea.lng)
-        return candidates
-            .filter { pin in
-                let location = CLLocation(latitude: pin.lat, longitude: pin.lng)
-                return location.distance(from: center) <= CLLocationDistance(searchArea.radiusMeters)
-            }
-            .prefix(densityPreviewVisibleCap)
-            .map { $0 }
+        let pinsInsideSearchArea = candidates.filter { pin in
+            let location = CLLocation(latitude: pin.lat, longitude: pin.lng)
+            return location.distance(from: center) <= CLLocationDistance(searchArea.radiusMeters)
+        }
+        return Array(pinsInsideSearchArea.prefix(densityPreviewVisibleCap))
     }
 
     /// Tolerant equality for map-derived drafts. MapKit camera round
@@ -1839,7 +1840,7 @@ private struct SearchAreaEditor: View {
 
     private var commitButton: some View {
         Button {
-            guard SetupScreen.canCommitSearchArea(draft: draft), let draft else { return }
+            guard let draft else { return }
             onCommit(draft)
         } label: {
             Text("USE THIS AREA")
@@ -1902,9 +1903,7 @@ private struct SearchAreaEditor: View {
     private func adjustRadius(by offset: Int) {
         guard let current = draft else { return }
         let next = SetupScreen.searchAreaAfterRadiusStep(current, offset: offset)
-        draft = next
-        densityPreviewModel.scheduleRefresh(for: next)
-        cameraPosition = .region(SetupScreen.mapRegion(for: next))
+        applyDraft(next, syncCamera: true)
     }
 
     private func updateDraft(from region: MKCoordinateRegion) {
@@ -1916,8 +1915,7 @@ private struct SearchAreaEditor: View {
         )
         let next = SetupScreen.searchArea(fromViewport: viewport, previousDraft: draft)
         if !SetupScreen.searchAreasMatchForDraftClose(next, draft) {
-            draft = next
-            densityPreviewModel.scheduleRefresh(for: next)
+            applyDraft(next, syncCamera: false)
         }
     }
 
@@ -1932,9 +1930,15 @@ private struct SearchAreaEditor: View {
         let radius = draft?.radiusMeters
             ?? SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
         let next = SetupScreen.searchArea(from: currentPlace, radiusMeters: radius)
+        applyDraft(next, syncCamera: true)
+    }
+
+    private func applyDraft(_ next: SetupScreen.SearchArea, syncCamera: Bool) {
         draft = next
         densityPreviewModel.scheduleRefresh(for: next)
-        cameraPosition = .region(SetupScreen.mapRegion(for: next))
+        if syncCamera {
+            cameraPosition = .region(SetupScreen.mapRegion(for: next))
+        }
     }
 
     private func requestClose() {
