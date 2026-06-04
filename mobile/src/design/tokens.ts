@@ -1,8 +1,40 @@
 import designTokens from "../../../design-system/tokens.json";
+import type { TextStyle } from "react-native";
 
-type FontWeight = "500" | "600" | "700" | "800" | "900";
+type FontWeight = NonNullable<TextStyle["fontWeight"]>;
 
 const typographyScale = designTokens.typography.scale;
+const bodyTypography = typographyScale.body;
+const displayTypography = typographyScale["display-s"];
+const eyebrowTypography = typographyScale.eyebrow;
+
+const toFontWeight = (weight: number): FontWeight => {
+  switch (weight) {
+    case 100:
+      return "100";
+    case 200:
+      return "200";
+    case 300:
+      return "300";
+    case 400:
+      return "400";
+    case 500:
+      return "500";
+    case 600:
+      return "600";
+    case 700:
+      return "700";
+    case 800:
+      return "800";
+    case 900:
+      return "900";
+    default:
+      throw new Error(`Unsupported mobile font weight: ${weight}`);
+  }
+};
+
+const lineHeightFor = (typography: { size: number; "line-height": number }) =>
+  typography.size * typography["line-height"];
 
 export const mobileTokens = {
   color: {
@@ -18,18 +50,18 @@ export const mobileTokens = {
   },
   typography: {
     body: {
-      size: typographyScale.body.size,
-      weight: String(typographyScale.body.weight) as FontWeight,
-      lineHeight: typographyScale.body.size * typographyScale.body["line-height"],
+      size: bodyTypography.size,
+      weight: toFontWeight(bodyTypography.weight),
+      lineHeight: lineHeightFor(bodyTypography),
     },
     display: {
-      size: typographyScale["display-s"].size,
-      weight: String(typographyScale["display-s"].weight) as FontWeight,
-      lineHeight: typographyScale["display-s"].size * typographyScale["display-s"]["line-height"],
+      size: displayTypography.size,
+      weight: toFontWeight(displayTypography.weight),
+      lineHeight: lineHeightFor(displayTypography),
     },
     eyebrow: {
-      size: typographyScale.eyebrow.size,
-      weight: String(typographyScale.eyebrow.weight) as FontWeight,
+      size: eyebrowTypography.size,
+      weight: toFontWeight(eyebrowTypography.weight),
     },
   },
 } as const;
