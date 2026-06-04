@@ -147,43 +147,44 @@ function SignInGate({
   onClaimCodeRedeemed,
 }: SignInGateProps) {
   const [claimCode, setClaimCode] = useState("");
-  const [claimError, setClaimError] = useState(false);
-  const [claimOpen, setClaimOpen] = useState(false);
-  const [claimSuccess, setClaimSuccess] = useState(false);
-  const [appleError, setAppleError] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [claimRedeemFailed, setClaimRedeemFailed] = useState(false);
+  const [isClaimPanelOpen, setIsClaimPanelOpen] = useState(false);
+  const [claimRedeemed, setClaimRedeemed] = useState(false);
+  const [appleSignInFailed, setAppleSignInFailed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const trimmedClaimCode = claimCode.trim();
+  const isClaimRedeemDisabled = !trimmedClaimCode || isSubmitting;
 
-  const signInWithApple = async () => {
-    setAppleError(false);
-    setSubmitting(true);
+  const handleAppleSignInPress = async () => {
+    setAppleSignInFailed(false);
+    setIsSubmitting(true);
 
     try {
       await authBoundary.signInWithApple();
       onAppleSignInSucceeded?.();
     } catch {
-      setAppleError(true);
+      setAppleSignInFailed(true);
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
-  const redeemClaimCode = async () => {
+  const handleClaimCodeRedeemPress = async () => {
     if (!trimmedClaimCode) {
       return;
     }
 
-    setClaimError(false);
-    setSubmitting(true);
+    setClaimRedeemFailed(false);
+    setIsSubmitting(true);
 
     try {
       await authBoundary.redeemClaimCode(trimmedClaimCode);
-      setClaimSuccess(true);
+      setClaimRedeemed(true);
       onClaimCodeRedeemed?.();
     } catch {
-      setClaimError(true);
+      setClaimRedeemFailed(true);
     } finally {
-      setSubmitting(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -196,15 +197,15 @@ function SignInGate({
         <Text style={styles.subtitle}>
           Sign in once and your taste profile saves itself.
         </Text>
-        {appleError ? (
+        {appleSignInFailed ? (
           <Text style={styles.inlineError}>Couldn't reach Apple. Try again.</Text>
         ) : null}
-        {claimSuccess ? (
+        {claimRedeemed ? (
           <Text style={styles.inlineSuccess}>
             Web Plans ready. Sign in with Apple to finish.
           </Text>
         ) : null}
-        {claimOpen ? (
+        {isClaimPanelOpen ? (
           <View style={styles.claimPanel}>
             <Text style={styles.claimTeaching}>
               Bring back your recent web Plans. Open any link you voted on, tap
@@ -220,7 +221,7 @@ function SignInGate({
               style={styles.claimInput}
               value={claimCode}
             />
-            {claimError ? (
+            {claimRedeemFailed ? (
               <Text accessibilityRole="alert" style={styles.inlineError}>
                 That code didn't work. Generate a fresh one from your web link.
               </Text>
@@ -228,11 +229,11 @@ function SignInGate({
             <Pressable
               accessibilityLabel="Bring my Plans over"
               accessibilityRole="button"
-              disabled={!trimmedClaimCode || submitting}
-              onPress={redeemClaimCode}
+              disabled={isClaimRedeemDisabled}
+              onPress={handleClaimCodeRedeemPress}
               style={[
                 styles.primaryButton,
-                (!trimmedClaimCode || submitting) && styles.disabledButton,
+                isClaimRedeemDisabled && styles.disabledButton,
               ]}
             >
               <Text style={styles.primaryButtonLabel}>Bring my Plans over</Text>
@@ -242,7 +243,7 @@ function SignInGate({
           <Pressable
             accessibilityLabel="Voted on the web?"
             accessibilityRole="button"
-            onPress={() => setClaimOpen(true)}
+            onPress={() => setIsClaimPanelOpen(true)}
             style={styles.secondaryButton}
           >
             <Text style={styles.secondaryButtonLabel}>Voted on the web?</Text>
@@ -251,9 +252,9 @@ function SignInGate({
         <Pressable
           accessibilityLabel="Sign in with Apple"
           accessibilityRole="button"
-          disabled={submitting}
-          onPress={signInWithApple}
-          style={[styles.primaryButton, submitting && styles.disabledButton]}
+          disabled={isSubmitting}
+          onPress={handleAppleSignInPress}
+          style={[styles.primaryButton, isSubmitting && styles.disabledButton]}
         >
           <Text style={styles.primaryButtonLabel}>Save my taste profile</Text>
         </Pressable>
