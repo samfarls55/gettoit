@@ -57,6 +57,15 @@ type RouteContent = {
   body: string;
 };
 
+type PlanListStatus = "idle" | "loading" | "loaded" | "error";
+
+type PlanListContentProps = {
+  onCreatePlan?: () => void;
+  onOpenPlan?: (plan: PlanListItem) => void;
+  plans: PlanListSnapshot;
+  status: PlanListStatus;
+};
+
 const contentByRouteName: Record<AppRouteName, RouteContent> = {
   signInGate: {
     title: "Sign in gate",
@@ -148,9 +157,8 @@ export function MobileAppShell({
   const [planSnapshot, setPlanSnapshot] = useState<PlanListSnapshot>(
     emptyPlanListSnapshot,
   );
-  const [planListStatus, setPlanListStatus] = useState<
-    "idle" | "loading" | "loaded" | "error"
-  >("idle");
+  const [planListStatus, setPlanListStatus] =
+    useState<PlanListStatus>("idle");
 
   useEffect(() => {
     if (route.name !== "planList") {
@@ -206,23 +214,12 @@ export function MobileAppShell({
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
-        {planListStatus === "error" ? (
-          <View style={styles.surface}>
-            <Text style={styles.routeTitle}>Plans unavailable</Text>
-            <Text style={styles.subtitle}>Try again in a moment.</Text>
-          </View>
-        ) : planListStatus === "loaded" ? (
-          <PlanListScreen
-            onCreatePlan={onCreatePlan}
-            onOpenPlan={onOpenPlan}
-            plans={planSnapshot}
-          />
-        ) : (
-          <View style={styles.surface}>
-            <Text style={styles.routeTitle}>Plans</Text>
-            <Text style={styles.subtitle}>Loading Plans.</Text>
-          </View>
-        )}
+        <PlanListContent
+          onCreatePlan={onCreatePlan}
+          onOpenPlan={onOpenPlan}
+          plans={planSnapshot}
+          status={planListStatus}
+        />
       </View>
     );
   }
@@ -238,6 +235,39 @@ export function MobileAppShell({
       </View>
     </View>
   );
+}
+
+function PlanListContent({
+  onCreatePlan,
+  onOpenPlan,
+  plans,
+  status,
+}: PlanListContentProps) {
+  switch (status) {
+    case "loaded":
+      return (
+        <PlanListScreen
+          onCreatePlan={onCreatePlan}
+          onOpenPlan={onOpenPlan}
+          plans={plans}
+        />
+      );
+    case "error":
+      return (
+        <View style={styles.surface}>
+          <Text style={styles.routeTitle}>Plans unavailable</Text>
+          <Text style={styles.subtitle}>Try again in a moment.</Text>
+        </View>
+      );
+    case "idle":
+    case "loading":
+      return (
+        <View style={styles.surface}>
+          <Text style={styles.routeTitle}>Plans</Text>
+          <Text style={styles.subtitle}>Loading Plans.</Text>
+        </View>
+      );
+  }
 }
 
 type SignInGateProps = {

@@ -131,20 +131,31 @@ function assertSupabaseRows<TRow>(
   return result.data ?? [];
 }
 
-function isJoinedPlan(plan: SupabasePlanRow, joinedPlanIds: Set<string>) {
-  return joinedPlanIds.has(plan.id);
-}
-
 function sortByNewest(
   plans: SupabasePlanRow[],
   getSortKey: (plan: SupabasePlanRow) => string | null,
-) {
+): SupabasePlanRow[] {
   return [...plans].sort((left, right) => {
     const leftTime = getSortKey(left) ?? left.created_at;
     const rightTime = getSortKey(right) ?? right.created_at;
 
     return rightTime.localeCompare(leftTime);
   });
+}
+
+function isPlanCreatedByUser(plan: SupabasePlanRow, userId: string): boolean {
+  return plan.creator_id === userId;
+}
+
+function joinedPlanIdForRoom(
+  room: SupabaseRoomRow,
+  joinedRoomIds: Set<string>,
+): string | null {
+  if (!joinedRoomIds.has(room.id)) {
+    return null;
+  }
+
+  return room.plan_id;
 }
 
 function pendingCreatedItem(plan: SupabasePlanRow): PlanListItem {
@@ -169,26 +180,26 @@ function pendingJoinedItem(plan: SupabasePlanRow): PlanListItem {
 
 function decidedItem(
   plan: SupabasePlanRow,
-  joinedPlanIds: Set<string>,
+  isJoinedByUser: boolean,
 ): PlanListItem {
   return {
     id: plan.id,
     title: plan.name,
     subtitle: "Live verdict",
-    badge: isJoinedPlan(plan, joinedPlanIds) ? "Joined" : "Decided",
+    badge: isJoinedByUser ? "Joined" : "Decided",
     routeTarget: "decided",
   };
 }
 
 function historyItem(
   plan: SupabasePlanRow,
-  joinedPlanIds: Set<string>,
+  isJoinedByUser: boolean,
 ): PlanListItem {
   return {
     id: plan.id,
     title: plan.name,
     subtitle: "Closed verdict",
-    badge: isJoinedPlan(plan, joinedPlanIds) ? "Joined" : "History",
+    badge: isJoinedByUser ? "Joined" : "History",
     routeTarget: "history",
   };
 }
@@ -218,8 +229,8 @@ export function createSupabasePlanRepository({
       const rooms = assertSupabaseRows(roomsResult, "Plan rooms read");
       const joinedPlanIds = new Set(
         rooms
-          .filter((room) => joinedRoomIds.has(room.id) && room.plan_id)
-          .map((room) => room.plan_id as string),
+          .map((room) => joinedPlanIdForRoom(room, joinedRoomIds))
+          .filter((planId): planId is string => planId !== null),
       );
 
       const plansResult = await supabase
@@ -229,13 +240,17 @@ export function createSupabasePlanRepository({
         )
         .order("created_at", { ascending: false });
       const plans = assertSupabaseRows(plansResult, "Plans read").filter(
-        (plan) => plan.creator_id === userId || joinedPlanIds.has(plan.id),
+        (plan) =>
+          isPlanCreatedByUser(plan, userId) || joinedPlanIds.has(plan.id),
       );
+      const isJoinedByUser = (plan: SupabasePlanRow) =>
+        joinedPlanIds.has(plan.id);
 
       return {
         created: sortByNewest(
           plans.filter(
-            (plan) => plan.status === "pending" && plan.creator_id === userId,
+            (plan) =>
+              plan.status === "pending" && isPlanCreatedByUser(plan, userId),
           ),
           (plan) => plan.created_at,
         ).map(pendingCreatedItem),
@@ -248,11 +263,11 @@ export function createSupabasePlanRepository({
         decided: sortByNewest(
           plans.filter((plan) => plan.status === "decided-active"),
           (plan) => plan.verdict_fired_at,
-        ).map((plan) => decidedItem(plan, joinedPlanIds)),
+        ).map((plan) => decidedItem(plan, isJoinedByUser(plan))),
         history: sortByNewest(
           plans.filter((plan) => plan.status === "decided-expired"),
           (plan) => plan.expired_at,
-        ).map((plan) => historyItem(plan, joinedPlanIds)),
+        ).map((plan) => historyItem(plan, isJoinedByUser(plan))),
       };
     },
   };
