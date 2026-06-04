@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "GetToIt Mobile",
+    "slug": "gettoit-mobile",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "scheme": "gettoit",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "web"],
+    "ios": {
+      "supportsTablet": false
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

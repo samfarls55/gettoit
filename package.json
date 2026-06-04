@@ -15,6 +15,12 @@
     "web:test": "npm test --prefix web",
     "web:build": "npm run build --prefix web",
     "web:dev": "npm run dev --prefix web",
+    "mobile:typecheck": "npm run typecheck --prefix mobile",
+    "mobile:test": "npm test --prefix mobile",
+    "mobile:web": "npm run web --prefix mobile",
+    "mobile:verify": "npm run verify --prefix mobile",
+    "typecheck": "npm run mobile:typecheck",
+    "test": "npm run mobile:test",
     "sandcastle": "npx tsx .sandcastle/main.mts"
   },
   "dependencies": {
