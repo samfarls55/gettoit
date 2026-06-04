@@ -59,6 +59,13 @@ type RouteContent = {
 
 type PlanListStatus = "idle" | "loading" | "loaded" | "error";
 
+type PlanListContentProps = {
+  onCreatePlan?: () => void;
+  onOpenPlan?: (plan: PlanListItem) => void;
+  plans: PlanListSnapshot;
+  status: PlanListStatus;
+};
+
 const contentByRouteName: Record<AppRouteName, RouteContent> = {
   signInGate: {
     title: "Sign in gate",
@@ -204,34 +211,15 @@ export function MobileAppShell({
   }
 
   if (route.name === "planList") {
-    let planListContent = (
-      <View style={styles.surface}>
-        <Text style={styles.routeTitle}>Plans</Text>
-        <Text style={styles.subtitle}>Loading Plans.</Text>
-      </View>
-    );
-
-    if (planListStatus === "error") {
-      planListContent = (
-        <View style={styles.surface}>
-          <Text style={styles.routeTitle}>Plans unavailable</Text>
-          <Text style={styles.subtitle}>Try again in a moment.</Text>
-        </View>
-      );
-    } else if (planListStatus === "loaded") {
-      planListContent = (
-        <PlanListScreen
-          onCreatePlan={onCreatePlan}
-          onOpenPlan={onOpenPlan}
-          plans={planSnapshot}
-        />
-      );
-    }
-
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
-        {planListContent}
+        <PlanListContent
+          onCreatePlan={onCreatePlan}
+          onOpenPlan={onOpenPlan}
+          plans={planSnapshot}
+          status={planListStatus}
+        />
       </View>
     );
   }
@@ -247,6 +235,39 @@ export function MobileAppShell({
       </View>
     </View>
   );
+}
+
+function PlanListContent({
+  onCreatePlan,
+  onOpenPlan,
+  plans,
+  status,
+}: PlanListContentProps) {
+  switch (status) {
+    case "loaded":
+      return (
+        <PlanListScreen
+          onCreatePlan={onCreatePlan}
+          onOpenPlan={onOpenPlan}
+          plans={plans}
+        />
+      );
+    case "error":
+      return (
+        <View style={styles.surface}>
+          <Text style={styles.routeTitle}>Plans unavailable</Text>
+          <Text style={styles.subtitle}>Try again in a moment.</Text>
+        </View>
+      );
+    case "idle":
+    case "loading":
+      return (
+        <View style={styles.surface}>
+          <Text style={styles.routeTitle}>Plans</Text>
+          <Text style={styles.subtitle}>Loading Plans.</Text>
+        </View>
+      );
+  }
 }
 
 type SignInGateProps = {

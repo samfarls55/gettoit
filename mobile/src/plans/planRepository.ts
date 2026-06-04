@@ -131,13 +131,6 @@ function assertSupabaseRows<TRow>(
   return result.data ?? [];
 }
 
-function isPlanJoinedByUser(
-  plan: SupabasePlanRow,
-  joinedPlanIds: Set<string>,
-): boolean {
-  return joinedPlanIds.has(plan.id);
-}
-
 function sortByNewest(
   plans: SupabasePlanRow[],
   getSortKey: (plan: SupabasePlanRow) => string | null,
@@ -187,26 +180,26 @@ function pendingJoinedItem(plan: SupabasePlanRow): PlanListItem {
 
 function decidedItem(
   plan: SupabasePlanRow,
-  joinedPlanIds: Set<string>,
+  isJoinedByUser: boolean,
 ): PlanListItem {
   return {
     id: plan.id,
     title: plan.name,
     subtitle: "Live verdict",
-    badge: isPlanJoinedByUser(plan, joinedPlanIds) ? "Joined" : "Decided",
+    badge: isJoinedByUser ? "Joined" : "Decided",
     routeTarget: "decided",
   };
 }
 
 function historyItem(
   plan: SupabasePlanRow,
-  joinedPlanIds: Set<string>,
+  isJoinedByUser: boolean,
 ): PlanListItem {
   return {
     id: plan.id,
     title: plan.name,
     subtitle: "Closed verdict",
-    badge: isPlanJoinedByUser(plan, joinedPlanIds) ? "Joined" : "History",
+    badge: isJoinedByUser ? "Joined" : "History",
     routeTarget: "history",
   };
 }
@@ -250,6 +243,8 @@ export function createSupabasePlanRepository({
         (plan) =>
           isPlanCreatedByUser(plan, userId) || joinedPlanIds.has(plan.id),
       );
+      const isJoinedByUser = (plan: SupabasePlanRow) =>
+        joinedPlanIds.has(plan.id);
 
       return {
         created: sortByNewest(
@@ -268,11 +263,11 @@ export function createSupabasePlanRepository({
         decided: sortByNewest(
           plans.filter((plan) => plan.status === "decided-active"),
           (plan) => plan.verdict_fired_at,
-        ).map((plan) => decidedItem(plan, joinedPlanIds)),
+        ).map((plan) => decidedItem(plan, isJoinedByUser(plan))),
         history: sortByNewest(
           plans.filter((plan) => plan.status === "decided-expired"),
           (plan) => plan.expired_at,
-        ).map((plan) => historyItem(plan, joinedPlanIds)),
+        ).map((plan) => historyItem(plan, isJoinedByUser(plan))),
       };
     },
   };
