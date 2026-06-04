@@ -1,10 +1,18 @@
+import type { InviteRouteResolution } from "../invites/inviteLinks";
+
 export type AuthState = "idle" | "anonymous" | "linkedApple";
 
-export type ActivePlanPhase = "setup" | "quiz" | "waiting" | "verdict";
+export type ActivePlanPhase =
+  | "join"
+  | "setup"
+  | "quiz"
+  | "waiting"
+  | "verdict";
 
 export type AppRouteName =
   | "signInGate"
   | "planList"
+  | "join"
   | "setup"
   | "quiz"
   | "waiting"
@@ -29,6 +37,7 @@ export type AppStateRouterEvent =
   | { type: "authSignedOut" }
   | { type: "deepLinkOpened"; url: string }
   | { type: "deepLinkHandled" }
+  | { type: "deepLinkResolved"; resolution: InviteRouteResolution }
   | { type: "openSettings" }
   | { type: "closeSettings" }
   | { type: "openSetup" }
@@ -51,6 +60,24 @@ function stateWithActivePlanPhase(
   return { ...state, activePlanPhase, settingsOpen: false };
 }
 
+function phaseForInviteResolution(
+  resolution: InviteRouteResolution,
+): ActivePlanPhase | null {
+  switch (resolution.kind) {
+    case "join":
+      return "join";
+    case "quiz":
+      return "quiz";
+    case "waiting":
+      return "waiting";
+    case "verdict":
+      return "verdict";
+    case "invalid":
+    case "stale":
+      return null;
+  }
+}
+
 export function appStateRouterReducer(
   state: AppStateRouterState,
   event: AppStateRouterEvent,
@@ -69,6 +96,11 @@ export function appStateRouterReducer(
       return { ...state, pendingDeepLinkUrl: event.url };
     case "deepLinkHandled":
       return { ...state, pendingDeepLinkUrl: null };
+    case "deepLinkResolved":
+      return stateWithActivePlanPhase(
+        { ...state, pendingDeepLinkUrl: null },
+        phaseForInviteResolution(event.resolution),
+      );
     case "openSettings":
       return { ...state, settingsOpen: true };
     case "closeSettings":
@@ -96,6 +128,8 @@ export function routeForAppState(state: AppStateRouterState): AppRoute {
   }
 
   switch (state.activePlanPhase) {
+    case "join":
+      return { name: "join" };
     case "quiz":
       return { name: "quiz" };
     case "waiting":

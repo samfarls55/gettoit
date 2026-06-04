@@ -1,5 +1,5 @@
 ﻿---
-status: ready-for-agent
+status: implemented
 type: AFK
 github_issue: 334
 ---
@@ -16,12 +16,19 @@ Build the group invite and deep-link routing path with local simulation. The sli
 
 ## Acceptance criteria
 
-- [ ] Group Plan launch can produce an invite link through a share/link adapter.
-- [ ] Incoming invite URLs are parsed into typed deep-link payloads.
-- [ ] The app-state router handles simulated cold and warm deep-link events.
-- [ ] Resolver tests cover open, in-progress, waiting, decided, and invalid/stale link cases with fake data.
-- [ ] Share and native link handling are boundary abstractions that can be faked locally.
-- [ ] Typecheck and mobile tests pass.
+- [x] Group Plan launch can produce an invite link through a share/link adapter.
+- [x] Incoming invite URLs are parsed into typed deep-link payloads.
+- [x] The app-state router handles simulated cold and warm deep-link events.
+- [x] Resolver tests cover open, in-progress, waiting, decided, and invalid/stale link cases with fake data.
+- [x] Share and native link handling are boundary abstractions that can be faked locally.
+- [x] Typecheck and mobile tests pass.
+
+## Implementation notes
+
+- Added a local invite-link parser/resolver for `https://.../join/:roomId` and `gettoit://join/:roomId`.
+- Wired Expo app launch through fakeable invite/share and native-link boundaries.
+- Added a `join` placeholder route plus resolver routing for join, quiz, waiting, and verdict states; invalid/stale links clear back to the Plan list.
+- Verified with `npm run verify --prefix mobile`.
 
 ## Blocked by
 

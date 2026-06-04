@@ -1,6 +1,7 @@
 import { useReducer } from "react";
 import { Button, View } from "react-native";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -9,6 +10,7 @@ import {
 
 import App, { MobileAppShell } from "../App";
 import { mobileTokens } from "../src/design/tokens";
+import type { InviteRouteResolution } from "../src/invites/inviteLinks";
 import type { AppStateRouterState } from "../src/navigation/appStateRouter";
 import {
   appStateRouterReducer,
@@ -85,6 +87,18 @@ function makeWritablePlanRepository(): PlanRepository {
       ...plan,
       id: plan.id ?? "saved-plan",
     })),
+  };
+}
+
+function makeInviteBoundary(
+  resolution: InviteRouteResolution = { kind: "join", roomId: "open-room" },
+) {
+  return {
+    createGroupInviteLink: jest
+      .fn()
+      .mockResolvedValue("https://gettoit.example/join/saved-plan"),
+    resolveInviteLink: jest.fn().mockResolvedValue(resolution),
+    shareInviteLink: jest.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -188,7 +202,7 @@ describe("App", () => {
       visibleBody: "Account settings live here.",
     },
   ])("$name", ({ state, visibleRoute, visibleBody }) => {
-    render(<App initialRouterState={state} />);
+    render(<MobileAppShell routerState={state} />);
 
     expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
     expect(screen.getByText(visibleBody)).toBeOnTheScreen();
@@ -415,6 +429,109 @@ describe("App", () => {
         serviceShape: "outdoor",
       });
       expect(screen.getByText("Quiz placeholder")).toBeOnTheScreen();
+    });
+  });
+
+  it("shares a group invite link after launching Setup", async () => {
+    const repository = makeWritablePlanRepository();
+    const inviteBoundary = makeInviteBoundary();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        inviteBoundary={inviteBoundary}
+        planRepository={repository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Create group Plan")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Create group Plan"));
+    fireEvent.changeText(screen.getByLabelText("Name this plan"), "Dinner crew");
+    fireEvent.press(screen.getByText("Set search area"));
+    fireEvent.press(screen.getByText("USE THIS AREA"));
+    fireEvent.press(screen.getByText("Drop the invite link"));
+
+    await waitFor(() => {
+      expect(inviteBoundary.createGroupInviteLink).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "saved-plan", name: "Dinner crew" }),
+      );
+      expect(inviteBoundary.shareInviteLink).toHaveBeenCalledWith(
+        "https://gettoit.example/join/saved-plan",
+      );
+      expect(screen.getByText("Waiting placeholder")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes a cold-start invite link to the join placeholder", async () => {
+    const inviteBoundary = makeInviteBoundary({ kind: "join", roomId: "open-room" });
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        inviteBoundary={inviteBoundary}
+        nativeLinkBoundary={{
+          getInitialUrl: jest
+            .fn()
+            .mockResolvedValue("https://gettoit.example/join/open-room"),
+          subscribe: jest.fn(() => () => undefined),
+        }}
+        planRepository={{
+          listPlans: async () => emptyPlanListSnapshot,
+          savePlan: jest.fn(),
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
+        "https://gettoit.example/join/open-room",
+      );
+      expect(screen.getByText("Join placeholder")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes a warm invite link event to the waiting placeholder", async () => {
+    const inviteBoundary = makeInviteBoundary({
+      kind: "waiting",
+      roomId: "waiting-room",
+    });
+    let listener: ((url: string) => void) | null = null;
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        inviteBoundary={inviteBoundary}
+        nativeLinkBoundary={{
+          getInitialUrl: jest.fn().mockResolvedValue(null),
+          subscribe: jest.fn((nextListener) => {
+            listener = nextListener;
+            return () => undefined;
+          }),
+        }}
+        planRepository={{
+          listPlans: async () => emptyPlanListSnapshot,
+          savePlan: jest.fn(),
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
+    });
+
+    await act(async () => {
+      listener?.("https://gettoit.example/join/waiting-room");
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
+        "https://gettoit.example/join/waiting-room",
+      );
+      expect(screen.getByText("Waiting placeholder")).toBeOnTheScreen();
     });
   });
 

@@ -9,6 +9,11 @@ import {
 } from "react-native";
 
 import { mobileTokens } from "./src/design/tokens";
+import {
+  createGroupInviteUrl,
+  resolveInviteLink,
+  type InviteRouteResolution,
+} from "./src/invites/inviteLinks";
 import type {
   AppRouteName,
   AppStateRouterState,
@@ -37,9 +42,24 @@ type AuthBoundary = {
   redeemClaimCode: (code: string) => Promise<void>;
 };
 
+type SavedPlanSetup = PlanSetup & { id: string };
+
+type InviteBoundary = {
+  createGroupInviteLink: (plan: SavedPlanSetup) => Promise<string>;
+  resolveInviteLink: (url: string) => Promise<InviteRouteResolution>;
+  shareInviteLink: (url: string) => Promise<void>;
+};
+
+type NativeLinkBoundary = {
+  getInitialUrl: () => Promise<string | null>;
+  subscribe: (listener: (url: string) => void) => () => void;
+};
+
 type AppProps = {
   authBoundary?: AuthBoundary;
   initialRouterState?: AppStateRouterState;
+  inviteBoundary?: InviteBoundary;
+  nativeLinkBoundary?: NativeLinkBoundary;
   planRepository?: PlanRepository;
   [key: string]: unknown;
 };
@@ -80,6 +100,10 @@ const contentByRouteName: Record<AppRouteName, RouteContent> = {
     title: "Plan list",
     body: "Your Plans will appear here.",
   },
+  join: {
+    title: "Join placeholder",
+    body: "Join this group Plan.",
+  },
   setup: {
     title: "Setup placeholder",
     body: "Plan setup starts here.",
@@ -111,6 +135,40 @@ const defaultAuthBoundary: AuthBoundary = {
   redeemClaimCode: async () => undefined,
 };
 
+const defaultInviteBoundary: InviteBoundary = {
+  createGroupInviteLink: async (plan) =>
+    createGroupInviteUrl({
+      baseUrl: "https://gettoit.example",
+      roomId: plan.id,
+    }),
+  resolveInviteLink: async (url) =>
+    resolveInviteLink(url, async (roomId) => {
+      if (roomId.startsWith("quiz")) {
+        return { kind: "inProgress", roomId };
+      }
+
+      if (roomId.startsWith("waiting")) {
+        return { kind: "waiting", roomId };
+      }
+
+      if (roomId.startsWith("decided")) {
+        return { kind: "decided", roomId };
+      }
+
+      if (roomId.startsWith("stale")) {
+        return { kind: "stale", roomId };
+      }
+
+      return { kind: "open", roomId };
+    }),
+  shareInviteLink: async () => undefined,
+};
+
+const defaultNativeLinkBoundary: NativeLinkBoundary = {
+  getInitialUrl: async () => null,
+  subscribe: () => () => undefined,
+};
+
 function defaultSetupPlan(participantScope: PlanParticipantScope): PlanSetup {
   return {
     name: "",
@@ -134,6 +192,8 @@ function editSetupPlan(plan: PlanListItem): PlanSetup {
 export default function App({
   authBoundary = defaultAuthBoundary,
   initialRouterState,
+  inviteBoundary = defaultInviteBoundary,
+  nativeLinkBoundary = defaultNativeLinkBoundary,
   planRepository = fakePlanRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
@@ -143,6 +203,54 @@ export default function App({
   const [setupPlan, setSetupPlan] = useState<PlanSetup>(
     defaultSetupPlan("group"),
   );
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    nativeLinkBoundary.getInitialUrl().then((url) => {
+      if (isCurrent && url) {
+        dispatch({ type: "deepLinkOpened", url });
+      }
+    });
+
+    const unsubscribe = nativeLinkBoundary.subscribe((url) => {
+      dispatch({ type: "deepLinkOpened", url });
+    });
+
+    return () => {
+      isCurrent = false;
+      unsubscribe();
+    };
+  }, [nativeLinkBoundary]);
+
+  useEffect(() => {
+    if (routerState.auth !== "linkedApple" || !routerState.pendingDeepLinkUrl) {
+      return;
+    }
+
+    let isCurrent = true;
+    const url = routerState.pendingDeepLinkUrl;
+
+    inviteBoundary
+      .resolveInviteLink(url)
+      .then((resolution) => {
+        if (isCurrent) {
+          dispatch({ type: "deepLinkResolved", resolution });
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          dispatch({
+            type: "deepLinkResolved",
+            resolution: { kind: "invalid", reason: "malformed-url" },
+          });
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [inviteBoundary, routerState.auth, routerState.pendingDeepLinkUrl]);
 
   return (
     <MobileAppShell
@@ -167,10 +275,17 @@ export default function App({
         }
       }}
       onLaunchSetup={async (plan) => {
-        await planRepository.savePlan(plan);
-        dispatch({
-          type: plan.participantScope === "solo" ? "startQuiz" : "waitForVerdict",
-        });
+        const savedPlan = await planRepository.savePlan(plan);
+
+        if (plan.participantScope === "solo") {
+          dispatch({ type: "startQuiz" });
+          return;
+        }
+
+        const inviteUrl =
+          await inviteBoundary.createGroupInviteLink(savedPlan);
+        await inviteBoundary.shareInviteLink(inviteUrl);
+        dispatch({ type: "waitForVerdict" });
       }}
       planRepository={planRepository}
       routerState={routerState}
