@@ -31,6 +31,9 @@ import {
 } from "./src/plans/planRepository";
 import { PlanListScreen } from "./src/plans/PlanListScreen";
 import { SetupScreen } from "./src/plans/SetupScreen";
+import { QuizScreen } from "./src/quiz/QuizScreen";
+import type { QuizProgressRepository } from "./src/quiz/quizProgressRepository";
+import { fakeQuizProgressRepository } from "./src/quiz/quizProgressRepository";
 
 type AuthBoundary = {
   signInWithApple: () => Promise<void>;
@@ -41,6 +44,7 @@ type AppProps = {
   authBoundary?: AuthBoundary;
   initialRouterState?: AppStateRouterState;
   planRepository?: PlanRepository;
+  quizProgressRepository?: QuizProgressRepository;
   [key: string]: unknown;
 };
 
@@ -52,9 +56,12 @@ type MobileAppShellProps = {
   onAppleSignInSucceeded?: () => void;
   onClaimCodeRedeemed?: () => void;
   onOpenPlan?: (plan: PlanListItem) => void;
+  onQuizExited?: () => void;
   onSaveSetup?: (plan: PlanSetup) => Promise<void>;
   planRepository?: PlanRepository;
+  quizProgressRepository?: QuizProgressRepository;
   setupPlan?: PlanSetup;
+  quizSession?: QuizSession;
 };
 
 type RouteContent = {
@@ -69,6 +76,11 @@ type PlanListContentProps = {
   onOpenPlan?: (plan: PlanListItem) => void;
   plans: PlanListSnapshot;
   status: PlanListStatus;
+};
+
+type QuizSession = {
+  roomId: string;
+  role: "initiator" | "joiner";
 };
 
 const contentByRouteName: Record<AppRouteName, RouteContent> = {
@@ -135,6 +147,7 @@ export default function App({
   authBoundary = defaultAuthBoundary,
   initialRouterState,
   planRepository = fakePlanRepository,
+  quizProgressRepository = fakeQuizProgressRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
     appStateRouterReducer,
@@ -143,6 +156,10 @@ export default function App({
   const [setupPlan, setSetupPlan] = useState<PlanSetup>(
     defaultSetupPlan("group"),
   );
+  const [quizSession, setQuizSession] = useState<QuizSession>({
+    roomId: "active-room",
+    role: "initiator",
+  });
 
   return (
     <MobileAppShell
@@ -158,6 +175,7 @@ export default function App({
             dispatch({ type: "openSetup" });
             break;
           case "joined":
+            setQuizSession({ roomId: plan.id, role: "joiner" });
             dispatch({ type: "startQuiz" });
             break;
           case "decided":
@@ -167,18 +185,25 @@ export default function App({
         }
       }}
       onLaunchSetup={async (plan) => {
-        await planRepository.savePlan(plan);
+        const savedPlan = await planRepository.savePlan(plan);
+        setQuizSession({
+          roomId: savedPlan.id,
+          role: "initiator",
+        });
         dispatch({
           type: plan.participantScope === "solo" ? "startQuiz" : "waitForVerdict",
         });
       }}
       planRepository={planRepository}
+      quizProgressRepository={quizProgressRepository}
       routerState={routerState}
+      quizSession={quizSession}
       setupPlan={setupPlan}
       onAppleSignInSucceeded={() =>
         dispatch({ type: "appleSignInSucceeded" })
       }
       onClaimCodeRedeemed={() => dispatch({ type: "claimCodeRedeemed" })}
+      onQuizExited={() => dispatch({ type: "returnToPlans" })}
       onSaveSetup={async (plan) => {
         await planRepository.savePlan(plan);
         dispatch({ type: "returnToPlans" });
@@ -194,9 +219,12 @@ export function MobileAppShell({
   onAppleSignInSucceeded,
   onClaimCodeRedeemed,
   onOpenPlan,
+  onQuizExited,
   onSaveSetup,
   planRepository = fakePlanRepository,
+  quizProgressRepository = fakeQuizProgressRepository,
   routerState,
+  quizSession = { roomId: "active-room", role: "initiator" },
   setupPlan = defaultSetupPlan("group"),
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
@@ -244,6 +272,20 @@ export function MobileAppShell({
           mode={setupPlan.id ? "edit" : "create"}
           onLaunch={onLaunchSetup ?? (async () => undefined)}
           onSave={onSaveSetup ?? (async () => undefined)}
+        />
+      </View>
+    );
+  }
+
+  if (route.name === "quiz") {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        <QuizScreen
+          onExited={onQuizExited ?? (() => undefined)}
+          progressRepository={quizProgressRepository}
+          role={quizSession.role}
+          roomId={quizSession.roomId}
         />
       </View>
     );

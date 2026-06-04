@@ -16,6 +16,7 @@ import {
 } from "../src/navigation/appStateRouter";
 import type { PlanRepository } from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
+import type { QuizProgressRepository } from "../src/quiz/quizProgressRepository";
 
 function EventRouterHarness() {
   const [routerState, dispatch] = useReducer(
@@ -80,11 +81,36 @@ function makeWritablePlanRepository(): PlanRepository {
           },
         },
       ],
+      joined: [
+        {
+          id: "joined-morgan-birthday",
+          title: "Morgan's birthday",
+          subtitle: "Quiz in progress",
+          badge: "Joined",
+          routeTarget: "joined",
+        },
+      ],
     }),
     savePlan: jest.fn(async (plan) => ({
       ...plan,
       id: plan.id ?? "saved-plan",
     })),
+  };
+}
+
+function makeQuizProgressRepository(
+  initialProgress: Awaited<
+    ReturnType<QuizProgressRepository["loadProgress"]>
+  > = null,
+): QuizProgressRepository {
+  let progress = initialProgress;
+
+  return {
+    loadProgress: jest.fn(async () => progress),
+    saveProgress: jest.fn(async (nextProgress) => {
+      progress = nextProgress;
+    }),
+    exitPlan: jest.fn(async () => undefined),
   };
 }
 
@@ -151,8 +177,8 @@ describe("App", () => {
         activePlanPhase: "quiz",
         settingsOpen: false,
       },
-      visibleRoute: "Quiz placeholder",
-      visibleBody: "Answer Plan questions here.",
+      visibleRoute: "Q1",
+      visibleBody: "What sounds good tonight?",
     },
     {
       name: "waiting Plans route to Waiting",
@@ -244,7 +270,7 @@ describe("App", () => {
 
   it.each([
     ["Open Created Plan Thursday dinner with the crew", "Edit your plan"],
-    ["Open Joined Plan Morgan's birthday", "Quiz placeholder"],
+    ["Open Joined Plan Morgan's birthday", "Q1"],
     ["Open Decided Plan Date night fallback", "Verdict placeholder"],
     ["Open History Plan Taco crawl", "Verdict placeholder"],
   ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
@@ -414,8 +440,119 @@ describe("App", () => {
         mealTime: "lunch",
         serviceShape: "outdoor",
       });
-      expect(screen.getByText("Quiz placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Q1")).toBeOnTheScreen();
     });
+  });
+
+  it("runs Q1-Q4 quiz navigation with persistence, back, and leave", async () => {
+    const quizProgressRepository = makeQuizProgressRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeWritablePlanRepository()}
+        quizProgressRepository={quizProgressRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open Joined Plan Morgan's birthday")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open Joined Plan Morgan's birthday"));
+    await waitFor(() => {
+      expect(screen.getByText("Q1")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("Italian"));
+    fireEvent.press(screen.getByText("Mexican"));
+    fireEvent.press(screen.getByText("Save cravings"));
+
+    await waitFor(() => {
+      expect(quizProgressRepository.saveProgress).toHaveBeenLastCalledWith({
+        roomId: "joined-morgan-birthday",
+        currentQuestion: "q2",
+        answers: {
+          q1CuisineCravings: ["italian", "mexican"],
+        },
+      });
+      expect(screen.getByText("Q2")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("$$"));
+    fireEvent.press(screen.getByText("Save spend"));
+    await waitFor(() => {
+      expect(screen.getByText("Q3")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("Back"));
+    expect(screen.getByText("Q2")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Spend cap $$ selected")).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByText("Save spend"));
+    fireEvent.press(screen.getByText("Hidden gem"));
+    fireEvent.press(screen.getByText("Save reputation"));
+    await waitFor(() => {
+      expect(screen.getByText("Q4")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("SOCIAL"));
+    fireEvent.press(screen.getByText("Save vibe"));
+    await waitFor(() => {
+      expect(quizProgressRepository.saveProgress).toHaveBeenLastCalledWith({
+        roomId: "joined-morgan-birthday",
+        currentQuestion: "q4",
+        answers: {
+          q1CuisineCravings: ["italian", "mexican"],
+          q2SpendCap: "$$",
+          q3Reputation: "hiddenGem",
+          q4VibeEnergy: "social",
+        },
+      });
+    });
+
+    fireEvent.press(screen.getByText("Leave"));
+    expect(screen.getByText("Leave this plan?")).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText("Confirm leave Plan"));
+
+    await waitFor(() => {
+      expect(quizProgressRepository.exitPlan).toHaveBeenCalledWith({
+        roomId: "joined-morgan-birthday",
+      });
+      expect(screen.getByText("Plans")).toBeOnTheScreen();
+    });
+
+  });
+
+  it("resumes quiz progress and preserves prior answers", async () => {
+    const resumedRepository = makeQuizProgressRepository({
+      roomId: "joined-morgan-birthday",
+      currentQuestion: "q3",
+      answers: {
+        q1CuisineCravings: ["italian"],
+        q2SpendCap: "$$$",
+      },
+    });
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeWritablePlanRepository()}
+        quizProgressRepository={resumedRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open Joined Plan Morgan's birthday")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open Joined Plan Morgan's birthday"));
+    await waitFor(() => {
+      expect(screen.getByText("Q3")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("Back"));
+    expect(screen.getByLabelText("Spend cap $$$ selected")).toBeOnTheScreen();
   });
 
   it("reveals Account claim before Apple sign-in and handles claim-code success", async () => {

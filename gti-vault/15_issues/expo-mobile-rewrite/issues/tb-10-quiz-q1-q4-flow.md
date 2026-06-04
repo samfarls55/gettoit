@@ -16,13 +16,17 @@ Implement the quiz flow through Q1-Q4 with local state, progress persistence sea
 
 ## Acceptance criteria
 
-- [ ] Starting or joining a Room can route into Quiz at Q1.
-- [ ] Q1-Q4 screens capture and preserve answers in the quiz state model.
-- [ ] Plan back moves to the prior question with prior answers preserved.
-- [ ] Plan exit/leave routes out through a repository seam and returns to the expected destination.
-- [ ] Progress persistence is an injected dependency and can be faked in tests.
-- [ ] Tests cover forward navigation, back navigation, answer preservation, exit/leave, and resume state.
-- [ ] Typecheck and mobile tests pass.
+- [x] Starting or joining a Room can route into Quiz at Q1.
+- [x] Q1-Q4 screens capture and preserve answers in the quiz state model.
+- [x] Plan back moves to the prior question with prior answers preserved.
+- [x] Plan exit/leave routes out through a repository seam and returns to the expected destination.
+- [x] Progress persistence is an injected dependency and can be faked in tests.
+- [x] Tests cover forward navigation, back navigation, answer preservation, exit/leave, and resume state.
+- [x] Typecheck and mobile tests pass.
+
+## Implementation note
+
+Completed in branch `sandcastle/issue-335`. The Expo app now routes joined Plans and solo Plan launches into a local Q1-Q4 Quiz surface, tracks answer state for cuisine craving, spend cap, reputation, and vibe, persists progress through an injected `QuizProgressRepository`, resumes from saved progress, and exits/leaves through the same seam back to the Plan list. Q5 candidate loading remains outside this issue.
 
 ## Blocked by
 
