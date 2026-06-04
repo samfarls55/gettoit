@@ -57,6 +57,8 @@ type RouteContent = {
   body: string;
 };
 
+type PlanListStatus = "idle" | "loading" | "loaded" | "error";
+
 const contentByRouteName: Record<AppRouteName, RouteContent> = {
   signInGate: {
     title: "Sign in gate",
@@ -148,9 +150,8 @@ export function MobileAppShell({
   const [planSnapshot, setPlanSnapshot] = useState<PlanListSnapshot>(
     emptyPlanListSnapshot,
   );
-  const [planListStatus, setPlanListStatus] = useState<
-    "idle" | "loading" | "loaded" | "error"
-  >("idle");
+  const [planListStatus, setPlanListStatus] =
+    useState<PlanListStatus>("idle");
 
   useEffect(() => {
     if (route.name !== "planList") {
@@ -203,26 +204,34 @@ export function MobileAppShell({
   }
 
   if (route.name === "planList") {
+    let planListContent = (
+      <View style={styles.surface}>
+        <Text style={styles.routeTitle}>Plans</Text>
+        <Text style={styles.subtitle}>Loading Plans.</Text>
+      </View>
+    );
+
+    if (planListStatus === "error") {
+      planListContent = (
+        <View style={styles.surface}>
+          <Text style={styles.routeTitle}>Plans unavailable</Text>
+          <Text style={styles.subtitle}>Try again in a moment.</Text>
+        </View>
+      );
+    } else if (planListStatus === "loaded") {
+      planListContent = (
+        <PlanListScreen
+          onCreatePlan={onCreatePlan}
+          onOpenPlan={onOpenPlan}
+          plans={planSnapshot}
+        />
+      );
+    }
+
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
-        {planListStatus === "error" ? (
-          <View style={styles.surface}>
-            <Text style={styles.routeTitle}>Plans unavailable</Text>
-            <Text style={styles.subtitle}>Try again in a moment.</Text>
-          </View>
-        ) : planListStatus === "loaded" ? (
-          <PlanListScreen
-            onCreatePlan={onCreatePlan}
-            onOpenPlan={onOpenPlan}
-            plans={planSnapshot}
-          />
-        ) : (
-          <View style={styles.surface}>
-            <Text style={styles.routeTitle}>Plans</Text>
-            <Text style={styles.subtitle}>Loading Plans.</Text>
-          </View>
-        )}
+        {planListContent}
       </View>
     );
   }
