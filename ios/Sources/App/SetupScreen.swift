@@ -62,10 +62,8 @@ public struct SetupScreen: View {
         case group
     }
 
-    /// C-28 committed Search area value. The user-facing model is
-    /// center + radius; legacy location metadata is carried only so
-    /// existing Plan/Room JSON writes do not drop fields outside this
-    /// issue's scope.
+    /// C-28 committed Search area value. Legacy location metadata is
+    /// retained only for the existing Plan/Room JSON writers.
     public struct SearchArea: Equatable, Sendable {
         public let centerLabel: String
         public let lat: Double
@@ -101,8 +99,8 @@ public struct SetupScreen: View {
         6.0, 7.0, 8.0, 9.0, 10.0,
     ]
 
-    /// Pending-save radius fallback. Plan.distance_meters column
-    /// default is `1609` (≈ 1.0 mi).
+    /// Pending-save radius fallback. Plan.distance_meters defaults to
+    /// `1609` (≈ 1.0 mi).
     public static let defaultSearchAreaRadiusMiles: Double = 1.0
 
     /// Radius min / max. Min/max match the schedule's endpoints; the
@@ -116,16 +114,11 @@ public struct SetupScreen: View {
     /// the lower-index (smaller) stop wins — same behavior as the JSX
     /// reduce (`Math.abs(stop - v) <` is strict).
     public static func snapSearchAreaRadiusMiles(_ value: Double) -> Double {
-        // `searchAreaRadiusStops` is a static-let literal, so `first` / `last` are
-        // never nil in practice — but per CODING_STANDARDS rule OPT-001
-        // (bug-30) we still avoid the force-unwrap. Defensive fallbacks:
-        // 0 for the floor, `Self.maxSearchAreaRadiusMiles` for the ceiling. Both
-        // are already declared adjacent and bracket the legal range.
-        let firstStop = searchAreaRadiusStops.first ?? 0
+        let firstStop = searchAreaRadiusStops.first ?? Self.minSearchAreaRadiusMiles
         let lastStop = searchAreaRadiusStops.last ?? Self.maxSearchAreaRadiusMiles
         if value <= firstStop { return firstStop }
         if value >= lastStop { return lastStop }
-        var best = searchAreaRadiusStops[0]
+        var best = firstStop
         var bestDistance = abs(value - best)
         for stop in searchAreaRadiusStops.dropFirst() {
             let d = abs(value - stop)
@@ -779,11 +772,9 @@ public struct SetupScreen: View {
     /// failures.
     public static func classifyPersistFailure(messageLike raw: String) -> FieldError {
         let lower = raw.lowercased()
-        // Radius storage check first — `distance_meters` contains the
-        // substring `meter` but not `name`, so order matters only
-        // against accidental matches. The two field signals are
-        // orthogonal in practice (the column names share no tokens).
-        if lower.contains("distance") || lower.contains("distance_meters") || lower.contains("radius") {
+        // `distance` covers legacy storage names such as
+        // `distance_meters` and `plans_distance_check`.
+        if lower.contains("distance") || lower.contains("radius") {
             return FieldError(field: .searchAreaRadius, message: searchAreaRadiusErrorCopy())
         }
         // Name signals: the literal word `name`, the CHECK constraint
@@ -958,8 +949,9 @@ public struct SetupScreen: View {
         _groupContext = State(initialValue: initialGroupContext)
         _mealTime = State(initialValue: session.mealTime)
         _serviceShape = State(initialValue: session.serviceShape)
-        let initialMeters = editingPlan?.distanceMeters ?? Int((SetupScreen.defaultSearchAreaRadiusMiles * SetupScreen.metersPerMile).rounded())
-        let initialMiles = SetupScreen.snapSearchAreaRadiusMiles(Double(initialMeters) / SetupScreen.metersPerMile)
+        let initialMeters = editingPlan?.distanceMeters
+            ?? SetupScreen.metersFromMiles(SetupScreen.defaultSearchAreaRadiusMiles)
+        let initialMiles = SetupScreen.snapSearchAreaRadiusMiles(SetupScreen.milesFromMeters(initialMeters))
         _fallbackRadiusMiles = State(initialValue: initialMiles)
         _committedSearchArea = State(initialValue: editingPlan.flatMap(SetupScreen.searchArea(from:)))
         _draftSearchArea = State(initialValue: nil)
