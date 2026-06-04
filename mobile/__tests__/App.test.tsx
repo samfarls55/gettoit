@@ -104,8 +104,8 @@ describe("App", () => {
         activePlanPhase: "setup",
         settingsOpen: false,
       },
-      visibleRoute: "Setup placeholder",
-      visibleBody: "Plan setup starts here.",
+      visibleRoute: "Search area",
+      visibleBody: "USE THIS AREA",
     },
     {
       name: "active quizzes route to Quiz",

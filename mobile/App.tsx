@@ -18,6 +18,7 @@ import {
   appStateRouterReducer,
   routeForAppState,
 } from "./src/navigation/appStateRouter";
+import { SearchAreaPickerPreview } from "./src/searchArea/SearchAreaPickerPreview";
 
 type AuthBoundary = {
   signInWithApple: () => Promise<void>;
@@ -110,6 +111,16 @@ export function MobileAppShell({
   routerState,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
+
+  if (route.name === "setup") {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        <SearchAreaPickerPreview />
+      </View>
+    );
+  }
+
   const content = contentByRouteName[route.name];
 
   if (route.name === "signInGate") {
