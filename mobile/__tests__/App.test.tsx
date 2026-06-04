@@ -4,8 +4,8 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import App, { MobileAppShell } from "../App";
 import { mobileTokens } from "../src/design/tokens";
+import type { AppStateRouterState } from "../src/navigation/appStateRouter";
 import {
-  AppStateRouterState,
   appStateRouterReducer,
   initialAppStateRouterState,
 } from "../src/navigation/appStateRouter";
@@ -19,7 +19,10 @@ function EventRouterHarness() {
   return (
     <View>
       <MobileAppShell routerState={routerState} />
-      <Button title="Sign in" onPress={() => dispatch({ type: "authSignedIn" })} />
+      <Button
+        title="Sign in"
+        onPress={() => dispatch({ type: "authSignedIn" })}
+      />
       <Button
         title="Open invite link"
         onPress={() =>

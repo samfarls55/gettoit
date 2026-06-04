@@ -3,9 +3,11 @@ import { useReducer } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "./src/design/tokens";
-import {
+import type {
   AppRouteName,
   AppStateRouterState,
+} from "./src/navigation/appStateRouter";
+import {
   initialAppStateRouterState,
   appStateRouterReducer,
   routeForAppState,
@@ -20,7 +22,12 @@ type MobileAppShellProps = {
   routerState: AppStateRouterState;
 };
 
-const routeContent: Record<AppRouteName, { title: string; body: string }> = {
+type RouteContent = {
+  title: string;
+  body: string;
+};
+
+const contentByRouteName: Record<AppRouteName, RouteContent> = {
   signInGate: {
     title: "Sign in gate",
     body: "Sign in with Apple to continue.",
@@ -66,7 +73,7 @@ export default function App({ initialRouterState }: AppProps = {}) {
 
 export function MobileAppShell({ routerState }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
-  const content = routeContent[route.name];
+  const content = contentByRouteName[route.name];
 
   return (
     <View style={styles.root}>

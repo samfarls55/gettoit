@@ -43,6 +43,13 @@ export const initialAppStateRouterState: AppStateRouterState = {
   settingsOpen: false,
 };
 
+function stateWithActivePlanPhase(
+  state: AppStateRouterState,
+  activePlanPhase: ActivePlanPhase | null,
+): AppStateRouterState {
+  return { ...state, activePlanPhase, settingsOpen: false };
+}
+
 export function appStateRouterReducer(
   state: AppStateRouterState,
   event: AppStateRouterEvent,
@@ -64,15 +71,15 @@ export function appStateRouterReducer(
     case "closeSettings":
       return { ...state, settingsOpen: false };
     case "openSetup":
-      return { ...state, activePlanPhase: "setup", settingsOpen: false };
+      return stateWithActivePlanPhase(state, "setup");
     case "startQuiz":
-      return { ...state, activePlanPhase: "quiz", settingsOpen: false };
+      return stateWithActivePlanPhase(state, "quiz");
     case "waitForVerdict":
-      return { ...state, activePlanPhase: "waiting", settingsOpen: false };
+      return stateWithActivePlanPhase(state, "waiting");
     case "showVerdict":
-      return { ...state, activePlanPhase: "verdict", settingsOpen: false };
+      return stateWithActivePlanPhase(state, "verdict");
     case "returnToPlans":
-      return { ...state, activePlanPhase: null, settingsOpen: false };
+      return stateWithActivePlanPhase(state, null);
   }
 }
 
@@ -85,25 +92,16 @@ export function routeForAppState(state: AppStateRouterState): AppRoute {
     return { name: "deepLink" };
   }
 
-  if (state.activePlanPhase === "quiz") {
-    return { name: "quiz" };
+  switch (state.activePlanPhase) {
+    case "quiz":
+      return { name: "quiz" };
+    case "waiting":
+      return { name: "waiting" };
+    case "verdict":
+      return { name: "verdict" };
+    case "setup":
+      return { name: state.settingsOpen ? "settings" : "setup" };
+    case null:
+      return { name: state.settingsOpen ? "settings" : "planList" };
   }
-
-  if (state.activePlanPhase === "waiting") {
-    return { name: "waiting" };
-  }
-
-  if (state.activePlanPhase === "verdict") {
-    return { name: "verdict" };
-  }
-
-  if (state.settingsOpen) {
-    return { name: "settings" };
-  }
-
-  if (state.activePlanPhase === "setup") {
-    return { name: "setup" };
-  }
-
-  return { name: "planList" };
 }
