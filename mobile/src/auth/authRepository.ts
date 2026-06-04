@@ -200,6 +200,26 @@ export function createSupabaseAuthRepository({
     return mapSession(await readCurrentSession());
   }
 
+  async function authenticateWithApple(
+    credential: AppleCredential,
+    currentState: MobileAuthState,
+  ): Promise<SupabaseResult<{ session: SupabaseAuthSession | null }>> {
+    const request = {
+      provider: "apple" as const,
+      token: credential.idToken,
+      nonce: credential.nonce || undefined,
+    };
+
+    if (currentState.kind === "anonymous") {
+      return supabase.auth.linkAppleWithIdToken({
+        ...request,
+        currentUserId: currentState.userId,
+      });
+    }
+
+    return supabase.auth.signInWithIdToken(request);
+  }
+
   return {
     restoreSession,
     getCurrentAuthState: restoreSession,
@@ -208,19 +228,7 @@ export function createSupabaseAuthRepository({
         appleProvider.requestAppleCredential(),
         restoreSession(),
       ]);
-      const request = {
-        provider: "apple" as const,
-        token: credential.idToken,
-        nonce: credential.nonce || undefined,
-      };
-
-      const result =
-        currentState.kind === "anonymous"
-          ? await supabase.auth.linkAppleWithIdToken({
-              ...request,
-              currentUserId: currentState.userId,
-            })
-          : await supabase.auth.signInWithIdToken(request);
+      const result = await authenticateWithApple(credential, currentState);
 
       if (result.error) {
         throw result.error;

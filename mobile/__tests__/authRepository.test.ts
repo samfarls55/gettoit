@@ -30,19 +30,13 @@ function appleCredential(): AppleCredential {
 function makeDeps(
   overrides: Partial<MobileAuthRepositoryDependencies> = {},
 ): MobileAuthRepositoryDependencies {
-  const currentSession = overrides.supabase?.auth.getSession
-    ? null
-    : session("anon-user", true);
-
   return {
     appleProvider: {
       requestAppleCredential: jest.fn().mockResolvedValue(appleCredential()),
     },
     supabase: {
       auth: {
-        getSession: jest
-          .fn()
-          .mockResolvedValue({ data: { session: currentSession }, error: null }),
+        getSession: mockGetSession(session("anon-user", true)),
         signInWithIdToken: jest.fn().mockResolvedValue({
           data: { session: session("apple-user", false) },
           error: null,
@@ -70,6 +64,30 @@ function makeDeps(
       },
     },
     ...overrides,
+  };
+}
+
+function mockGetSession(sessionValue: SupabaseAuthSession | null, error = null) {
+  return jest.fn().mockResolvedValue({
+    data: { session: sessionValue },
+    error,
+  });
+}
+
+function makeDepsWithSession(
+  sessionValue: SupabaseAuthSession | null,
+): MobileAuthRepositoryDependencies {
+  const deps = makeDeps();
+
+  return {
+    ...deps,
+    supabase: {
+      ...deps.supabase,
+      auth: {
+        ...deps.supabase.auth,
+        getSession: mockGetSession(sessionValue),
+      },
+    },
   };
 }
 
@@ -112,18 +130,11 @@ describe("authRepository", () => {
       input: session("apple-user", false),
       kind: "linkedApple",
     },
-  ] as const)("maps a Supabase session to $name auth state", async ({ input, kind }) => {
-    const deps = makeDeps({
-      supabase: {
-        ...makeDeps().supabase,
-        auth: {
-          ...makeDeps().supabase.auth,
-          getSession: jest
-            .fn()
-            .mockResolvedValue({ data: { session: input }, error: null }),
-        },
-      },
-    });
+  ] as const)("maps a Supabase session to $name auth state", async ({
+    input,
+    kind,
+  }) => {
+    const deps = makeDepsWithSession(input);
     const repository = createSupabaseAuthRepository(deps);
 
     await expect(repository.restoreSession()).resolves.toMatchObject({
@@ -151,17 +162,7 @@ describe("authRepository", () => {
   });
 
   it("signs in with Apple from idle without requiring a native Apple runtime in tests", async () => {
-    const deps = makeDeps({
-      supabase: {
-        ...makeDeps().supabase,
-        auth: {
-          ...makeDeps().supabase.auth,
-          getSession: jest
-            .fn()
-            .mockResolvedValue({ data: { session: null }, error: null }),
-        },
-      },
-    });
+    const deps = makeDepsWithSession(null);
     const repository = createSupabaseAuthRepository(deps);
 
     await expect(repository.signInWithApple()).resolves.toEqual({
@@ -177,17 +178,7 @@ describe("authRepository", () => {
   });
 
   it("redeems a claim code and installs the carried Anonymous session", async () => {
-    const deps = makeDeps({
-      supabase: {
-        ...makeDeps().supabase,
-        auth: {
-          ...makeDeps().supabase.auth,
-          getSession: jest
-            .fn()
-            .mockResolvedValue({ data: { session: null }, error: null }),
-        },
-      },
-    });
+    const deps = makeDepsWithSession(null);
     const repository = createSupabaseAuthRepository(deps);
 
     await expect(repository.redeemClaimCode(" ABCD2345 ")).resolves.toEqual({
@@ -215,18 +206,11 @@ describe("authRepository", () => {
   });
 
   it("surfaces Supabase auth errors", async () => {
-    const deps = makeDeps({
-      supabase: {
-        ...makeDeps().supabase,
-        auth: {
-          ...makeDeps().supabase.auth,
-          getSession: jest.fn().mockResolvedValue({
-            data: { session: null },
-            error: new Error("auth service unavailable"),
-          }),
-        },
-      },
-    });
+    const deps = makeDeps();
+    deps.supabase.auth.getSession = mockGetSession(
+      null,
+      new Error("auth service unavailable"),
+    );
     const repository = createSupabaseAuthRepository(deps);
 
     await expect(repository.restoreSession()).rejects.toThrow(
