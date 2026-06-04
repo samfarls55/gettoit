@@ -170,10 +170,10 @@ final class SetupScreenRenderTests: XCTestCase {
         )
     }
 
-    func testDistanceFieldErrorRenders() {
+    func testSearchAreaRadiusFieldErrorRenders() {
         render(
             makeScreen(mode: .create, groupMode: .group)
-                .injectingError(.init(field: .distance, message: "Distance is out of range."))
+                .injectingError(.init(field: .searchAreaRadius, message: "Search area radius is out of range."))
         )
     }
 

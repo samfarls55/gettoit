@@ -1625,10 +1625,10 @@ public struct RootView: View {
         let client: SupabaseClient
         /// TB-03 (quiz redesign) — shared LocationCoordinator instance. The
         /// S00b pre-prime CTA fires `requestPermission()` on this
-        /// instance; the SetupScreen LocationPickerChip + LocationPickerSheet
-        /// observe the same instance so the permission state and the
-        /// resolved place flow from the pre-prime into the setup
-        /// surface without re-instantiating CLLocationManager.
+        /// instance; the SetupScreen Search area editor observes the
+        /// same instance so permission state and current-location
+        /// jumps flow from the pre-prime into setup without
+        /// re-instantiating CLLocationManager.
         let locationCoordinator: LocationCoordinator
     }
 

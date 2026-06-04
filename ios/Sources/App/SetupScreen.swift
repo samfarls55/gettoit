@@ -62,15 +62,16 @@ public struct SetupScreen: View {
         case group
     }
 
-    /// C-28 committed Search area value. The storage stays on the
-    /// existing Plan/Room fields: `location` carries center metadata
-    /// and `distance_meters` carries radius.
+    /// C-28 committed Search area value. The user-facing model is
+    /// center + radius; legacy location metadata is carried only so
+    /// existing Plan/Room JSON writes do not drop fields outside this
+    /// issue's scope.
     public struct SearchArea: Equatable, Sendable {
         public let centerLabel: String
         public let lat: Double
         public let lng: Double
         public let source: String
-        public let timeZoneIdentifier: String
+        public let legacyLocationTimeZoneIdentifier: String
         public let radiusMeters: Int
 
         public init(
@@ -78,57 +79,55 @@ public struct SetupScreen: View {
             lat: Double,
             lng: Double,
             source: String,
-            timeZoneIdentifier: String,
+            legacyLocationTimeZoneIdentifier: String,
             radiusMeters: Int
         ) {
             self.centerLabel = centerLabel
             self.lat = lat
             self.lng = lng
             self.source = source
-            self.timeZoneIdentifier = timeZoneIdentifier
+            self.legacyLocationTimeZoneIdentifier = legacyLocationTimeZoneIdentifier
             self.radiusMeters = radiusMeters
         }
     }
 
-    // MARK: - locked schedule + helpers (workflow-overhaul Q8)
+    // MARK: - Search area radius stops
 
-    /// Composed non-uniform snap-list — 17 stops. Mirrors the JSX's
-    /// `DISTANCE_STEPS`. The native slider slides through the smallest
-    /// step (0.25 mi); on commit we snap to the nearest entry here.
-    public static let distanceSteps: [Double] = [
+    /// Composed non-uniform radius stop list — 17 stops. C-28 keeps
+    /// the old product range while retiring Setup's separate slider.
+    public static let searchAreaRadiusStops: [Double] = [
         0.25, 0.5, 0.75,
         1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0,
         6.0, 7.0, 8.0, 9.0, 10.0,
     ]
 
-    /// Default lands on `1.0 mi` per the spec — the same value that
-    /// hosts the visual tick. Plan.distance_meters column default is
-    /// `1609` (≈ 1.0 mi).
-    public static let defaultDistanceMiles: Double = 1.0
+    /// Pending-save radius fallback. Plan.distance_meters column
+    /// default is `1609` (≈ 1.0 mi).
+    public static let defaultSearchAreaRadiusMiles: Double = 1.0
 
     /// Radius min / max. Min/max match the schedule's endpoints; the
     /// snap helper handles out-of-range values defensively.
-    public static let minDistanceMiles: Double = 0.25
-    public static let maxDistanceMiles: Double = 10.0
+    public static let minSearchAreaRadiusMiles: Double = 0.25
+    public static let maxSearchAreaRadiusMiles: Double = 10.0
 
     /// Snap a continuous radius value to the nearest stop in
-    /// `distanceSteps`. Out-of-range values clamp to
+    /// `searchAreaRadiusStops`. Out-of-range values clamp to
     /// the nearest endpoint. On a tie (equidistant from two stops),
     /// the lower-index (smaller) stop wins — same behavior as the JSX
     /// reduce (`Math.abs(stop - v) <` is strict).
-    public static func snapDistance(_ value: Double) -> Double {
-        // `distanceSteps` is a static-let literal, so `first` / `last` are
+    public static func snapSearchAreaRadiusMiles(_ value: Double) -> Double {
+        // `searchAreaRadiusStops` is a static-let literal, so `first` / `last` are
         // never nil in practice — but per CODING_STANDARDS rule OPT-001
         // (bug-30) we still avoid the force-unwrap. Defensive fallbacks:
-        // 0 for the floor, `Self.maxDistanceMiles` for the ceiling. Both
+        // 0 for the floor, `Self.maxSearchAreaRadiusMiles` for the ceiling. Both
         // are already declared adjacent and bracket the legal range.
-        let firstStop = distanceSteps.first ?? 0
-        let lastStop = distanceSteps.last ?? Self.maxDistanceMiles
+        let firstStop = searchAreaRadiusStops.first ?? 0
+        let lastStop = searchAreaRadiusStops.last ?? Self.maxSearchAreaRadiusMiles
         if value <= firstStop { return firstStop }
         if value >= lastStop { return lastStop }
-        var best = distanceSteps[0]
+        var best = searchAreaRadiusStops[0]
         var bestDistance = abs(value - best)
-        for stop in distanceSteps.dropFirst() {
+        for stop in searchAreaRadiusStops.dropFirst() {
             let d = abs(value - stop)
             if d < bestDistance {
                 best = stop
@@ -178,7 +177,7 @@ public struct SetupScreen: View {
 
     /// First-open editor radius when current location is available and
     /// no Search area has been committed yet. This is intentionally
-    /// separate from `defaultDistanceMiles`, which remains the pending
+    /// separate from `defaultSearchAreaRadiusMiles`, which remains the pending
     /// Plan storage fallback for Save-for-later without Search area.
     public static let firstOpenSearchAreaRadiusMiles: Double = 2.0
     private static let searchAreaDraftToleranceMeters: CLLocationDistance = 25
@@ -332,12 +331,13 @@ public struct SetupScreen: View {
     }
 
     /// Build the draft Search area from the current MapKit viewport.
-    /// Existing source/timezone metadata is retained because map
-    /// movement changes geometry, not persistence schema semantics.
+    /// Existing legacy location metadata is retained because map
+    /// movement changes Search area geometry, not the legacy JSON
+    /// fields this screen still writes.
     public static func searchArea(
         fromViewport viewport: SearchAreaViewport,
         previousDraft: SearchArea?,
-        fallbackTimeZoneIdentifier: String = TimeZone.current.identifier
+        fallbackLegacyLocationTimeZoneIdentifier: String = TimeZone.current.identifier
     ) -> SearchArea {
         let center = CLLocation(latitude: viewport.centerLat, longitude: viewport.centerLng)
         let centerLabel: String
@@ -354,7 +354,7 @@ public struct SetupScreen: View {
             lat: viewport.centerLat,
             lng: viewport.centerLng,
             source: previousDraft?.source ?? "manual",
-            timeZoneIdentifier: previousDraft?.timeZoneIdentifier ?? fallbackTimeZoneIdentifier,
+            legacyLocationTimeZoneIdentifier: previousDraft?.legacyLocationTimeZoneIdentifier ?? fallbackLegacyLocationTimeZoneIdentifier,
             radiusMeters: searchAreaRadiusMeters(from: viewport)
         )
     }
@@ -370,7 +370,7 @@ public struct SetupScreen: View {
             lat: searchArea.lat,
             lng: searchArea.lng,
             source: searchArea.source,
-            timeZoneIdentifier: searchArea.timeZoneIdentifier,
+            legacyLocationTimeZoneIdentifier: searchArea.legacyLocationTimeZoneIdentifier,
             radiusMeters: steppedSearchAreaRadiusMeters(
                 currentRadiusMeters: searchArea.radiusMeters,
                 offset: offset
@@ -384,10 +384,10 @@ public struct SetupScreen: View {
         currentRadiusMeters: Int,
         offset: Int
     ) -> Int {
-        let currentMiles = snapDistance(milesFromMeters(currentRadiusMeters))
-        let index = distanceSteps.firstIndex(of: currentMiles) ?? 0
-        let nextIndex = min(max(index + offset, 0), distanceSteps.count - 1)
-        return metersFromMiles(distanceSteps[nextIndex])
+        let currentMiles = snapSearchAreaRadiusMiles(milesFromMeters(currentRadiusMeters))
+        let index = searchAreaRadiusStops.firstIndex(of: currentMiles) ?? 0
+        let nextIndex = min(max(index + offset, 0), searchAreaRadiusStops.count - 1)
+        return metersFromMiles(searchAreaRadiusStops[nextIndex])
     }
 
     /// Decide whether closing the editor can dismiss immediately or
@@ -436,7 +436,7 @@ public struct SetupScreen: View {
             return lhsCenter.distance(from: rhsCenter) <= searchAreaDraftToleranceMeters
                 && CLLocationDistance(abs(lhs.radiusMeters - rhs.radiusMeters)) <= searchAreaDraftToleranceMeters
                 && lhs.source == rhs.source
-                && lhs.timeZoneIdentifier == rhs.timeZoneIdentifier
+                && lhs.legacyLocationTimeZoneIdentifier == rhs.legacyLocationTimeZoneIdentifier
         case (.some, .none), (.none, .some):
             return false
         }
@@ -471,7 +471,7 @@ public struct SetupScreen: View {
             lat: location.lat,
             lng: location.lng,
             source: location.source,
-            timeZoneIdentifier: location.timeZoneIdentifier,
+            legacyLocationTimeZoneIdentifier: location.timeZoneIdentifier,
             radiusMeters: plan.distanceMeters
         )
     }
@@ -485,7 +485,7 @@ public struct SetupScreen: View {
             lat: place.coordinate.latitude,
             lng: place.coordinate.longitude,
             source: place.source.rawValue,
-            timeZoneIdentifier: place.timeZone.identifier,
+            legacyLocationTimeZoneIdentifier: place.timeZone.identifier,
             radiusMeters: radiusMeters
         )
     }
@@ -553,7 +553,7 @@ public struct SetupScreen: View {
             lat: searchArea.lat,
             lng: searchArea.lng,
             source: searchArea.source,
-            timeZoneIdentifier: searchArea.timeZoneIdentifier
+            timeZoneIdentifier: searchArea.legacyLocationTimeZoneIdentifier
         )
     }
 
@@ -567,7 +567,7 @@ public struct SetupScreen: View {
             lat: searchArea.lat,
             lng: searchArea.lng,
             source: source,
-            timeZoneIdentifier: searchArea.timeZoneIdentifier
+            timeZoneIdentifier: searchArea.legacyLocationTimeZoneIdentifier
         )
     }
 
@@ -576,9 +576,9 @@ public struct SetupScreen: View {
     /// the fallback Setup default for pending-save without Search area.
     static func payloadDistanceMeters(
         committedSearchArea: SearchArea?,
-        fallbackDistanceMiles: Double
+        fallbackRadiusMiles: Double
     ) -> Int {
-        committedSearchArea?.radiusMeters ?? metersFromMiles(fallbackDistanceMiles)
+        committedSearchArea?.radiusMeters ?? metersFromMiles(fallbackRadiusMiles)
     }
 
     // MARK: - pure mode helpers
@@ -743,12 +743,12 @@ public struct SetupScreen: View {
 
     /// wfr-25 — which form field the failure should render against.
     /// `crossField` keeps the historical top-of-dock placement for
-    /// network / RLS / unknown failures; `name` + `distance` route the
+    /// network / RLS / unknown failures; `name` + `searchAreaRadius` route the
     /// message inline under the offending control per `patterns.md`
     /// §"Error Messages" + the run report finding #25.
     public enum FieldErrorField: Equatable, Sendable {
         case name
-        case distance
+        case searchAreaRadius
         case crossField
     }
 
@@ -771,7 +771,7 @@ public struct SetupScreen: View {
     /// wfr-25 — classify a raw error message into the routing bucket
     /// the view should use. Pure substring matcher — covers the known
     /// PostgREST CHECK shapes (`plans_name_check`, `plans_distance_check`),
-    /// the user-facing column names (`name`, `distance`), and the
+    /// the user-facing field names (`name`, `Search area radius`), and the
     /// Postgres typed-overflow shape for the name column
     /// (`character varying(40)` — the SQL type of `plans.name`).
     /// Anything else falls through to `.crossField` so the historical
@@ -779,12 +779,12 @@ public struct SetupScreen: View {
     /// failures.
     public static func classifyPersistFailure(messageLike raw: String) -> FieldError {
         let lower = raw.lowercased()
-        // Distance check first — `distance_meters` contains the
+        // Radius storage check first — `distance_meters` contains the
         // substring `meter` but not `name`, so order matters only
         // against accidental matches. The two field signals are
         // orthogonal in practice (the column names share no tokens).
-        if lower.contains("distance") || lower.contains("distance_meters") {
-            return FieldError(field: .distance, message: distanceErrorCopy())
+        if lower.contains("distance") || lower.contains("distance_meters") || lower.contains("radius") {
+            return FieldError(field: .searchAreaRadius, message: searchAreaRadiusErrorCopy())
         }
         // Name signals: the literal word `name`, the CHECK constraint
         // identifier, or the Postgres typed-overflow shape for the
@@ -817,12 +817,11 @@ public struct SetupScreen: View {
         "Name needs to be 1 to 40 characters."
     }
 
-    /// Distance-field error copy. The slider's snap-list keeps the
-    /// user inside 0.25..10 mi by construction; this error fires only
-    /// if a server-side CHECK rejects the value (e.g., a future
-    /// tightening of `plans_distance_check`). Polite, plain-language,
-    /// no computerese.
-    public static func distanceErrorCopy() -> String {
+    /// Search area radius error copy. C-28 keeps the user inside
+    /// 0.25..10 mi by construction; this error fires only if a
+    /// server-side CHECK rejects the stored radius (e.g., a future
+    /// tightening of `plans_distance_check`).
+    public static func searchAreaRadiusErrorCopy() -> String {
         "Search area radius is out of range — pick a value between 0.25 and 10 miles."
     }
 
@@ -882,7 +881,7 @@ public struct SetupScreen: View {
     @State private var groupContext: SessionParameters.GroupContext
     @State private var mealTime: SessionParameters.MealTime
     @State private var serviceShape: SessionParameters.ServiceShape
-    @State private var distanceMiles: Double
+    @State private var fallbackRadiusMiles: Double
     @State private var committedSearchArea: SearchArea?
     @State private var draftSearchArea: SearchArea?
     @State private var phase: Phase = .ready
@@ -905,7 +904,7 @@ public struct SetupScreen: View {
         case launchingRoom
         /// wfr-25 — carries a routed `FieldError` so the view body can
         /// place the message under the offending control (`.name` /
-        /// `.distance`) or at the top of the dock (`.crossField`) per
+        /// `.searchAreaRadius`) or at the top of the dock (`.crossField`) per
         /// `patterns.md` §"Error Messages". Replaces the previous
         /// `.error(String)` shape that funnelled every failure to the
         /// top-of-dock.
@@ -959,9 +958,9 @@ public struct SetupScreen: View {
         _groupContext = State(initialValue: initialGroupContext)
         _mealTime = State(initialValue: session.mealTime)
         _serviceShape = State(initialValue: session.serviceShape)
-        let initialMeters = editingPlan?.distanceMeters ?? Int((SetupScreen.defaultDistanceMiles * SetupScreen.metersPerMile).rounded())
-        let initialMiles = SetupScreen.snapDistance(Double(initialMeters) / SetupScreen.metersPerMile)
-        _distanceMiles = State(initialValue: initialMiles)
+        let initialMeters = editingPlan?.distanceMeters ?? Int((SetupScreen.defaultSearchAreaRadiusMiles * SetupScreen.metersPerMile).rounded())
+        let initialMiles = SetupScreen.snapSearchAreaRadiusMiles(Double(initialMeters) / SetupScreen.metersPerMile)
+        _fallbackRadiusMiles = State(initialValue: initialMiles)
         _committedSearchArea = State(initialValue: editingPlan.flatMap(SetupScreen.searchArea(from:)))
         _draftSearchArea = State(initialValue: nil)
         _phase = State(initialValue: initialPhase)
@@ -1057,7 +1056,7 @@ public struct SetupScreen: View {
                 locationCoordinator: locationCoordinator,
                 onCommit: { area in
                     committedSearchArea = area
-                    distanceMiles = SetupScreen.snapDistance(SetupScreen.milesFromMeters(area.radiusMeters))
+                    fallbackRadiusMiles = SetupScreen.snapSearchAreaRadiusMiles(SetupScreen.milesFromMeters(area.radiusMeters))
                     searchAreaEditorOpen = false
                 },
                 onDismiss: { searchAreaEditorOpen = false }
@@ -1219,7 +1218,7 @@ public struct SetupScreen: View {
             )
             .accessibilityIdentifier("setup.searchArea.chip")
 
-            if case .error(let fieldError) = phase, fieldError.field == .distance {
+            if case .error(let fieldError) = phase, fieldError.field == .searchAreaRadius {
                 fieldErrorLabel(fieldError.message, id: "setup.searchArea.error")
             }
         }
@@ -1253,7 +1252,7 @@ public struct SetupScreen: View {
     private var dock: some View {
         VStack(spacing: GTISpacing.step3) {
             // wfr-25 — only cross-field / network failures render at
-            // top-of-dock now. `.name` + `.distance` errors render
+            // top-of-dock now. `.name` + `.searchAreaRadius` errors render
             // inline under their respective controls so the user can
             // read the problem next to the input that needs fixing
             // (per `patterns.md` §"Error Messages").
@@ -1463,7 +1462,7 @@ public struct SetupScreen: View {
             sessionParameters: session,
             distanceMeters: SetupScreen.payloadDistanceMeters(
                 committedSearchArea: committedSearchArea,
-                fallbackDistanceMiles: distanceMiles
+                fallbackRadiusMiles: fallbackRadiusMiles
             )
         )
     }

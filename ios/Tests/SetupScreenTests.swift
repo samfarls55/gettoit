@@ -76,14 +76,14 @@ final class SetupScreenTests: XCTestCase {
         lat: Double = 37.7767,
         lng: Double = -122.4241,
         source: String = "manual",
-        timeZoneIdentifier: String = "America/Los_Angeles"
+        legacyLocationTimeZoneIdentifier: String = "America/Los_Angeles"
     ) -> SetupScreen.SearchArea {
         SetupScreen.SearchArea(
             centerLabel: centerLabel,
             lat: lat,
             lng: lng,
             source: source,
-            timeZoneIdentifier: timeZoneIdentifier,
+            legacyLocationTimeZoneIdentifier: legacyLocationTimeZoneIdentifier,
             radiusMeters: SetupScreen.metersFromMiles(radiusMiles)
         )
     }
@@ -122,6 +122,13 @@ final class SetupScreenTests: XCTestCase {
         )
     }
 
+    func testSearchAreaModelDoesNotExposeTimingTimezoneSemantics() {
+        let area = makeSearchArea(centerLabel: "Hayes Valley", radiusMiles: 2.0)
+        let labels = Mirror(reflecting: area).children.compactMap(\.label)
+
+        XCTAssertFalse(labels.contains("timeZoneIdentifier"))
+    }
+
     func testSearchAreaViewportRadiusUsesNearestVisibleEdge() {
         let viewport = SetupScreen.SearchAreaViewport(
             centerLat: 37.7767,
@@ -146,7 +153,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7767,
             lng: -122.4241,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(2.0)
         )
         let viewport = SetupScreen.SearchAreaViewport(
@@ -162,7 +169,7 @@ final class SetupScreenTests: XCTestCase {
         XCTAssertEqual(draft.lng, viewport.centerLng, accuracy: 0.0001)
         XCTAssertEqual(draft.radiusMeters, SetupScreen.searchAreaRadiusMeters(from: viewport))
         XCTAssertEqual(draft.source, committed.source)
-        XCTAssertEqual(draft.timeZoneIdentifier, committed.timeZoneIdentifier)
+        XCTAssertEqual(draft.legacyLocationTimeZoneIdentifier, committed.legacyLocationTimeZoneIdentifier)
         XCTAssertEqual(committed.centerLabel, "Hayes Valley", "viewport movement must not mutate the committed value")
     }
 
@@ -172,7 +179,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7767,
             lng: -122.4241,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(2.0)
         )
 
@@ -190,7 +197,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 0,
             lng: 0,
             source: "manual",
-            timeZoneIdentifier: "UTC",
+            legacyLocationTimeZoneIdentifier: "UTC",
             radiusMeters: SetupScreen.metersFromMiles(0.25)
         )
         let maxArea = SetupScreen.SearchArea(
@@ -198,7 +205,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 0,
             lng: 0,
             source: "manual",
-            timeZoneIdentifier: "UTC",
+            legacyLocationTimeZoneIdentifier: "UTC",
             radiusMeters: SetupScreen.metersFromMiles(10.0)
         )
         XCTAssertEqual(
@@ -374,7 +381,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7767,
             lng: -122.4241,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(2.0)
         )
         let pannedDraft = SetupScreen.SearchArea(
@@ -382,7 +389,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7599,
             lng: -122.4148,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(2.0)
         )
         let steppedDraft = SetupScreen.searchAreaAfterRadiusStep(committed, offset: 1)
@@ -411,7 +418,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7767,
             lng: -122.4241,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(1.0)
         )
         let inside = (0..<25).map { index in
@@ -463,7 +470,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7767,
             lng: -122.4241,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(1.0)
         )
         let latest = SetupScreen.SearchArea(
@@ -471,7 +478,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7599,
             lng: -122.4148,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(1.0)
         )
 
@@ -493,7 +500,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7599,
             lng: -122.4148,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(1.5)
         )
         let emptyModel = SetupScreen.DensityPreviewModel(
@@ -566,7 +573,7 @@ final class SetupScreenTests: XCTestCase {
             lat: 37.7767,
             lng: -122.4241,
             source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
+            legacyLocationTimeZoneIdentifier: "America/Los_Angeles",
             radiusMeters: SetupScreen.metersFromMiles(3.0)
         )
 
@@ -574,7 +581,7 @@ final class SetupScreenTests: XCTestCase {
         let roomLocation = SetupScreen.roomLocation(fromCommittedSearchArea: searchArea)
         let radius = SetupScreen.payloadDistanceMeters(
             committedSearchArea: searchArea,
-            fallbackDistanceMiles: SetupScreen.defaultDistanceMiles
+            fallbackRadiusMiles: SetupScreen.defaultSearchAreaRadiusMiles
         )
 
         XCTAssertEqual(planLocation?.name, "Hayes Valley")
@@ -613,72 +620,73 @@ final class SetupScreenTests: XCTestCase {
         let payload = screen.snapshotPayload()
 
         XCTAssertNil(payload.location)
-        XCTAssertEqual(payload.distanceMeters, SetupScreen.metersFromMiles(SetupScreen.defaultDistanceMiles))
+        XCTAssertEqual(payload.distanceMeters, SetupScreen.metersFromMiles(SetupScreen.defaultSearchAreaRadiusMiles))
     }
 
-    // MARK: - distance/radius snap-list (workflow-overhaul Q8)
+    // MARK: - Search area radius stops
 
-    /// The 17-stop schedule locked in `surfaces/01-setup.md` §"Distance
-    /// slider". Mirrors the JSX `DISTANCE_STEPS` constant. Order
-    /// matters — the slider snaps onChange to the nearest entry.
-    func testDistanceStepsMatchTheLockedSchedule() {
+    /// The 17-stop schedule is the locked C-28 Search area radius range.
+    /// Order matters because radius step controls move through adjacent
+    /// stops.
+    func testSearchAreaRadiusStopsMatchTheLockedSchedule() {
         XCTAssertEqual(
-            SetupScreen.distanceSteps,
+            SetupScreen.searchAreaRadiusStops,
             [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
         )
     }
 
-    /// Default lands on `1.0 mi` per the spec (tick anchor).
-    func testDistanceDefaultIsOneMile() {
-        XCTAssertEqual(SetupScreen.defaultDistanceMiles, 1.0, accuracy: 0.001)
-        XCTAssertTrue(SetupScreen.distanceSteps.contains(SetupScreen.defaultDistanceMiles))
+    /// Pending-save radius fallback lands on the existing 1.0 mi
+    /// storage default.
+    func testSearchAreaRadiusFallbackIsOneMile() {
+        XCTAssertEqual(SetupScreen.defaultSearchAreaRadiusMiles, 1.0, accuracy: 0.001)
+        XCTAssertTrue(SetupScreen.searchAreaRadiusStops.contains(SetupScreen.defaultSearchAreaRadiusMiles))
     }
 
-    /// The native slider slides through the smallest step (0.25 mi); the
-    /// `snap` helper maps any continuous value to the nearest entry
-    /// in `distanceSteps`. End-positions clamp inside the schedule.
-    func testSnapDistanceMaps_endpoints_andInterior() {
-        XCTAssertEqual(SetupScreen.snapDistance(0.0), 0.25, accuracy: 0.001,
+    /// The snap helper maps any continuous radius value to the nearest
+    /// entry in `searchAreaRadiusStops`. End-positions clamp inside
+    /// the schedule.
+    func testSnapSearchAreaRadiusMapsEndpointsAndInterior() {
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(0.0), 0.25, accuracy: 0.001,
             "below-range value clamps to the smallest stop")
-        XCTAssertEqual(SetupScreen.snapDistance(0.25), 0.25, accuracy: 0.001)
-        XCTAssertEqual(SetupScreen.snapDistance(0.4), 0.5, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(0.25), 0.25, accuracy: 0.001)
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(0.4), 0.5, accuracy: 0.001,
             "0.4 mi snaps to 0.5 (nearer than 0.25 by 0.05)")
-        XCTAssertEqual(SetupScreen.snapDistance(1.0), 1.0, accuracy: 0.001)
-        XCTAssertEqual(SetupScreen.snapDistance(1.2), 1.0, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(1.0), 1.0, accuracy: 0.001)
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(1.2), 1.0, accuracy: 0.001,
             "1.2 snaps down to 1.0 (closer than 1.5)")
-        XCTAssertEqual(SetupScreen.snapDistance(1.3), 1.5, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(1.3), 1.5, accuracy: 0.001,
             "1.3 snaps up to 1.5")
-        XCTAssertEqual(SetupScreen.snapDistance(5.5), 5.0, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(5.5), 5.0, accuracy: 0.001,
             "5.5 snaps to 5.0 (tied with 6.0 — lower-index wins on tie)")
-        XCTAssertEqual(SetupScreen.snapDistance(5.6), 6.0, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(5.6), 6.0, accuracy: 0.001,
             "5.6 snaps to 6.0")
-        XCTAssertEqual(SetupScreen.snapDistance(10.0), 10.0, accuracy: 0.001)
-        XCTAssertEqual(SetupScreen.snapDistance(15.0), 10.0, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(10.0), 10.0, accuracy: 0.001)
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(15.0), 10.0, accuracy: 0.001,
             "above-range value clamps to the top stop")
     }
 
-    /// bug-30 — `snapDistance` originally force-unwrapped `distanceSteps.first!`
-    /// / `distanceSteps.last!`. The fix replaces both with `??` fallbacks
-    /// (`0` floor, `Self.maxDistanceMiles` ceiling) per CODING_STANDARDS.md
+    /// bug-30 — `snapSearchAreaRadiusMiles` originally force-unwrapped `searchAreaRadiusStops.first!`
+    /// / `searchAreaRadiusStops.last!`. The fix replaces both with `??` fallbacks
+    /// (`0` floor, `Self.maxSearchAreaRadiusMiles` ceiling) per CODING_STANDARDS.md
     /// rule OPT-001. Behavior is observably identical because
-    /// `distanceSteps` is a static-let literal, but the three acceptance
+    /// `searchAreaRadiusStops` is a static-let literal, but the three acceptance
     /// criteria from the bug-30 spec are pinned here so a future
     /// regression that breaks the clamp / passthrough contract fails
     /// loud — and so the snap helper is exercised at the exact endpoints
     /// the spec named.
-    func testSnapDistance_bug30AcceptanceCriteria() {
+    func testSnapSearchAreaRadiusBug30AcceptanceCriteria() {
         guard
-            let first = SetupScreen.distanceSteps.first,
-            let last = SetupScreen.distanceSteps.last
+            let first = SetupScreen.searchAreaRadiusStops.first,
+            let last = SetupScreen.searchAreaRadiusStops.last
         else {
-            return XCTFail("distanceSteps must be non-empty")
+            return XCTFail("searchAreaRadiusStops must be non-empty")
         }
-        XCTAssertEqual(SetupScreen.snapDistance(-1), first, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(-1), first, accuracy: 0.001,
             "negative input clamps to the first stop")
-        XCTAssertEqual(SetupScreen.snapDistance(100), last, accuracy: 0.001,
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(100), last, accuracy: 0.001,
             "far-above-range input clamps to the last stop")
-        let interior = SetupScreen.distanceSteps[2]
-        XCTAssertEqual(SetupScreen.snapDistance(interior), interior, accuracy: 0.001,
+        let interior = SetupScreen.searchAreaRadiusStops[2]
+        XCTAssertEqual(SetupScreen.snapSearchAreaRadiusMiles(interior), interior, accuracy: 0.001,
             "an exact stop passes through unchanged")
     }
 
@@ -803,15 +811,15 @@ final class SetupScreenTests: XCTestCase {
         XCTAssertTrue(SetupScreen.shouldAutoSaveOnBack(mode: .edit,   name: "Already named"))
     }
 
-    // MARK: - distance default → Plan column default (1609 m)
+    // MARK: - Search area radius fallback → Plan column default (1609 m)
 
     /// The Plan column's default is `distance_meters int default 1609`
-    /// (≈ 1.0 mi). SetupScreen's `defaultDistanceMiles` × 1609.344
+    /// (≈ 1.0 mi). SetupScreen's `defaultSearchAreaRadiusMiles` × 1609.344
     /// rounds to that same value, so a Setup → Plan write that the
     /// user never adjusted ships exactly the column default.
-    func testDefaultDistanceMatchesPlanColumnDefault() {
-        XCTAssertEqual(SetupScreen.metersFromMiles(SetupScreen.defaultDistanceMiles), 1609,
-            "defaultDistanceMiles → meters must match plans.distance_meters default of 1609")
+    func testDefaultSearchAreaRadiusMatchesPlanColumnDefault() {
+        XCTAssertEqual(SetupScreen.metersFromMiles(SetupScreen.defaultSearchAreaRadiusMiles), 1609,
+            "defaultSearchAreaRadiusMiles → meters must match plans.distance_meters default of 1609")
     }
 
     // MARK: - disabled-state CTA affordance (wfr-09)
@@ -934,7 +942,7 @@ final class SetupScreenTests: XCTestCase {
     // MARK: - field-level error routing (wfr-25)
 
     /// wfr-25 — errors are routed to the field that failed (name,
-    /// distance) or kept at the top of the dock for cross-field /
+    /// Search area radius) or kept at the top of the dock for cross-field /
     /// network failures per `patterns.md` §"Error Messages" + the
     /// run report finding #25. Routing is encoded as a pure
     /// classifier so the view body has a single source of truth and
@@ -962,18 +970,18 @@ final class SetupScreenTests: XCTestCase {
     }
 
     /// PostgREST CHECK violations on `distance_meters` (>= 0 / sane
-    /// range) route to the `.distance` field. Substring match covers
-    /// both the column name and the user-facing word.
-    func testClassifyFailureRoutesDistanceErrorsToDistanceField() {
+    /// range) route to the `.searchAreaRadius` field. Substring match covers
+    /// the legacy column name and the user-facing radius word.
+    func testClassifyFailureRoutesRadiusErrorsToSearchAreaRadiusField() {
         let cases: [String] = [
             "distance_meters out of range",
-            "Distance must be positive",
+            "Search area radius must be positive",
             "plans_distance_check violated",
         ]
         for raw in cases {
             let classified = SetupScreen.classifyPersistFailure(messageLike: raw)
-            XCTAssertEqual(classified.field, .distance,
-                "expected .distance routing for \(raw) — got \(classified.field)")
+            XCTAssertEqual(classified.field, .searchAreaRadius,
+                "expected .searchAreaRadius routing for \(raw) — got \(classified.field)")
             XCTAssertFalse(classified.message.isEmpty,
                 "field error message must not be empty")
         }
@@ -999,7 +1007,7 @@ final class SetupScreenTests: XCTestCase {
         }
     }
 
-    /// Voice register — all three error copies (name / distance /
+    /// Voice register — all three error copies (name / Search area radius /
     /// cross-field) must stay in the warm-friend register the surface
     /// codifies. Never `"required"` / `" field"` (form-field register).
     /// The word `"error"` is allowed in the cross-field generic copy
@@ -1007,7 +1015,7 @@ final class SetupScreenTests: XCTestCase {
     func testFieldErrorCopyUsesWarmFriendRegister() {
         let copies = [
             SetupScreen.classifyPersistFailure(messageLike: "name violates check").message,
-            SetupScreen.classifyPersistFailure(messageLike: "distance out of range").message,
+            SetupScreen.classifyPersistFailure(messageLike: "radius out of range").message,
             SetupScreen.classifyPersistFailure(messageLike: "network down").message,
         ]
         for copy in copies {
