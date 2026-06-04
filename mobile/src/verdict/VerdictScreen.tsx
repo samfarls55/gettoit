@@ -3,16 +3,14 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
 import type {
-  RerollReason,
+  RerollInput,
   VerdictViewModel,
+  WidenAndRerunInput,
 } from "./verdictRepository";
 
 type VerdictScreenProps = {
-  onReroll?: (input: { roomId: string; reason: RerollReason }) => Promise<void>;
-  onWidenAndRerun?: (input: {
-    roomId: string;
-    radiusMiles: number;
-  }) => Promise<void>;
+  onReroll?: (input: RerollInput) => Promise<void>;
+  onWidenAndRerun?: (input: WidenAndRerunInput) => Promise<void>;
   verdict: VerdictViewModel;
 };
 
@@ -85,12 +83,13 @@ export function VerdictScreen({
 }
 
 type NoSurvivorVerdictProps = {
-  onWidenAndRerun: (input: {
-    roomId: string;
-    radiusMiles: number;
-  }) => Promise<void>;
+  onWidenAndRerun: (input: WidenAndRerunInput) => Promise<void>;
   verdict: Extract<VerdictViewModel, { kind: "noSurvivor" }>;
 };
+
+function radiusLabel(radiusMiles: number): string {
+  return `${radiusMiles.toFixed(1)} mi`;
+}
 
 function NoSurvivorVerdict({
   onWidenAndRerun,
@@ -137,7 +136,7 @@ function NoSurvivorVerdict({
         >
           <Text style={styles.secondaryButtonLabel}>-</Text>
         </Pressable>
-        <Text style={styles.radiusValue}>{radiusMiles.toFixed(1)} mi</Text>
+        <Text style={styles.radiusValue}>{radiusLabel(radiusMiles)}</Text>
         <Pressable
           accessibilityLabel="Widen search area"
           accessibilityRole="button"
@@ -154,7 +153,7 @@ function NoSurvivorVerdict({
         style={styles.primaryButton}
       >
         <Text style={styles.primaryButtonLabel}>
-          Re-run · {radiusMiles.toFixed(1)} mi
+          Re-run · {radiusLabel(radiusMiles)}
         </Text>
       </Pressable>
     </View>

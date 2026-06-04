@@ -1,6 +1,18 @@
 export type VerdictFlavor = "group" | "solo";
 export type RerollReason = "cost" | "dist" | "mood" | "diet" | "avail";
 
+const MAX_REROLL_BURNS = 3;
+
+export type RerollInput = {
+  roomId: string;
+  reason: RerollReason;
+};
+
+export type WidenAndRerunInput = {
+  roomId: string;
+  radiusMiles: number;
+};
+
 export type LiveVerdictReceipt = {
   id: string;
   name: string;
@@ -48,11 +60,8 @@ export type VerdictRepository = {
     roomId: string;
     flavor: VerdictFlavor;
   }) => Promise<VerdictViewModel>;
-  reroll: (input: { roomId: string; reason: RerollReason }) => Promise<void>;
-  widenAndRerun: (input: {
-    roomId: string;
-    radiusMiles: number;
-  }) => Promise<void>;
+  reroll: (input: RerollInput) => Promise<void>;
+  widenAndRerun: (input: WidenAndRerunInput) => Promise<void>;
 };
 
 export type SupabaseQueryResult<TData> = {
@@ -242,7 +251,7 @@ function receiptsFor(
 }
 
 function rerollStateFor(rerolls: SupabaseRerollRow[]): RerollViewModel {
-  const burnsRemaining = Math.max(0, 3 - rerolls.length);
+  const burnsRemaining = Math.max(0, MAX_REROLL_BURNS - rerolls.length);
 
   return {
     burnsRemaining,
