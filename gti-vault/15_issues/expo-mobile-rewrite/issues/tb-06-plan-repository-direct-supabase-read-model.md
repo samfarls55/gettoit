@@ -27,3 +27,7 @@ Replace the fake Plan list data path with a typed Supabase-backed Plan repositor
 
 - TB-05: Plan list landing with fake repository.
 
+## Implementation notes
+
+- 2026-06-04: Expo Plan list repository now has an async Supabase-backed read model that reads `members`, `rooms`, and `plans` directly, then buckets Created, Joined, Decided, and History behind the `PlanRepository` interface. The local fake repository remains for UI tests and Expo web preview. No Supabase contract cleanup or migration was needed for this slice.
+

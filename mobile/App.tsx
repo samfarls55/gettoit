@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -20,9 +20,13 @@ import {
 } from "./src/navigation/appStateRouter";
 import type {
   PlanListItem,
+  PlanListSnapshot,
   PlanRepository,
 } from "./src/plans/planRepository";
-import { fakePlanRepository } from "./src/plans/planRepository";
+import {
+  emptyPlanListSnapshot,
+  fakePlanRepository,
+} from "./src/plans/planRepository";
 import { PlanListScreen } from "./src/plans/PlanListScreen";
 import { SearchAreaPickerPreview } from "./src/searchArea/SearchAreaPickerPreview";
 
@@ -141,6 +145,41 @@ export function MobileAppShell({
   routerState,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
+  const [planSnapshot, setPlanSnapshot] = useState<PlanListSnapshot>(
+    emptyPlanListSnapshot,
+  );
+  const [planListStatus, setPlanListStatus] = useState<
+    "idle" | "loading" | "loaded" | "error"
+  >("idle");
+
+  useEffect(() => {
+    if (route.name !== "planList") {
+      return;
+    }
+
+    let isCurrent = true;
+    setPlanListStatus("loading");
+
+    planRepository
+      .listPlans()
+      .then((snapshot) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setPlanSnapshot(snapshot);
+        setPlanListStatus("loaded");
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setPlanListStatus("error");
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [planRepository, route.name]);
 
   if (route.name === "setup") {
     return (
@@ -167,11 +206,23 @@ export function MobileAppShell({
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
-        <PlanListScreen
-          onCreatePlan={onCreatePlan}
-          onOpenPlan={onOpenPlan}
-          plans={planRepository.listPlans()}
-        />
+        {planListStatus === "error" ? (
+          <View style={styles.surface}>
+            <Text style={styles.routeTitle}>Plans unavailable</Text>
+            <Text style={styles.subtitle}>Try again in a moment.</Text>
+          </View>
+        ) : planListStatus === "loaded" ? (
+          <PlanListScreen
+            onCreatePlan={onCreatePlan}
+            onOpenPlan={onOpenPlan}
+            plans={planSnapshot}
+          />
+        ) : (
+          <View style={styles.surface}>
+            <Text style={styles.routeTitle}>Plans</Text>
+            <Text style={styles.subtitle}>Loading Plans.</Text>
+          </View>
+        )}
       </View>
     );
   }

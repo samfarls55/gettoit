@@ -83,17 +83,6 @@ describe("App", () => {
     visibleBody: string;
   }>([
     {
-      name: "Linked-Apple members land on the Plan list",
-      state: {
-        auth: "linkedApple",
-        pendingDeepLinkUrl: null,
-        activePlanPhase: null,
-        settingsOpen: false,
-      },
-      visibleRoute: "Plans",
-      visibleBody: "Thursday dinner with the crew",
-    },
-    {
       name: "deep links route to the resolver before active Plan work",
       state: {
         auth: "linkedApple",
@@ -198,14 +187,17 @@ describe("App", () => {
     });
   });
 
-  it("renders fake Plan list buckets", () => {
+  it("renders fake Plan list buckets", async () => {
     render(<App initialRouterState={linkedApplePlanListState} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Thursday dinner with the crew")).toBeOnTheScreen();
+    });
 
     expect(screen.getAllByText("Created")).toHaveLength(2);
     expect(screen.getAllByText("Joined")).toHaveLength(2);
     expect(screen.getAllByText("Decided")).toHaveLength(2);
     expect(screen.getAllByText("History")).toHaveLength(2);
-    expect(screen.getByText("Thursday dinner with the crew")).toBeOnTheScreen();
     expect(screen.getByText("Morgan's birthday")).toBeOnTheScreen();
     expect(screen.getByText("Date night fallback")).toBeOnTheScreen();
     expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
@@ -216,14 +208,18 @@ describe("App", () => {
     ["Open Joined Plan Morgan's birthday", "Quiz placeholder"],
     ["Open Decided Plan Date night fallback", "Verdict placeholder"],
     ["Open History Plan Taco crawl", "Verdict placeholder"],
-  ])("routes %s to %s", (accessibilityLabel, visibleRoute) => {
+  ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
     render(<App initialRouterState={linkedApplePlanListState} />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(accessibilityLabel)).toBeOnTheScreen();
+    });
 
     fireEvent.press(screen.getByLabelText(accessibilityLabel));
     expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
   });
 
-  it("renders an empty Plan list with a create-Plan entry path", () => {
+  it("renders an empty Plan list with a create-Plan entry path", async () => {
     render(
       <App
         initialRouterState={{
@@ -233,12 +229,15 @@ describe("App", () => {
           settingsOpen: false,
         }}
         planRepository={{
-          listPlans: () => emptyPlanListSnapshot,
+          listPlans: async () => emptyPlanListSnapshot,
         }}
       />,
     );
 
-    expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
+    await waitFor(() => {
+      expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
+    });
+
     expect(screen.getByLabelText("Create a Plan")).toBeOnTheScreen();
 
     fireEvent.press(screen.getByLabelText("Create a Plan"));
