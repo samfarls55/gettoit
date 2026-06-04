@@ -16,7 +16,10 @@ import {
 } from "../src/navigation/appStateRouter";
 import type { PlanRepository } from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
-import type { QuizProgressRepository } from "../src/quiz/quizProgressRepository";
+import type {
+  QuizProgress,
+  QuizProgressRepository,
+} from "../src/quiz/quizProgressRepository";
 
 function EventRouterHarness() {
   const [routerState, dispatch] = useReducer(
@@ -99,9 +102,7 @@ function makeWritablePlanRepository(): PlanRepository {
 }
 
 function makeQuizProgressRepository(
-  initialProgress: Awaited<
-    ReturnType<QuizProgressRepository["loadProgress"]>
-  > = null,
+  initialProgress: QuizProgress | null = null,
 ): QuizProgressRepository {
   let progress = initialProgress;
 
@@ -214,7 +215,12 @@ describe("App", () => {
       visibleBody: "Account settings live here.",
     },
   ])("$name", ({ state, visibleRoute, visibleBody }) => {
-    render(<App initialRouterState={state} />);
+    render(
+      <App
+        initialRouterState={state}
+        quizProgressRepository={makeQuizProgressRepository()}
+      />,
+    );
 
     expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
     expect(screen.getByText(visibleBody)).toBeOnTheScreen();
@@ -274,7 +280,12 @@ describe("App", () => {
     ["Open Decided Plan Date night fallback", "Verdict placeholder"],
     ["Open History Plan Taco crawl", "Verdict placeholder"],
   ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
-    render(<App initialRouterState={linkedApplePlanListState} />);
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        quizProgressRepository={makeQuizProgressRepository()}
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByLabelText(accessibilityLabel)).toBeOnTheScreen();
@@ -358,6 +369,7 @@ describe("App", () => {
       <App
         initialRouterState={linkedApplePlanListState}
         planRepository={repository}
+        quizProgressRepository={makeQuizProgressRepository()}
       />,
     );
 
@@ -521,7 +533,6 @@ describe("App", () => {
       });
       expect(screen.getByText("Plans")).toBeOnTheScreen();
     });
-
   });
 
   it("resumes quiz progress and preserves prior answers", async () => {

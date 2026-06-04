@@ -33,6 +33,9 @@ type QuestionConfig = {
   multi?: true;
 };
 
+const noPreferenceValue = "noPreference";
+const maxMultiSelectValues = 3;
+
 const questionConfigs: readonly QuestionConfig[] = [
   {
     id: "q1",
@@ -138,6 +141,24 @@ function nextAnswers(
   };
 }
 
+function nextMultiSelectValues(
+  currentValues: string[],
+  selectedValue: string,
+): string[] {
+  if (selectedValue === noPreferenceValue) {
+    return [noPreferenceValue];
+  }
+
+  if (currentValues.includes(selectedValue)) {
+    return currentValues.filter((selection) => selection !== selectedValue);
+  }
+
+  return [
+    ...currentValues.filter((selection) => selection !== noPreferenceValue),
+    selectedValue,
+  ].slice(0, maxMultiSelectValues);
+}
+
 export function QuizScreen({
   progressRepository,
   role,
@@ -177,17 +198,7 @@ export function QuizScreen({
       }
 
       const currentValues = selectedValues(currentAnswers, currentQuestion);
-      const nextValues =
-        value === "noPreference"
-          ? ["noPreference"]
-          : currentValues.includes(value)
-            ? currentValues.filter((selection) => selection !== value)
-            : [
-                ...currentValues.filter(
-                  (selection) => selection !== "noPreference",
-                ),
-                value,
-              ].slice(0, 3);
+      const nextValues = nextMultiSelectValues(currentValues, value);
 
       return { ...currentAnswers, [currentQuestion.answerKey]: nextValues };
     });
@@ -219,7 +230,9 @@ export function QuizScreen({
         ) : (
           <Pressable
             accessibilityRole="button"
-            onPress={() => setCurrentQuestionId(questionBefore(currentQuestion.id))}
+            onPress={() =>
+              setCurrentQuestionId(questionBefore(currentQuestion.id))
+            }
             style={styles.chromeAction}
           >
             <Text style={styles.chromeLabel}>Back</Text>
