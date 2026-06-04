@@ -1,16 +1,81 @@
 import { StatusBar } from "expo-status-bar";
+import { useReducer } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "./src/design/tokens";
+import {
+  AppRouteName,
+  AppStateRouterState,
+  initialAppStateRouterState,
+  appStateRouterReducer,
+  routeForAppState,
+} from "./src/navigation/appStateRouter";
 
-export default function App() {
+type AppProps = {
+  initialRouterState?: AppStateRouterState;
+  [key: string]: unknown;
+};
+
+type MobileAppShellProps = {
+  routerState: AppStateRouterState;
+};
+
+const routeContent: Record<AppRouteName, { title: string; body: string }> = {
+  signInGate: {
+    title: "Sign in gate",
+    body: "Sign in with Apple to continue.",
+  },
+  planList: {
+    title: "Plan list",
+    body: "Your Plans will appear here.",
+  },
+  setup: {
+    title: "Setup placeholder",
+    body: "Plan setup starts here.",
+  },
+  quiz: {
+    title: "Quiz placeholder",
+    body: "Answer Plan questions here.",
+  },
+  waiting: {
+    title: "Waiting placeholder",
+    body: "Waiting for the group verdict.",
+  },
+  verdict: {
+    title: "Verdict placeholder",
+    body: "The Plan verdict appears here.",
+  },
+  settings: {
+    title: "Settings placeholder",
+    body: "Account settings live here.",
+  },
+  deepLink: {
+    title: "Deep-link placeholder",
+    body: "Resolving invite link.",
+  },
+};
+
+export default function App({ initialRouterState }: AppProps = {}) {
+  const [routerState] = useReducer(
+    appStateRouterReducer,
+    initialRouterState ?? initialAppStateRouterState,
+  );
+
+  return <MobileAppShell routerState={routerState} />;
+}
+
+export function MobileAppShell({ routerState }: MobileAppShellProps) {
+  const route = routeForAppState(routerState);
+  const content = routeContent[route.name];
+
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
       <View style={styles.surface}>
-        <Text style={styles.eyebrow}>Design tokens wired</Text>
+        <Text style={styles.eyebrow}>Mobile router</Text>
         <Text style={styles.title}>GetToIt</Text>
-        <Text style={styles.subtitle}>Expo mobile rewrite scaffold</Text>
+        <Text style={styles.routeTitle}>{content.title}</Text>
+        <Text style={styles.subtitle}>{content.body}</Text>
       </View>
     </View>
   );
@@ -41,6 +106,13 @@ const styles = StyleSheet.create({
     fontWeight: mobileTokens.typography.display.weight,
     lineHeight: mobileTokens.typography.display.lineHeight,
     marginBottom: mobileTokens.spacing[4],
+  },
+  routeTitle: {
+    color: mobileTokens.color.paper,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "700",
+    lineHeight: mobileTokens.typography.body.lineHeight,
+    marginBottom: mobileTokens.spacing[3],
   },
   subtitle: {
     color: mobileTokens.color.textSecondaryOnGradient,
