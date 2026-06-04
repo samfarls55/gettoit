@@ -131,6 +131,10 @@ type QuizSession = {
   role: "initiator" | "joiner";
 };
 
+function routeAfterQuizSubmission(participantScope: PlanParticipantScope) {
+  return participantScope === "solo" ? "showVerdict" : "waitForVerdict";
+}
+
 const contentByRouteName: Record<AppRouteName, RouteContent> = {
   signInGate: {
     title: "Sign in gate",
@@ -372,10 +376,7 @@ export default function App({
       onQuizExited={() => dispatch({ type: "returnToPlans" })}
       onQuizSubmitted={() =>
         dispatch({
-          type:
-            quizSession.participantScope === "solo"
-              ? "showVerdict"
-              : "waitForVerdict",
+          type: routeAfterQuizSubmission(quizSession.participantScope),
         })
       }
       onSessionEnded={() => {

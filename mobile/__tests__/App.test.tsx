@@ -708,7 +708,7 @@ describe("App", () => {
       <App
         initialRouterState={{
           ...linkedApplePlanListState,
-      activePlanPhase: "waiting",
+          activePlanPhase: "waiting",
         }}
         verdictRepository={makeVerdictRepository()}
         waitingRepository={waitingRepository}
