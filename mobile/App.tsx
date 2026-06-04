@@ -45,9 +45,9 @@ import type { QuizSubmissionRepository } from "./src/quiz/quizSubmissionReposito
 import { fakeQuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
 import { VerdictScreen } from "./src/verdict/VerdictScreen";
 import type {
-  LiveVerdictViewModel,
   VerdictFlavor,
   VerdictRepository,
+  VerdictViewModel,
 } from "./src/verdict/verdictRepository";
 import { fakeVerdictRepository } from "./src/verdict/verdictRepository";
 import { WaitingScreen } from "./src/waiting/WaitingScreen";
@@ -464,7 +464,7 @@ export function MobileAppShell({
   );
   const [planListStatus, setPlanListStatus] =
     useState<PlanListStatus>("idle");
-  const [verdict, setVerdict] = useState<LiveVerdictViewModel | null>(null);
+  const [verdict, setVerdict] = useState<VerdictViewModel | null>(null);
   const verdictFlavor: VerdictFlavor =
     quizSession.participantScope === "solo" ? "solo" : "group";
   const [deletedCreatedPlanIds, setDeletedCreatedPlanIds] = useState<
@@ -529,7 +529,7 @@ export function MobileAppShell({
     setVerdict(null);
 
     verdictRepository
-      .loadLiveVerdict({
+      .loadVerdict({
         roomId: quizSession.roomId,
         flavor: verdictFlavor,
       })
@@ -609,7 +609,11 @@ export function MobileAppShell({
       <View style={styles.root}>
         <StatusBar style="light" />
         {verdict ? (
-          <VerdictScreen verdict={verdict} />
+          <VerdictScreen
+            onReroll={verdictRepository.reroll}
+            onWidenAndRerun={verdictRepository.widenAndRerun}
+            verdict={verdict}
+          />
         ) : (
           <View style={styles.surface}>
             <Text style={styles.routeTitle}>Loading verdict</Text>

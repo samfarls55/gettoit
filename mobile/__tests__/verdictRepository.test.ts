@@ -122,14 +122,22 @@ describe("verdictRepository", () => {
             ],
             error: null,
           },
+          rerolls: {
+            data: [
+              { id: "reroll-1", room_id: "room-1" },
+              { id: "reroll-2", room_id: "room-1" },
+            ],
+            error: null,
+          },
         },
         calls,
       ),
     });
 
     await expect(
-      repository.loadLiveVerdict({ roomId: "room-1", flavor: "group" }),
+      repository.loadVerdict({ roomId: "room-1", flavor: "group" }),
     ).resolves.toEqual({
+      kind: "live",
       roomId: "room-1",
       flavor: "group",
       placeName: "Pico's Taqueria",
@@ -144,6 +152,12 @@ describe("verdictRepository", () => {
         { id: "user-2", name: "Morgan", action: "wanted calm" },
       ],
       primaryActionLabel: "I'm in",
+      reroll: {
+        burnsRemaining: 1,
+        ineligibleReason: null,
+        isEligible: true,
+        windowClosesAt: null,
+      },
     });
 
     expect(calls.map((call) => call.table)).toEqual([
@@ -151,6 +165,7 @@ describe("verdictRepository", () => {
       "options",
       "members",
       "votes",
+      "rerolls",
     ]);
   });
 
@@ -182,17 +197,53 @@ describe("verdictRepository", () => {
           data: [{ user_id: "user-1", q4: { answer: { vibe: "cozy" } } }],
           error: null,
         },
+        rerolls: {
+          data: [],
+          error: null,
+        },
       }),
     });
 
     await expect(
-      repository.loadLiveVerdict({ roomId: "room-1", flavor: "solo" }),
+      repository.loadVerdict({ roomId: "room-1", flavor: "solo" }),
     ).resolves.toMatchObject({
+      kind: "live",
       flavor: "solo",
       placeName: "Solo Ramen",
       receipts: [],
       timeBadge: { time: "7:00 PM", audience: "" },
       primaryActionLabel: "Save taste profile",
+    });
+  });
+
+  it("maps no-survivor verdicts to the no-survivor screen model", async () => {
+    const repository = createSupabaseVerdictRepository({
+      supabase: makeSupabaseClient({
+        verdicts: {
+          data: [
+            {
+              id: "verdict-1",
+              room_id: "room-1",
+              option_id: null,
+              computed_at: "2026-06-04T19:00:00Z",
+              method: "no_survivor",
+              rule_text: "No candidate survived the hard constraints.",
+            },
+          ],
+          error: null,
+        },
+      }),
+    });
+
+    await expect(
+      repository.loadVerdict({ roomId: "room-1", flavor: "group" }),
+    ).resolves.toEqual({
+      kind: "noSurvivor",
+      roomId: "room-1",
+      currentRadiusMiles: 2,
+      maxRadiusMiles: 5,
+      minRadiusMiles: 1,
+      stepMiles: 0.5,
     });
   });
 });

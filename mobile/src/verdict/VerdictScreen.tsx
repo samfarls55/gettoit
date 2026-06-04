@@ -1,14 +1,40 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
-import type { LiveVerdictViewModel } from "./verdictRepository";
+import type {
+  RerollReason,
+  VerdictViewModel,
+} from "./verdictRepository";
 
 type VerdictScreenProps = {
-  verdict: LiveVerdictViewModel;
+  onReroll?: (input: { roomId: string; reason: RerollReason }) => Promise<void>;
+  onWidenAndRerun?: (input: {
+    roomId: string;
+    radiusMiles: number;
+  }) => Promise<void>;
+  verdict: VerdictViewModel;
 };
 
-export function VerdictScreen({ verdict }: VerdictScreenProps) {
+export function VerdictScreen({
+  onReroll = async () => undefined,
+  onWidenAndRerun = async () => undefined,
+  verdict,
+}: VerdictScreenProps) {
+  if (verdict.kind === "noSurvivor") {
+    return (
+      <NoSurvivorVerdict
+        onWidenAndRerun={onWidenAndRerun}
+        verdict={verdict}
+      />
+    );
+  }
+
   const isSolo = verdict.flavor === "solo";
+  const rerollLabel =
+    verdict.reroll.burnsRemaining === 1
+      ? "Reroll · last one"
+      : `Reroll · ${verdict.reroll.burnsRemaining} left`;
 
   return (
     <View style={styles.root}>
@@ -42,10 +68,95 @@ export function VerdictScreen({ verdict }: VerdictScreenProps) {
             {verdict.primaryActionLabel}
           </Text>
         </Pressable>
-        <Pressable accessibilityRole="button" style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonLabel}>Reroll</Text>
+        {verdict.reroll.isEligible ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => onReroll({ roomId: verdict.roomId, reason: "mood" })}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonLabel}>{rerollLabel}</Text>
+          </Pressable>
+        ) : (
+          <Text style={styles.subtitle}>{verdict.reroll.ineligibleReason}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+type NoSurvivorVerdictProps = {
+  onWidenAndRerun: (input: {
+    roomId: string;
+    radiusMiles: number;
+  }) => Promise<void>;
+  verdict: Extract<VerdictViewModel, { kind: "noSurvivor" }>;
+};
+
+function NoSurvivorVerdict({
+  onWidenAndRerun,
+  verdict,
+}: NoSurvivorVerdictProps) {
+  const [radiusMiles, setRadiusMiles] = useState(verdict.currentRadiusMiles);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const widen = () => {
+    setRadiusMiles((current) =>
+      Math.min(verdict.maxRadiusMiles, current + verdict.stepMiles),
+    );
+  };
+
+  const narrow = () => {
+    setRadiusMiles((current) =>
+      Math.max(verdict.minRadiusMiles, current - verdict.stepMiles),
+    );
+  };
+
+  const handleRerun = async () => {
+    setActionError(null);
+
+    try {
+      await onWidenAndRerun({ roomId: verdict.roomId, radiusMiles });
+    } catch {
+      setActionError("Could not re-run. Try again.");
+    }
+  };
+
+  return (
+    <View style={styles.root}>
+      <Text style={styles.eyebrow}>Try a wider search</Text>
+      <Text style={styles.title}>No spot fits tonight</Text>
+      <Text style={styles.subtitle}>
+        Every candidate was ruled out by the group's hard constraints.
+      </Text>
+      <View style={styles.radiusControl}>
+        <Pressable
+          accessibilityLabel="Narrow search area"
+          accessibilityRole="button"
+          onPress={narrow}
+          style={styles.stepButton}
+        >
+          <Text style={styles.secondaryButtonLabel}>-</Text>
+        </Pressable>
+        <Text style={styles.radiusValue}>{radiusMiles.toFixed(1)} mi</Text>
+        <Pressable
+          accessibilityLabel="Widen search area"
+          accessibilityRole="button"
+          onPress={widen}
+          style={styles.stepButton}
+        >
+          <Text style={styles.secondaryButtonLabel}>+</Text>
         </Pressable>
       </View>
+      {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+      <Pressable
+        accessibilityRole="button"
+        onPress={handleRerun}
+        style={styles.primaryButton}
+      >
+        <Text style={styles.primaryButtonLabel}>
+          Re-run · {radiusMiles.toFixed(1)} mi
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -153,5 +264,31 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
     textTransform: "uppercase",
+  },
+  radiusControl: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: mobileTokens.spacing[4],
+  },
+  radiusValue: {
+    color: mobileTokens.color.paper,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "800",
+    minWidth: 96,
+    textAlign: "center",
+  },
+  stepButton: {
+    alignItems: "center",
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  errorText: {
+    color: mobileTokens.color.sun,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "700",
   },
 });

@@ -1,4 +1,5 @@
 export type VerdictFlavor = "group" | "solo";
+export type RerollReason = "cost" | "dist" | "mood" | "diet" | "avail";
 
 export type LiveVerdictReceipt = {
   id: string;
@@ -6,7 +7,15 @@ export type LiveVerdictReceipt = {
   action: string;
 };
 
+export type RerollViewModel = {
+  burnsRemaining: number;
+  ineligibleReason: string | null;
+  isEligible: boolean;
+  windowClosesAt: string | null;
+};
+
 export type LiveVerdictViewModel = {
+  kind: "live";
   roomId: string;
   flavor: VerdictFlavor;
   placeName: string;
@@ -18,13 +27,32 @@ export type LiveVerdictViewModel = {
   };
   receipts: LiveVerdictReceipt[];
   primaryActionLabel: string;
+  reroll: RerollViewModel;
 };
 
+export type NoSurvivorVerdictViewModel = {
+  kind: "noSurvivor";
+  roomId: string;
+  currentRadiusMiles: number;
+  maxRadiusMiles: number;
+  minRadiusMiles: number;
+  stepMiles: number;
+};
+
+export type VerdictViewModel =
+  | LiveVerdictViewModel
+  | NoSurvivorVerdictViewModel;
+
 export type VerdictRepository = {
-  loadLiveVerdict: (input: {
+  loadVerdict: (input: {
     roomId: string;
     flavor: VerdictFlavor;
-  }) => Promise<LiveVerdictViewModel>;
+  }) => Promise<VerdictViewModel>;
+  reroll: (input: { roomId: string; reason: RerollReason }) => Promise<void>;
+  widenAndRerun: (input: {
+    roomId: string;
+    radiusMiles: number;
+  }) => Promise<void>;
 };
 
 export type SupabaseQueryResult<TData> = {
@@ -86,8 +114,14 @@ type SupabaseVoteRow = {
   };
 };
 
+type SupabaseRerollRow = {
+  id: string;
+  room_id: string;
+};
+
 export const fakeVerdictRepository: VerdictRepository = {
-  loadLiveVerdict: async ({ roomId, flavor }) => ({
+  loadVerdict: async ({ roomId, flavor }) => ({
+    kind: "live",
     roomId,
     flavor,
     placeName: "Pico's Taqueria",
@@ -105,7 +139,15 @@ export const fakeVerdictRepository: VerdictRepository = {
             { id: "morgan", name: "Morgan", action: "wanted calm" },
           ],
     primaryActionLabel: flavor === "solo" ? "Save taste profile" : "I'm in",
+    reroll: {
+      burnsRemaining: 3,
+      ineligibleReason: null,
+      isEligible: true,
+      windowClosesAt: null,
+    },
   }),
+  reroll: async () => undefined,
+  widenAndRerun: async () => undefined,
 };
 
 function assertSupabaseRows<TRow>(
@@ -199,13 +241,25 @@ function receiptsFor(
   });
 }
 
+function rerollStateFor(rerolls: SupabaseRerollRow[]): RerollViewModel {
+  const burnsRemaining = Math.max(0, 3 - rerolls.length);
+
+  return {
+    burnsRemaining,
+    ineligibleReason:
+      burnsRemaining > 0 ? null : "No rerolls left. Tonight is locked.",
+    isEligible: burnsRemaining > 0,
+    windowClosesAt: null,
+  };
+}
+
 export function createSupabaseVerdictRepository({
   supabase,
 }: {
   supabase: VerdictSupabaseClient;
 }): VerdictRepository {
   return {
-    loadLiveVerdict: async ({ roomId, flavor }) => {
+    loadVerdict: async ({ roomId, flavor }) => {
       const verdictRows = assertSupabaseRows(
         await supabase
           .from<SupabaseVerdictRow>("verdicts")
@@ -216,8 +270,19 @@ export function createSupabaseVerdictRepository({
       );
       const verdict = latestVerdict(verdictRows);
 
-      if (!verdict?.option_id) {
-        throw new Error("Verdict read failed: no winning option");
+      if (!verdict) {
+        throw new Error("Verdict read failed: no row returned");
+      }
+
+      if (verdict.method === "no_survivor" || !verdict.option_id) {
+        return {
+          kind: "noSurvivor",
+          roomId,
+          currentRadiusMiles: 2,
+          maxRadiusMiles: 5,
+          minRadiusMiles: 1,
+          stepMiles: 0.5,
+        };
       }
 
       const optionRows = assertSupabaseRows(
@@ -247,8 +312,16 @@ export function createSupabaseVerdictRepository({
           .eq("room_id", roomId),
         "Verdict votes read",
       );
+      const rerollRows = assertSupabaseRows(
+        await supabase
+          .from<SupabaseRerollRow>("rerolls")
+          .select("id, room_id")
+          .eq("room_id", roomId),
+        "Verdict rerolls read",
+      );
 
       return {
+        kind: "live",
         roomId,
         flavor,
         placeName: option.payload.name ?? "Unnamed",
@@ -261,7 +334,10 @@ export function createSupabaseVerdictRepository({
         receipts: receiptsFor(memberRows, voteRows, flavor),
         primaryActionLabel:
           flavor === "solo" ? "Save taste profile" : "I'm in",
+        reroll: rerollStateFor(rerollRows),
       };
     },
+    reroll: async () => undefined,
+    widenAndRerun: async () => undefined,
   };
 }

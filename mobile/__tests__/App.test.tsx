@@ -31,8 +31,8 @@ import type {
   WaitingSnapshot,
 } from "../src/waiting/waitingRepository";
 import type {
-  LiveVerdictViewModel,
   VerdictRepository,
+  VerdictViewModel,
 } from "../src/verdict/verdictRepository";
 
 function EventRouterHarness() {
@@ -196,7 +196,8 @@ function makeWaitingRepository(
 }
 
 function makeVerdictRepository(
-  verdict: LiveVerdictViewModel = {
+  verdict: VerdictViewModel = {
+    kind: "live",
     roomId: "active-room",
     flavor: "group",
     placeName: "Pico's Taqueria",
@@ -205,21 +206,35 @@ function makeVerdictRepository(
     timeBadge: { time: "7:00 PM", audience: "All 2 of you" },
     receipts: [{ id: "ava", name: "Ava", action: "wanted social" }],
     primaryActionLabel: "I'm in",
+    reroll: {
+      burnsRemaining: 3,
+      ineligibleReason: null,
+      isEligible: true,
+      windowClosesAt: null,
+    },
   },
 ): VerdictRepository {
   return {
-    loadLiveVerdict: jest.fn(async ({ roomId, flavor }) => ({
-      ...verdict,
-      roomId,
-      flavor,
-      timeBadge:
-        flavor === "solo"
-          ? { time: verdict.timeBadge.time, audience: "" }
-          : verdict.timeBadge,
-      receipts: flavor === "solo" ? [] : verdict.receipts,
-      primaryActionLabel:
-        flavor === "solo" ? "Save taste profile" : verdict.primaryActionLabel,
-    })),
+    loadVerdict: jest.fn(async ({ roomId, flavor }) => {
+      if (verdict.kind === "noSurvivor") {
+        return { ...verdict, roomId };
+      }
+
+      return {
+        ...verdict,
+        roomId,
+        flavor,
+        timeBadge:
+          flavor === "solo"
+            ? { time: verdict.timeBadge.time, audience: "" }
+            : verdict.timeBadge,
+        receipts: flavor === "solo" ? [] : verdict.receipts,
+        primaryActionLabel:
+          flavor === "solo" ? "Save taste profile" : verdict.primaryActionLabel,
+      };
+    }),
+    reroll: jest.fn(async () => undefined),
+    widenAndRerun: jest.fn(async () => undefined),
   };
 }
 
@@ -924,13 +939,48 @@ describe("App", () => {
     fireEvent.press(screen.getByText("Head to the verdict"));
 
     await waitFor(() => {
-      expect(verdictRepository.loadLiveVerdict).toHaveBeenCalledWith({
+      expect(verdictRepository.loadVerdict).toHaveBeenCalledWith({
         roomId: "solo-plan",
         flavor: "solo",
       });
       expect(screen.getByText("Your solo pick")).toBeOnTheScreen();
       expect(screen.queryByText("Ava")).toBeNull();
       expect(screen.getByText("Save taste profile")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes no-survivor verdicts through the verdict surface and widen action", async () => {
+    const verdictRepository = makeVerdictRepository({
+      kind: "noSurvivor",
+      roomId: "active-room",
+      currentRadiusMiles: 2,
+      maxRadiusMiles: 5,
+      minRadiusMiles: 1,
+      stepMiles: 0.5,
+    });
+
+    render(
+      <App
+        initialRouterState={{
+          ...linkedApplePlanListState,
+          activePlanPhase: "verdict",
+        }}
+        verdictRepository={verdictRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("No spot fits tonight")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Widen search area"));
+    fireEvent.press(screen.getByText("Re-run · 2.5 mi"));
+
+    await waitFor(() => {
+      expect(verdictRepository.widenAndRerun).toHaveBeenCalledWith({
+        roomId: "active-room",
+        radiusMiles: 2.5,
+      });
     });
   });
 
