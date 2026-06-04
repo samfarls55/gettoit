@@ -20,21 +20,20 @@ export type WaitingRepository = {
   fireVerdict: (input: { roomId: string }) => Promise<WaitingSnapshot>;
 };
 
+const fakeWaitingMembers: WaitingMemberProgress[] = [
+  { id: "you", displayName: "You", quizSubmitted: true },
+  { id: "morgan", displayName: "Morgan", quizSubmitted: false },
+];
+
 export const fakeWaitingRepository: WaitingRepository = {
   loadSnapshot: async (roomId) => ({
     roomId,
     status: "waiting",
-    members: [
-      { id: "you", displayName: "You", quizSubmitted: true },
-      { id: "morgan", displayName: "Morgan", quizSubmitted: false },
-    ],
+    members: fakeWaitingMembers,
   }),
   fireVerdict: async (input) => ({
     roomId: input.roomId,
     status: "verdictReady",
-    members: [
-      { id: "you", displayName: "You", quizSubmitted: true },
-      { id: "morgan", displayName: "Morgan", quizSubmitted: false },
-    ],
+    members: fakeWaitingMembers,
   }),
 };

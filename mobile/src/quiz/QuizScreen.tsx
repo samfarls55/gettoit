@@ -289,24 +289,20 @@ export function QuizScreen({
     onExited();
   };
 
-  const handleQ5Submit = async () => {
-    const submittedAnswers = { ...answers, q5Ratings };
-
+  const submitQ5Answers = async (ratings: Record<string, number>) => {
     await submissionRepository.submitQuiz({
       roomId,
-      answers: submittedAnswers,
+      answers: { ...answers, q5Ratings: ratings },
     });
     onSubmitted?.();
   };
 
-  const handleQ5NoResultsSubmit = async () => {
-    const submittedAnswers = { ...answers, q5Ratings: {} };
+  const handleQ5Submit = async () => {
+    await submitQ5Answers(q5Ratings);
+  };
 
-    await submissionRepository.submitQuiz({
-      roomId,
-      answers: submittedAnswers,
-    });
-    onSubmitted?.();
+  const handleQ5NoResultsSubmit = async () => {
+    await submitQ5Answers({});
   };
 
   return (

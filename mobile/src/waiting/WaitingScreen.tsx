@@ -90,12 +90,15 @@ function routeSnapshot(
   onVerdictReady: () => void,
   onSessionEnded: () => void,
 ) {
-  if (snapshot.status === "verdictReady") {
-    onVerdictReady();
-  }
-
-  if (snapshot.status === "sessionEnded") {
-    onSessionEnded();
+  switch (snapshot.status) {
+    case "waiting":
+      return;
+    case "verdictReady":
+      onVerdictReady();
+      return;
+    case "sessionEnded":
+      onSessionEnded();
+      return;
   }
 }
 
