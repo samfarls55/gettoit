@@ -25,6 +25,7 @@ Implemented shape:
 - The Docker image installs `ripgrep` so agents do not fall back to broad `find` / `grep -R` scans over ignored directories.
 - Planner and merger hooks skip dependency install; implementer and reviewer sandboxes run dependency setup before agents start so dependency discovery does not burn model turns.
 - Implementer and reviewer prompts explicitly avoid broad scans and exclude `.sandcastle/**`, `node_modules/**`, `.next/**`, build outputs, generated caches, and prior worktrees.
+- Reviewer failure no longer discards implementer commits. If the reviewer crashes after the implementer committed work, the issue still proceeds to the merge phase with the implementer result.
 - Remove stale `.sandcastle/worktrees/*` directories after extracting any needed artifacts; those nested repo copies are ignored by git but visible to shell searches.
 
 `GIT_CONFIG_GLOBAL` points at `/home/agent/workspace/.sandcastle/gitconfig` so Git writes global config into the writable worktree instead of `/home/agent/.gitconfig`, which can be unwritable when container UID/GID alignment differs.

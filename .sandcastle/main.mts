@@ -230,22 +230,28 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
         // Only review if the implementer produced commits
         if (implement.commits.length > 0) {
-          const review = await sandbox.run({
-            name: "reviewer",
-            maxIterations: 1,
-            agent: codexAgent("gpt-5.5", { effort: "high" }),
-            promptFile: "./.sandcastle/review-prompt.md",
-            promptArgs: {
-              BRANCH: issue.branch,
-            },
-          });
+          try {
+            const review = await sandbox.run({
+              name: "reviewer",
+              maxIterations: 1,
+              agent: codexAgent("gpt-5.5", { effort: "high" }),
+              promptFile: "./.sandcastle/review-prompt.md",
+              promptArgs: {
+                BRANCH: issue.branch,
+              },
+            });
 
-          // Merge commits from both runs so the merge phase sees all of them.
-          // Each sandbox.run() only returns commits from its own run.
-          return {
-            ...review,
-            commits: [...implement.commits, ...review.commits],
-          };
+            // Merge commits from both runs so the merge phase sees all of them.
+            // Each sandbox.run() only returns commits from its own run.
+            return {
+              ...review,
+              commits: [...implement.commits, ...review.commits],
+            };
+          } catch (error) {
+            console.warn(
+              `  ! ${issue.id} (${issue.branch}) reviewer failed; keeping implementer commits: ${error}`,
+            );
+          }
         }
 
         return implement;
