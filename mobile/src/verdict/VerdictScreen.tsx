@@ -14,16 +14,21 @@ export function VerdictScreen({
 }: VerdictScreenProps) {
   const isSolo = verdict.flavor === "solo";
   const isReadOnly = mode === "readOnly";
+  let eyebrowLabel = "Tonight, the verdict is";
+
+  if (isReadOnly) {
+    eyebrowLabel = "Closed verdict record";
+  } else if (isSolo) {
+    eyebrowLabel = "Your solo pick";
+  }
+
+  const primaryActionLabel = isReadOnly
+    ? "Start a new decision"
+    : verdict.primaryActionLabel;
 
   return (
     <View style={styles.root}>
-      <Text style={styles.eyebrow}>
-        {isReadOnly
-          ? "Closed verdict record"
-          : isSolo
-            ? "Your solo pick"
-            : "Tonight, the verdict is"}
-      </Text>
+      <Text style={styles.eyebrow}>{eyebrowLabel}</Text>
       <Text style={styles.title}>{verdict.placeName}</Text>
       {verdict.metaLine ? (
         <Text style={styles.subtitle}>{verdict.metaLine}</Text>
@@ -53,26 +58,18 @@ export function VerdictScreen({
           ))}
         </View>
       ) : null}
-      {isReadOnly ? (
-        <View style={styles.actionRow}>
-          <Pressable accessibilityRole="button" style={styles.primaryButton}>
-            <Text style={styles.primaryButtonLabel}>
-              Start a new decision
-            </Text>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.actionRow}>
-          <Pressable accessibilityRole="button" style={styles.primaryButton}>
-            <Text style={styles.primaryButtonLabel}>
-              {verdict.primaryActionLabel}
-            </Text>
-          </Pressable>
+      <View style={styles.actionRow}>
+        <Pressable accessibilityRole="button" style={styles.primaryButton}>
+          <Text style={styles.primaryButtonLabel}>
+            {primaryActionLabel}
+          </Text>
+        </Pressable>
+        {isReadOnly ? null : (
           <Pressable accessibilityRole="button" style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonLabel}>Reroll</Text>
           </Pressable>
-        </View>
-      )}
+        )}
+      </View>
     </View>
   );
 }

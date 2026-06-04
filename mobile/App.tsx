@@ -144,6 +144,32 @@ function routeAfterQuizSubmission(participantScope: PlanParticipantScope) {
   return participantScope === "solo" ? "showVerdict" : "waitForVerdict";
 }
 
+function groupQuizSession(
+  roomId: string,
+  role: QuizSession["role"],
+): QuizSession {
+  return {
+    roomId,
+    participantScope: "group",
+    role,
+  };
+}
+
+function routedInviteRoomId(
+  resolution: InviteRouteResolution,
+): string | null {
+  switch (resolution.kind) {
+    case "join":
+    case "quiz":
+    case "waiting":
+    case "verdict":
+      return resolution.roomId;
+    case "invalid":
+    case "stale":
+      return null;
+  }
+}
+
 const contentByRouteName: Record<AppRouteName, RouteContent> = {
   signInGate: {
     title: "Sign in gate",
@@ -323,17 +349,10 @@ export default function App({
       .resolveInviteLink(url)
       .then((resolution) => {
         if (isCurrent) {
-          if (
-            resolution.kind === "join" ||
-            resolution.kind === "quiz" ||
-            resolution.kind === "waiting" ||
-            resolution.kind === "verdict"
-          ) {
-            setQuizSession({
-              roomId: resolution.roomId,
-              participantScope: "group",
-              role: "joiner",
-            });
+          const roomId = routedInviteRoomId(resolution);
+
+          if (roomId) {
+            setQuizSession(groupQuizSession(roomId, "joiner"));
           }
 
           dispatch({ type: "deepLinkResolved", resolution });
@@ -369,27 +388,15 @@ export default function App({
             dispatch({ type: "openSetup" });
             break;
           case "joined":
-            setQuizSession({
-              roomId: plan.id,
-              participantScope: "group",
-              role: "joiner",
-            });
+            setQuizSession(groupQuizSession(plan.id, "joiner"));
             dispatch({ type: "startQuiz" });
             break;
           case "decided":
-            setQuizSession({
-              roomId: plan.id,
-              participantScope: "group",
-              role: "initiator",
-            });
+            setQuizSession(groupQuizSession(plan.id, "initiator"));
             dispatch({ type: "showVerdict" });
             break;
           case "history":
-            setQuizSession({
-              roomId: plan.id,
-              participantScope: "group",
-              role: "initiator",
-            });
+            setQuizSession(groupQuizSession(plan.id, "initiator"));
             dispatch({ type: "showReadOnlyVerdict" });
             break;
         }
