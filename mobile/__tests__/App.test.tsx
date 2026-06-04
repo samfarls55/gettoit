@@ -14,6 +14,7 @@ import {
   appStateRouterReducer,
   initialAppStateRouterState,
 } from "../src/navigation/appStateRouter";
+import { emptyPlanListSnapshot } from "../src/plans/planRepository";
 
 function EventRouterHarness() {
   const [routerState, dispatch] = useReducer(
@@ -40,6 +41,13 @@ function EventRouterHarness() {
     </View>
   );
 }
+
+const linkedApplePlanListState: AppStateRouterState = {
+  auth: "linkedApple",
+  pendingDeepLinkUrl: null,
+  activePlanPhase: null,
+  settingsOpen: false,
+};
 
 describe("App", () => {
   it.each<AppStateRouterState["auth"]>(["idle", "anonymous"])(
@@ -82,8 +90,8 @@ describe("App", () => {
         activePlanPhase: null,
         settingsOpen: false,
       },
-      visibleRoute: "Plan list",
-      visibleBody: "Your Plans will appear here.",
+      visibleRoute: "Plans",
+      visibleBody: "Thursday dinner with the crew",
     },
     {
       name: "deep links route to the resolver before active Plan work",
@@ -164,7 +172,7 @@ describe("App", () => {
     expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
 
     fireEvent.press(screen.getByText("Sign in"));
-    expect(screen.getByText("Plan list")).toBeOnTheScreen();
+    expect(screen.getByText("Plans")).toBeOnTheScreen();
 
     fireEvent.press(screen.getByText("Open invite link"));
     expect(screen.getByText("Deep-link placeholder")).toBeOnTheScreen();
@@ -186,8 +194,55 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(signInWithApple).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("Plan list")).toBeOnTheScreen();
+      expect(screen.getByText("Plans")).toBeOnTheScreen();
     });
+  });
+
+  it("renders fake Plan list buckets", () => {
+    render(<App initialRouterState={linkedApplePlanListState} />);
+
+    expect(screen.getAllByText("Created")).toHaveLength(2);
+    expect(screen.getAllByText("Joined")).toHaveLength(2);
+    expect(screen.getAllByText("Decided")).toHaveLength(2);
+    expect(screen.getAllByText("History")).toHaveLength(2);
+    expect(screen.getByText("Thursday dinner with the crew")).toBeOnTheScreen();
+    expect(screen.getByText("Morgan's birthday")).toBeOnTheScreen();
+    expect(screen.getByText("Date night fallback")).toBeOnTheScreen();
+    expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
+  });
+
+  it.each([
+    ["Open Created Plan Thursday dinner with the crew", "Search area"],
+    ["Open Joined Plan Morgan's birthday", "Quiz placeholder"],
+    ["Open Decided Plan Date night fallback", "Verdict placeholder"],
+    ["Open History Plan Taco crawl", "Verdict placeholder"],
+  ])("routes %s to %s", (accessibilityLabel, visibleRoute) => {
+    render(<App initialRouterState={linkedApplePlanListState} />);
+
+    fireEvent.press(screen.getByLabelText(accessibilityLabel));
+    expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
+  });
+
+  it("renders an empty Plan list with a create-Plan entry path", () => {
+    render(
+      <App
+        initialRouterState={{
+          auth: "linkedApple",
+          pendingDeepLinkUrl: null,
+          activePlanPhase: null,
+          settingsOpen: false,
+        }}
+        planRepository={{
+          listPlans: () => emptyPlanListSnapshot,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Create a Plan")).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByLabelText("Create a Plan"));
+    expect(screen.getByText("Search area")).toBeOnTheScreen();
   });
 
   it("reveals Account claim before Apple sign-in and handles claim-code success", async () => {
