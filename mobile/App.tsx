@@ -173,6 +173,10 @@ const contentByRouteName: Record<AppRouteName, RouteContent> = {
     title: "Verdict placeholder",
     body: "The Plan verdict appears here.",
   },
+  readOnlyVerdict: {
+    title: "Read-only verdict placeholder",
+    body: "The closed Plan verdict appears here.",
+  },
   settings: {
     title: "Settings placeholder",
     body: "Account settings live here.",
@@ -319,6 +323,19 @@ export default function App({
       .resolveInviteLink(url)
       .then((resolution) => {
         if (isCurrent) {
+          if (
+            resolution.kind === "join" ||
+            resolution.kind === "quiz" ||
+            resolution.kind === "waiting" ||
+            resolution.kind === "verdict"
+          ) {
+            setQuizSession({
+              roomId: resolution.roomId,
+              participantScope: "group",
+              role: "joiner",
+            });
+          }
+
           dispatch({ type: "deepLinkResolved", resolution });
         }
       })
@@ -360,13 +377,20 @@ export default function App({
             dispatch({ type: "startQuiz" });
             break;
           case "decided":
-          case "history":
             setQuizSession({
               roomId: plan.id,
               participantScope: "group",
               role: "initiator",
             });
             dispatch({ type: "showVerdict" });
+            break;
+          case "history":
+            setQuizSession({
+              roomId: plan.id,
+              participantScope: "group",
+              role: "initiator",
+            });
+            dispatch({ type: "showReadOnlyVerdict" });
             break;
         }
       }}
@@ -521,7 +545,7 @@ export function MobileAppShell({
   }, [deletedCreatedPlanIds, planRepository, route.name]);
 
   useEffect(() => {
-    if (route.name !== "verdict") {
+    if (route.name !== "verdict" && route.name !== "readOnlyVerdict") {
       return;
     }
 
@@ -604,12 +628,15 @@ export function MobileAppShell({
     );
   }
 
-  if (route.name === "verdict") {
+  if (route.name === "verdict" || route.name === "readOnlyVerdict") {
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
         {verdict ? (
-          <VerdictScreen verdict={verdict} />
+          <VerdictScreen
+            mode={route.name === "readOnlyVerdict" ? "readOnly" : "live"}
+            verdict={verdict}
+          />
         ) : (
           <View style={styles.surface}>
             <Text style={styles.routeTitle}>Loading verdict</Text>

@@ -489,7 +489,7 @@ describe("App", () => {
     ["Open Created Plan Thursday dinner with the crew", "Edit your plan"],
     ["Open Joined Plan Morgan's birthday", "Q1"],
     ["Open Decided Plan Date night fallback", "Tonight, the verdict is"],
-    ["Open History Plan Taco crawl", "Tonight, the verdict is"],
+    ["Open History Plan Taco crawl", "Closed verdict record"],
   ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
     render(
       <App
@@ -507,6 +507,35 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
+    });
+  });
+
+  it("routes History Plans to read-only verdict without live actions", async () => {
+    const verdictRepository = makeVerdictRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        verdictRepository={verdictRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open History Plan Taco crawl")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open History Plan Taco crawl"));
+
+    await waitFor(() => {
+      expect(verdictRepository.loadLiveVerdict).toHaveBeenCalledWith({
+        roomId: "history-taco-crawl",
+        flavor: "group",
+      });
+      expect(screen.getByText("Closed verdict record")).toBeOnTheScreen();
+      expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+      expect(screen.queryByText("I'm in")).toBeNull();
+      expect(screen.queryByText("Reroll")).toBeNull();
+      expect(screen.getByText("Start a new decision")).toBeOnTheScreen();
     });
   });
 
@@ -977,6 +1006,42 @@ describe("App", () => {
         "https://gettoit.example/join/open-room",
       );
       expect(screen.getByText("Join placeholder")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes a cold-start decided invite link to read-only verdict", async () => {
+    const inviteBoundary = makeInviteBoundary({
+      kind: "verdict",
+      roomId: "decided-room",
+    });
+    const verdictRepository = makeVerdictRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        inviteBoundary={inviteBoundary}
+        nativeLinkBoundary={{
+          getInitialUrl: jest
+            .fn()
+            .mockResolvedValue("https://gettoit.example/join/decided-room"),
+          subscribe: jest.fn(() => () => undefined),
+        }}
+        planRepository={makeEmptyPlanRepository()}
+        verdictRepository={verdictRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
+        "https://gettoit.example/join/decided-room",
+      );
+      expect(verdictRepository.loadLiveVerdict).toHaveBeenCalledWith({
+        roomId: "decided-room",
+        flavor: "group",
+      });
+      expect(screen.getByText("Closed verdict record")).toBeOnTheScreen();
+      expect(screen.queryByText("I'm in")).toBeNull();
+      expect(screen.queryByText("Reroll")).toBeNull();
     });
   });
 

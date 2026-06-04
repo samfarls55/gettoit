@@ -4,27 +4,44 @@ import { mobileTokens } from "../design/tokens";
 import type { LiveVerdictViewModel } from "./verdictRepository";
 
 type VerdictScreenProps = {
+  mode?: "live" | "readOnly";
   verdict: LiveVerdictViewModel;
 };
 
-export function VerdictScreen({ verdict }: VerdictScreenProps) {
+export function VerdictScreen({
+  mode = "live",
+  verdict,
+}: VerdictScreenProps) {
   const isSolo = verdict.flavor === "solo";
+  const isReadOnly = mode === "readOnly";
 
   return (
     <View style={styles.root}>
       <Text style={styles.eyebrow}>
-        {isSolo ? "Your solo pick" : "Tonight, the verdict is"}
+        {isReadOnly
+          ? "Closed verdict record"
+          : isSolo
+            ? "Your solo pick"
+            : "Tonight, the verdict is"}
       </Text>
       <Text style={styles.title}>{verdict.placeName}</Text>
       {verdict.metaLine ? (
         <Text style={styles.subtitle}>{verdict.metaLine}</Text>
       ) : null}
-      <View style={styles.timeBadge}>
-        <Text style={styles.timeText}>{verdict.timeBadge.time}</Text>
-        {verdict.timeBadge.audience ? (
-          <Text style={styles.timeAudience}>{verdict.timeBadge.audience}</Text>
-        ) : null}
-      </View>
+      {isReadOnly ? (
+        <Text style={styles.recordCopy}>
+          This Plan is closed. The recommendation is preserved as a record.
+        </Text>
+      ) : (
+        <View style={styles.timeBadge}>
+          <Text style={styles.timeText}>{verdict.timeBadge.time}</Text>
+          {verdict.timeBadge.audience ? (
+            <Text style={styles.timeAudience}>
+              {verdict.timeBadge.audience}
+            </Text>
+          ) : null}
+        </View>
+      )}
       <Text style={styles.ruleText}>{verdict.ruleText}</Text>
       {verdict.receipts.length > 0 ? (
         <View style={styles.receiptStack}>
@@ -36,16 +53,26 @@ export function VerdictScreen({ verdict }: VerdictScreenProps) {
           ))}
         </View>
       ) : null}
-      <View style={styles.actionRow}>
-        <Pressable accessibilityRole="button" style={styles.primaryButton}>
-          <Text style={styles.primaryButtonLabel}>
-            {verdict.primaryActionLabel}
-          </Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonLabel}>Reroll</Text>
-        </Pressable>
-      </View>
+      {isReadOnly ? (
+        <View style={styles.actionRow}>
+          <Pressable accessibilityRole="button" style={styles.primaryButton}>
+            <Text style={styles.primaryButtonLabel}>
+              Start a new decision
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.actionRow}>
+          <Pressable accessibilityRole="button" style={styles.primaryButton}>
+            <Text style={styles.primaryButtonLabel}>
+              {verdict.primaryActionLabel}
+            </Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonLabel}>Reroll</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -99,6 +126,11 @@ const styles = StyleSheet.create({
     color: mobileTokens.color.paper,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
+    lineHeight: mobileTokens.typography.body.lineHeight,
+  },
+  recordCopy: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
   receiptStack: {
