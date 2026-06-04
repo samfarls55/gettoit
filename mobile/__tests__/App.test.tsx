@@ -16,7 +16,10 @@ import {
   appStateRouterReducer,
   initialAppStateRouterState,
 } from "../src/navigation/appStateRouter";
-import type { PlanRepository } from "../src/plans/planRepository";
+import type {
+  PlanListSnapshot,
+  PlanRepository,
+} from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
 import type {
   QuizProgress,
@@ -71,7 +74,7 @@ const committedSearchArea = {
 };
 
 function makeWritablePlanRepository(): PlanRepository {
-  let snapshot = {
+  let snapshot: PlanListSnapshot = {
     ...emptyPlanListSnapshot,
     created: [
       {
@@ -79,14 +82,14 @@ function makeWritablePlanRepository(): PlanRepository {
         title: "Brunch plan",
         subtitle: "Pending setup",
         badge: "Created",
-        routeTarget: "pending" as const,
+        routeTarget: "pending",
         setup: {
           id: "pending-brunch",
           name: "Brunch plan",
-          participantScope: "duo" as const,
+          participantScope: "duo",
           searchArea: committedSearchArea,
-          mealTime: "lunch" as const,
-          serviceShape: "outdoor" as const,
+          mealTime: "lunch",
+          serviceShape: "outdoor",
         },
       },
     ],
@@ -96,7 +99,7 @@ function makeWritablePlanRepository(): PlanRepository {
         title: "Morgan's birthday",
         subtitle: "Quiz in progress",
         badge: "Joined",
-        routeTarget: "joined" as const,
+        routeTarget: "joined",
       },
     ],
   };

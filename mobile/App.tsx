@@ -117,7 +117,7 @@ type PlanListStatus = "idle" | "loading" | "loaded" | "error";
 
 type PlanListContentProps = {
   notice?: string | null;
-  onDeletePlan?: (plan: PlanListItem) => void;
+  onDeletePlan?: (plan: PlanListItem) => Promise<void> | void;
   onCreatePlan?: (participantScope: PlanParticipantScope) => void;
   onOpenPlan?: (plan: PlanListItem) => void;
   onOpenSettings?: () => void;
@@ -230,16 +230,18 @@ function editSetupPlan(plan: PlanListItem): PlanSetup {
   );
 }
 
-function filterDeletedPlans(
+function filterDeletedCreatedPlans(
   snapshot: PlanListSnapshot,
-  deletedPlanIds: Set<string>,
+  deletedCreatedPlanIds: Set<string>,
 ): PlanListSnapshot {
-  if (deletedPlanIds.size === 0) {
+  if (deletedCreatedPlanIds.size === 0) {
     return snapshot;
   }
 
   return {
-    created: snapshot.created.filter((plan) => !deletedPlanIds.has(plan.id)),
+    created: snapshot.created.filter(
+      (plan) => !deletedCreatedPlanIds.has(plan.id),
+    ),
     joined: snapshot.joined,
     decided: snapshot.decided,
     history: snapshot.history,
@@ -426,17 +428,24 @@ export function MobileAppShell({
   );
   const [planListStatus, setPlanListStatus] =
     useState<PlanListStatus>("idle");
-  const [deletedPlanIds, setDeletedPlanIds] = useState<Set<string>>(
+  const [deletedCreatedPlanIds, setDeletedCreatedPlanIds] = useState<
+    Set<string>
+  >(
     () => new Set(),
   );
 
   const handleDeletePlan = async (plan: PlanListItem) => {
     await planRepository.deletePlan({ planId: plan.id });
-    const nextDeletedPlanIds = new Set(deletedPlanIds).add(plan.id);
+    const nextDeletedCreatedPlanIds = new Set(deletedCreatedPlanIds).add(
+      plan.id,
+    );
 
-    setDeletedPlanIds(nextDeletedPlanIds);
+    setDeletedCreatedPlanIds(nextDeletedCreatedPlanIds);
     setPlanSnapshot(
-      filterDeletedPlans(await planRepository.listPlans(), nextDeletedPlanIds),
+      filterDeletedCreatedPlans(
+        await planRepository.listPlans(),
+        nextDeletedCreatedPlanIds,
+      ),
     );
     onPlanDeleted?.();
   };
@@ -456,7 +465,9 @@ export function MobileAppShell({
           return;
         }
 
-        setPlanSnapshot(filterDeletedPlans(snapshot, deletedPlanIds));
+        setPlanSnapshot(
+          filterDeletedCreatedPlans(snapshot, deletedCreatedPlanIds),
+        );
         setPlanListStatus("loaded");
       })
       .catch(() => {
@@ -468,7 +479,7 @@ export function MobileAppShell({
     return () => {
       isCurrent = false;
     };
-  }, [deletedPlanIds, planRepository, route.name]);
+  }, [deletedCreatedPlanIds, planRepository, route.name]);
 
   if (route.name === "setup") {
     return (

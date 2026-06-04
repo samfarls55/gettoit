@@ -18,7 +18,7 @@ type PlanListScreenProps = {
   plans: PlanListSnapshot;
   notice?: string | null;
   onCreatePlan?: (participantScope: PlanParticipantScope) => void;
-  onDeletePlan?: (plan: PlanListItem) => void;
+  onDeletePlan?: (plan: PlanListItem) => Promise<void> | void;
   onOpenPlan?: (plan: PlanListItem) => void;
   onOpenSettings?: () => void;
 };
@@ -41,9 +41,18 @@ export function PlanListScreen({
   const hasAnyPlan = hasPlans(plans);
   const [planPendingDelete, setPlanPendingDelete] =
     useState<PlanListItem | null>(null);
-  const [locallyDeletedPlanIds, setLocallyDeletedPlanIds] = useState<
-    Set<string>
-  >(() => new Set());
+  const [
+    locallyDeletedCreatedPlanIds,
+    setLocallyDeletedCreatedPlanIds,
+  ] = useState<Set<string>>(() => new Set());
+
+  const handleConfirmDelete = (plan: PlanListItem) => {
+    setLocallyDeletedCreatedPlanIds(
+      (currentIds) => new Set(currentIds).add(plan.id),
+    );
+    setPlanPendingDelete(null);
+    void (onDeletePlan?.(plan));
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.content} style={styles.root}>
@@ -84,7 +93,7 @@ export function PlanListScreen({
             <View key={bucket.key} style={styles.bucket}>
               <Text style={styles.bucketTitle}>{bucket.title}</Text>
               {plans[bucket.key]
-                .filter((plan) => !locallyDeletedPlanIds.has(plan.id))
+                .filter((plan) => !locallyDeletedCreatedPlanIds.has(plan.id))
                 .map((plan) => (
                   <View key={plan.id} style={styles.planRow}>
                     <Pressable
@@ -120,13 +129,7 @@ export function PlanListScreen({
                         <Pressable
                           accessibilityLabel={`Confirm delete Plan ${plan.title}`}
                           accessibilityRole="button"
-                          onPress={() => {
-                            setLocallyDeletedPlanIds(
-                              (currentIds) => new Set(currentIds).add(plan.id),
-                            );
-                            setPlanPendingDelete(null);
-                            onDeletePlan?.(plan);
-                          }}
+                          onPress={() => handleConfirmDelete(plan)}
                           style={styles.secondaryButton}
                         >
                           <Text style={styles.secondaryButtonLabel}>
