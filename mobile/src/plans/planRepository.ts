@@ -66,6 +66,7 @@ export type PlanListSnapshot = {
 export type PlanRepository = {
   listPlans: () => Promise<PlanListSnapshot>;
   savePlan: (plan: PlanSetup) => Promise<PlanSetup & { id: string }>;
+  deletePlan: (input: { planId: string }) => Promise<void>;
 };
 
 export type SupabaseQueryResult<TData> = {
@@ -94,6 +95,7 @@ export type PlanSupabaseMutation<TRow> = PromiseLike<
 };
 
 export type PlanSupabaseTable<TRow> = PlanSupabaseQuery<TRow> & {
+  delete: () => PlanSupabaseMutation<TRow>;
   insert: (row: Record<string, unknown>) => PlanSupabaseMutation<TRow>;
   update: (row: Record<string, unknown>) => PlanSupabaseMutation<TRow>;
 };
@@ -203,6 +205,7 @@ export const fakePlanRepository: PlanRepository = {
     ...plan,
     id: plan.id ?? "fake-saved-plan",
   }),
+  deletePlan: async () => undefined,
 };
 
 function assertSupabaseRows<TRow>(
@@ -482,6 +485,16 @@ export function createSupabasePlanRepository({
         ...setupFromPlanRow(result.data),
         id: result.data.id,
       };
+    },
+    deletePlan: async ({ planId }) => {
+      const result = await supabase
+        .from<SupabasePlanRow>("plans")
+        .delete()
+        .eq("id", planId);
+
+      if (result.error) {
+        throw new Error(`Plan delete failed: ${result.error.message}`);
+      }
     },
   };
 }

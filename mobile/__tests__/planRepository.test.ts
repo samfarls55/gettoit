@@ -8,7 +8,10 @@ import {
 type QueryCall = {
   table: string;
   filters: Array<[string, string, unknown]>;
-  mutation: { type: "insert" | "update"; row: Record<string, unknown> } | null;
+  mutation:
+    | { type: "delete"; row: null }
+    | { type: "insert" | "update"; row: Record<string, unknown> }
+    | null;
   orderBy: string | null;
   selectColumns: string | null;
   single: boolean;
@@ -75,6 +78,14 @@ class TestQuery<T> implements PromiseLike<SupabaseQueryResult<T[]>> {
   order(column: string) {
     this.call.orderBy = column;
     return this;
+  }
+
+  delete() {
+    this.call.mutation = { type: "delete", row: null };
+    return new TestMutation<T>(this.call, {
+      data: this.result.data?.[0] ?? null,
+      error: this.result.error,
+    });
   }
 
   insert(row: Record<string, unknown>) {
@@ -421,5 +432,29 @@ describe("planRepository", () => {
 
     expect(calls[1].mutation?.type).toBe("update");
     expect(calls[1].filters).toEqual([["eq", "id", "saved-plan"]]);
+  });
+
+  it("deletes a created Plan through Supabase plans", async () => {
+    const calls: QueryCall[] = [];
+    const repository = createSupabasePlanRepository({
+      supabase: makeSupabaseClient(
+        {
+          plans: {
+            data: [],
+            error: null,
+          },
+        },
+        calls,
+      ),
+      userId: "user-1",
+    });
+
+    await expect(
+      repository.deletePlan({ planId: "created-plan" }),
+    ).resolves.toBeUndefined();
+
+    expect(calls[0].table).toBe("plans");
+    expect(calls[0].mutation).toEqual({ type: "delete", row: null });
+    expect(calls[0].filters).toEqual([["eq", "id", "created-plan"]]);
   });
 });
