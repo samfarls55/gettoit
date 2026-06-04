@@ -29,3 +29,10 @@ Implement Setup create/edit behavior for solo and group Plans. The slice should 
 - TB-06: Plan repository direct Supabase read model.
 - TB-07: Search area picker feasibility build.
 
+## Implementation notes
+
+- Added Expo Setup create/edit state for Plan name, participant scope, Search area, meal time, and service shape.
+- Wired Plan list solo/group create actions into Setup, and pending Created Plan taps into edit-mode Setup hydration.
+- Kept launch guarded on committed Search area; save-for-later writes pending Plan setup data and returns to the Plan list.
+- Added typed `PlanRepository.savePlan` with fake and Supabase-backed implementations.
+- Verification: `npm run typecheck --prefix mobile`, focused App and plan repository Jest tests passed before full mobile verify.

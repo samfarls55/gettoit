@@ -21,14 +21,16 @@ import {
 import type {
   PlanListItem,
   PlanListSnapshot,
+  PlanParticipantScope,
   PlanRepository,
+  PlanSetup,
 } from "./src/plans/planRepository";
 import {
   emptyPlanListSnapshot,
   fakePlanRepository,
 } from "./src/plans/planRepository";
 import { PlanListScreen } from "./src/plans/PlanListScreen";
-import { SearchAreaPickerPreview } from "./src/searchArea/SearchAreaPickerPreview";
+import { SetupScreen } from "./src/plans/SetupScreen";
 
 type AuthBoundary = {
   signInWithApple: () => Promise<void>;
@@ -44,12 +46,15 @@ type AppProps = {
 
 type MobileAppShellProps = {
   authBoundary?: AuthBoundary;
-  onCreatePlan?: () => void;
+  onCreatePlan?: (participantScope: PlanParticipantScope) => void;
+  onLaunchSetup?: (plan: PlanSetup) => Promise<void>;
   routerState: AppStateRouterState;
   onAppleSignInSucceeded?: () => void;
   onClaimCodeRedeemed?: () => void;
   onOpenPlan?: (plan: PlanListItem) => void;
+  onSaveSetup?: (plan: PlanSetup) => Promise<void>;
   planRepository?: PlanRepository;
+  setupPlan?: PlanSetup;
 };
 
 type RouteContent = {
@@ -60,7 +65,7 @@ type RouteContent = {
 type PlanListStatus = "idle" | "loading" | "loaded" | "error";
 
 type PlanListContentProps = {
-  onCreatePlan?: () => void;
+  onCreatePlan?: (participantScope: PlanParticipantScope) => void;
   onOpenPlan?: (plan: PlanListItem) => void;
   plans: PlanListSnapshot;
   status: PlanListStatus;
@@ -106,6 +111,26 @@ const defaultAuthBoundary: AuthBoundary = {
   redeemClaimCode: async () => undefined,
 };
 
+function defaultSetupPlan(participantScope: PlanParticipantScope): PlanSetup {
+  return {
+    name: "",
+    participantScope,
+    searchArea: null,
+    mealTime: "dinner",
+    serviceShape: "dineIn",
+  };
+}
+
+function editSetupPlan(plan: PlanListItem): PlanSetup {
+  return (
+    plan.setup ?? {
+      ...defaultSetupPlan("group"),
+      id: plan.id,
+      name: plan.title,
+    }
+  );
+}
+
 export default function App({
   authBoundary = defaultAuthBoundary,
   initialRouterState,
@@ -115,14 +140,21 @@ export default function App({
     appStateRouterReducer,
     initialRouterState ?? initialAppStateRouterState,
   );
+  const [setupPlan, setSetupPlan] = useState<PlanSetup>(
+    defaultSetupPlan("group"),
+  );
 
   return (
     <MobileAppShell
       authBoundary={authBoundary}
-      onCreatePlan={() => dispatch({ type: "openSetup" })}
+      onCreatePlan={(participantScope) => {
+        setSetupPlan(defaultSetupPlan(participantScope));
+        dispatch({ type: "openSetup" });
+      }}
       onOpenPlan={(plan) => {
         switch (plan.routeTarget) {
           case "pending":
+            setSetupPlan(editSetupPlan(plan));
             dispatch({ type: "openSetup" });
             break;
           case "joined":
@@ -134,12 +166,23 @@ export default function App({
             break;
         }
       }}
+      onLaunchSetup={async (plan) => {
+        await planRepository.savePlan(plan);
+        dispatch({
+          type: plan.participantScope === "solo" ? "startQuiz" : "waitForVerdict",
+        });
+      }}
       planRepository={planRepository}
       routerState={routerState}
+      setupPlan={setupPlan}
       onAppleSignInSucceeded={() =>
         dispatch({ type: "appleSignInSucceeded" })
       }
       onClaimCodeRedeemed={() => dispatch({ type: "claimCodeRedeemed" })}
+      onSaveSetup={async (plan) => {
+        await planRepository.savePlan(plan);
+        dispatch({ type: "returnToPlans" });
+      }}
     />
   );
 }
@@ -147,11 +190,14 @@ export default function App({
 export function MobileAppShell({
   authBoundary = defaultAuthBoundary,
   onCreatePlan,
+  onLaunchSetup,
   onAppleSignInSucceeded,
   onClaimCodeRedeemed,
   onOpenPlan,
+  onSaveSetup,
   planRepository = fakePlanRepository,
   routerState,
+  setupPlan = defaultSetupPlan("group"),
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
   const [planSnapshot, setPlanSnapshot] = useState<PlanListSnapshot>(
@@ -193,7 +239,12 @@ export function MobileAppShell({
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
-        <SearchAreaPickerPreview />
+        <SetupScreen
+          initialPlan={setupPlan}
+          mode={setupPlan.id ? "edit" : "create"}
+          onLaunch={onLaunchSetup ?? (async () => undefined)}
+          onSave={onSaveSetup ?? (async () => undefined)}
+        />
       </View>
     );
   }

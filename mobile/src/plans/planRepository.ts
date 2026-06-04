@@ -1,4 +1,25 @@
+import type { SearchArea } from "../searchArea/searchArea";
+
 export type PlanListRouteTarget = "pending" | "joined" | "decided" | "history";
+
+export type PlanParticipantScope = "solo" | "duo" | "group";
+
+export type PlanMealTime = "breakfast" | "lunch" | "dinner" | "lateNight";
+
+export type PlanServiceShape =
+  | "dineIn"
+  | "outdoor"
+  | "takeout"
+  | "delivery";
+
+export type PlanSetup = {
+  id?: string;
+  name: string;
+  participantScope: PlanParticipantScope;
+  searchArea: SearchArea | null;
+  mealTime: PlanMealTime;
+  serviceShape: PlanServiceShape;
+};
 
 export type PlanListItem = {
   id: string;
@@ -6,6 +27,7 @@ export type PlanListItem = {
   subtitle: string;
   badge: string;
   routeTarget: PlanListRouteTarget;
+  setup?: PlanSetup;
 };
 
 export type PlanListSnapshot = {
@@ -17,6 +39,7 @@ export type PlanListSnapshot = {
 
 export type PlanRepository = {
   listPlans: () => Promise<PlanListSnapshot>;
+  savePlan: (plan: PlanSetup) => Promise<PlanSetup & { id: string }>;
 };
 
 export type SupabaseQueryResult<TData> = {
@@ -36,8 +59,21 @@ export type PlanSupabaseQuery<TRow> = PromiseLike<
   ) => PlanSupabaseQuery<TRow>;
 };
 
+export type PlanSupabaseMutation<TRow> = PromiseLike<
+  SupabaseQueryResult<TRow>
+> & {
+  eq: (column: string, value: unknown) => PlanSupabaseMutation<TRow>;
+  select: (columns: string) => PlanSupabaseMutation<TRow>;
+  single: () => PlanSupabaseMutation<TRow>;
+};
+
+export type PlanSupabaseTable<TRow> = PlanSupabaseQuery<TRow> & {
+  insert: (row: Record<string, unknown>) => PlanSupabaseMutation<TRow>;
+  update: (row: Record<string, unknown>) => PlanSupabaseMutation<TRow>;
+};
+
 export type PlanSupabaseClient = {
-  from: <TRow>(table: string) => PlanSupabaseQuery<TRow>;
+  from: <TRow>(table: string) => PlanSupabaseTable<TRow>;
 };
 
 type SupabasePlanStatus = "pending" | "decided-active" | "decided-expired";
@@ -46,10 +82,21 @@ type SupabasePlanRow = {
   id: string;
   creator_id: string;
   name: string;
+  scope?: PlanParticipantScope;
+  location?: SupabasePlanLocation | null;
+  session_params?: Record<string, unknown> | null;
+  distance_meters?: number;
   status: SupabasePlanStatus;
   created_at: string;
   verdict_fired_at: string | null;
   expired_at: string | null;
+};
+
+type SupabasePlanLocation = {
+  lat?: number;
+  lng?: number;
+  name?: string;
+  source?: string;
 };
 
 type SupabaseMemberRow = {
@@ -88,6 +135,14 @@ export const fakePlanRepository: PlanRepository = {
         subtitle: "Pending setup - Search area missing",
         badge: "Created",
         routeTarget: "pending",
+        setup: {
+          id: "created-thursday-dinner",
+          name: "Thursday dinner with the crew",
+          participantScope: "group",
+          searchArea: null,
+          mealTime: "dinner",
+          serviceShape: "dineIn",
+        },
       },
     ],
     joined: [
@@ -117,6 +172,10 @@ export const fakePlanRepository: PlanRepository = {
         routeTarget: "history",
       },
     ],
+  }),
+  savePlan: async (plan) => ({
+    ...plan,
+    id: plan.id ?? "fake-saved-plan",
   }),
 };
 
@@ -158,6 +217,78 @@ function joinedPlanIdForRoom(
   return room.plan_id;
 }
 
+function milesToMeters(radiusMiles: number): number {
+  return Math.round(radiusMiles * 1609.344);
+}
+
+function metersToMiles(distanceMeters: number): number {
+  return Math.round((distanceMeters / 1609.344) * 10) / 10;
+}
+
+function setupFromPlanRow(plan: SupabasePlanRow): PlanSetup {
+  const sessionParams = plan.session_params ?? {};
+  const location = plan.location;
+  const locationLat = location?.lat;
+  const locationLng = location?.lng;
+  const locationName = location?.name;
+  const hasLocation =
+    typeof locationLat === "number" &&
+    typeof locationLng === "number" &&
+    typeof locationName === "string";
+
+  return {
+    id: plan.id,
+    name: plan.name,
+    participantScope: plan.scope ?? "group",
+    searchArea: hasLocation
+      ? {
+          center: {
+            latitude: locationLat,
+            longitude: locationLng,
+            label: locationName,
+          },
+          radiusMiles: metersToMiles(plan.distance_meters ?? 3219),
+        }
+      : null,
+    mealTime:
+      typeof sessionParams.meal_time === "string"
+        ? (sessionParams.meal_time as PlanMealTime)
+        : "dinner",
+    serviceShape:
+      typeof sessionParams.service_shape === "string"
+        ? (sessionParams.service_shape as PlanServiceShape)
+        : "dineIn",
+  };
+}
+
+function planWriteRow(plan: PlanSetup, userId: string): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    creator_id: userId,
+    name: plan.name.trim(),
+    scope: plan.participantScope,
+    location: plan.searchArea
+      ? {
+          lat: plan.searchArea.center.latitude,
+          lng: plan.searchArea.center.longitude,
+          name: plan.searchArea.center.label,
+          source: "manual",
+        }
+      : null,
+    session_params: {
+      meal_time: plan.mealTime,
+      group_context: plan.participantScope,
+      service_shape: plan.serviceShape,
+    },
+    status: "pending",
+  };
+
+  if (plan.searchArea) {
+    row.distance_meters = milesToMeters(plan.searchArea.radiusMiles);
+  }
+
+  return row;
+}
+
 function pendingCreatedItem(plan: SupabasePlanRow): PlanListItem {
   return {
     id: plan.id,
@@ -165,6 +296,7 @@ function pendingCreatedItem(plan: SupabasePlanRow): PlanListItem {
     subtitle: "Pending setup",
     badge: "Created",
     routeTarget: "pending",
+    setup: setupFromPlanRow(plan),
   };
 }
 
@@ -236,7 +368,7 @@ export function createSupabasePlanRepository({
       const plansResult = await supabase
         .from<SupabasePlanRow>("plans")
         .select(
-          "id, creator_id, name, status, created_at, verdict_fired_at, expired_at",
+          "id, creator_id, name, scope, location, session_params, distance_meters, status, created_at, verdict_fired_at, expired_at",
         )
         .order("created_at", { ascending: false });
       const plans = assertSupabaseRows(plansResult, "Plans read").filter(
@@ -268,6 +400,30 @@ export function createSupabasePlanRepository({
           plans.filter((plan) => plan.status === "decided-expired"),
           (plan) => plan.expired_at,
         ).map((plan) => historyItem(plan, isJoinedByUser(plan))),
+      };
+    },
+    savePlan: async (plan) => {
+      const row = planWriteRow(plan, userId);
+      const mutation = plan.id
+        ? supabase.from<SupabasePlanRow>("plans").update(row).eq("id", plan.id)
+        : supabase.from<SupabasePlanRow>("plans").insert(row);
+      const result = await mutation
+        .select(
+          "id, creator_id, name, scope, location, session_params, distance_meters, status, created_at, verdict_fired_at, expired_at",
+        )
+        .single();
+
+      if (result.error) {
+        throw new Error(`Plan save failed: ${result.error.message}`);
+      }
+
+      if (!result.data) {
+        throw new Error("Plan save failed: no row returned");
+      }
+
+      return {
+        ...setupFromPlanRow(result.data),
+        id: result.data.id,
       };
     },
   };

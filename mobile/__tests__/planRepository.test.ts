@@ -8,9 +8,45 @@ import {
 type QueryCall = {
   table: string;
   filters: Array<[string, string, unknown]>;
+  mutation: { type: "insert" | "update"; row: Record<string, unknown> } | null;
   orderBy: string | null;
   selectColumns: string | null;
+  single: boolean;
 };
+
+class TestMutation<T> implements PromiseLike<SupabaseQueryResult<T>> {
+  private readonly call: QueryCall;
+  private readonly result: SupabaseQueryResult<T>;
+
+  constructor(call: QueryCall, result: SupabaseQueryResult<T>) {
+    this.call = call;
+    this.result = result;
+  }
+
+  eq(column: string, value: unknown) {
+    this.call.filters.push(["eq", column, value]);
+    return this;
+  }
+
+  select(columns: string) {
+    this.call.selectColumns = columns;
+    return this;
+  }
+
+  single() {
+    this.call.single = true;
+    return this;
+  }
+
+  then<TResult1 = SupabaseQueryResult<T>, TResult2 = never>(
+    onfulfilled?:
+      | ((value: SupabaseQueryResult<T>) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve(this.result).then(onfulfilled, onrejected);
+  }
+}
 
 class TestQuery<T> implements PromiseLike<SupabaseQueryResult<T[]>> {
   private readonly call: QueryCall;
@@ -41,6 +77,22 @@ class TestQuery<T> implements PromiseLike<SupabaseQueryResult<T[]>> {
     return this;
   }
 
+  insert(row: Record<string, unknown>) {
+    this.call.mutation = { type: "insert", row };
+    return new TestMutation<T>(this.call, {
+      data: this.result.data?.[0] ?? null,
+      error: this.result.error,
+    });
+  }
+
+  update(row: Record<string, unknown>) {
+    this.call.mutation = { type: "update", row };
+    return new TestMutation<T>(this.call, {
+      data: this.result.data?.[0] ?? null,
+      error: this.result.error,
+    });
+  }
+
   then<TResult1 = SupabaseQueryResult<T[]>, TResult2 = never>(
     onfulfilled?:
       | ((value: SupabaseQueryResult<T[]>) => TResult1 | PromiseLike<TResult1>)
@@ -60,8 +112,10 @@ function makeSupabaseClient(
       const call: QueryCall = {
         table,
         filters: [],
+        mutation: null,
         orderBy: null,
         selectColumns: null,
+        single: false,
       };
       calls.push(call);
 
@@ -107,6 +161,17 @@ describe("planRepository", () => {
                 id: "created-plan",
                 creator_id: "user-1",
                 name: "Friday dinner",
+                scope: "group",
+                location: {
+                  lat: 40.7128,
+                  lng: -74.006,
+                  name: "Lower Manhattan",
+                },
+                session_params: {
+                  meal_time: "dinner",
+                  service_shape: "dineIn",
+                },
+                distance_meters: 3219,
                 status: "pending",
                 created_at: "2026-06-04T10:00:00Z",
                 verdict_fired_at: null,
@@ -165,6 +230,21 @@ describe("planRepository", () => {
           subtitle: "Pending setup",
           badge: "Created",
           routeTarget: "pending",
+          setup: {
+            id: "created-plan",
+            name: "Friday dinner",
+            participantScope: "group",
+            searchArea: {
+              center: {
+                latitude: 40.7128,
+                longitude: -74.006,
+                label: "Lower Manhattan",
+              },
+              radiusMiles: 2,
+            },
+            mealTime: "dinner",
+            serviceShape: "dineIn",
+          },
         },
       ],
       joined: [
@@ -238,5 +318,108 @@ describe("planRepository", () => {
     await expect(repository.listPlans()).rejects.toThrow(
       "Plan memberships read failed: database unavailable",
     );
+  });
+
+  it("writes create and edit Setup payloads through Supabase plans", async () => {
+    const calls: QueryCall[] = [];
+    const repository = createSupabasePlanRepository({
+      supabase: makeSupabaseClient(
+        {
+          plans: {
+            data: [
+              {
+                id: "saved-plan",
+                creator_id: "user-1",
+                name: "Solo ramen",
+                scope: "solo",
+                location: {
+                  lat: 37.7749,
+                  lng: -122.4194,
+                  name: "San Francisco",
+                },
+                session_params: {
+                  meal_time: "dinner",
+                  service_shape: "dineIn",
+                },
+                distance_meters: 3219,
+                status: "pending",
+                created_at: "2026-06-04T10:00:00Z",
+                verdict_fired_at: null,
+                expired_at: null,
+              },
+            ],
+            error: null,
+          },
+        },
+        calls,
+      ),
+      userId: "user-1",
+    });
+
+    await expect(
+      repository.savePlan({
+        name: " Solo ramen ",
+        participantScope: "solo",
+        searchArea: {
+          center: {
+            latitude: 37.7749,
+            longitude: -122.4194,
+            label: "San Francisco",
+          },
+          radiusMiles: 2,
+        },
+        mealTime: "dinner",
+        serviceShape: "dineIn",
+      }),
+    ).resolves.toEqual({
+      id: "saved-plan",
+      name: "Solo ramen",
+      participantScope: "solo",
+      searchArea: {
+        center: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          label: "San Francisco",
+        },
+        radiusMiles: 2,
+      },
+      mealTime: "dinner",
+      serviceShape: "dineIn",
+    });
+
+    expect(calls[0].table).toBe("plans");
+    expect(calls[0].mutation).toEqual({
+      type: "insert",
+      row: {
+        creator_id: "user-1",
+        name: "Solo ramen",
+        scope: "solo",
+        location: {
+          lat: 37.7749,
+          lng: -122.4194,
+          name: "San Francisco",
+          source: "manual",
+        },
+        session_params: {
+          meal_time: "dinner",
+          group_context: "solo",
+          service_shape: "dineIn",
+        },
+        distance_meters: 3219,
+        status: "pending",
+      },
+    });
+
+    await repository.savePlan({
+      id: "saved-plan",
+      name: "Solo ramen again",
+      participantScope: "solo",
+      searchArea: null,
+      mealTime: "lunch",
+      serviceShape: "takeout",
+    });
+
+    expect(calls[1].mutation?.type).toBe("update");
+    expect(calls[1].filters).toEqual([["eq", "id", "saved-plan"]]);
   });
 });

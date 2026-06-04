@@ -14,6 +14,7 @@ import {
   appStateRouterReducer,
   initialAppStateRouterState,
 } from "../src/navigation/appStateRouter";
+import type { PlanRepository } from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
 
 function EventRouterHarness() {
@@ -48,6 +49,44 @@ const linkedApplePlanListState: AppStateRouterState = {
   activePlanPhase: null,
   settingsOpen: false,
 };
+
+const committedSearchArea = {
+  center: {
+    latitude: 40.7128,
+    longitude: -74.006,
+    label: "Lower Manhattan",
+  },
+  radiusMiles: 2,
+};
+
+function makeWritablePlanRepository(): PlanRepository {
+  return {
+    listPlans: async () => ({
+      ...emptyPlanListSnapshot,
+      created: [
+        {
+          id: "pending-brunch",
+          title: "Brunch plan",
+          subtitle: "Pending setup",
+          badge: "Created",
+          routeTarget: "pending",
+          setup: {
+            id: "pending-brunch",
+            name: "Brunch plan",
+            participantScope: "duo",
+            searchArea: committedSearchArea,
+            mealTime: "lunch",
+            serviceShape: "outdoor",
+          },
+        },
+      ],
+    }),
+    savePlan: jest.fn(async (plan) => ({
+      ...plan,
+      id: plan.id ?? "saved-plan",
+    })),
+  };
+}
 
 describe("App", () => {
   it.each<AppStateRouterState["auth"]>(["idle", "anonymous"])(
@@ -101,8 +140,8 @@ describe("App", () => {
         activePlanPhase: "setup",
         settingsOpen: false,
       },
-      visibleRoute: "Search area",
-      visibleBody: "USE THIS AREA",
+      visibleRoute: "Start a new plan",
+      visibleBody: "Set search area",
     },
     {
       name: "active quizzes route to Quiz",
@@ -204,7 +243,7 @@ describe("App", () => {
   });
 
   it.each([
-    ["Open Created Plan Thursday dinner with the crew", "Search area"],
+    ["Open Created Plan Thursday dinner with the crew", "Edit your plan"],
     ["Open Joined Plan Morgan's birthday", "Quiz placeholder"],
     ["Open Decided Plan Date night fallback", "Verdict placeholder"],
     ["Open History Plan Taco crawl", "Verdict placeholder"],
@@ -219,17 +258,13 @@ describe("App", () => {
     expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
   });
 
-  it("renders an empty Plan list with a create-Plan entry path", async () => {
+  it("routes Plan list solo create actions to matching Setup mode", async () => {
     render(
       <App
-        initialRouterState={{
-          auth: "linkedApple",
-          pendingDeepLinkUrl: null,
-          activePlanPhase: null,
-          settingsOpen: false,
-        }}
+        initialRouterState={linkedApplePlanListState}
         planRepository={{
           listPlans: async () => emptyPlanListSnapshot,
+          savePlan: jest.fn(),
         }}
       />,
     );
@@ -238,10 +273,149 @@ describe("App", () => {
       expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
     });
 
-    expect(screen.getByLabelText("Create a Plan")).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText("Create solo Plan"));
 
-    fireEvent.press(screen.getByLabelText("Create a Plan"));
-    expect(screen.getByText("Search area")).toBeOnTheScreen();
+    expect(screen.getByText("Start a new plan")).toBeOnTheScreen();
+    expect(screen.getByText("Just me")).toBeOnTheScreen();
+    expect(screen.getByText("Start the quiz")).toBeOnTheScreen();
+  });
+
+  it("routes Plan list group create actions to matching Setup mode", async () => {
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={{
+          listPlans: async () => emptyPlanListSnapshot,
+          savePlan: jest.fn(),
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Create group Plan"));
+
+    expect(screen.getByText("Start a new plan")).toBeOnTheScreen();
+    expect(screen.getByText("A group")).toBeOnTheScreen();
+    expect(screen.getByText("Drop the invite link")).toBeOnTheScreen();
+  });
+
+  it("hydrates edit Setup from a pending Plan", async () => {
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeWritablePlanRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open Created Plan Brunch plan")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open Created Plan Brunch plan"));
+
+    expect(screen.getByText("Edit your plan")).toBeOnTheScreen();
+    expect(screen.getByDisplayValue("Brunch plan")).toBeOnTheScreen();
+    expect(screen.getByText("Lower Manhattan")).toBeOnTheScreen();
+    expect(screen.getByText("Search area - 2.0 mi")).toBeOnTheScreen();
+    expect(screen.getByText("Two of us")).toBeOnTheScreen();
+    expect(screen.getByText("Lunch")).toBeOnTheScreen();
+    expect(screen.getByText("Outdoor seating")).toBeOnTheScreen();
+  });
+
+  it("blocks launch until a Search area is committed", async () => {
+    const repository = makeWritablePlanRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={repository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Create group Plan")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Create group Plan"));
+    fireEvent.changeText(screen.getByLabelText("Name this plan"), "Dinner crew");
+    fireEvent.press(screen.getByText("Drop the invite link"));
+
+    expect(screen.getByText("Set search area before launch.")).toBeOnTheScreen();
+    expect(repository.savePlan).not.toHaveBeenCalled();
+  });
+
+  it("saves a pending Plan and returns to the Plan list", async () => {
+    const repository = makeWritablePlanRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={repository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Create solo Plan")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Create solo Plan"));
+    fireEvent.changeText(screen.getByLabelText("Name this plan"), "Solo ramen");
+    fireEvent.press(screen.getByText("Set search area"));
+    fireEvent.press(screen.getByText("USE THIS AREA"));
+    fireEvent.press(screen.getByText("SAVE FOR LATER"));
+
+    await waitFor(() => {
+      expect(repository.savePlan).toHaveBeenCalledWith({
+        name: "Solo ramen",
+        participantScope: "solo",
+        searchArea: {
+          center: {
+            latitude: 37.7749,
+            longitude: -122.4194,
+            label: "San Francisco",
+          },
+          radiusMiles: 2,
+        },
+        mealTime: "dinner",
+        serviceShape: "dineIn",
+      });
+      expect(screen.getByText("Plans")).toBeOnTheScreen();
+    });
+  });
+
+  it("writes edit changes and routes launch outcomes", async () => {
+    const repository = makeWritablePlanRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={repository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open Created Plan Brunch plan")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open Created Plan Brunch plan"));
+    fireEvent.changeText(screen.getByLabelText("Name this plan"), "Brunch reset");
+    fireEvent.press(screen.getByText("Just me"));
+    fireEvent.press(screen.getByText("Start the quiz"));
+
+    await waitFor(() => {
+      expect(repository.savePlan).toHaveBeenCalledWith({
+        id: "pending-brunch",
+        name: "Brunch reset",
+        participantScope: "solo",
+        searchArea: committedSearchArea,
+        mealTime: "lunch",
+        serviceShape: "outdoor",
+      });
+      expect(screen.getByText("Quiz placeholder")).toBeOnTheScreen();
+    });
   });
 
   it("reveals Account claim before Apple sign-in and handles claim-code success", async () => {

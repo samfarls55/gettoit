@@ -1,7 +1,11 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
-import type { PlanListItem, PlanListSnapshot } from "./planRepository";
+import type {
+  PlanListItem,
+  PlanListSnapshot,
+  PlanParticipantScope,
+} from "./planRepository";
 import { hasPlans } from "./planRepository";
 
 type PlanBucket = {
@@ -11,7 +15,7 @@ type PlanBucket = {
 
 type PlanListScreenProps = {
   plans: PlanListSnapshot;
-  onCreatePlan?: () => void;
+  onCreatePlan?: (participantScope: PlanParticipantScope) => void;
   onOpenPlan?: (plan: PlanListItem) => void;
 };
 
@@ -33,6 +37,24 @@ export function PlanListScreen({
     <ScrollView contentContainerStyle={styles.content} style={styles.root}>
       <Text style={styles.eyebrow}>GetToIt</Text>
       <Text style={styles.title}>Plans</Text>
+      <View style={styles.createActions}>
+        <Pressable
+          accessibilityLabel="Create solo Plan"
+          accessibilityRole="button"
+          onPress={() => onCreatePlan?.("solo")}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonLabel}>Just me</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel="Create group Plan"
+          accessibilityRole="button"
+          onPress={() => onCreatePlan?.("group")}
+          style={styles.primaryButton}
+        >
+          <Text style={styles.primaryButtonLabel}>A group</Text>
+        </Pressable>
+      </View>
       {hasAnyPlan ? (
         <View style={styles.bucketStack}>
           {planBuckets.map((bucket) => (
@@ -62,14 +84,6 @@ export function PlanListScreen({
           <Text style={styles.emptyBody}>
             Create a Plan when you are ready to pick a place.
           </Text>
-          <Pressable
-            accessibilityLabel="Create a Plan"
-            accessibilityRole="button"
-            onPress={onCreatePlan}
-            style={styles.primaryButton}
-          >
-            <Text style={styles.primaryButtonLabel}>Create a Plan</Text>
-          </Pressable>
         </View>
       )}
     </ScrollView>
@@ -98,6 +112,11 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.display.size,
     fontWeight: mobileTokens.typography.display.weight,
     lineHeight: mobileTokens.typography.display.lineHeight,
+    marginBottom: mobileTokens.spacing[4],
+  },
+  createActions: {
+    flexDirection: "row",
+    gap: mobileTokens.spacing[3],
     marginBottom: mobileTokens.spacing[8],
   },
   bucketStack: {
@@ -168,6 +187,22 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     color: mobileTokens.color.ink,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  secondaryButton: {
+    alignItems: "center",
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: 999,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 56,
+    justifyContent: "center",
+    paddingHorizontal: mobileTokens.spacing[4],
+  },
+  secondaryButtonLabel: {
+    color: mobileTokens.color.paper,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
     textTransform: "uppercase",
