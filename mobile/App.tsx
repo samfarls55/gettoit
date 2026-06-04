@@ -12,6 +12,7 @@ import {
   appStateRouterReducer,
   routeForAppState,
 } from "./src/navigation/appStateRouter";
+import { SearchAreaPickerPreview } from "./src/searchArea/SearchAreaPickerPreview";
 
 type AppProps = {
   initialRouterState?: AppStateRouterState;
@@ -74,6 +75,15 @@ export default function App({ initialRouterState }: AppProps = {}) {
 export function MobileAppShell({ routerState }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
   const content = contentByRouteName[route.name];
+
+  if (route.name === "setup") {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        <SearchAreaPickerPreview />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
