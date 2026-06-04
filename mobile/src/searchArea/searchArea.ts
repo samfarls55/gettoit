@@ -51,27 +51,32 @@ export function createSearchAreaDraft(
   return committedSearchArea ?? defaultSearchArea;
 }
 
-export function radiusLabel(radiusMiles: number) {
+export function radiusLabel(radiusMiles: number): string {
   return `${radiusMiles.toFixed(1)} MI RADIUS`;
 }
 
-export function clampRadiusMiles(radiusMiles: number) {
+export function clampRadiusMiles(radiusMiles: number): number {
   const min = searchAreaRadiusStopsMiles[0];
   const max = searchAreaRadiusStopsMiles[searchAreaRadiusStopsMiles.length - 1];
 
   return Math.min(max, Math.max(min, radiusMiles));
 }
 
-function nearestRadiusStopIndex(radiusMiles: number) {
+function nearestRadiusStopIndex(radiusMiles: number): number {
   return searchAreaRadiusStopsMiles.reduce((nearestIndex, stop, index) => {
     const nearestStop = searchAreaRadiusStopsMiles[nearestIndex];
-    return Math.abs(stop - radiusMiles) < Math.abs(nearestStop - radiusMiles)
-      ? index
-      : nearestIndex;
+    const stopDistance = Math.abs(stop - radiusMiles);
+    const nearestDistance = Math.abs(nearestStop - radiusMiles);
+
+    if (stopDistance < nearestDistance) {
+      return index;
+    }
+
+    return nearestIndex;
   }, 0);
 }
 
-function stepRadius(radiusMiles: number, direction: -1 | 1) {
+function stepRadius(radiusMiles: number, direction: -1 | 1): number {
   const currentIndex = nearestRadiusStopIndex(radiusMiles);
   const nextIndex = Math.min(
     searchAreaRadiusStopsMiles.length - 1,
@@ -115,7 +120,7 @@ export function cancelSearchAreaDraft(
 export function isSearchAreaDraftDirty(
   draft: SearchAreaDraft,
   committedSearchArea: SearchArea | null,
-) {
+): boolean {
   if (committedSearchArea === null) {
     return true;
   }
@@ -151,6 +156,6 @@ export const deterministicSearchAreaAdapter: SearchAreaAdapter = {
       latitude: searchArea.center.latitude + (index - 2) * 0.002,
       longitude: searchArea.center.longitude + (index - 2) * 0.002,
       label: `Preview ${index + 1}`,
-    })).slice(0, 20);
+    }));
   },
 };

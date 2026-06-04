@@ -74,7 +74,6 @@ export default function App({ initialRouterState }: AppProps = {}) {
 
 export function MobileAppShell({ routerState }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
-  const content = contentByRouteName[route.name];
 
   if (route.name === "setup") {
     return (
@@ -84,6 +83,8 @@ export function MobileAppShell({ routerState }: MobileAppShellProps) {
       </View>
     );
   }
+
+  const content = contentByRouteName[route.name];
 
   return (
     <View style={styles.root}>

@@ -14,7 +14,6 @@ import type {
   SearchAreaAdapter,
 } from "./searchArea";
 import {
-  cancelSearchAreaDraft,
   commitSearchAreaDraft,
   createSearchAreaDraft,
   deterministicSearchAreaAdapter,
@@ -56,6 +55,10 @@ export function SearchAreaPickerPreview({
       return;
     }
 
+    onCancel?.();
+  };
+
+  const discardDraft = () => {
     onCancel?.();
   };
 
@@ -151,10 +154,7 @@ export function SearchAreaPickerPreview({
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {
-                cancelSearchAreaDraft(draft, initialSearchArea);
-                onCancel?.();
-              }}
+              onPress={discardDraft}
               style={styles.promptButton}
             >
               <Text style={styles.promptButtonLabel}>Discard changes</Text>
