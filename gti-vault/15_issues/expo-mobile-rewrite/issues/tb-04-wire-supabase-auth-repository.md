@@ -27,3 +27,11 @@ Wire the mobile auth repository to Supabase JS using the same project URL and an
 
 - TB-03: Render S00a Sign-in Gate with mocked auth.
 
+## Implementation notes
+
+- Added a mobile Supabase auth repository in `mobile/src/auth/authRepository.ts` with Expo public env config (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`), a Supabase JS client factory, and typed repository methods for session restore/current state, Apple sign-in, claim-code redemption, sign-out, and account delete.
+- Kept Apple credential acquisition behind an injected `AppleCredentialProvider`; tests inject a fake provider and fake Supabase client so local Windows checks do not require native Apple runtime.
+- Repository mapping treats missing Supabase session as `idle`, `user.is_anonymous !== false` as Anonymous, and `user.is_anonymous === false` as Linked-Apple.
+- Claim-code redemption invokes `redeem-claim-code`, installs the returned refresh token with `auth.refreshSession`, and remains idle-only so the Account claim flow stays before Apple sign-in.
+- Verification: `npm run typecheck` and `npm run test -- --runInBand` passed in `mobile/`.
+
