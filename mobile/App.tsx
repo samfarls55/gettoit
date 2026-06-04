@@ -144,6 +144,32 @@ function routeAfterQuizSubmission(participantScope: PlanParticipantScope) {
   return participantScope === "solo" ? "showVerdict" : "waitForVerdict";
 }
 
+function groupQuizSession(
+  roomId: string,
+  role: QuizSession["role"],
+): QuizSession {
+  return {
+    roomId,
+    participantScope: "group",
+    role,
+  };
+}
+
+function routedInviteRoomId(
+  resolution: InviteRouteResolution,
+): string | null {
+  switch (resolution.kind) {
+    case "join":
+    case "quiz":
+    case "waiting":
+    case "verdict":
+      return resolution.roomId;
+    case "invalid":
+    case "stale":
+      return null;
+  }
+}
+
 const contentByRouteName: Record<AppRouteName, RouteContent> = {
   signInGate: {
     title: "Sign in gate",
@@ -172,6 +198,10 @@ const contentByRouteName: Record<AppRouteName, RouteContent> = {
   verdict: {
     title: "Verdict placeholder",
     body: "The Plan verdict appears here.",
+  },
+  readOnlyVerdict: {
+    title: "Read-only verdict placeholder",
+    body: "The closed Plan verdict appears here.",
   },
   settings: {
     title: "Settings placeholder",
@@ -319,6 +349,12 @@ export default function App({
       .resolveInviteLink(url)
       .then((resolution) => {
         if (isCurrent) {
+          const roomId = routedInviteRoomId(resolution);
+
+          if (roomId) {
+            setQuizSession(groupQuizSession(roomId, "joiner"));
+          }
+
           dispatch({ type: "deepLinkResolved", resolution });
         }
       })
@@ -352,21 +388,16 @@ export default function App({
             dispatch({ type: "openSetup" });
             break;
           case "joined":
-            setQuizSession({
-              roomId: plan.id,
-              participantScope: "group",
-              role: "joiner",
-            });
+            setQuizSession(groupQuizSession(plan.id, "joiner"));
             dispatch({ type: "startQuiz" });
             break;
           case "decided":
-          case "history":
-            setQuizSession({
-              roomId: plan.id,
-              participantScope: "group",
-              role: "initiator",
-            });
+            setQuizSession(groupQuizSession(plan.id, "initiator"));
             dispatch({ type: "showVerdict" });
+            break;
+          case "history":
+            setQuizSession(groupQuizSession(plan.id, "initiator"));
+            dispatch({ type: "showReadOnlyVerdict" });
             break;
         }
       }}
@@ -521,7 +552,7 @@ export function MobileAppShell({
   }, [deletedCreatedPlanIds, planRepository, route.name]);
 
   useEffect(() => {
-    if (route.name !== "verdict") {
+    if (route.name !== "verdict" && route.name !== "readOnlyVerdict") {
       return;
     }
 
@@ -604,12 +635,13 @@ export function MobileAppShell({
     );
   }
 
-  if (route.name === "verdict") {
+  if (route.name === "verdict" || route.name === "readOnlyVerdict") {
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
         {verdict ? (
           <VerdictScreen
+            mode={route.name === "readOnlyVerdict" ? "readOnly" : "live"}
             onReroll={verdictRepository.reroll}
             onWidenAndRerun={verdictRepository.widenAndRerun}
             verdict={verdict}

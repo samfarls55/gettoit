@@ -163,4 +163,20 @@ describe("VerdictScreen", () => {
       expect(screen.getByText("Could not re-run. Try again.")).toBeOnTheScreen();
     });
   });
+
+  it("renders read-only verdict records without live-only actions", () => {
+    render(<VerdictScreen mode="readOnly" verdict={groupVerdict} />);
+
+    expect(screen.getByText("Closed verdict record")).toBeOnTheScreen();
+    expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+    expect(screen.getByText("Mexican - $$ - 8 min walk")).toBeOnTheScreen();
+    expect(screen.getByText("Best fit for the table.")).toBeOnTheScreen();
+    expect(screen.getByText("Ava")).toBeOnTheScreen();
+    expect(screen.getByText("wanted social")).toBeOnTheScreen();
+    expect(screen.queryByText("7:00 PM")).toBeNull();
+    expect(screen.queryByText("All 2 of you")).toBeNull();
+    expect(screen.queryByText("I'm in")).toBeNull();
+    expect(screen.queryByText("Reroll")).toBeNull();
+    expect(screen.getByText("Start a new decision")).toBeOnTheScreen();
+  });
 });

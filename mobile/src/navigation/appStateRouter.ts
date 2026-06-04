@@ -7,7 +7,8 @@ export type ActivePlanPhase =
   | "setup"
   | "quiz"
   | "waiting"
-  | "verdict";
+  | "verdict"
+  | "readOnlyVerdict";
 
 export type AppRouteName =
   | "signInGate"
@@ -17,6 +18,7 @@ export type AppRouteName =
   | "quiz"
   | "waiting"
   | "verdict"
+  | "readOnlyVerdict"
   | "settings"
   | "deepLink";
 
@@ -44,6 +46,7 @@ export type AppStateRouterEvent =
   | { type: "startQuiz" }
   | { type: "waitForVerdict" }
   | { type: "showVerdict" }
+  | { type: "showReadOnlyVerdict" }
   | { type: "returnToPlans" };
 
 export const initialAppStateRouterState: AppStateRouterState = {
@@ -71,7 +74,7 @@ function phaseForInviteResolution(
     case "waiting":
       return "waiting";
     case "verdict":
-      return "verdict";
+      return "readOnlyVerdict";
     case "invalid":
     case "stale":
       return null;
@@ -113,6 +116,8 @@ export function appStateRouterReducer(
       return stateWithActivePlanPhase(state, "waiting");
     case "showVerdict":
       return stateWithActivePlanPhase(state, "verdict");
+    case "showReadOnlyVerdict":
+      return stateWithActivePlanPhase(state, "readOnlyVerdict");
     case "returnToPlans":
       return stateWithActivePlanPhase(state, null);
   }
@@ -136,6 +141,8 @@ export function routeForAppState(state: AppStateRouterState): AppRoute {
       return { name: "waiting" };
     case "verdict":
       return { name: "verdict" };
+    case "readOnlyVerdict":
+      return { name: "readOnlyVerdict" };
     case "setup":
       return { name: state.settingsOpen ? "settings" : "setup" };
     case null:

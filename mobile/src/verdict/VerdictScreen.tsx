@@ -9,12 +9,14 @@ import type {
 } from "./verdictRepository";
 
 type VerdictScreenProps = {
+  mode?: "live" | "readOnly";
   onReroll?: (input: RerollInput) => Promise<void>;
   onWidenAndRerun?: (input: WidenAndRerunInput) => Promise<void>;
   verdict: VerdictViewModel;
 };
 
 export function VerdictScreen({
+  mode = "live",
   onReroll = async () => undefined,
   onWidenAndRerun = async () => undefined,
   verdict,
@@ -29,6 +31,18 @@ export function VerdictScreen({
   }
 
   const isSolo = verdict.flavor === "solo";
+  const isReadOnly = mode === "readOnly";
+  let eyebrowLabel = "Tonight, the verdict is";
+
+  if (isReadOnly) {
+    eyebrowLabel = "Closed verdict record";
+  } else if (isSolo) {
+    eyebrowLabel = "Your solo pick";
+  }
+
+  const primaryActionLabel = isReadOnly
+    ? "Start a new decision"
+    : verdict.primaryActionLabel;
   const rerollLabel =
     verdict.reroll.burnsRemaining === 1
       ? "Reroll · last one"
@@ -36,19 +50,25 @@ export function VerdictScreen({
 
   return (
     <View style={styles.root}>
-      <Text style={styles.eyebrow}>
-        {isSolo ? "Your solo pick" : "Tonight, the verdict is"}
-      </Text>
+      <Text style={styles.eyebrow}>{eyebrowLabel}</Text>
       <Text style={styles.title}>{verdict.placeName}</Text>
       {verdict.metaLine ? (
         <Text style={styles.subtitle}>{verdict.metaLine}</Text>
       ) : null}
-      <View style={styles.timeBadge}>
-        <Text style={styles.timeText}>{verdict.timeBadge.time}</Text>
-        {verdict.timeBadge.audience ? (
-          <Text style={styles.timeAudience}>{verdict.timeBadge.audience}</Text>
-        ) : null}
-      </View>
+      {isReadOnly ? (
+        <Text style={styles.recordCopy}>
+          This Plan is closed. The recommendation is preserved as a record.
+        </Text>
+      ) : (
+        <View style={styles.timeBadge}>
+          <Text style={styles.timeText}>{verdict.timeBadge.time}</Text>
+          {verdict.timeBadge.audience ? (
+            <Text style={styles.timeAudience}>
+              {verdict.timeBadge.audience}
+            </Text>
+          ) : null}
+        </View>
+      )}
       <Text style={styles.ruleText}>{verdict.ruleText}</Text>
       {verdict.receipts.length > 0 ? (
         <View style={styles.receiptStack}>
@@ -63,10 +83,10 @@ export function VerdictScreen({
       <View style={styles.actionRow}>
         <Pressable accessibilityRole="button" style={styles.primaryButton}>
           <Text style={styles.primaryButtonLabel}>
-            {verdict.primaryActionLabel}
+            {primaryActionLabel}
           </Text>
         </Pressable>
-        {verdict.reroll.isEligible ? (
+        {isReadOnly ? null : verdict.reroll.isEligible ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => onReroll({ roomId: verdict.roomId, reason: "mood" })}
@@ -209,6 +229,11 @@ const styles = StyleSheet.create({
     color: mobileTokens.color.paper,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
+    lineHeight: mobileTokens.typography.body.lineHeight,
+  },
+  recordCopy: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
   receiptStack: {
