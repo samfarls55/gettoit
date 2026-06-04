@@ -22,6 +22,11 @@ import type {
   QuizProgress,
   QuizProgressRepository,
 } from "../src/quiz/quizProgressRepository";
+import type { QuizSubmissionRepository } from "../src/quiz/quizSubmissionRepository";
+import type {
+  WaitingRepository,
+  WaitingSnapshot,
+} from "../src/waiting/waitingRepository";
 
 function EventRouterHarness() {
   const [routerState, dispatch] = useReducer(
@@ -129,6 +134,34 @@ function makeQuizProgressRepository(
   };
 }
 
+function makeQuizSubmissionRepository(): QuizSubmissionRepository {
+  return {
+    submitQuiz: jest.fn(async () => undefined),
+  };
+}
+
+const waitingSnapshot: WaitingSnapshot = {
+  roomId: "waiting-room",
+  status: "waiting",
+  members: [
+    { id: "ava", displayName: "Ava", quizSubmitted: true },
+    { id: "morgan", displayName: "Morgan", quizSubmitted: false },
+  ],
+};
+
+function makeWaitingRepository(
+  snapshot: WaitingSnapshot = waitingSnapshot,
+  fireResult: WaitingSnapshot = {
+    ...waitingSnapshot,
+    status: "verdictReady",
+  },
+): WaitingRepository {
+  return {
+    loadSnapshot: jest.fn(async () => snapshot),
+    fireVerdict: jest.fn(async () => fireResult),
+  };
+}
+
 describe("App", () => {
   it.each<AppStateRouterState["auth"]>(["idle", "anonymous"])(
     "routes %s auth launches to the sign-in gate",
@@ -203,8 +236,8 @@ describe("App", () => {
         activePlanPhase: "waiting",
         settingsOpen: false,
       },
-      visibleRoute: "Waiting placeholder",
-      visibleBody: "Waiting for the group verdict.",
+      visibleRoute: "Waiting for the group",
+      visibleBody: "The verdict opens as soon as voting closes.",
     },
     {
       name: "decided Plans route to Verdict",
@@ -494,7 +527,7 @@ describe("App", () => {
       expect(inviteBoundary.shareInviteLink).toHaveBeenCalledWith(
         "https://gettoit.example/join/saved-plan",
       );
-      expect(screen.getByText("Waiting placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
     });
   });
 
@@ -578,6 +611,126 @@ describe("App", () => {
     });
   });
 
+  it("routes Q5 submit into Waiting for a group flow", async () => {
+    const quizSubmissionRepository = makeQuizSubmissionRepository();
+
+    render(
+      <App
+        initialRouterState={{
+          ...linkedApplePlanListState,
+          activePlanPhase: "quiz",
+        }}
+        q5CandidateRepository={{ loadCandidates: jest.fn(async () => []) }}
+        quizProgressRepository={makeQuizProgressRepository({
+          roomId: "active-room",
+          currentQuestion: "q5",
+          answers: {
+            q1CuisineCravings: ["italian"],
+            q2SpendCap: "$$",
+            q3Reputation: "popular",
+            q4VibeEnergy: "social",
+          },
+        })}
+        quizSubmissionRepository={quizSubmissionRepository}
+        waitingRepository={makeWaitingRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("No spots to rate near you.")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("Head to the verdict"));
+
+    await waitFor(() => {
+      expect(quizSubmissionRepository.submitQuiz).toHaveBeenCalledWith({
+        roomId: "active-room",
+        answers: {
+          q1CuisineCravings: ["italian"],
+          q2SpendCap: "$$",
+          q3Reputation: "popular",
+          q4VibeEnergy: "social",
+          q5Ratings: {},
+        },
+      });
+      expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
+    });
+  });
+
+  it("renders Waiting member progress and lets the initiator close voting", async () => {
+    const waitingRepository = makeWaitingRepository();
+
+    render(
+      <App
+        initialRouterState={{
+          ...linkedApplePlanListState,
+          activePlanPhase: "waiting",
+        }}
+        waitingRepository={waitingRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
+      expect(screen.getByText("Ava")).toBeOnTheScreen();
+      expect(screen.getByText("Submitted")).toBeOnTheScreen();
+      expect(screen.getByText("Morgan")).toBeOnTheScreen();
+      expect(screen.getByText("Still answering")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("Close voting"));
+
+    await waitFor(() => {
+      expect(waitingRepository.fireVerdict).toHaveBeenCalledWith({
+        roomId: "active-room",
+      });
+      expect(screen.getByText("Verdict placeholder")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes verdict-ready Waiting snapshots to the verdict placeholder", async () => {
+    render(
+      <App
+        initialRouterState={{
+          ...linkedApplePlanListState,
+          activePlanPhase: "waiting",
+        }}
+        waitingRepository={makeWaitingRepository({
+          ...waitingSnapshot,
+          status: "verdictReady",
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Verdict placeholder")).toBeOnTheScreen();
+    });
+  });
+
+  it("returns to Plans with feedback when Waiting sees a session-ended state", async () => {
+    render(
+      <App
+        initialRouterState={{
+          ...linkedApplePlanListState,
+          activePlanPhase: "waiting",
+        }}
+        planRepository={{
+          listPlans: async () => emptyPlanListSnapshot,
+          savePlan: jest.fn(),
+        }}
+        waitingRepository={makeWaitingRepository({
+          ...waitingSnapshot,
+          status: "sessionEnded",
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Session ended. Back to Plans.")).toBeOnTheScreen();
+      expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
+    });
+  });
+
   it("routes a cold-start invite link to the join placeholder", async () => {
     const inviteBoundary = makeInviteBoundary({ kind: "join", roomId: "open-room" });
 
@@ -644,7 +797,7 @@ describe("App", () => {
       expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
         "https://gettoit.example/join/waiting-room",
       );
-      expect(screen.getByText("Waiting placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
     });
   });
 
@@ -745,7 +898,7 @@ describe("App", () => {
       expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
         "https://gettoit.example/join/waiting-room",
       );
-      expect(screen.getByText("Waiting placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
     });
   });
 

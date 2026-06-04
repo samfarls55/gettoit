@@ -16,6 +16,10 @@ import type {
   QuizProgressRepository,
   QuizQuestionId,
 } from "./quizProgressRepository";
+import {
+  fakeQuizSubmissionRepository,
+  type QuizSubmissionRepository,
+} from "./quizSubmissionRepository";
 
 type QuizScreenProps = {
   progressRepository: QuizProgressRepository;
@@ -23,6 +27,8 @@ type QuizScreenProps = {
   role: "initiator" | "joiner";
   roomId: string;
   onExited: () => void;
+  onSubmitted?: () => void;
+  submissionRepository?: QuizSubmissionRepository;
 };
 
 type AnswerKey = keyof QuizAnswers;
@@ -187,6 +193,8 @@ export function QuizScreen({
   role,
   roomId,
   onExited,
+  onSubmitted,
+  submissionRepository = fakeQuizSubmissionRepository,
 }: QuizScreenProps) {
   const [currentQuestionId, setCurrentQuestionId] =
     useState<QuizQuestionId>("q1");
@@ -282,19 +290,23 @@ export function QuizScreen({
   };
 
   const handleQ5Submit = async () => {
-    await progressRepository.saveProgress({
+    const submittedAnswers = { ...answers, q5Ratings };
+
+    await submissionRepository.submitQuiz({
       roomId,
-      currentQuestion: "q5",
-      answers: { ...answers, q5Ratings },
+      answers: submittedAnswers,
     });
+    onSubmitted?.();
   };
 
   const handleQ5NoResultsSubmit = async () => {
-    await progressRepository.saveProgress({
+    const submittedAnswers = { ...answers, q5Ratings: {} };
+
+    await submissionRepository.submitQuiz({
       roomId,
-      currentQuestion: "q5",
-      answers: { ...answers, q5Ratings: {} },
+      answers: submittedAnswers,
     });
+    onSubmitted?.();
   };
 
   return (

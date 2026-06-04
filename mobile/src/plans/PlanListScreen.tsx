@@ -15,6 +15,7 @@ type PlanBucket = {
 
 type PlanListScreenProps = {
   plans: PlanListSnapshot;
+  notice?: string | null;
   onCreatePlan?: (participantScope: PlanParticipantScope) => void;
   onOpenPlan?: (plan: PlanListItem) => void;
 };
@@ -28,6 +29,7 @@ const planBuckets: PlanBucket[] = [
 
 export function PlanListScreen({
   plans,
+  notice,
   onCreatePlan,
   onOpenPlan,
 }: PlanListScreenProps) {
@@ -37,6 +39,7 @@ export function PlanListScreen({
     <ScrollView contentContainerStyle={styles.content} style={styles.root}>
       <Text style={styles.eyebrow}>GetToIt</Text>
       <Text style={styles.title}>Plans</Text>
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
       <View style={styles.createActions}>
         <Pressable
           accessibilityLabel="Create solo Plan"
@@ -165,6 +168,13 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     gap: mobileTokens.spacing[4],
+  },
+  notice: {
+    color: mobileTokens.color.sun,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "700",
+    lineHeight: mobileTokens.typography.body.lineHeight,
+    marginBottom: mobileTokens.spacing[4],
   },
   emptyTitle: {
     color: mobileTokens.color.paper,

@@ -29,3 +29,6 @@ Wire Q5 submit into the post-quiz Waiting path. The slice should write quiz answ
 
 - TB-11: Q5 candidate probe.
 
+## Notes
+
+- 2026-06-04: Shipped on `sandcastle/issue-338`. Q5 final submit now writes through a typed `QuizSubmissionRepository` seam and routes to Waiting. Added a fakeable Waiting repository/surface that renders member progress, lets the initiator close voting, routes verdict-ready snapshots to the verdict placeholder, and returns session-ended rooms to the Plan list with feedback. `npm run verify --prefix mobile` passed with the existing non-failing React `act(...)` warnings from async screen hydration.

@@ -41,6 +41,11 @@ import type { Q5CandidateRepository } from "./src/quiz/q5CandidateRepository";
 import { fakeQ5CandidateRepository } from "./src/quiz/q5CandidateRepository";
 import type { QuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import { fakeQuizProgressRepository } from "./src/quiz/quizProgressRepository";
+import type { QuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
+import { fakeQuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
+import { WaitingScreen } from "./src/waiting/WaitingScreen";
+import type { WaitingRepository } from "./src/waiting/waitingRepository";
+import { fakeWaitingRepository } from "./src/waiting/waitingRepository";
 
 type AuthBoundary = {
   signInWithApple: () => Promise<void>;
@@ -68,6 +73,8 @@ type AppProps = {
   planRepository?: PlanRepository;
   q5CandidateRepository?: Q5CandidateRepository;
   quizProgressRepository?: QuizProgressRepository;
+  quizSubmissionRepository?: QuizSubmissionRepository;
+  waitingRepository?: WaitingRepository;
   [key: string]: unknown;
 };
 
@@ -80,12 +87,18 @@ type MobileAppShellProps = {
   onClaimCodeRedeemed?: () => void;
   onOpenPlan?: (plan: PlanListItem) => void;
   onQuizExited?: () => void;
+  onQuizSubmitted?: () => void;
   onSaveSetup?: (plan: PlanSetup) => Promise<void>;
+  onSessionEnded?: () => void;
+  onVerdictReady?: () => void;
   planRepository?: PlanRepository;
+  planListNotice?: string | null;
   q5CandidateRepository?: Q5CandidateRepository;
   quizProgressRepository?: QuizProgressRepository;
+  quizSubmissionRepository?: QuizSubmissionRepository;
   setupPlan?: PlanSetup;
   quizSession?: QuizSession;
+  waitingRepository?: WaitingRepository;
 };
 
 type RouteContent = {
@@ -96,6 +109,7 @@ type RouteContent = {
 type PlanListStatus = "idle" | "loading" | "loaded" | "error";
 
 type PlanListContentProps = {
+  notice?: string | null;
   onCreatePlan?: (participantScope: PlanParticipantScope) => void;
   onOpenPlan?: (plan: PlanListItem) => void;
   plans: PlanListSnapshot;
@@ -213,6 +227,8 @@ export default function App({
   planRepository = fakePlanRepository,
   q5CandidateRepository = fakeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
+  quizSubmissionRepository = fakeQuizSubmissionRepository,
+  waitingRepository = fakeWaitingRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
     appStateRouterReducer,
@@ -225,6 +241,7 @@ export default function App({
     roomId: "active-room",
     role: "initiator",
   });
+  const [planListNotice, setPlanListNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -278,10 +295,12 @@ export default function App({
     <MobileAppShell
       authBoundary={authBoundary}
       onCreatePlan={(participantScope) => {
+        setPlanListNotice(null);
         setSetupPlan(defaultSetupPlan(participantScope));
         dispatch({ type: "openSetup" });
       }}
       onOpenPlan={(plan) => {
+        setPlanListNotice(null);
         switch (plan.routeTarget) {
           case "pending":
             setSetupPlan(editSetupPlan(plan));
@@ -315,16 +334,25 @@ export default function App({
         dispatch({ type: "waitForVerdict" });
       }}
       planRepository={planRepository}
+      planListNotice={planListNotice}
       q5CandidateRepository={q5CandidateRepository}
       quizProgressRepository={quizProgressRepository}
+      quizSubmissionRepository={quizSubmissionRepository}
       routerState={routerState}
       quizSession={quizSession}
       setupPlan={setupPlan}
+      waitingRepository={waitingRepository}
       onAppleSignInSucceeded={() =>
         dispatch({ type: "appleSignInSucceeded" })
       }
       onClaimCodeRedeemed={() => dispatch({ type: "claimCodeRedeemed" })}
       onQuizExited={() => dispatch({ type: "returnToPlans" })}
+      onQuizSubmitted={() => dispatch({ type: "waitForVerdict" })}
+      onSessionEnded={() => {
+        setPlanListNotice("Session ended. Back to Plans.");
+        dispatch({ type: "returnToPlans" });
+      }}
+      onVerdictReady={() => dispatch({ type: "showVerdict" })}
       onSaveSetup={async (plan) => {
         await planRepository.savePlan(plan);
         dispatch({ type: "returnToPlans" });
@@ -341,13 +369,19 @@ export function MobileAppShell({
   onClaimCodeRedeemed,
   onOpenPlan,
   onQuizExited,
+  onQuizSubmitted,
   onSaveSetup,
+  onSessionEnded,
+  onVerdictReady,
   planRepository = fakePlanRepository,
+  planListNotice = null,
   q5CandidateRepository = fakeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
+  quizSubmissionRepository = fakeQuizSubmissionRepository,
   routerState,
   quizSession = { roomId: "active-room", role: "initiator" },
   setupPlan = defaultSetupPlan("group"),
+  waitingRepository = fakeWaitingRepository,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
   const [planSnapshot, setPlanSnapshot] = useState<PlanListSnapshot>(
@@ -405,9 +439,26 @@ export function MobileAppShell({
         <StatusBar style="light" />
         <QuizScreen
           onExited={onQuizExited ?? (() => undefined)}
+          onSubmitted={onQuizSubmitted}
           progressRepository={quizProgressRepository}
           q5CandidateRepository={q5CandidateRepository}
           role={quizSession.role}
+          roomId={quizSession.roomId}
+          submissionRepository={quizSubmissionRepository}
+        />
+      </View>
+    );
+  }
+
+  if (route.name === "waiting") {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        <WaitingScreen
+          isInitiator={quizSession.role === "initiator"}
+          onSessionEnded={onSessionEnded ?? (() => undefined)}
+          onVerdictReady={onVerdictReady ?? (() => undefined)}
+          repository={waitingRepository}
           roomId={quizSession.roomId}
         />
       </View>
@@ -431,6 +482,7 @@ export function MobileAppShell({
       <View style={styles.root}>
         <StatusBar style="light" />
         <PlanListContent
+          notice={planListNotice}
           onCreatePlan={onCreatePlan}
           onOpenPlan={onOpenPlan}
           plans={planSnapshot}
@@ -454,6 +506,7 @@ export function MobileAppShell({
 }
 
 function PlanListContent({
+  notice,
   onCreatePlan,
   onOpenPlan,
   plans,
@@ -463,6 +516,7 @@ function PlanListContent({
     case "loaded":
       return (
         <PlanListScreen
+          notice={notice}
           onCreatePlan={onCreatePlan}
           onOpenPlan={onOpenPlan}
           plans={plans}

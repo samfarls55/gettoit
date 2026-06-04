@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react-nativ
 import { QuizScreen } from "../src/quiz/QuizScreen";
 import type { Q5CandidateRepository } from "../src/quiz/q5CandidateRepository";
 import type { QuizProgressRepository } from "../src/quiz/quizProgressRepository";
+import type { QuizSubmissionRepository } from "../src/quiz/quizSubmissionRepository";
 
 function makeProgressRepository(): QuizProgressRepository {
   return {
@@ -120,5 +121,56 @@ describe("QuizScreen Q5", () => {
 
     expect(screen.getByText("Head to the verdict")).toBeOnTheScreen();
     expect(screen.queryByText("Drop the verdict")).toBeNull();
+  });
+
+  it("submits the Q5 quiz payload through the submission repository", async () => {
+    const submissionRepository: QuizSubmissionRepository = {
+      submitQuiz: jest.fn(async () => undefined),
+    };
+    const onSubmitted = jest.fn();
+
+    render(
+      <QuizScreen
+        onExited={jest.fn()}
+        onSubmitted={onSubmitted}
+        progressRepository={makeProgressRepository()}
+        q5CandidateRepository={makeCandidateRepository(candidatePool)}
+        role="initiator"
+        roomId="room-q5"
+        submissionRepository={submissionRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Q4")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("SOCIAL"));
+    fireEvent.press(screen.getByText("Save vibe"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Thai Orchid")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Rate 5 for Thai Orchid"));
+    fireEvent.press(screen.getByText("Drop the verdict"));
+
+    await waitFor(() => {
+      expect(submissionRepository.submitQuiz).toHaveBeenCalledWith({
+        roomId: "room-q5",
+        answers: {
+          q1CuisineCravings: ["mexican"],
+          q2SpendCap: "$$",
+          q3Reputation: "popular",
+          q4VibeEnergy: "social",
+          q5Ratings: {
+            "fsq-thai": 5,
+            "fsq-casa": 3,
+            "fsq-farol": 3,
+          },
+        },
+      });
+      expect(onSubmitted).toHaveBeenCalledTimes(1);
+    });
   });
 });
