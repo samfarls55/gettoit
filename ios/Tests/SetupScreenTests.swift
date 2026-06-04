@@ -37,7 +37,7 @@ final class SetupScreenTests: XCTestCase {
     private func makeScreen(
         mode: SetupScreen.Mode = .create,
         groupMode: SetupScreen.GroupMode = .group,
-        locationCoordinator: LocationCoordinator = LocationCoordinator(),
+        locationCoordinator: LocationCoordinator? = nil,
         editingPlan: PlansStore.Plan? = nil
     ) -> SetupScreen {
         let client = makeClient()
@@ -47,7 +47,7 @@ final class SetupScreenTests: XCTestCase {
             plansStore: PlansStore(client: client),
             roomStore: RoomStore(client: client),
             userID: UUID(),
-            locationCoordinator: locationCoordinator,
+            locationCoordinator: locationCoordinator ?? LocationCoordinator(),
             editingPlan: editingPlan
         )
     }
