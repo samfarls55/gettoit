@@ -1,0 +1,61 @@
+import { render, screen } from "@testing-library/react-native";
+
+import { VerdictScreen } from "../src/verdict/VerdictScreen";
+
+const groupVerdict = {
+  roomId: "room-1",
+  flavor: "group" as const,
+  placeName: "Pico's Taqueria",
+  metaLine: "Mexican - $$ - 8 min walk",
+  ruleText: "Best fit for the table.",
+  timeBadge: {
+    time: "7:00 PM",
+    audience: "All 2 of you",
+  },
+  receipts: [
+    { id: "user-1", name: "Ava", action: "wanted social" },
+    { id: "user-2", name: "Morgan", action: "wanted calm" },
+  ],
+  primaryActionLabel: "I'm in",
+};
+
+describe("VerdictScreen", () => {
+  it("renders group live verdict details, receipts, and live actions", () => {
+    render(<VerdictScreen verdict={groupVerdict} />);
+
+    expect(screen.getByText("Tonight, the verdict is")).toBeOnTheScreen();
+    expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+    expect(screen.getByText("Mexican - $$ - 8 min walk")).toBeOnTheScreen();
+    expect(screen.getByText("7:00 PM")).toBeOnTheScreen();
+    expect(screen.getByText("All 2 of you")).toBeOnTheScreen();
+    expect(screen.getByText("Best fit for the table.")).toBeOnTheScreen();
+    expect(screen.getByText("Ava")).toBeOnTheScreen();
+    expect(screen.getByText("wanted social")).toBeOnTheScreen();
+    expect(screen.getByText("Morgan")).toBeOnTheScreen();
+    expect(screen.getByText("wanted calm")).toBeOnTheScreen();
+    expect(screen.getByText("I'm in")).toBeOnTheScreen();
+    expect(screen.getByText("Reroll")).toBeOnTheScreen();
+  });
+
+  it("renders solo live verdict copy and suppresses group-only behavior", () => {
+    render(
+      <VerdictScreen
+        verdict={{
+          ...groupVerdict,
+          flavor: "solo",
+          timeBadge: { time: "7:00 PM", audience: "" },
+          receipts: [],
+          primaryActionLabel: "Save taste profile",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Your solo pick")).toBeOnTheScreen();
+    expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+    expect(screen.getByText("7:00 PM")).toBeOnTheScreen();
+    expect(screen.queryByText("All 2 of you")).toBeNull();
+    expect(screen.queryByText("Ava")).toBeNull();
+    expect(screen.queryByText("wanted social")).toBeNull();
+    expect(screen.getByText("Save taste profile")).toBeOnTheScreen();
+  });
+});

@@ -27,6 +27,10 @@ import type {
   WaitingRepository,
   WaitingSnapshot,
 } from "../src/waiting/waitingRepository";
+import type {
+  LiveVerdictViewModel,
+  VerdictRepository,
+} from "../src/verdict/verdictRepository";
 
 function EventRouterHarness() {
   const [routerState, dispatch] = useReducer(
@@ -162,6 +166,34 @@ function makeWaitingRepository(
   };
 }
 
+function makeVerdictRepository(
+  verdict: LiveVerdictViewModel = {
+    roomId: "active-room",
+    flavor: "group",
+    placeName: "Pico's Taqueria",
+    metaLine: "Mexican - $$ - 8 min walk",
+    ruleText: "Best fit for the table.",
+    timeBadge: { time: "7:00 PM", audience: "All 2 of you" },
+    receipts: [{ id: "ava", name: "Ava", action: "wanted social" }],
+    primaryActionLabel: "I'm in",
+  },
+): VerdictRepository {
+  return {
+    loadLiveVerdict: jest.fn(async ({ roomId, flavor }) => ({
+      ...verdict,
+      roomId,
+      flavor,
+      timeBadge:
+        flavor === "solo"
+          ? { time: verdict.timeBadge.time, audience: "" }
+          : verdict.timeBadge,
+      receipts: flavor === "solo" ? [] : verdict.receipts,
+      primaryActionLabel:
+        flavor === "solo" ? "Save taste profile" : verdict.primaryActionLabel,
+    })),
+  };
+}
+
 describe("App", () => {
   it.each<AppStateRouterState["auth"]>(["idle", "anonymous"])(
     "routes %s auth launches to the sign-in gate",
@@ -247,8 +279,8 @@ describe("App", () => {
         activePlanPhase: "verdict",
         settingsOpen: false,
       },
-      visibleRoute: "Verdict placeholder",
-      visibleBody: "The Plan verdict appears here.",
+      visibleRoute: "Tonight, the verdict is",
+      visibleBody: "Pico's Taqueria",
     },
     {
       name: "settings can cover the signed-in Plan list",
@@ -261,8 +293,16 @@ describe("App", () => {
       visibleRoute: "Settings placeholder",
       visibleBody: "Account settings live here.",
     },
-  ])("$name", ({ state, visibleRoute, visibleBody }) => {
+  ])("$name", async ({ state, visibleRoute, visibleBody }) => {
     render(<MobileAppShell routerState={state} />);
+
+    if (state.activePlanPhase === "verdict") {
+      await waitFor(() => {
+        expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
+        expect(screen.getByText(visibleBody)).toBeOnTheScreen();
+      });
+      return;
+    }
 
     expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
     expect(screen.getByText(visibleBody)).toBeOnTheScreen();
@@ -319,13 +359,14 @@ describe("App", () => {
   it.each([
     ["Open Created Plan Thursday dinner with the crew", "Edit your plan"],
     ["Open Joined Plan Morgan's birthday", "Q1"],
-    ["Open Decided Plan Date night fallback", "Verdict placeholder"],
-    ["Open History Plan Taco crawl", "Verdict placeholder"],
+    ["Open Decided Plan Date night fallback", "Tonight, the verdict is"],
+    ["Open History Plan Taco crawl", "Tonight, the verdict is"],
   ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
     render(
       <App
         initialRouterState={linkedApplePlanListState}
         quizProgressRepository={makeQuizProgressRepository()}
+        verdictRepository={makeVerdictRepository()}
       />,
     );
 
@@ -334,7 +375,10 @@ describe("App", () => {
     });
 
     fireEvent.press(screen.getByLabelText(accessibilityLabel));
-    expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
+
+    await waitFor(() => {
+      expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
+    });
   });
 
   it("routes Plan list solo create actions to matching Setup mode", async () => {
@@ -664,8 +708,9 @@ describe("App", () => {
       <App
         initialRouterState={{
           ...linkedApplePlanListState,
-          activePlanPhase: "waiting",
+      activePlanPhase: "waiting",
         }}
+        verdictRepository={makeVerdictRepository()}
         waitingRepository={waitingRepository}
       />,
     );
@@ -684,17 +729,18 @@ describe("App", () => {
       expect(waitingRepository.fireVerdict).toHaveBeenCalledWith({
         roomId: "active-room",
       });
-      expect(screen.getByText("Verdict placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Tonight, the verdict is")).toBeOnTheScreen();
     });
   });
 
-  it("routes verdict-ready Waiting snapshots to the verdict placeholder", async () => {
+  it("routes verdict-ready Waiting snapshots to the live verdict", async () => {
     render(
       <App
         initialRouterState={{
           ...linkedApplePlanListState,
           activePlanPhase: "waiting",
         }}
+        verdictRepository={makeVerdictRepository()}
         waitingRepository={makeWaitingRepository({
           ...waitingSnapshot,
           status: "verdictReady",
@@ -703,7 +749,64 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Verdict placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Tonight, the verdict is")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes solo Q5 submit to the solo live verdict flavor", async () => {
+    const quizSubmissionRepository = makeQuizSubmissionRepository();
+    const verdictRepository = makeVerdictRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={{
+          listPlans: async () => emptyPlanListSnapshot,
+          savePlan: jest.fn(async (plan) => ({
+            ...plan,
+            id: "solo-plan",
+          })),
+        }}
+        q5CandidateRepository={{ loadCandidates: jest.fn(async () => []) }}
+        quizProgressRepository={makeQuizProgressRepository({
+          roomId: "solo-plan",
+          currentQuestion: "q5",
+          answers: {
+            q1CuisineCravings: ["ramen"],
+            q2SpendCap: "$$",
+            q3Reputation: "hiddenGem",
+            q4VibeEnergy: "cozy",
+          },
+        })}
+        quizSubmissionRepository={quizSubmissionRepository}
+        verdictRepository={verdictRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Create solo Plan")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Create solo Plan"));
+    fireEvent.changeText(screen.getByLabelText("Name this plan"), "Solo ramen");
+    fireEvent.press(screen.getByText("Set search area"));
+    fireEvent.press(screen.getByText("USE THIS AREA"));
+    fireEvent.press(screen.getByText("Start the quiz"));
+
+    await waitFor(() => {
+      expect(screen.getByText("No spots to rate near you.")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("Head to the verdict"));
+
+    await waitFor(() => {
+      expect(verdictRepository.loadLiveVerdict).toHaveBeenCalledWith({
+        roomId: "solo-plan",
+        flavor: "solo",
+      });
+      expect(screen.getByText("Your solo pick")).toBeOnTheScreen();
+      expect(screen.queryByText("Ava")).toBeNull();
+      expect(screen.getByText("Save taste profile")).toBeOnTheScreen();
     });
   });
 

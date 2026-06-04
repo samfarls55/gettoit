@@ -43,6 +43,13 @@ import type { QuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import { fakeQuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import type { QuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
 import { fakeQuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
+import { VerdictScreen } from "./src/verdict/VerdictScreen";
+import type {
+  LiveVerdictViewModel,
+  VerdictFlavor,
+  VerdictRepository,
+} from "./src/verdict/verdictRepository";
+import { fakeVerdictRepository } from "./src/verdict/verdictRepository";
 import { WaitingScreen } from "./src/waiting/WaitingScreen";
 import type { WaitingRepository } from "./src/waiting/waitingRepository";
 import { fakeWaitingRepository } from "./src/waiting/waitingRepository";
@@ -74,6 +81,7 @@ type AppProps = {
   q5CandidateRepository?: Q5CandidateRepository;
   quizProgressRepository?: QuizProgressRepository;
   quizSubmissionRepository?: QuizSubmissionRepository;
+  verdictRepository?: VerdictRepository;
   waitingRepository?: WaitingRepository;
   [key: string]: unknown;
 };
@@ -98,6 +106,7 @@ type MobileAppShellProps = {
   quizSubmissionRepository?: QuizSubmissionRepository;
   setupPlan?: PlanSetup;
   quizSession?: QuizSession;
+  verdictRepository?: VerdictRepository;
   waitingRepository?: WaitingRepository;
 };
 
@@ -118,6 +127,7 @@ type PlanListContentProps = {
 
 type QuizSession = {
   roomId: string;
+  participantScope: PlanParticipantScope;
   role: "initiator" | "joiner";
 };
 
@@ -228,6 +238,7 @@ export default function App({
   q5CandidateRepository = fakeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
   quizSubmissionRepository = fakeQuizSubmissionRepository,
+  verdictRepository = fakeVerdictRepository,
   waitingRepository = fakeWaitingRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
@@ -239,6 +250,7 @@ export default function App({
   );
   const [quizSession, setQuizSession] = useState<QuizSession>({
     roomId: "active-room",
+    participantScope: "group",
     role: "initiator",
   });
   const [planListNotice, setPlanListNotice] = useState<string | null>(null);
@@ -307,11 +319,20 @@ export default function App({
             dispatch({ type: "openSetup" });
             break;
           case "joined":
-            setQuizSession({ roomId: plan.id, role: "joiner" });
+            setQuizSession({
+              roomId: plan.id,
+              participantScope: "group",
+              role: "joiner",
+            });
             dispatch({ type: "startQuiz" });
             break;
           case "decided":
           case "history":
+            setQuizSession({
+              roomId: plan.id,
+              participantScope: "group",
+              role: "initiator",
+            });
             dispatch({ type: "showVerdict" });
             break;
         }
@@ -320,6 +341,7 @@ export default function App({
         const savedPlan = await planRepository.savePlan(plan);
         setQuizSession({
           roomId: savedPlan.id,
+          participantScope: plan.participantScope,
           role: "initiator",
         });
 
@@ -341,13 +363,21 @@ export default function App({
       routerState={routerState}
       quizSession={quizSession}
       setupPlan={setupPlan}
+      verdictRepository={verdictRepository}
       waitingRepository={waitingRepository}
       onAppleSignInSucceeded={() =>
         dispatch({ type: "appleSignInSucceeded" })
       }
       onClaimCodeRedeemed={() => dispatch({ type: "claimCodeRedeemed" })}
       onQuizExited={() => dispatch({ type: "returnToPlans" })}
-      onQuizSubmitted={() => dispatch({ type: "waitForVerdict" })}
+      onQuizSubmitted={() =>
+        dispatch({
+          type:
+            quizSession.participantScope === "solo"
+              ? "showVerdict"
+              : "waitForVerdict",
+        })
+      }
       onSessionEnded={() => {
         setPlanListNotice("Session ended. Back to Plans.");
         dispatch({ type: "returnToPlans" });
@@ -379,8 +409,13 @@ export function MobileAppShell({
   quizProgressRepository = fakeQuizProgressRepository,
   quizSubmissionRepository = fakeQuizSubmissionRepository,
   routerState,
-  quizSession = { roomId: "active-room", role: "initiator" },
+  quizSession = {
+    roomId: "active-room",
+    participantScope: "group",
+    role: "initiator",
+  },
   setupPlan = defaultSetupPlan("group"),
+  verdictRepository = fakeVerdictRepository,
   waitingRepository = fakeWaitingRepository,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
@@ -389,6 +424,9 @@ export function MobileAppShell({
   );
   const [planListStatus, setPlanListStatus] =
     useState<PlanListStatus>("idle");
+  const [verdict, setVerdict] = useState<LiveVerdictViewModel | null>(null);
+  const verdictFlavor: VerdictFlavor =
+    quizSession.participantScope === "solo" ? "solo" : "group";
 
   useEffect(() => {
     if (route.name !== "planList") {
@@ -418,6 +456,30 @@ export function MobileAppShell({
       isCurrent = false;
     };
   }, [planRepository, route.name]);
+
+  useEffect(() => {
+    if (route.name !== "verdict") {
+      return;
+    }
+
+    let isCurrent = true;
+    setVerdict(null);
+
+    verdictRepository
+      .loadLiveVerdict({
+        roomId: quizSession.roomId,
+        flavor: verdictFlavor,
+      })
+      .then((nextVerdict) => {
+        if (isCurrent) {
+          setVerdict(nextVerdict);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [quizSession.roomId, route.name, verdictFlavor, verdictRepository]);
 
   if (route.name === "setup") {
     return (
@@ -461,6 +523,22 @@ export function MobileAppShell({
           repository={waitingRepository}
           roomId={quizSession.roomId}
         />
+      </View>
+    );
+  }
+
+  if (route.name === "verdict") {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        {verdict ? (
+          <VerdictScreen verdict={verdict} />
+        ) : (
+          <View style={styles.surface}>
+            <Text style={styles.routeTitle}>Loading verdict</Text>
+            <Text style={styles.subtitle}>Pulling the recommendation.</Text>
+          </View>
+        )}
       </View>
     );
   }

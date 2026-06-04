@@ -16,12 +16,16 @@ Implement live verdict rendering and solo verdict behavior. The slice should map
 
 ## Acceptance criteria
 
-- [ ] Verdict repository maps a successful verdict response into a typed live verdict view model.
-- [ ] Group live verdict renders recommendation details, receipts, and live actions.
-- [ ] Solo verdict suppresses group-only behavior and uses solo-specific copy/actions.
-- [ ] Post-quiz routing lands on the correct verdict flavor based on session context.
-- [ ] Tests cover repository mapping, group verdict rendering, solo verdict rendering, and route dispatch.
-- [ ] Typecheck and mobile tests pass.
+- [x] Verdict repository maps a successful verdict response into a typed live verdict view model.
+- [x] Group live verdict renders recommendation details, receipts, and live actions.
+- [x] Solo verdict suppresses group-only behavior and uses solo-specific copy/actions.
+- [x] Post-quiz routing lands on the correct verdict flavor based on session context.
+- [x] Tests cover repository mapping, group verdict rendering, solo verdict rendering, and route dispatch.
+- [x] Typecheck and mobile tests pass.
+
+## Implementation note
+
+Completed 2026-06-04 on `sandcastle/issue-339`. Added the Expo mobile live verdict repository seam, the live verdict screen, group/solo flavor dispatch from the active quiz session, and focused repository/screen/App route tests. `npm run verify --prefix mobile` passed with the existing non-failing React `act(...)` warnings from async Quiz/Waiting hydration.
 
 ## Blocked by
 
