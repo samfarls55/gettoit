@@ -2,6 +2,14 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
+import type { Q5CandidateRepository } from "./q5CandidateRepository";
+import { fakeQ5CandidateRepository } from "./q5CandidateRepository";
+import {
+  generateQ5FactorialCards,
+  q5CardsToCandidates,
+  type Q5Candidate,
+  type Q5MemberProfile,
+} from "./q5Factorial";
 import type {
   QuizAnswers,
   QuizProgressRepository,
@@ -10,6 +18,7 @@ import type {
 
 type QuizScreenProps = {
   progressRepository: QuizProgressRepository;
+  q5CandidateRepository?: Q5CandidateRepository;
   role: "initiator" | "joiner";
   roomId: string;
   onExited: () => void;
@@ -23,7 +32,7 @@ type Option = {
 };
 
 type QuestionConfig = {
-  id: QuizQuestionId;
+  id: Exclude<QuizQuestionId, "q5">;
   title: string;
   answerKey: AnswerKey;
   cta: string;
@@ -35,6 +44,14 @@ type QuestionConfig = {
 
 const noPreferenceValue = "noPreference";
 const maxMultiSelectValues = 3;
+const quizQuestionIds: readonly QuizQuestionId[] = ["q1", "q2", "q3", "q4", "q5"];
+const vibeValueByAnswer: Record<string, number> = {
+  quiet: 0,
+  chill: 1,
+  social: 2,
+  lively: 3,
+  rowdy: 4,
+};
 
 const questionConfigs: readonly QuestionConfig[] = [
   {
@@ -98,19 +115,19 @@ const questionConfigs: readonly QuestionConfig[] = [
 ];
 
 function questionIndex(questionId: QuizQuestionId): number {
-  return questionConfigs.findIndex((question) => question.id === questionId);
+  return quizQuestionIds.indexOf(questionId);
 }
 
 function questionAfter(questionId: QuizQuestionId): QuizQuestionId {
-  return questionConfigs[
-    Math.min(questionIndex(questionId) + 1, questionConfigs.length - 1)
-  ].id;
+  return quizQuestionIds[
+    Math.min(questionIndex(questionId) + 1, quizQuestionIds.length - 1)
+  ];
 }
 
 function questionBefore(questionId: QuizQuestionId): QuizQuestionId {
-  return questionConfigs[
+  return quizQuestionIds[
     Math.max(questionIndex(questionId) - 1, 0)
-  ].id;
+  ];
 }
 
 function selectedValues(
@@ -161,6 +178,7 @@ function nextMultiSelectValues(
 
 export function QuizScreen({
   progressRepository,
+  q5CandidateRepository = fakeQ5CandidateRepository,
   role,
   roomId,
   onExited,
@@ -169,6 +187,9 @@ export function QuizScreen({
     useState<QuizQuestionId>("q1");
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
+  const [q5Candidates, setQ5Candidates] = useState<Q5Candidate[]>([]);
+  const [q5Status, setQ5Status] = useState<"idle" | "loading" | "ready" | "noResults">("idle");
+  const [q5Ratings, setQ5Ratings] = useState<Record<string, number>>({});
   const currentQuestion =
     questionConfigs[questionIndex(currentQuestionId)] ?? questionConfigs[0];
   const exitLabel = role === "joiner" ? "Leave" : "Exit";
@@ -184,12 +205,48 @@ export function QuizScreen({
 
       setCurrentQuestionId(progress.currentQuestion);
       setAnswers(progress.answers);
+
+      if (progress.currentQuestion === "q5") {
+        void loadQ5Candidates(progress.answers);
+      }
     });
 
     return () => {
       isCurrent = false;
     };
   }, [progressRepository, roomId]);
+
+  const loadQ5Candidates = async (nextQuizAnswers: QuizAnswers) => {
+    setQ5Status("loading");
+
+    try {
+      const pool = await q5CandidateRepository.loadCandidates({
+        roomId,
+        answers: nextQuizAnswers,
+      });
+      const cards = generateQ5FactorialCards({
+        member: memberProfileFromAnswers(nextQuizAnswers),
+        pool,
+      });
+
+      if (!cards) {
+        setQ5Candidates([]);
+        setQ5Status("noResults");
+        return;
+      }
+
+      const candidates = q5CardsToCandidates(cards);
+
+      setQ5Candidates(candidates);
+      setQ5Ratings(
+        Object.fromEntries(candidates.map((candidate) => [candidate.id, 3])),
+      );
+      setQ5Status("ready");
+    } catch {
+      setQ5Candidates([]);
+      setQ5Status("noResults");
+    }
+  };
 
   const handleOptionPress = (value: string) => {
     setAnswers((currentAnswers) => {
@@ -215,6 +272,10 @@ export function QuizScreen({
       currentQuestion: savedQuestion,
       answers: savedAnswers,
     });
+
+    if (savedQuestion === "q5") {
+      await loadQ5Candidates(savedAnswers);
+    }
   };
 
   const handleExitConfirm = async () => {
@@ -222,16 +283,32 @@ export function QuizScreen({
     onExited();
   };
 
+  const handleQ5Submit = async () => {
+    await progressRepository.saveProgress({
+      roomId,
+      currentQuestion: "q5",
+      answers: { ...answers, q5Ratings },
+    });
+  };
+
+  const handleQ5NoResultsSubmit = async () => {
+    await progressRepository.saveProgress({
+      roomId,
+      currentQuestion: "q5",
+      answers: { ...answers, q5Ratings: {} },
+    });
+  };
+
   return (
     <View style={styles.root}>
       <View style={styles.chrome}>
-        {currentQuestion.id === "q1" ? (
+        {currentQuestionId === "q1" ? (
           <View style={styles.chromeAction} />
         ) : (
           <Pressable
             accessibilityRole="button"
             onPress={() =>
-              setCurrentQuestionId(questionBefore(currentQuestion.id))
+              setCurrentQuestionId(questionBefore(currentQuestionId))
             }
             style={styles.chromeAction}
           >
@@ -248,17 +325,32 @@ export function QuizScreen({
       </View>
 
       <View style={styles.progressRow}>
-        {questionConfigs.map((question) => (
+        {quizQuestionIds.map((questionId) => (
           <View
-            key={question.id}
+            key={questionId}
             style={[
               styles.progressSegment,
-              question.id === currentQuestion.id && styles.activeProgressSegment,
+              questionId === currentQuestionId && styles.activeProgressSegment,
             ]}
           />
         ))}
       </View>
 
+      {currentQuestionId === "q5" ? (
+        <Q5Probe
+          candidates={q5Candidates}
+          onNoResultsSubmit={handleQ5NoResultsSubmit}
+          onRatingPress={(candidateId, score) =>
+            setQ5Ratings((currentRatings) => ({
+              ...currentRatings,
+              [candidateId]: score,
+            }))
+          }
+          onSubmit={handleQ5Submit}
+          ratings={q5Ratings}
+          status={q5Status}
+        />
+      ) : (
       <View style={styles.question}>
         <Text style={styles.eyebrow}>{currentQuestion.id.toUpperCase()}</Text>
         <Text style={styles.title}>{currentQuestion.title}</Text>
@@ -296,6 +388,7 @@ export function QuizScreen({
           <Text style={styles.primaryButtonLabel}>{currentQuestion.cta}</Text>
         </Pressable>
       </View>
+      )}
 
       {isExitConfirmOpen ? (
         <View style={styles.confirmCard}>
@@ -324,6 +417,117 @@ export function QuizScreen({
           </Pressable>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function memberProfileFromAnswers(quizAnswers: QuizAnswers): Q5MemberProfile {
+  return {
+    cuisines: (quizAnswers.q1CuisineCravings ?? []).filter(
+      (cuisine) => cuisine !== noPreferenceValue,
+    ),
+    reputation: quizAnswers.q3Reputation ?? noPreferenceValue,
+    vibe: vibeValueByAnswer[quizAnswers.q4VibeEnergy ?? "social"] ?? 2,
+  };
+}
+
+type Q5ProbeProps = {
+  candidates: Q5Candidate[];
+  onNoResultsSubmit: () => void;
+  onRatingPress: (candidateId: string, score: number) => void;
+  onSubmit: () => void;
+  ratings: Record<string, number>;
+  status: "idle" | "loading" | "ready" | "noResults";
+};
+
+function Q5Probe({
+  candidates,
+  onNoResultsSubmit,
+  onRatingPress,
+  onSubmit,
+  ratings,
+  status,
+}: Q5ProbeProps) {
+  if (status === "loading" || status === "idle") {
+    return (
+      <View style={styles.question}>
+        <Text style={styles.eyebrow}>Q5</Text>
+        <Text style={styles.title}>Finding real spots to rate.</Text>
+      </View>
+    );
+  }
+
+  if (status === "noResults") {
+    return (
+      <View style={styles.question}>
+        <Text style={styles.eyebrow}>Q5</Text>
+        <Text style={styles.title}>No spots to rate near you.</Text>
+        <Text style={styles.noResultsBody}>
+          Couldn't line up rateable spots in your radius tonight. Your other
+          answers still count - the verdict lands without this step.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onNoResultsSubmit}
+          style={styles.sunButton}
+        >
+          <Text style={styles.sunButtonLabel}>Head to the verdict</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.question}>
+      <Text style={styles.eyebrow}>Q5</Text>
+      <Text style={styles.title}>How excited does each of these make you?</Text>
+      <Text style={styles.q5Subtitle}>Three real spots near you. Rate each.</Text>
+      <View style={styles.candidateStack}>
+        {candidates.map((candidate) => (
+          <View key={candidate.id} style={styles.candidateCard}>
+            <Text style={styles.candidateName}>{candidate.name}</Text>
+            {candidate.meta ? (
+              <Text style={styles.candidateMeta}>
+                {candidate.meta.toUpperCase()}
+              </Text>
+            ) : null}
+            <View style={styles.ratingRow}>
+              {[1, 2, 3, 4, 5].map((score) => {
+                const selected = (ratings[candidate.id] ?? 3) === score;
+
+                return (
+                  <Pressable
+                    accessibilityLabel={`Rate ${score} for ${candidate.name}`}
+                    accessibilityRole="button"
+                    key={score}
+                    onPress={() => onRatingPress(candidate.id, score)}
+                    style={[
+                      styles.ratingButton,
+                      selected && styles.selectedRatingButton,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.ratingLabel,
+                        selected && styles.selectedRatingLabel,
+                      ]}
+                    >
+                      {score}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onSubmit}
+        style={styles.sunButton}
+      >
+        <Text style={styles.sunButtonLabel}>Drop the verdict</Text>
+      </Pressable>
     </View>
   );
 }
@@ -367,6 +571,64 @@ const styles = StyleSheet.create({
   },
   question: {
     gap: mobileTokens.spacing[4],
+  },
+  noResultsBody: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: mobileTokens.typography.body.size,
+    lineHeight: mobileTokens.typography.body.lineHeight,
+  },
+  q5Subtitle: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: mobileTokens.typography.body.size,
+    lineHeight: mobileTokens.typography.body.lineHeight,
+  },
+  candidateStack: {
+    gap: mobileTokens.spacing[3],
+  },
+  candidateCard: {
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: mobileTokens.spacing[3],
+    padding: mobileTokens.spacing[4],
+  },
+  candidateName: {
+    color: mobileTokens.color.paper,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "800",
+  },
+  candidateMeta: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: mobileTokens.typography.eyebrow.size,
+    fontWeight: mobileTokens.typography.eyebrow.weight,
+    letterSpacing: 1.5,
+  },
+  ratingRow: {
+    flexDirection: "row",
+    gap: mobileTokens.spacing[3],
+  },
+  ratingButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: 10,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  selectedRatingButton: {
+    backgroundColor: mobileTokens.color.sun,
+    borderColor: mobileTokens.color.sun,
+  },
+  ratingLabel: {
+    color: mobileTokens.color.paper,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "800",
+  },
+  selectedRatingLabel: {
+    color: mobileTokens.color.ink,
   },
   eyebrow: {
     color: mobileTokens.color.sun,
@@ -419,6 +681,21 @@ const styles = StyleSheet.create({
     color: mobileTokens.color.ink,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  sunButton: {
+    alignItems: "center",
+    backgroundColor: mobileTokens.color.sun,
+    borderRadius: 999,
+    minHeight: 56,
+    justifyContent: "center",
+    marginTop: mobileTokens.spacing[4],
+    paddingHorizontal: mobileTokens.spacing[4],
+  },
+  sunButtonLabel: {
+    color: mobileTokens.color.ink,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "800",
     textTransform: "uppercase",
   },
   secondaryButton: {

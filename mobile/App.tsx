@@ -37,6 +37,8 @@ import {
 import { PlanListScreen } from "./src/plans/PlanListScreen";
 import { SetupScreen } from "./src/plans/SetupScreen";
 import { QuizScreen } from "./src/quiz/QuizScreen";
+import type { Q5CandidateRepository } from "./src/quiz/q5CandidateRepository";
+import { fakeQ5CandidateRepository } from "./src/quiz/q5CandidateRepository";
 import type { QuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import { fakeQuizProgressRepository } from "./src/quiz/quizProgressRepository";
 
@@ -64,6 +66,7 @@ type AppProps = {
   inviteBoundary?: InviteBoundary;
   nativeLinkBoundary?: NativeLinkBoundary;
   planRepository?: PlanRepository;
+  q5CandidateRepository?: Q5CandidateRepository;
   quizProgressRepository?: QuizProgressRepository;
   [key: string]: unknown;
 };
@@ -79,6 +82,7 @@ type MobileAppShellProps = {
   onQuizExited?: () => void;
   onSaveSetup?: (plan: PlanSetup) => Promise<void>;
   planRepository?: PlanRepository;
+  q5CandidateRepository?: Q5CandidateRepository;
   quizProgressRepository?: QuizProgressRepository;
   setupPlan?: PlanSetup;
   quizSession?: QuizSession;
@@ -207,6 +211,7 @@ export default function App({
   inviteBoundary = defaultInviteBoundary,
   nativeLinkBoundary = defaultNativeLinkBoundary,
   planRepository = fakePlanRepository,
+  q5CandidateRepository = fakeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
@@ -310,6 +315,7 @@ export default function App({
         dispatch({ type: "waitForVerdict" });
       }}
       planRepository={planRepository}
+      q5CandidateRepository={q5CandidateRepository}
       quizProgressRepository={quizProgressRepository}
       routerState={routerState}
       quizSession={quizSession}
@@ -337,6 +343,7 @@ export function MobileAppShell({
   onQuizExited,
   onSaveSetup,
   planRepository = fakePlanRepository,
+  q5CandidateRepository = fakeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
   routerState,
   quizSession = { roomId: "active-room", role: "initiator" },
@@ -399,6 +406,7 @@ export function MobileAppShell({
         <QuizScreen
           onExited={onQuizExited ?? (() => undefined)}
           progressRepository={quizProgressRepository}
+          q5CandidateRepository={q5CandidateRepository}
           role={quizSession.role}
           roomId={quizSession.roomId}
         />

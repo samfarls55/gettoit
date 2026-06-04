@@ -555,7 +555,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(quizProgressRepository.saveProgress).toHaveBeenLastCalledWith({
         roomId: "joined-morgan-birthday",
-        currentQuestion: "q4",
+        currentQuestion: "q5",
         answers: {
           q1CuisineCravings: ["italian", "mexican"],
           q2SpendCap: "$$",
@@ -563,6 +563,7 @@ describe("App", () => {
           q4VibeEnergy: "social",
         },
       });
+      expect(screen.getByText("Q5")).toBeOnTheScreen();
     });
 
     fireEvent.press(screen.getByText("Leave"));

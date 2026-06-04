@@ -27,3 +27,9 @@ Implement Q5 candidate loading and the preference probe. The slice should port t
 
 - TB-10: Quiz Q1-Q4 flow.
 
+## Completion notes
+
+Completed in branch `sandcastle/issue-337`. The Expo Quiz now advances from Q4 into Q5, loads a profiled real-venue candidate pool through an injected `Q5CandidateRepository`, generates strict factorial cards in a pure TypeScript module, renders the Q5 excitement probe for valid cards, and renders the no-results path when the pool is empty or cannot furnish usable cards. Q5 never falls back to fictitious candidate rows.
+
+Tests added for factorial invariants, empty/invalid pools, candidate shaping, Q5 card rendering, repository input, and no-results behavior. `npm run verify --prefix mobile` passed with the existing non-failing React `act` warning around async QuizScreen progress hydration.
+

@@ -1,10 +1,11 @@
-export type QuizQuestionId = "q1" | "q2" | "q3" | "q4";
+export type QuizQuestionId = "q1" | "q2" | "q3" | "q4" | "q5";
 
 export type QuizAnswers = {
   q1CuisineCravings?: string[];
   q2SpendCap?: string;
   q3Reputation?: string;
   q4VibeEnergy?: string;
+  q5Ratings?: Record<string, number>;
 };
 
 export type QuizProgress = {
