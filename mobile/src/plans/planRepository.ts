@@ -21,6 +21,32 @@ export type PlanSetup = {
   serviceShape: PlanServiceShape;
 };
 
+const metersPerMile = 1609.344;
+const defaultSearchRadiusMeters = 3219;
+const defaultParticipantScope: PlanParticipantScope = "group";
+const defaultMealTime: PlanMealTime = "dinner";
+const defaultServiceShape: PlanServiceShape = "dineIn";
+
+const participantScopes: readonly PlanParticipantScope[] = [
+  "solo",
+  "duo",
+  "group",
+];
+
+const mealTimes: readonly PlanMealTime[] = [
+  "breakfast",
+  "lunch",
+  "dinner",
+  "lateNight",
+];
+
+const serviceShapes: readonly PlanServiceShape[] = [
+  "dineIn",
+  "outdoor",
+  "takeout",
+  "delivery",
+];
+
 export type PlanListItem = {
   id: string;
   title: string;
@@ -217,47 +243,78 @@ function joinedPlanIdForRoom(
   return room.plan_id;
 }
 
+function isOneOf<TValue extends string>(
+  value: unknown,
+  values: readonly TValue[],
+): value is TValue {
+  return typeof value === "string" && values.includes(value as TValue);
+}
+
+function participantScopeFromPlanRow(plan: SupabasePlanRow): PlanParticipantScope {
+  return isOneOf(plan.scope, participantScopes)
+    ? plan.scope
+    : defaultParticipantScope;
+}
+
+function mealTimeFromSessionParams(
+  sessionParams: Record<string, unknown>,
+): PlanMealTime {
+  return isOneOf(sessionParams.meal_time, mealTimes)
+    ? sessionParams.meal_time
+    : defaultMealTime;
+}
+
+function serviceShapeFromSessionParams(
+  sessionParams: Record<string, unknown>,
+): PlanServiceShape {
+  return isOneOf(sessionParams.service_shape, serviceShapes)
+    ? sessionParams.service_shape
+    : defaultServiceShape;
+}
+
 function milesToMeters(radiusMiles: number): number {
-  return Math.round(radiusMiles * 1609.344);
+  return Math.round(radiusMiles * metersPerMile);
 }
 
 function metersToMiles(distanceMeters: number): number {
-  return Math.round((distanceMeters / 1609.344) * 10) / 10;
+  return Math.round((distanceMeters / metersPerMile) * 10) / 10;
 }
 
-function setupFromPlanRow(plan: SupabasePlanRow): PlanSetup {
-  const sessionParams = plan.session_params ?? {};
+function searchAreaFromPlanRow(plan: SupabasePlanRow): SearchArea | null {
   const location = plan.location;
   const locationLat = location?.lat;
   const locationLng = location?.lng;
   const locationName = location?.name;
-  const hasLocation =
-    typeof locationLat === "number" &&
-    typeof locationLng === "number" &&
-    typeof locationName === "string";
 
+  if (
+    typeof locationLat !== "number" ||
+    typeof locationLng !== "number" ||
+    typeof locationName !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    center: {
+      latitude: locationLat,
+      longitude: locationLng,
+      label: locationName,
+    },
+    radiusMiles: metersToMiles(
+      plan.distance_meters ?? defaultSearchRadiusMeters,
+    ),
+  };
+}
+
+function setupFromPlanRow(plan: SupabasePlanRow): PlanSetup {
+  const sessionParams = plan.session_params ?? {};
   return {
     id: plan.id,
     name: plan.name,
-    participantScope: plan.scope ?? "group",
-    searchArea: hasLocation
-      ? {
-          center: {
-            latitude: locationLat,
-            longitude: locationLng,
-            label: locationName,
-          },
-          radiusMiles: metersToMiles(plan.distance_meters ?? 3219),
-        }
-      : null,
-    mealTime:
-      typeof sessionParams.meal_time === "string"
-        ? (sessionParams.meal_time as PlanMealTime)
-        : "dinner",
-    serviceShape:
-      typeof sessionParams.service_shape === "string"
-        ? (sessionParams.service_shape as PlanServiceShape)
-        : "dineIn",
+    participantScope: participantScopeFromPlanRow(plan),
+    searchArea: searchAreaFromPlanRow(plan),
+    mealTime: mealTimeFromSessionParams(sessionParams),
+    serviceShape: serviceShapeFromSessionParams(sessionParams),
   };
 }
 
