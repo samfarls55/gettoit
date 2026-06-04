@@ -1,6 +1,11 @@
 import { useReducer } from "react";
 import { Button, View } from "react-native";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react-native";
 
 import App, { MobileAppShell } from "../App";
 import { mobileTokens } from "../src/design/tokens";
@@ -21,7 +26,7 @@ function EventRouterHarness() {
       <MobileAppShell routerState={routerState} />
       <Button
         title="Sign in"
-        onPress={() => dispatch({ type: "authSignedIn" })}
+        onPress={() => dispatch({ type: "appleSignInSucceeded" })}
       />
       <Button
         title="Open invite link"
@@ -37,12 +42,29 @@ function EventRouterHarness() {
 }
 
 describe("App", () => {
-  it("routes unauthenticated launches to the sign-in gate", () => {
-    render(<App />);
+  it.each<AppStateRouterState["auth"]>(["idle", "anonymous"])(
+    "routes %s auth launches to the sign-in gate",
+    (auth) => {
+      render(
+        <App
+          initialRouterState={{
+            auth,
+            pendingDeepLinkUrl: null,
+            activePlanPhase: null,
+            settingsOpen: false,
+          }}
+        />,
+      );
 
-    expect(screen.getByText("GetToIt")).toBeOnTheScreen();
-    expect(screen.getByText("Sign in gate")).toBeOnTheScreen();
-    expect(screen.getByText("Sign in with Apple to continue.")).toBeOnTheScreen();
+      expect(screen.getByText("Tonight's session")).toBeOnTheScreen();
+      expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Voted on the web?")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Sign in with Apple")).toBeOnTheScreen();
+      expect(screen.getByText("Save my taste profile")).toBeOnTheScreen();
+    },
+  );
+
+  it("uses the design-system token adapter", () => {
     expect(mobileTokens.color.sun).toBe("#FFD23F");
   });
 
@@ -53,9 +75,9 @@ describe("App", () => {
     visibleBody: string;
   }>([
     {
-      name: "signed-in members land on the Plan list",
+      name: "Linked-Apple members land on the Plan list",
       state: {
-        auth: "signedIn",
+        auth: "linkedApple",
         pendingDeepLinkUrl: null,
         activePlanPhase: null,
         settingsOpen: false,
@@ -66,7 +88,7 @@ describe("App", () => {
     {
       name: "deep links route to the resolver before active Plan work",
       state: {
-        auth: "signedIn",
+        auth: "linkedApple",
         pendingDeepLinkUrl: "https://gettoit.example/join/abc",
         activePlanPhase: "quiz",
         settingsOpen: false,
@@ -77,7 +99,7 @@ describe("App", () => {
     {
       name: "setup Plans route to Setup",
       state: {
-        auth: "signedIn",
+        auth: "linkedApple",
         pendingDeepLinkUrl: null,
         activePlanPhase: "setup",
         settingsOpen: false,
@@ -88,7 +110,7 @@ describe("App", () => {
     {
       name: "active quizzes route to Quiz",
       state: {
-        auth: "signedIn",
+        auth: "linkedApple",
         pendingDeepLinkUrl: null,
         activePlanPhase: "quiz",
         settingsOpen: false,
@@ -99,7 +121,7 @@ describe("App", () => {
     {
       name: "waiting Plans route to Waiting",
       state: {
-        auth: "signedIn",
+        auth: "linkedApple",
         pendingDeepLinkUrl: null,
         activePlanPhase: "waiting",
         settingsOpen: false,
@@ -110,7 +132,7 @@ describe("App", () => {
     {
       name: "decided Plans route to Verdict",
       state: {
-        auth: "signedIn",
+        auth: "linkedApple",
         pendingDeepLinkUrl: null,
         activePlanPhase: "verdict",
         settingsOpen: false,
@@ -121,7 +143,7 @@ describe("App", () => {
     {
       name: "settings can cover the signed-in Plan list",
       state: {
-        auth: "signedIn",
+        auth: "linkedApple",
         pendingDeepLinkUrl: null,
         activePlanPhase: null,
         settingsOpen: true,
@@ -139,12 +161,86 @@ describe("App", () => {
   it("routes visible auth and deep-link event outcomes", () => {
     render(<EventRouterHarness />);
 
-    expect(screen.getByText("Sign in gate")).toBeOnTheScreen();
+    expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
 
     fireEvent.press(screen.getByText("Sign in"));
     expect(screen.getByText("Plan list")).toBeOnTheScreen();
 
     fireEvent.press(screen.getByText("Open invite link"));
     expect(screen.getByText("Deep-link placeholder")).toBeOnTheScreen();
+  });
+
+  it("routes to the signed-in landing after a successful mocked Apple sign-in", async () => {
+    const signInWithApple = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <App
+        authBoundary={{
+          signInWithApple,
+          redeemClaimCode: jest.fn(),
+        }}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Sign in with Apple"));
+
+    await waitFor(() => {
+      expect(signInWithApple).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Plan list")).toBeOnTheScreen();
+    });
+  });
+
+  it("reveals Account claim before Apple sign-in and handles claim-code success", async () => {
+    const redeemClaimCode = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <App
+        authBoundary={{
+          signInWithApple: jest.fn(),
+          redeemClaimCode,
+        }}
+      />,
+    );
+
+    const appleButton = screen.getByLabelText("Sign in with Apple");
+    fireEvent.press(screen.getByLabelText("Voted on the web?"));
+    fireEvent.changeText(screen.getByLabelText("Claim code"), " claim-123 ");
+    fireEvent.press(screen.getByLabelText("Bring my Plans over"));
+
+    await waitFor(() => {
+      expect(redeemClaimCode).toHaveBeenCalledWith("claim-123");
+      expect(
+        screen.getByText("Web Plans ready. Sign in with Apple to finish."),
+      ).toBeOnTheScreen();
+      expect(appleButton).toBeOnTheScreen();
+    });
+  });
+
+  it("keeps S00a open when a mocked claim-code redeem fails", async () => {
+    const redeemClaimCode = jest
+      .fn()
+      .mockRejectedValue(new Error("expired claim code"));
+
+    render(
+      <App
+        authBoundary={{
+          signInWithApple: jest.fn(),
+          redeemClaimCode,
+        }}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText("Voted on the web?"));
+    fireEvent.changeText(screen.getByLabelText("Claim code"), "expired");
+    fireEvent.press(screen.getByLabelText("Bring my Plans over"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "That code didn't work. Generate a fresh one from your web link.",
+        ),
+      ).toBeOnTheScreen();
+      expect(screen.getByLabelText("Sign in with Apple")).toBeOnTheScreen();
+    });
   });
 });

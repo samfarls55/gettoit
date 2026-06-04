@@ -41,7 +41,9 @@ export const mobileTokens = {
     ink: designTokens.color.ink,
     paper: designTokens.color.paper,
     sun: designTokens.color.sun,
+    glassStroke: designTokens.color.glass.stroke,
     textSecondaryOnGradient: designTokens.color.text["on-gradient"].secondary,
+    textTertiaryOnGradient: designTokens.color.text["on-gradient"].tertiary,
   },
   spacing: {
     3: designTokens.spacing["3"],

@@ -1,4 +1,4 @@
-export type AuthState = "signedOut" | "signedIn";
+export type AuthState = "idle" | "anonymous" | "linkedApple";
 
 export type ActivePlanPhase = "setup" | "quiz" | "waiting" | "verdict";
 
@@ -24,7 +24,8 @@ export type AppStateRouterState = {
 };
 
 export type AppStateRouterEvent =
-  | { type: "authSignedIn" }
+  | { type: "appleSignInSucceeded" }
+  | { type: "claimCodeRedeemed" }
   | { type: "authSignedOut" }
   | { type: "deepLinkOpened"; url: string }
   | { type: "deepLinkHandled" }
@@ -37,7 +38,7 @@ export type AppStateRouterEvent =
   | { type: "returnToPlans" };
 
 export const initialAppStateRouterState: AppStateRouterState = {
-  auth: "signedOut",
+  auth: "idle",
   pendingDeepLinkUrl: null,
   activePlanPhase: null,
   settingsOpen: false,
@@ -55,8 +56,10 @@ export function appStateRouterReducer(
   event: AppStateRouterEvent,
 ): AppStateRouterState {
   switch (event.type) {
-    case "authSignedIn":
-      return { ...state, auth: "signedIn" };
+    case "appleSignInSucceeded":
+      return { ...state, auth: "linkedApple" };
+    case "claimCodeRedeemed":
+      return { ...state, auth: "anonymous" };
     case "authSignedOut":
       return {
         ...initialAppStateRouterState,
@@ -84,7 +87,7 @@ export function appStateRouterReducer(
 }
 
 export function routeForAppState(state: AppStateRouterState): AppRoute {
-  if (state.auth !== "signedIn") {
+  if (state.auth !== "linkedApple") {
     return { name: "signInGate" };
   }
 
