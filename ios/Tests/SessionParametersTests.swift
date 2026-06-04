@@ -159,8 +159,8 @@ final class SessionParametersTests: XCTestCase {
         XCTAssertEqual(SessionParameters.TransportMode.walk.defaultRadiusMiles, 2.0, accuracy: 0.001)
         XCTAssertEqual(SessionParameters.TransportMode.drive.defaultRadiusMiles, 5.0, accuracy: 0.001)
         for mode in SessionParameters.TransportMode.allCases {
-            XCTAssertGreaterThanOrEqual(mode.defaultRadiusMiles, SetupScreen.minDistanceMiles)
-            XCTAssertLessThanOrEqual(mode.defaultRadiusMiles, SetupScreen.maxDistanceMiles)
+            XCTAssertGreaterThanOrEqual(mode.defaultRadiusMiles, SetupScreen.minSearchAreaRadiusMiles)
+            XCTAssertLessThanOrEqual(mode.defaultRadiusMiles, SetupScreen.maxSearchAreaRadiusMiles)
         }
     }
 
