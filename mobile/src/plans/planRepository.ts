@@ -27,12 +27,7 @@ export const emptyPlanListSnapshot: PlanListSnapshot = {
 };
 
 export function hasPlans(snapshot: PlanListSnapshot): boolean {
-  return (
-    snapshot.created.length > 0 ||
-    snapshot.joined.length > 0 ||
-    snapshot.decided.length > 0 ||
-    snapshot.history.length > 0
-  );
+  return Object.values(snapshot).some((plans) => plans.length > 0);
 }
 
 export const fakePlanRepository: PlanRepository = {

@@ -42,6 +42,13 @@ function EventRouterHarness() {
   );
 }
 
+const linkedApplePlanListState: AppStateRouterState = {
+  auth: "linkedApple",
+  pendingDeepLinkUrl: null,
+  activePlanPhase: null,
+  settingsOpen: false,
+};
+
 describe("App", () => {
   it.each<AppStateRouterState["auth"]>(["idle", "anonymous"])(
     "routes %s auth launches to the sign-in gate",
@@ -191,19 +198,8 @@ describe("App", () => {
     });
   });
 
-  it("renders fake Plan list buckets and routes row taps to placeholders", () => {
-    const linkedAppleState: AppStateRouterState = {
-      auth: "linkedApple",
-      pendingDeepLinkUrl: null,
-      activePlanPhase: null,
-      settingsOpen: false,
-    };
-    const renderPlanList = () =>
-      render(
-        <App initialRouterState={linkedAppleState} />,
-      );
-
-    const planList = renderPlanList();
+  it("renders fake Plan list buckets", () => {
+    render(<App initialRouterState={linkedApplePlanListState} />);
 
     expect(screen.getAllByText("Created")).toHaveLength(2);
     expect(screen.getAllByText("Joined")).toHaveLength(2);
@@ -213,30 +209,18 @@ describe("App", () => {
     expect(screen.getByText("Morgan's birthday")).toBeOnTheScreen();
     expect(screen.getByText("Date night fallback")).toBeOnTheScreen();
     expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
+  });
 
-    fireEvent.press(
-      screen.getByLabelText("Open Created Plan Thursday dinner with the crew"),
-    );
-    expect(screen.getByText("Search area")).toBeOnTheScreen();
-    planList.unmount();
+  it.each([
+    ["Open Created Plan Thursday dinner with the crew", "Search area"],
+    ["Open Joined Plan Morgan's birthday", "Quiz placeholder"],
+    ["Open Decided Plan Date night fallback", "Verdict placeholder"],
+    ["Open History Plan Taco crawl", "Verdict placeholder"],
+  ])("routes %s to %s", (accessibilityLabel, visibleRoute) => {
+    render(<App initialRouterState={linkedApplePlanListState} />);
 
-    const joinedPlanList = renderPlanList();
-    fireEvent.press(
-      screen.getByLabelText("Open Joined Plan Morgan's birthday"),
-    );
-    expect(screen.getByText("Quiz placeholder")).toBeOnTheScreen();
-    joinedPlanList.unmount();
-
-    const decidedPlanList = renderPlanList();
-    fireEvent.press(
-      screen.getByLabelText("Open Decided Plan Date night fallback"),
-    );
-    expect(screen.getByText("Verdict placeholder")).toBeOnTheScreen();
-    decidedPlanList.unmount();
-
-    renderPlanList();
-    fireEvent.press(screen.getByLabelText("Open History Plan Taco crawl"));
-    expect(screen.getByText("Verdict placeholder")).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText(accessibilityLabel));
+    expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
   });
 
   it("renders an empty Plan list with a create-Plan entry path", () => {
