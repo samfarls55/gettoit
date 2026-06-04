@@ -401,7 +401,7 @@ public struct SetupScreen: View {
     /// Filter broad density preview results to the selected circle and
     /// cap visible pins so the map remains sizing feedback, not browse
     /// results.
-    public static func densityPreviewPins(
+    nonisolated public static func densityPreviewPins(
         for searchArea: SearchArea,
         candidates: [DensityPreviewPin]
     ) -> [DensityPreviewPin] {
@@ -1723,14 +1723,15 @@ private struct SearchAreaEditor: View {
     init(
         draft: Binding<SetupScreen.SearchArea?>,
         committed: SetupScreen.SearchArea?,
-        currentPlace: ResolvedPlace?,
+        locationCoordinator: LocationCoordinator,
         densityPreviewSearcher: any SetupScreen.SearchAreaDensityPreviewSearching = MapKitSearchAreaDensityPreviewSearcher(),
         onCommit: @escaping (SetupScreen.SearchArea) -> Void,
         onDismiss: @escaping () -> Void
     ) {
         _draft = draft
         self.committed = committed
-        self.currentLocationPlace = currentPlace
+        self.locationCoordinator = locationCoordinator
+        self.currentLocationPlace = locationCoordinator.place
         self.onCommit = onCommit
         self.onDismiss = onDismiss
         _densityPreviewModel = StateObject(
@@ -2058,7 +2059,7 @@ private struct SearchAreaEditor: View {
     }
 
     private func jumpToCurrentLocation() {
-        guard let currentPlace else { return }
+        guard let currentPlace = currentLocationPlace else { return }
         let radius = draft?.radiusMeters
             ?? SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
         let next = SetupScreen.searchArea(from: currentPlace, radiusMeters: radius)
