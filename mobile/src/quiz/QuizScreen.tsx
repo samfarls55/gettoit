@@ -9,6 +9,7 @@ import {
   q5CardsToCandidates,
   type Q5Candidate,
   type Q5MemberProfile,
+  type Q5PoolVenue,
 } from "./q5Factorial";
 import type {
   QuizAnswers,
@@ -42,9 +43,13 @@ type QuestionConfig = {
   multi?: true;
 };
 
+type Q5Status = "idle" | "loading" | "ready" | "noResults";
+
 const noPreferenceValue = "noPreference";
 const maxMultiSelectValues = 3;
 const quizQuestionIds: readonly QuizQuestionId[] = ["q1", "q2", "q3", "q4", "q5"];
+const defaultQ5Rating = 3;
+const q5RatingScores = [1, 2, 3, 4, 5] as const;
 const vibeValueByAnswer: Record<string, number> = {
   quiet: 0,
   chill: 1,
@@ -188,12 +193,37 @@ export function QuizScreen({
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
   const [q5Candidates, setQ5Candidates] = useState<Q5Candidate[]>([]);
-  const [q5Status, setQ5Status] = useState<"idle" | "loading" | "ready" | "noResults">("idle");
+  const [q5Status, setQ5Status] = useState<Q5Status>("idle");
   const [q5Ratings, setQ5Ratings] = useState<Record<string, number>>({});
   const currentQuestion =
     questionConfigs[questionIndex(currentQuestionId)] ?? questionConfigs[0];
   const exitLabel = role === "joiner" ? "Leave" : "Exit";
   const currentSelectedValues = selectedValues(answers, currentQuestion);
+
+  async function loadQ5Candidates(nextQuizAnswers: QuizAnswers) {
+    setQ5Status("loading");
+
+    try {
+      const pool = await q5CandidateRepository.loadCandidates({
+        roomId,
+        answers: nextQuizAnswers,
+      });
+      const candidates = q5CandidatesFromAnswers(pool, nextQuizAnswers);
+
+      if (!candidates) {
+        setQ5Candidates([]);
+        setQ5Status("noResults");
+        return;
+      }
+
+      setQ5Candidates(candidates);
+      setQ5Ratings(initialQ5Ratings(candidates));
+      setQ5Status("ready");
+    } catch {
+      setQ5Candidates([]);
+      setQ5Status("noResults");
+    }
+  }
 
   useEffect(() => {
     let isCurrent = true;
@@ -215,38 +245,6 @@ export function QuizScreen({
       isCurrent = false;
     };
   }, [progressRepository, roomId]);
-
-  const loadQ5Candidates = async (nextQuizAnswers: QuizAnswers) => {
-    setQ5Status("loading");
-
-    try {
-      const pool = await q5CandidateRepository.loadCandidates({
-        roomId,
-        answers: nextQuizAnswers,
-      });
-      const cards = generateQ5FactorialCards({
-        member: memberProfileFromAnswers(nextQuizAnswers),
-        pool,
-      });
-
-      if (!cards) {
-        setQ5Candidates([]);
-        setQ5Status("noResults");
-        return;
-      }
-
-      const candidates = q5CardsToCandidates(cards);
-
-      setQ5Candidates(candidates);
-      setQ5Ratings(
-        Object.fromEntries(candidates.map((candidate) => [candidate.id, 3])),
-      );
-      setQ5Status("ready");
-    } catch {
-      setQ5Candidates([]);
-      setQ5Status("noResults");
-    }
-  };
 
   const handleOptionPress = (value: string) => {
     setAnswers((currentAnswers) => {
@@ -351,43 +349,43 @@ export function QuizScreen({
           status={q5Status}
         />
       ) : (
-      <View style={styles.question}>
-        <Text style={styles.eyebrow}>{currentQuestion.id.toUpperCase()}</Text>
-        <Text style={styles.title}>{currentQuestion.title}</Text>
-        <View style={styles.optionGrid}>
-          {currentQuestion.options.map((option) => {
-            const isSelected = currentSelectedValues.includes(option.value);
+        <View style={styles.question}>
+          <Text style={styles.eyebrow}>{currentQuestion.id.toUpperCase()}</Text>
+          <Text style={styles.title}>{currentQuestion.title}</Text>
+          <View style={styles.optionGrid}>
+            {currentQuestion.options.map((option) => {
+              const isSelected = currentSelectedValues.includes(option.value);
 
-            return (
-              <Pressable
-                accessibilityLabel={`${currentQuestion.labelPrefix} ${option.label}${
-                  isSelected ? " selected" : ""
-                }`}
-                accessibilityRole="button"
-                key={option.value}
-                onPress={() => handleOptionPress(option.value)}
-                style={[styles.option, isSelected && styles.selectedOption]}
-              >
-                <Text
-                  style={[
-                    styles.optionLabel,
-                    isSelected && styles.selectedOptionLabel,
-                  ]}
+              return (
+                <Pressable
+                  accessibilityLabel={`${currentQuestion.labelPrefix} ${option.label}${
+                    isSelected ? " selected" : ""
+                  }`}
+                  accessibilityRole="button"
+                  key={option.value}
+                  onPress={() => handleOptionPress(option.value)}
+                  style={[styles.option, isSelected && styles.selectedOption]}
                 >
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      isSelected && styles.selectedOptionLabel,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleSave}
+            style={styles.primaryButton}
+          >
+            <Text style={styles.primaryButtonLabel}>{currentQuestion.cta}</Text>
+          </Pressable>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleSave}
-          style={styles.primaryButton}
-        >
-          <Text style={styles.primaryButtonLabel}>{currentQuestion.cta}</Text>
-        </Pressable>
-      </View>
       )}
 
       {isExitConfirmOpen ? (
@@ -431,13 +429,31 @@ function memberProfileFromAnswers(quizAnswers: QuizAnswers): Q5MemberProfile {
   };
 }
 
+function q5CandidatesFromAnswers(
+  pool: Q5PoolVenue[],
+  quizAnswers: QuizAnswers,
+): Q5Candidate[] | null {
+  const cards = generateQ5FactorialCards({
+    member: memberProfileFromAnswers(quizAnswers),
+    pool,
+  });
+
+  return cards ? q5CardsToCandidates(cards) : null;
+}
+
+function initialQ5Ratings(candidates: Q5Candidate[]): Record<string, number> {
+  return Object.fromEntries(
+    candidates.map((candidate) => [candidate.id, defaultQ5Rating]),
+  );
+}
+
 type Q5ProbeProps = {
   candidates: Q5Candidate[];
   onNoResultsSubmit: () => void;
   onRatingPress: (candidateId: string, score: number) => void;
   onSubmit: () => void;
   ratings: Record<string, number>;
-  status: "idle" | "loading" | "ready" | "noResults";
+  status: Q5Status;
 };
 
 function Q5Probe({
@@ -492,8 +508,9 @@ function Q5Probe({
               </Text>
             ) : null}
             <View style={styles.ratingRow}>
-              {[1, 2, 3, 4, 5].map((score) => {
-                const selected = (ratings[candidate.id] ?? 3) === score;
+              {q5RatingScores.map((score) => {
+                const selected =
+                  (ratings[candidate.id] ?? defaultQ5Rating) === score;
 
                 return (
                   <Pressable
