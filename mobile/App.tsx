@@ -18,6 +18,12 @@ import {
   appStateRouterReducer,
   routeForAppState,
 } from "./src/navigation/appStateRouter";
+import type {
+  PlanListItem,
+  PlanRepository,
+} from "./src/plans/planRepository";
+import { fakePlanRepository } from "./src/plans/planRepository";
+import { PlanListScreen } from "./src/plans/PlanListScreen";
 import { SearchAreaPickerPreview } from "./src/searchArea/SearchAreaPickerPreview";
 
 type AuthBoundary = {
@@ -28,14 +34,18 @@ type AuthBoundary = {
 type AppProps = {
   authBoundary?: AuthBoundary;
   initialRouterState?: AppStateRouterState;
+  planRepository?: PlanRepository;
   [key: string]: unknown;
 };
 
 type MobileAppShellProps = {
   authBoundary?: AuthBoundary;
+  onCreatePlan?: () => void;
   routerState: AppStateRouterState;
   onAppleSignInSucceeded?: () => void;
   onClaimCodeRedeemed?: () => void;
+  onOpenPlan?: (plan: PlanListItem) => void;
+  planRepository?: PlanRepository;
 };
 
 type RouteContent = {
@@ -86,6 +96,7 @@ const defaultAuthBoundary: AuthBoundary = {
 export default function App({
   authBoundary = defaultAuthBoundary,
   initialRouterState,
+  planRepository = fakePlanRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
     appStateRouterReducer,
@@ -95,6 +106,22 @@ export default function App({
   return (
     <MobileAppShell
       authBoundary={authBoundary}
+      onCreatePlan={() => dispatch({ type: "openSetup" })}
+      onOpenPlan={(plan) => {
+        switch (plan.routeTarget) {
+          case "pending":
+            dispatch({ type: "openSetup" });
+            break;
+          case "joined":
+            dispatch({ type: "startQuiz" });
+            break;
+          case "decided":
+          case "history":
+            dispatch({ type: "showVerdict" });
+            break;
+        }
+      }}
+      planRepository={planRepository}
       routerState={routerState}
       onAppleSignInSucceeded={() =>
         dispatch({ type: "appleSignInSucceeded" })
@@ -106,8 +133,11 @@ export default function App({
 
 export function MobileAppShell({
   authBoundary = defaultAuthBoundary,
+  onCreatePlan,
   onAppleSignInSucceeded,
   onClaimCodeRedeemed,
+  onOpenPlan,
+  planRepository = fakePlanRepository,
   routerState,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
@@ -130,6 +160,19 @@ export function MobileAppShell({
         onAppleSignInSucceeded={onAppleSignInSucceeded}
         onClaimCodeRedeemed={onClaimCodeRedeemed}
       />
+    );
+  }
+
+  if (route.name === "planList") {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        <PlanListScreen
+          onCreatePlan={onCreatePlan}
+          onOpenPlan={onOpenPlan}
+          plans={planRepository.listPlans()}
+        />
+      </View>
     );
   }
 
