@@ -390,10 +390,8 @@ public struct SetupScreen: View {
         if let committed {
             return committed
         }
-        guard
-            canUseCurrentLocationJump(currentPlace: currentPlace, authorization: authorization),
-            let currentPlace
-        else {
+        guard let currentPlace,
+              canUseCurrentLocationJump(currentPlace: currentPlace, authorization: authorization) else {
             return nil
         }
         return searchArea(
@@ -1635,7 +1633,7 @@ private struct SearchAreaEditor: View {
         VStack(spacing: GTISpacing.step2) {
             topChrome
             if showsSearchResults {
-                searchResults
+                searchResults(for: visibleSearchSuggestions)
             }
         }
     }
@@ -1700,9 +1698,9 @@ private struct SearchAreaEditor: View {
         Array(locationCoordinator.suggestions.prefix(5))
     }
 
-    private var searchResults: some View {
+    private func searchResults(for suggestions: [PlaceSuggestion]) -> some View {
         VStack(spacing: 0) {
-            ForEach(visibleSearchSuggestions) { suggestion in
+            ForEach(suggestions) { suggestion in
                 Button {
                     selectSearchResult(suggestion)
                 } label: {
@@ -1732,7 +1730,7 @@ private struct SearchAreaEditor: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(suggestion.name), \(suggestion.sub)")
-                if suggestion.id != visibleSearchSuggestions.last?.id {
+                if suggestion.id != suggestions.last?.id {
                     Divider()
                         .overlay(Color.white.opacity(0.12))
                 }

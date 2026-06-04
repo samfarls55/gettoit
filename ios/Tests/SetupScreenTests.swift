@@ -69,6 +69,43 @@ final class SetupScreenTests: XCTestCase {
         )
     }
 
+    private func makeSearchArea(
+        centerLabel: String,
+        radiusMiles: Double,
+        lat: Double = 37.7767,
+        lng: Double = -122.4241,
+        source: String = "manual",
+        timeZoneIdentifier: String = "America/Los_Angeles"
+    ) -> SetupScreen.SearchArea {
+        SetupScreen.SearchArea(
+            centerLabel: centerLabel,
+            lat: lat,
+            lng: lng,
+            source: source,
+            timeZoneIdentifier: timeZoneIdentifier,
+            radiusMeters: SetupScreen.metersFromMiles(radiusMiles)
+        )
+    }
+
+    private func makeResolvedPlace(
+        id: String,
+        name: String,
+        source: ResolvedPlace.Source,
+        sub: String = "San Francisco",
+        lat: Double = 37.7767,
+        lng: Double = -122.4241,
+        timeZoneIdentifier: String = "America/Los_Angeles"
+    ) -> ResolvedPlace {
+        ResolvedPlace(
+            id: id,
+            name: name,
+            sub: sub,
+            coordinate: .init(latitude: lat, longitude: lng),
+            source: source,
+            timeZone: TimeZone(identifier: timeZoneIdentifier) ?? .current
+        )
+    }
+
     // MARK: - search area chip + radius foundation (tb-SA-1)
 
     func testSearchAreaChipCopy() {
@@ -193,21 +230,17 @@ final class SetupScreenTests: XCTestCase {
     }
 
     func testTypedSearchAreaJumpUpdatesDraftWithoutCommitting() {
-        let committed = SetupScreen.SearchArea(
+        let committed = makeSearchArea(
             centerLabel: "Hayes Valley",
-            lat: 37.7767,
-            lng: -122.4241,
-            source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
-            radiusMeters: SetupScreen.metersFromMiles(2.5)
+            radiusMiles: 2.5
         )
-        let typedResult = ResolvedPlace(
+        let typedResult = makeResolvedPlace(
             id: "completion:mission",
             name: "Mission District",
-            sub: "San Francisco, CA",
-            coordinate: .init(latitude: 37.7599, longitude: -122.4148),
             source: .manual,
-            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+            sub: "San Francisco, CA",
+            lat: 37.7599,
+            lng: -122.4148
         )
 
         let draft = SetupScreen.searchAreaJump(
@@ -224,21 +257,16 @@ final class SetupScreenTests: XCTestCase {
     }
 
     func testCurrentLocationJumpUpdatesDraftWithoutCommitting() {
-        let currentDraft = SetupScreen.SearchArea(
+        let currentDraft = makeSearchArea(
             centerLabel: "Mission District",
+            radiusMiles: 3.0,
             lat: 37.7599,
-            lng: -122.4148,
-            source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
-            radiusMeters: SetupScreen.metersFromMiles(3.0)
+            lng: -122.4148
         )
-        let currentLocation = ResolvedPlace(
+        let currentLocation = makeResolvedPlace(
             id: "gps:hayes",
             name: "Current location",
-            sub: "San Francisco",
-            coordinate: .init(latitude: 37.7767, longitude: -122.4241),
-            source: .gps,
-            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+            source: .gps
         )
 
         let draft = SetupScreen.searchAreaJump(
@@ -270,13 +298,12 @@ final class SetupScreenTests: XCTestCase {
     }
 
     func testFirstOpenSearchAreaDoesNotTreatManualPlaceAsCurrentLocation() {
-        let manualPlace = ResolvedPlace(
+        let manualPlace = makeResolvedPlace(
             id: "manual:previous",
             name: "Previous typed place",
-            sub: "San Francisco",
-            coordinate: .init(latitude: 37.7599, longitude: -122.4148),
             source: .manual,
-            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+            lat: 37.7599,
+            lng: -122.4148
         )
 
         XCTAssertNil(
@@ -294,13 +321,10 @@ final class SetupScreenTests: XCTestCase {
     }
 
     func testFirstOpenSearchAreaDoesNotUseGpsPlaceWhenPermissionDenied() {
-        let currentLocation = ResolvedPlace(
+        let currentLocation = makeResolvedPlace(
             id: "gps:hayes",
             name: "Current location",
-            sub: "San Francisco",
-            coordinate: .init(latitude: 37.7767, longitude: -122.4241),
-            source: .gps,
-            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+            source: .gps
         )
 
         XCTAssertNil(
@@ -317,21 +341,16 @@ final class SetupScreenTests: XCTestCase {
     }
 
     func testFirstOpenSearchAreaUsesCommittedBeforeCurrentLocation() {
-        let committed = SetupScreen.SearchArea(
+        let committed = makeSearchArea(
             centerLabel: "Saved area",
-            lat: 37.7767,
-            lng: -122.4241,
-            source: "manual",
-            timeZoneIdentifier: "America/Los_Angeles",
-            radiusMeters: SetupScreen.metersFromMiles(1.5)
+            radiusMiles: 1.5
         )
-        let currentLocation = ResolvedPlace(
+        let currentLocation = makeResolvedPlace(
             id: "gps:hayes",
             name: "Current location",
-            sub: "San Francisco",
-            coordinate: .init(latitude: 37.7599, longitude: -122.4148),
             source: .gps,
-            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+            lat: 37.7599,
+            lng: -122.4148
         )
 
         XCTAssertEqual(
