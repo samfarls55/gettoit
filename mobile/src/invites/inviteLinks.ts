@@ -40,10 +40,14 @@ export function parseInviteUrl(url: string): InvitePayload {
     return { kind: "invalid", reason: "unsupported-path" };
   }
 
-  return {
-    kind: "invite",
-    roomId: decodeURIComponent(pathParts[1]),
-  };
+  try {
+    return {
+      kind: "invite",
+      roomId: decodeURIComponent(pathParts[1]),
+    };
+  } catch {
+    return { kind: "invalid", reason: "malformed-url" };
+  }
 }
 
 export function createGroupInviteUrl({

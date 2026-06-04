@@ -40,6 +40,13 @@ describe("inviteLinks", () => {
     });
   });
 
+  it("rejects invite URLs with malformed room id encoding", () => {
+    expect(parseInviteUrl("https://gettoit.example/join/%E0%A4%A")).toEqual({
+      kind: "invalid",
+      reason: "malformed-url",
+    });
+  });
+
   it("creates group invite URLs through the local link shape", () => {
     expect(
       createGroupInviteUrl({
