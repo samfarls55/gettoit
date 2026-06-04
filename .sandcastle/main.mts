@@ -73,16 +73,38 @@ const createDockerSandbox = () =>
     },
   });
 
-const codexAgent = (
-  model: string,
-  options?: { effort?: "low" | "medium" | "high" | "xhigh" },
-) =>
-  sandcastle.codex(model, {
-    ...options,
+type CodexAgentOptions = {
+  effort?: "low" | "medium" | "high" | "xhigh";
+  serviceTier?: "fast";
+};
+
+const codexAgent = (model: string, options?: CodexAgentOptions) => {
+  const { serviceTier, ...codexOptions } = options ?? {};
+  const agent = sandcastle.codex(model, {
+    ...codexOptions,
     sessionStorage: {
       sandboxSessionsDir: SANDBOX_CODEX_SESSIONS_DIR,
     },
   });
+
+  if (!serviceTier) {
+    return agent;
+  }
+
+  const serviceTierFlag = ` -c 'service_tier="${serviceTier}"'`;
+
+  return {
+    ...agent,
+    buildPrintCommand(commandOptions: Parameters<typeof agent.buildPrintCommand>[0]) {
+      const printCommand = agent.buildPrintCommand(commandOptions);
+      const command = printCommand.command.endsWith(" -")
+        ? `${printCommand.command.slice(0, -2)}${serviceTierFlag} -`
+        : `${printCommand.command}${serviceTierFlag}`;
+
+      return { ...printCommand, command };
+    },
+  };
+};
 
 // Hooks run inside the sandbox before the agent starts each iteration.
 // npm install ensures the sandbox always has fresh dependencies.
@@ -170,7 +192,10 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         const implement = await sandbox.run({
           name: "implementer",
           maxIterations: 100,
-          agent: codexAgent("gpt-5.5", { effort: "medium" }),
+          agent: codexAgent("gpt-5.5", {
+            effort: "medium",
+            serviceTier: "fast",
+          }),
           promptFile: "./.sandcastle/implement-prompt.md",
           promptArgs: {
             TASK_ID: issue.id,
