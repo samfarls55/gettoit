@@ -192,6 +192,162 @@ final class SetupScreenTests: XCTestCase {
         XCTAssertEqual(draft.radiusMeters, SetupScreen.metersFromMiles(2.0))
     }
 
+    func testTypedSearchAreaJumpUpdatesDraftWithoutCommitting() {
+        let committed = SetupScreen.SearchArea(
+            centerLabel: "Hayes Valley",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(2.5)
+        )
+        let typedResult = ResolvedPlace(
+            id: "completion:mission",
+            name: "Mission District",
+            sub: "San Francisco, CA",
+            coordinate: .init(latitude: 37.7599, longitude: -122.4148),
+            source: .manual,
+            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+        )
+
+        let draft = SetupScreen.searchAreaJump(
+            from: typedResult,
+            currentDraft: nil,
+            committed: committed
+        )
+
+        XCTAssertEqual(draft.centerLabel, "Mission District")
+        XCTAssertEqual(draft.lat, 37.7599, accuracy: 0.0001)
+        XCTAssertEqual(draft.lng, -122.4148, accuracy: 0.0001)
+        XCTAssertEqual(draft.radiusMeters, committed.radiusMeters)
+        XCTAssertEqual(committed.centerLabel, "Hayes Valley", "typed jumps must not commit")
+    }
+
+    func testCurrentLocationJumpUpdatesDraftWithoutCommitting() {
+        let currentDraft = SetupScreen.SearchArea(
+            centerLabel: "Mission District",
+            lat: 37.7599,
+            lng: -122.4148,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(3.0)
+        )
+        let currentLocation = ResolvedPlace(
+            id: "gps:hayes",
+            name: "Current location",
+            sub: "San Francisco",
+            coordinate: .init(latitude: 37.7767, longitude: -122.4241),
+            source: .gps,
+            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+        )
+
+        let draft = SetupScreen.searchAreaJump(
+            from: currentLocation,
+            currentDraft: currentDraft,
+            committed: nil
+        )
+
+        XCTAssertEqual(draft.centerLabel, "Current location")
+        XCTAssertEqual(draft.lat, 37.7767, accuracy: 0.0001)
+        XCTAssertEqual(draft.lng, -122.4241, accuracy: 0.0001)
+        XCTAssertEqual(draft.radiusMeters, currentDraft.radiusMeters)
+        XCTAssertEqual(currentDraft.centerLabel, "Mission District", "current-location jumps must not commit")
+    }
+
+    func testFirstOpenSearchAreaStartsSearchFirstWithoutCurrentLocation() {
+        XCTAssertNil(
+            SetupScreen.initialSearchAreaDraft(
+                committed: nil,
+                currentPlace: nil,
+                authorization: .notDetermined
+            ),
+            "no committed value plus no current location should leave the editor search-first"
+        )
+        XCTAssertEqual(
+            SetupScreen.searchAreaJumpPromptCopy(),
+            "Search city, neighborhood, or address"
+        )
+    }
+
+    func testFirstOpenSearchAreaDoesNotTreatManualPlaceAsCurrentLocation() {
+        let manualPlace = ResolvedPlace(
+            id: "manual:previous",
+            name: "Previous typed place",
+            sub: "San Francisco",
+            coordinate: .init(latitude: 37.7599, longitude: -122.4148),
+            source: .manual,
+            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+        )
+
+        XCTAssertNil(
+            SetupScreen.initialSearchAreaDraft(
+                committed: nil,
+                currentPlace: manualPlace,
+                authorization: .denied
+            ),
+            "first open should only seed from an actual current-location fix"
+        )
+        XCTAssertFalse(SetupScreen.canUseCurrentLocationJump(
+            currentPlace: manualPlace,
+            authorization: .authorizedWhenInUse
+        ))
+    }
+
+    func testFirstOpenSearchAreaDoesNotUseGpsPlaceWhenPermissionDenied() {
+        let currentLocation = ResolvedPlace(
+            id: "gps:hayes",
+            name: "Current location",
+            sub: "San Francisco",
+            coordinate: .init(latitude: 37.7767, longitude: -122.4241),
+            source: .gps,
+            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+        )
+
+        XCTAssertNil(
+            SetupScreen.initialSearchAreaDraft(
+                committed: nil,
+                currentPlace: currentLocation,
+                authorization: .denied
+            )
+        )
+        XCTAssertFalse(SetupScreen.canUseCurrentLocationJump(
+            currentPlace: currentLocation,
+            authorization: .notDetermined
+        ))
+    }
+
+    func testFirstOpenSearchAreaUsesCommittedBeforeCurrentLocation() {
+        let committed = SetupScreen.SearchArea(
+            centerLabel: "Saved area",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(1.5)
+        )
+        let currentLocation = ResolvedPlace(
+            id: "gps:hayes",
+            name: "Current location",
+            sub: "San Francisco",
+            coordinate: .init(latitude: 37.7599, longitude: -122.4148),
+            source: .gps,
+            timeZone: TimeZone(identifier: "America/Los_Angeles") ?? .current
+        )
+
+        XCTAssertEqual(
+            SetupScreen.initialSearchAreaDraft(
+                committed: committed,
+                currentPlace: currentLocation,
+                authorization: .denied
+            ),
+            committed
+        )
+        XCTAssertTrue(SetupScreen.canUseCurrentLocationJump(
+            currentPlace: currentLocation,
+            authorization: .authorizedWhenInUse
+        ))
+    }
+
     func testSearchAreaCloseDecisionCleanVsDirty() {
         let committed = SetupScreen.SearchArea(
             centerLabel: "Hayes Valley",

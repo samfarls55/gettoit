@@ -163,6 +163,11 @@ public struct SetupScreen: View {
         "Tap to choose on map"
     }
 
+    /// Placeholder copy for the Search area jump query field.
+    public static func searchAreaJumpPromptCopy() -> String {
+        "Search city, neighborhood, or address"
+    }
+
     public static func searchAreaSupportCopy(radiusMeters: Int) -> String {
         "Search area - \(searchAreaRadiusMilesCopy(radiusMeters: radiusMeters)) mi"
     }
@@ -358,6 +363,61 @@ public struct SetupScreen: View {
             timeZoneIdentifier: place.timeZone.identifier,
             radiusMeters: radiusMeters
         )
+    }
+
+    /// Build a draft Search area after a Search area jump. Jumps reuse
+    /// the active draft radius when present, then the committed radius,
+    /// and otherwise the fixed first-open radius.
+    public static func searchAreaJump(
+        from place: ResolvedPlace,
+        currentDraft: SearchArea?,
+        committed: SearchArea?
+    ) -> SearchArea {
+        let radius = currentDraft?.radiusMeters
+            ?? committed?.radiusMeters
+            ?? metersFromMiles(firstOpenSearchAreaRadiusMiles)
+        return searchArea(from: place, radiusMeters: radius)
+    }
+
+    /// Decide the editor's initial draft. Saved Search area wins; a
+    /// first-open default is only seeded from an actual GPS current
+    /// location. Nil means search-first.
+    public static func initialSearchAreaDraft(
+        committed: SearchArea?,
+        currentPlace: ResolvedPlace?,
+        authorization: CLAuthorizationStatus
+    ) -> SearchArea? {
+        if let committed {
+            return committed
+        }
+        guard
+            canUseCurrentLocationJump(currentPlace: currentPlace, authorization: authorization),
+            let currentPlace
+        else {
+            return nil
+        }
+        return searchArea(
+            from: currentPlace,
+            radiusMeters: metersFromMiles(firstOpenSearchAreaRadiusMiles)
+        )
+    }
+
+    /// Current-location jumps require a GPS-sourced place. Manual
+    /// typed results are Search area jumps, but they are not "current
+    /// location" for the first-open default or the location button.
+    public static func canUseCurrentLocationJump(
+        currentPlace: ResolvedPlace?,
+        authorization: CLAuthorizationStatus
+    ) -> Bool {
+        guard currentPlace?.source == .gps else { return false }
+        switch authorization {
+        case .authorizedAlways, .authorizedWhenInUse:
+            return true
+        case .denied, .restricted, .notDetermined:
+            return false
+        @unknown default:
+            return false
+        }
     }
 
     /// Build a `PlansStore.Location` from the committed Search area.
@@ -871,7 +931,7 @@ public struct SetupScreen: View {
             SearchAreaEditor(
                 draft: $draftSearchArea,
                 committed: committedSearchArea,
-                currentPlace: locationCoordinator.place,
+                locationCoordinator: locationCoordinator,
                 onCommit: { area in
                     committedSearchArea = area
                     distanceMiles = SetupScreen.snapDistance(SetupScreen.milesFromMeters(area.radiusMeters))
@@ -1247,20 +1307,12 @@ public struct SetupScreen: View {
     // MARK: - actions
 
     private func openSearchAreaEditor() {
-        if committedSearchArea == nil {
-            draftSearchArea = nil
-            seedDraftFromCurrentLocation()
-        } else {
-            draftSearchArea = committedSearchArea
-        }
+        draftSearchArea = SetupScreen.initialSearchAreaDraft(
+            committed: committedSearchArea,
+            currentPlace: locationCoordinator.place,
+            authorization: locationCoordinator.authorization
+        )
         searchAreaEditorOpen = true
-    }
-
-    private func seedDraftFromCurrentLocation() {
-        guard let place = locationCoordinator.place else { return }
-        let radius = committedSearchArea?.radiusMeters
-            ?? SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
-        draftSearchArea = SetupScreen.searchArea(from: place, radiusMeters: radius)
     }
 
     /// Compile the current state into a value type carrying everything
@@ -1514,12 +1566,12 @@ private struct SearchAreaPickerChip: View {
 private struct SearchAreaEditor: View {
     @Binding var draft: SetupScreen.SearchArea?
     let committed: SetupScreen.SearchArea?
-    let currentPlace: ResolvedPlace?
+    @Bindable var locationCoordinator: LocationCoordinator
     let onCommit: (SetupScreen.SearchArea) -> Void
     let onDismiss: () -> Void
     @State private var cameraPosition: MapCameraPosition = .automatic
-    @State private var searchQuery: String = ""
     @State private var showDirtyClosePrompt = false
+    @State private var currentLocationPlace: ResolvedPlace?
 
     var body: some View {
         ZStack {
@@ -1527,7 +1579,7 @@ private struct SearchAreaEditor: View {
                 .ignoresSafeArea()
 
             VStack(spacing: GTISpacing.step4) {
-                topChrome
+                searchChrome
 
                 Spacer()
 
@@ -1538,7 +1590,13 @@ private struct SearchAreaEditor: View {
             .padding(.top, GTISpacing.step8)
             .padding(.bottom, GTISpacing.step6)
         }
-        .onAppear(perform: syncCameraToDraft)
+        .onAppear {
+            rememberCurrentLocationIfAvailable(locationCoordinator.place)
+            syncCameraToDraft()
+        }
+        .onChange(of: locationCoordinator.place) { _, newValue in
+            rememberCurrentLocationIfAvailable(newValue)
+        }
         .alert("Use this search area?", isPresented: $showDirtyClosePrompt) {
             Button("Use this area") {
                 commitDraftAndDismiss()
@@ -1573,6 +1631,15 @@ private struct SearchAreaEditor: View {
         }
     }
 
+    private var searchChrome: some View {
+        VStack(spacing: GTISpacing.step2) {
+            topChrome
+            if showsSearchResults {
+                searchResults
+            }
+        }
+    }
+
     private var topChrome: some View {
         HStack(spacing: GTISpacing.step3) {
             Button(action: requestClose) {
@@ -1586,8 +1653,8 @@ private struct SearchAreaEditor: View {
 
             TextField(
                 "",
-                text: $searchQuery,
-                prompt: Text("Search city, neighborhood, or address")
+                text: $locationCoordinator.query,
+                prompt: Text(SetupScreen.searchAreaJumpPromptCopy())
                     .foregroundStyle(GTIColor.TextOnGradient.tertiary)
             )
             .textInputAutocapitalization(.words)
@@ -1622,6 +1689,64 @@ private struct SearchAreaEditor: View {
             .disabled(!hasCurrentPlace)
             .accessibilityLabel("Use current location")
         }
+    }
+
+    private var showsSearchResults: Bool {
+        !locationCoordinator.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !visibleSearchSuggestions.isEmpty
+    }
+
+    private var visibleSearchSuggestions: [PlaceSuggestion] {
+        Array(locationCoordinator.suggestions.prefix(5))
+    }
+
+    private var searchResults: some View {
+        VStack(spacing: 0) {
+            ForEach(visibleSearchSuggestions) { suggestion in
+                Button {
+                    selectSearchResult(suggestion)
+                } label: {
+                    HStack(spacing: GTISpacing.step3) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 14, weight: .black))
+                            .foregroundStyle(GTIColor.sun)
+                            .frame(width: 24, height: 24)
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(suggestion.name)
+                                .font(.system(size: 15, weight: .heavy))
+                                .foregroundStyle(GTIColor.TextOnGradient.primary)
+                                .lineLimit(1)
+                            if !suggestion.sub.isEmpty {
+                                Text(suggestion.sub)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(GTIColor.TextOnGradient.tertiary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer(minLength: GTISpacing.step2)
+                    }
+                    .padding(.horizontal, GTISpacing.step4)
+                    .padding(.vertical, GTISpacing.step3)
+                    .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(suggestion.name), \(suggestion.sub)")
+                if suggestion.id != visibleSearchSuggestions.last?.id {
+                    Divider()
+                        .overlay(Color.white.opacity(0.12))
+                }
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                .fill(GTIColor.Glass.fillSoft)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: GTIRadii.row, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
+        .accessibilityIdentifier("setup.searchArea.results")
     }
 
     private var radiusControls: some View {
@@ -1676,7 +1801,10 @@ private struct SearchAreaEditor: View {
     }
 
     private var hasCurrentPlace: Bool {
-        currentPlace != nil
+        SetupScreen.canUseCurrentLocationJump(
+            currentPlace: currentLocationPlace,
+            authorization: locationCoordinator.authorization
+        )
     }
 
     private var currentLocationIconColor: Color {
@@ -1736,11 +1864,32 @@ private struct SearchAreaEditor: View {
         cameraPosition = .region(SetupScreen.mapRegion(for: draft))
     }
 
+    private func rememberCurrentLocationIfAvailable(_ place: ResolvedPlace?) {
+        guard SetupScreen.canUseCurrentLocationJump(
+            currentPlace: place,
+            authorization: locationCoordinator.authorization
+        ) else { return }
+        currentLocationPlace = place
+    }
+
+    private func selectSearchResult(_ suggestion: PlaceSuggestion) {
+        locationCoordinator.select(suggestion: suggestion) { success in
+            guard success, let place = locationCoordinator.place else { return }
+            jump(to: place)
+        }
+    }
+
     private func jumpToCurrentLocation() {
-        guard let currentPlace else { return }
-        let radius = draft?.radiusMeters
-            ?? SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
-        let next = SetupScreen.searchArea(from: currentPlace, radiusMeters: radius)
+        guard hasCurrentPlace, let currentLocationPlace else { return }
+        jump(to: currentLocationPlace)
+    }
+
+    private func jump(to place: ResolvedPlace) {
+        let next = SetupScreen.searchAreaJump(
+            from: place,
+            currentDraft: draft,
+            committed: committed
+        )
         draft = next
         cameraPosition = .region(SetupScreen.mapRegion(for: next))
     }
