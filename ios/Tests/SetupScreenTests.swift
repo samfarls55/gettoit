@@ -665,15 +665,8 @@ final class SetupScreenTests: XCTestCase {
             "above-range value clamps to the top stop")
     }
 
-    /// bug-30 — `snapSearchAreaRadiusMiles` originally force-unwrapped `searchAreaRadiusStops.first!`
-    /// / `searchAreaRadiusStops.last!`. The fix replaces both with `??` fallbacks
-    /// (`0` floor, `Self.maxSearchAreaRadiusMiles` ceiling) per CODING_STANDARDS.md
-    /// rule OPT-001. Behavior is observably identical because
-    /// `searchAreaRadiusStops` is a static-let literal, but the three acceptance
-    /// criteria from the bug-30 spec are pinned here so a future
-    /// regression that breaks the clamp / passthrough contract fails
-    /// loud — and so the snap helper is exercised at the exact endpoints
-    /// the spec named.
+    /// The snap helper clamps out-of-range values and preserves exact
+    /// stops without force-unwrapping stop-list endpoints.
     func testSnapSearchAreaRadiusBug30AcceptanceCriteria() {
         guard
             let first = SetupScreen.searchAreaRadiusStops.first,
