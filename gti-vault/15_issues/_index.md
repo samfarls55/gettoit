@@ -17,6 +17,8 @@ See `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md` for the fu
 
 ## Cycles
 
+- [[expo-mobile-rewrite/_index|expo-mobile-rewrite]] - full pre-launch migration of the mobile iOS client to Expo managed React Native + TypeScript.
+
 - [[0.1.0/_index|0.1.0]] — pre-launch development cycle. Collapses the former `v1`, `v1.1`, and `workflow-overhaul` batches into a single named cycle (since `v1` is reserved for the first public-launch release). Three organizational phases:
     - [[0.1.0/prd-phase|PRD phase]] — 18 tracer-bullet build slices (`tb-00`–`tb-17`) + 5 design-system spec-gap issues from [[../10_prds/0.1.0-prd|0.1.0-prd.md]].
     - [[0.1.0/dogfood-phase|Dogfood phase]] — first-install TestFlight feedback (2026-05-14 onward), quiz redesign ([[../10_prds/0.1.0-quiz-redesign-prd|0.1.0-quiz-redesign-prd.md]]), Q5-wiring fix, premium-data follow-ups, post-Q5 router fix, verdict-pipeline integration, candidate-pool floor, verdict-spinner diagnosis, solo-session post-mortem, AFK-run follow-ups, UI dogfood batch.
