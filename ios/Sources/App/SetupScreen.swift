@@ -211,6 +211,110 @@ public struct SetupScreen: View {
         case prompt
     }
 
+    /// Non-interactive density feedback marker for the Search area
+    /// editor. It intentionally carries no venue details, ranking, or
+    /// candidate-pool metadata.
+    public struct DensityPreviewPin: Equatable, Identifiable, Sendable {
+        public let id: String
+        public let lat: Double
+        public let lng: Double
+
+        public init(id: String, lat: Double, lng: Double) {
+            self.id = id
+            self.lat = lat
+            self.lng = lng
+        }
+    }
+
+    /// Abstraction over the broad MapKit density search so tests can
+    /// exercise debounce and failure behavior without live MapKit calls.
+    public protocol SearchAreaDensityPreviewSearching: Sendable {
+        /// Return broad food/dining density preview pins near the draft
+        /// Search area center.
+        func searchDensityPreview(
+            near coordinate: CLLocationCoordinate2D,
+            radiusMeters: Double
+        ) async throws -> [DensityPreviewPin]
+    }
+
+    public typealias DensityPreviewSleep = @Sendable (UInt64) async throws -> Void
+
+    public static let densityPreviewVisibleCap = 20
+    public static let densityPreviewDebounceNanoseconds: UInt64 = 450_000_000
+    public static let densityPreviewMapKitQuery = "food dining"
+
+    /// Owns density preview debounce and failure isolation for the
+    /// Search area editor. Preview failures clear pins but never affect
+    /// Search area commit validity.
+    public final class DensityPreviewModel: ObservableObject {
+        @Published public private(set) var pins: [DensityPreviewPin] = []
+
+        private let searcher: any SearchAreaDensityPreviewSearching
+        private let sleep: DensityPreviewSleep
+        private var refreshTask: Task<Void, Never>?
+        private var refreshGeneration = 0
+
+        public init(
+            searcher: any SearchAreaDensityPreviewSearching,
+            sleep: @escaping DensityPreviewSleep = { nanoseconds in
+                try await Task.sleep(nanoseconds: nanoseconds)
+            }
+        ) {
+            self.searcher = searcher
+            self.sleep = sleep
+        }
+
+        deinit {
+            refreshTask?.cancel()
+        }
+
+        /// Schedule a density preview refresh after the editor has been
+        /// idle long enough. A newer draft cancels and supersedes the
+        /// older pending refresh.
+        public func scheduleRefresh(for area: SearchArea) {
+            refreshGeneration += 1
+            let scheduledRefreshGeneration = refreshGeneration
+            let searcher = searcher
+            let sleep = sleep
+            pins = SetupScreen.densityPreviewPins(for: area, candidates: pins)
+            refreshTask?.cancel()
+            refreshTask = Task { [weak self] in
+                do {
+                    try await sleep(SetupScreen.densityPreviewDebounceNanoseconds)
+                    try Task.checkCancellation()
+                    let coordinate = CLLocationCoordinate2D(latitude: area.lat, longitude: area.lng)
+                    let candidates = try await searcher.searchDensityPreview(
+                        near: coordinate,
+                        radiusMeters: Double(area.radiusMeters)
+                    )
+                    try Task.checkCancellation()
+                    let pins = SetupScreen.densityPreviewPins(for: area, candidates: candidates)
+                    await MainActor.run {
+                        self?.setPins(pins, ifCurrent: scheduledRefreshGeneration)
+                    }
+                } catch is CancellationError {
+                    return
+                } catch {
+                    await MainActor.run {
+                        self?.setPins([], ifCurrent: scheduledRefreshGeneration)
+                    }
+                }
+            }
+        }
+
+        /// Cancel any pending preview refresh and remove visible pins.
+        public func clear() {
+            refreshGeneration += 1
+            refreshTask?.cancel()
+            pins = []
+        }
+
+        private func setPins(_ pins: [DensityPreviewPin], ifCurrent generation: Int) {
+            guard refreshGeneration == generation else { return }
+            self.pins = pins
+        }
+    }
+
     /// Compute Search area radius as the distance from camera center to
     /// the nearest visible map edge.
     public static func searchAreaRadiusMeters(from viewport: SearchAreaViewport) -> Int {
@@ -293,6 +397,27 @@ public struct SetupScreen: View {
         committed: SearchArea?
     ) -> SearchAreaCloseDecision {
         searchAreasMatchForDraftClose(draft, committed) ? .dismiss : .prompt
+    }
+
+    /// Whether the editor can commit the selected Search area. Density
+    /// preview state is deliberately excluded from this guard.
+    public static func canCommitSearchArea(draft: SearchArea?) -> Bool {
+        draft != nil
+    }
+
+    /// Filter broad density preview results to the selected circle and
+    /// cap visible pins so the map remains sizing feedback, not browse
+    /// results.
+    public static func densityPreviewPins(
+        for searchArea: SearchArea,
+        candidates: [DensityPreviewPin]
+    ) -> [DensityPreviewPin] {
+        let center = CLLocation(latitude: searchArea.lat, longitude: searchArea.lng)
+        let pinsInsideSearchArea = candidates.filter { pin in
+            let location = CLLocation(latitude: pin.lat, longitude: pin.lng)
+            return location.distance(from: center) <= CLLocationDistance(searchArea.radiusMeters)
+        }
+        return Array(pinsInsideSearchArea.prefix(densityPreviewVisibleCap))
     }
 
     /// Tolerant equality for map-derived drafts. MapKit camera round
@@ -1496,6 +1621,38 @@ public struct SetupScreen: View {
 
 // MARK: - C-28 SearchAreaPicker shell
 
+private final class MapKitSearchAreaDensityPreviewSearcher: SetupScreen.SearchAreaDensityPreviewSearching {
+    func searchDensityPreview(
+        near coordinate: CLLocationCoordinate2D,
+        radiusMeters: Double
+    ) async throws -> [SetupScreen.DensityPreviewPin] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = SetupScreen.densityPreviewMapKitQuery
+        request.region = MKCoordinateRegion(
+            center: coordinate,
+            latitudinalMeters: max(100, radiusMeters * 2.0),
+            longitudinalMeters: max(100, radiusMeters * 2.0)
+        )
+        request.resultTypes = [.pointOfInterest]
+
+        let response = try await MKLocalSearch(request: request).start()
+        return response.mapItems.enumerated().compactMap { index, item in
+            let coordinate = item.placemark.coordinate
+            guard coordinate.latitude.isFinite, coordinate.longitude.isFinite else { return nil }
+            let id = [
+                item.name ?? "density-\(index)",
+                String(format: "%.5f", coordinate.latitude),
+                String(format: "%.5f", coordinate.longitude),
+            ].joined(separator: "|")
+            return SetupScreen.DensityPreviewPin(
+                id: id,
+                lat: coordinate.latitude,
+                lng: coordinate.longitude
+            )
+        }
+    }
+}
+
 private struct SearchAreaPickerChip: View {
     let searchArea: SetupScreen.SearchArea?
     let onOpen: () -> Void
@@ -1567,9 +1724,28 @@ private struct SearchAreaEditor: View {
     @Bindable var locationCoordinator: LocationCoordinator
     let onCommit: (SetupScreen.SearchArea) -> Void
     let onDismiss: () -> Void
+    @StateObject private var densityPreviewModel: SetupScreen.DensityPreviewModel
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var showDirtyClosePrompt = false
     @State private var currentLocationPlace: ResolvedPlace?
+
+    init(
+        draft: Binding<SetupScreen.SearchArea?>,
+        committed: SetupScreen.SearchArea?,
+        currentPlace: ResolvedPlace?,
+        densityPreviewSearcher: any SetupScreen.SearchAreaDensityPreviewSearching = MapKitSearchAreaDensityPreviewSearcher(),
+        onCommit: @escaping (SetupScreen.SearchArea) -> Void,
+        onDismiss: @escaping () -> Void
+    ) {
+        _draft = draft
+        self.committed = committed
+        self.currentLocationPlace = currentPlace
+        self.onCommit = onCommit
+        self.onDismiss = onDismiss
+        _densityPreviewModel = StateObject(
+            wrappedValue: SetupScreen.DensityPreviewModel(searcher: densityPreviewSearcher)
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -1605,6 +1781,9 @@ private struct SearchAreaEditor: View {
         } message: {
             Text("You have uncommitted map changes.")
         }
+        .onDisappear {
+            densityPreviewModel.clear()
+        }
         .accessibilityIdentifier("setup.searchArea.editor")
     }
 
@@ -1621,6 +1800,16 @@ private struct SearchAreaEditor: View {
                     radius: CLLocationDistance(draft.radiusMeters)
                 )
                 .stroke(GTIColor.sun, lineWidth: 2)
+            }
+            ForEach(densityPreviewModel.pins) { pin in
+                Annotation(
+                    "",
+                    coordinate: CLLocationCoordinate2D(latitude: pin.lat, longitude: pin.lng)
+                ) {
+                    DensityPreviewPinView()
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
         }
         .mapStyle(.standard)
@@ -1789,7 +1978,7 @@ private struct SearchAreaEditor: View {
                 )
         }
         .buttonStyle(.plain)
-        .disabled(draft == nil)
+        .disabled(!SetupScreen.canCommitSearchArea(draft: draft))
         .accessibilityIdentifier("setup.searchArea.useThisArea")
     }
 
@@ -1840,8 +2029,7 @@ private struct SearchAreaEditor: View {
     private func adjustRadius(by offset: Int) {
         guard let current = draft else { return }
         let next = SetupScreen.searchAreaAfterRadiusStep(current, offset: offset)
-        draft = next
-        cameraPosition = .region(SetupScreen.mapRegion(for: next))
+        applyDraft(next, syncCamera: true)
     }
 
     private func updateDraft(from region: MKCoordinateRegion) {
@@ -1853,13 +2041,14 @@ private struct SearchAreaEditor: View {
         )
         let next = SetupScreen.searchArea(fromViewport: viewport, previousDraft: draft)
         if !SetupScreen.searchAreasMatchForDraftClose(next, draft) {
-            draft = next
+            applyDraft(next, syncCamera: false)
         }
     }
 
     private func syncCameraToDraft() {
         guard let draft else { return }
         cameraPosition = .region(SetupScreen.mapRegion(for: draft))
+        densityPreviewModel.scheduleRefresh(for: draft)
     }
 
     private func rememberCurrentLocationIfAvailable(_ place: ResolvedPlace?) {
@@ -1878,8 +2067,11 @@ private struct SearchAreaEditor: View {
     }
 
     private func jumpToCurrentLocation() {
-        guard hasCurrentPlace, let currentLocationPlace else { return }
-        jump(to: currentLocationPlace)
+        guard let currentPlace else { return }
+        let radius = draft?.radiusMeters
+            ?? SetupScreen.metersFromMiles(SetupScreen.firstOpenSearchAreaRadiusMiles)
+        let next = SetupScreen.searchArea(from: currentPlace, radiusMeters: radius)
+        applyDraft(next, syncCamera: true)
     }
 
     private func jump(to place: ResolvedPlace) {
@@ -1888,8 +2080,15 @@ private struct SearchAreaEditor: View {
             currentDraft: draft,
             committed: committed
         )
+        applyDraft(next, syncCamera: true)
+    }
+
+    private func applyDraft(_ next: SetupScreen.SearchArea, syncCamera: Bool) {
         draft = next
-        cameraPosition = .region(SetupScreen.mapRegion(for: next))
+        densityPreviewModel.scheduleRefresh(for: next)
+        if syncCamera {
+            cameraPosition = .region(SetupScreen.mapRegion(for: next))
+        }
     }
 
     private func requestClose() {
@@ -1904,6 +2103,22 @@ private struct SearchAreaEditor: View {
     private func commitDraftAndDismiss() {
         guard let draft else { return }
         onCommit(draft)
+    }
+}
+
+private struct DensityPreviewPinView: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(GTIColor.ink.opacity(0.28))
+                .frame(width: 18, height: 18)
+            Circle()
+                .fill(GTIColor.paper)
+                .frame(width: 9, height: 9)
+            Circle()
+                .stroke(GTIColor.sun, lineWidth: 2)
+                .frame(width: 13, height: 13)
+        }
     }
 }
 

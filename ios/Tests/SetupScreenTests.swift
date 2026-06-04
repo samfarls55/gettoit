@@ -19,6 +19,7 @@
 // `PlansStoreTests` (already cover the insert payload shape).
 
 import XCTest
+import Foundation
 import CoreLocation
 import Supabase
 @testable import GetToIt
@@ -402,6 +403,117 @@ final class SetupScreenTests: XCTestCase {
             SetupScreen.searchAreaCloseDecision(draft: nil, committed: nil),
             .dismiss
         )
+    }
+
+    func testDensityPreviewFiltersPinsInsideSelectedCircleAndCapsAtTwenty() {
+        let area = SetupScreen.SearchArea(
+            centerLabel: "Hayes Valley",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(1.0)
+        )
+        let inside = (0..<25).map { index in
+            SetupScreen.DensityPreviewPin(
+                id: "inside-\(index)",
+                lat: area.lat + Double(index) * 0.0001,
+                lng: area.lng
+            )
+        }
+        let outside = SetupScreen.DensityPreviewPin(
+            id: "outside",
+            lat: area.lat + 1.0,
+            lng: area.lng
+        )
+
+        let pins = SetupScreen.densityPreviewPins(for: area, candidates: inside + [outside])
+
+        XCTAssertEqual(pins.count, SetupScreen.densityPreviewVisibleCap)
+        XCTAssertEqual(pins.map(\.id), inside.prefix(SetupScreen.densityPreviewVisibleCap).map(\.id))
+        XCTAssertFalse(pins.contains(outside))
+    }
+
+    func testDensityPreviewPinCarriesOnlyNonInteractiveMapFeedbackShape() {
+        let pin = SetupScreen.DensityPreviewPin(id: "density-1", lat: 37.7767, lng: -122.4241)
+
+        XCTAssertEqual(pin.id, "density-1")
+        XCTAssertEqual(pin.lat, 37.7767, accuracy: 0.0001)
+        XCTAssertEqual(pin.lng, -122.4241, accuracy: 0.0001)
+        XCTAssertEqual(
+            SetupScreen.densityPreviewMapKitQuery,
+            "food dining",
+            "preview search stays broad and separate from candidate filters"
+        )
+    }
+
+    func testDensityPreviewRefreshDebouncesToLatestDraft() async {
+        let searcher = FakeDensityPreviewSearcher(results: [
+            SetupScreen.DensityPreviewPin(id: "latest", lat: 37.7599, lng: -122.4148),
+        ])
+        let model = SetupScreen.DensityPreviewModel(
+            searcher: searcher,
+            sleep: { _ in
+                await Task.yield()
+                try Task.checkCancellation()
+            }
+        )
+        let first = SetupScreen.SearchArea(
+            centerLabel: "First",
+            lat: 37.7767,
+            lng: -122.4241,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(1.0)
+        )
+        let latest = SetupScreen.SearchArea(
+            centerLabel: "Latest",
+            lat: 37.7599,
+            lng: -122.4148,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(1.0)
+        )
+
+        model.scheduleRefresh(for: first)
+        model.scheduleRefresh(for: latest)
+        for _ in 0..<5 {
+            await Task.yield()
+        }
+
+        let requests = await searcher.requests
+        XCTAssertEqual(requests.map(\.lat), [latest.lat])
+        XCTAssertEqual(requests.map(\.lng), [latest.lng])
+        XCTAssertEqual(model.pins.map(\.id), ["latest"])
+    }
+
+    func testDensityPreviewEmptyAndFailureDoNotBlockCommit() async {
+        let area = SetupScreen.SearchArea(
+            centerLabel: "Mission District",
+            lat: 37.7599,
+            lng: -122.4148,
+            source: "manual",
+            timeZoneIdentifier: "America/Los_Angeles",
+            radiusMeters: SetupScreen.metersFromMiles(1.5)
+        )
+        let emptyModel = SetupScreen.DensityPreviewModel(
+            searcher: FakeDensityPreviewSearcher(results: []),
+            sleep: { _ in }
+        )
+        let failingModel = SetupScreen.DensityPreviewModel(
+            searcher: FakeDensityPreviewSearcher(error: URLError(.notConnectedToInternet)),
+            sleep: { _ in }
+        )
+
+        emptyModel.scheduleRefresh(for: area)
+        failingModel.scheduleRefresh(for: area)
+        for _ in 0..<5 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(emptyModel.pins, [])
+        XCTAssertEqual(failingModel.pins, [])
+        XCTAssertTrue(SetupScreen.canCommitSearchArea(draft: area))
     }
 
     func testLaunchWithoutSearchAreaOpensEditorGate() {
@@ -917,5 +1029,40 @@ final class SetupScreenTests: XCTestCase {
         }
         let viaError = SetupScreen.classifyPersistFailure(FakeError())
         XCTAssertEqual(viaError.field, .name)
+    }
+}
+
+private actor FakeDensityPreviewSearcher: SetupScreen.SearchAreaDensityPreviewSearching {
+    struct Request: Equatable {
+        let lat: Double
+        let lng: Double
+        let radiusMeters: Double
+    }
+
+    private(set) var requests: [Request] = []
+    private let results: [SetupScreen.DensityPreviewPin]
+    private let error: Error?
+
+    init(
+        results: [SetupScreen.DensityPreviewPin] = [],
+        error: Error? = nil
+    ) {
+        self.results = results
+        self.error = error
+    }
+
+    func searchDensityPreview(
+        near coordinate: CLLocationCoordinate2D,
+        radiusMeters: Double
+    ) async throws -> [SetupScreen.DensityPreviewPin] {
+        requests.append(Request(
+            lat: coordinate.latitude,
+            lng: coordinate.longitude,
+            radiusMeters: radiusMeters
+        ))
+        if let error {
+            throw error
+        }
+        return results
     }
 }
