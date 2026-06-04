@@ -71,40 +71,66 @@ const committedSearchArea = {
 };
 
 function makeWritablePlanRepository(): PlanRepository {
-  return {
-    listPlans: async () => ({
-      ...emptyPlanListSnapshot,
-      created: [
-        {
+  let snapshot = {
+    ...emptyPlanListSnapshot,
+    created: [
+      {
+        id: "pending-brunch",
+        title: "Brunch plan",
+        subtitle: "Pending setup",
+        badge: "Created",
+        routeTarget: "pending" as const,
+        setup: {
           id: "pending-brunch",
-          title: "Brunch plan",
-          subtitle: "Pending setup",
-          badge: "Created",
-          routeTarget: "pending",
-          setup: {
-            id: "pending-brunch",
-            name: "Brunch plan",
-            participantScope: "duo",
-            searchArea: committedSearchArea,
-            mealTime: "lunch",
-            serviceShape: "outdoor",
-          },
+          name: "Brunch plan",
+          participantScope: "duo" as const,
+          searchArea: committedSearchArea,
+          mealTime: "lunch" as const,
+          serviceShape: "outdoor" as const,
         },
-      ],
-      joined: [
-        {
-          id: "joined-morgan-birthday",
-          title: "Morgan's birthday",
-          subtitle: "Quiz in progress",
-          badge: "Joined",
-          routeTarget: "joined",
-        },
-      ],
-    }),
+      },
+    ],
+    joined: [
+      {
+        id: "joined-morgan-birthday",
+        title: "Morgan's birthday",
+        subtitle: "Quiz in progress",
+        badge: "Joined",
+        routeTarget: "joined" as const,
+      },
+    ],
+  };
+
+  return {
+    listPlans: async () => snapshot,
     savePlan: jest.fn(async (plan) => ({
       ...plan,
       id: plan.id ?? "saved-plan",
     })),
+    deletePlan: jest.fn(async ({ planId }) => {
+      snapshot = {
+        ...snapshot,
+        created: snapshot.created.filter((plan) => plan.id !== planId),
+      };
+    }),
+  };
+}
+
+function makeEmptyPlanRepository(): PlanRepository {
+  return {
+    listPlans: async () => emptyPlanListSnapshot,
+    savePlan: jest.fn(),
+    deletePlan: jest.fn(),
+  };
+}
+
+function makeAuthBoundary(overrides = {}) {
+  return {
+    deleteCurrentAccount: jest.fn().mockResolvedValue(undefined),
+    signInWithApple: jest.fn().mockResolvedValue(undefined),
+    redeemClaimCode: jest.fn().mockResolvedValue(undefined),
+    signOut: jest.fn().mockResolvedValue(undefined),
+    ...overrides,
   };
 }
 
@@ -258,8 +284,8 @@ describe("App", () => {
         activePlanPhase: null,
         settingsOpen: true,
       },
-      visibleRoute: "Settings placeholder",
-      visibleBody: "Account settings live here.",
+      visibleRoute: "Just one thing here for now.",
+      visibleBody: "Delete my data",
     },
   ])("$name", ({ state, visibleRoute, visibleBody }) => {
     render(<MobileAppShell routerState={state} />);
@@ -285,10 +311,7 @@ describe("App", () => {
 
     render(
       <App
-        authBoundary={{
-          signInWithApple,
-          redeemClaimCode: jest.fn(),
-        }}
+        authBoundary={makeAuthBoundary({ signInWithApple })}
       />,
     );
 
@@ -316,6 +339,109 @@ describe("App", () => {
     expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
   });
 
+  it("deletes a Created Plan after confirmation and keeps joined Plans", async () => {
+    const repository = makeWritablePlanRepository();
+
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={repository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Brunch plan")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Delete Created Plan Brunch plan"));
+    expect(screen.getByText("Delete Brunch plan?")).toBeOnTheScreen();
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText("Confirm delete Plan Brunch plan"));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(repository.deletePlan).toHaveBeenCalledWith({
+        planId: "pending-brunch",
+      });
+      expect(screen.queryByLabelText("Open Created Plan Brunch plan")).toBeNull();
+      expect(screen.getByText("Morgan's birthday")).toBeOnTheScreen();
+      expect(screen.getByText("Plan deleted.")).toBeOnTheScreen();
+    });
+  });
+
+  it("opens Settings from the Plan list and closes back to Plans", async () => {
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeEmptyPlanRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open Settings")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open Settings"));
+    expect(screen.getByText("Just one thing here for now.")).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByLabelText("Close Settings"));
+
+    await waitFor(() => {
+      expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes account delete from Settings back to S00a", async () => {
+    const deleteCurrentAccount = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <App
+        authBoundary={makeAuthBoundary({ deleteCurrentAccount })}
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeEmptyPlanRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open Settings")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open Settings"));
+    fireEvent.press(screen.getByText("Delete my data"));
+    fireEvent.press(screen.getByLabelText("Confirm delete account"));
+
+    await waitFor(() => {
+      expect(deleteCurrentAccount).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
+    });
+  });
+
+  it("routes sign out from Settings back to S00a", async () => {
+    const signOut = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <App
+        authBoundary={makeAuthBoundary({ signOut })}
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeEmptyPlanRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Open Settings")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByLabelText("Open Settings"));
+    fireEvent.press(screen.getByText("Sign out"));
+
+    await waitFor(() => {
+      expect(signOut).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
+    });
+  });
+
   it.each([
     ["Open Created Plan Thursday dinner with the crew", "Edit your plan"],
     ["Open Joined Plan Morgan's birthday", "Q1"],
@@ -341,10 +467,7 @@ describe("App", () => {
     render(
       <App
         initialRouterState={linkedApplePlanListState}
-        planRepository={{
-          listPlans: async () => emptyPlanListSnapshot,
-          savePlan: jest.fn(),
-        }}
+        planRepository={makeEmptyPlanRepository()}
       />,
     );
 
@@ -363,10 +486,7 @@ describe("App", () => {
     render(
       <App
         initialRouterState={linkedApplePlanListState}
-        planRepository={{
-          listPlans: async () => emptyPlanListSnapshot,
-          savePlan: jest.fn(),
-        }}
+        planRepository={makeEmptyPlanRepository()}
       />,
     );
 
@@ -714,10 +834,7 @@ describe("App", () => {
           ...linkedApplePlanListState,
           activePlanPhase: "waiting",
         }}
-        planRepository={{
-          listPlans: async () => emptyPlanListSnapshot,
-          savePlan: jest.fn(),
-        }}
+        planRepository={makeEmptyPlanRepository()}
         waitingRepository={makeWaitingRepository({
           ...waitingSnapshot,
           status: "sessionEnded",
@@ -744,10 +861,7 @@ describe("App", () => {
             .mockResolvedValue("https://gettoit.example/join/open-room"),
           subscribe: jest.fn(() => () => undefined),
         }}
-        planRepository={{
-          listPlans: async () => emptyPlanListSnapshot,
-          savePlan: jest.fn(),
-        }}
+        planRepository={makeEmptyPlanRepository()}
       />,
     );
 
@@ -777,10 +891,7 @@ describe("App", () => {
             return () => undefined;
           }),
         }}
-        planRepository={{
-          listPlans: async () => emptyPlanListSnapshot,
-          savePlan: jest.fn(),
-        }}
+        planRepository={makeEmptyPlanRepository()}
       />,
     );
 
@@ -845,10 +956,7 @@ describe("App", () => {
             .mockResolvedValue("https://gettoit.example/join/open-room"),
           subscribe: jest.fn(() => () => undefined),
         }}
-        planRepository={{
-          listPlans: async () => emptyPlanListSnapshot,
-          savePlan: jest.fn(),
-        }}
+        planRepository={makeEmptyPlanRepository()}
       />,
     );
 
@@ -878,10 +986,7 @@ describe("App", () => {
             return () => undefined;
           }),
         }}
-        planRepository={{
-          listPlans: async () => emptyPlanListSnapshot,
-          savePlan: jest.fn(),
-        }}
+        planRepository={makeEmptyPlanRepository()}
       />,
     );
 
@@ -938,10 +1043,7 @@ describe("App", () => {
 
     render(
       <App
-        authBoundary={{
-          signInWithApple: jest.fn(),
-          redeemClaimCode,
-        }}
+        authBoundary={makeAuthBoundary({ redeemClaimCode })}
       />,
     );
 
@@ -966,10 +1068,7 @@ describe("App", () => {
 
     render(
       <App
-        authBoundary={{
-          signInWithApple: jest.fn(),
-          redeemClaimCode,
-        }}
+        authBoundary={makeAuthBoundary({ redeemClaimCode })}
       />,
     );
 

@@ -48,8 +48,10 @@ import type { WaitingRepository } from "./src/waiting/waitingRepository";
 import { fakeWaitingRepository } from "./src/waiting/waitingRepository";
 
 type AuthBoundary = {
-  signInWithApple: () => Promise<void>;
-  redeemClaimCode: (code: string) => Promise<void>;
+  deleteCurrentAccount: () => Promise<unknown>;
+  signInWithApple: () => Promise<unknown>;
+  redeemClaimCode: (code: string) => Promise<unknown>;
+  signOut: () => Promise<unknown>;
 };
 
 type SavedPlanSetup = PlanSetup & { id: string };
@@ -81,15 +83,20 @@ type AppProps = {
 type MobileAppShellProps = {
   authBoundary?: AuthBoundary;
   onCreatePlan?: (participantScope: PlanParticipantScope) => void;
+  onAccountDeleted?: () => void;
   onLaunchSetup?: (plan: PlanSetup) => Promise<void>;
   routerState: AppStateRouterState;
   onAppleSignInSucceeded?: () => void;
   onClaimCodeRedeemed?: () => void;
+  onCloseSettings?: () => void;
+  onOpenSettings?: () => void;
   onOpenPlan?: (plan: PlanListItem) => void;
+  onPlanDeleted?: () => void;
   onQuizExited?: () => void;
   onQuizSubmitted?: () => void;
   onSaveSetup?: (plan: PlanSetup) => Promise<void>;
   onSessionEnded?: () => void;
+  onSignedOut?: () => void;
   onVerdictReady?: () => void;
   planRepository?: PlanRepository;
   planListNotice?: string | null;
@@ -110,8 +117,10 @@ type PlanListStatus = "idle" | "loading" | "loaded" | "error";
 
 type PlanListContentProps = {
   notice?: string | null;
+  onDeletePlan?: (plan: PlanListItem) => void;
   onCreatePlan?: (participantScope: PlanParticipantScope) => void;
   onOpenPlan?: (plan: PlanListItem) => void;
+  onOpenSettings?: () => void;
   plans: PlanListSnapshot;
   status: PlanListStatus;
 };
@@ -161,8 +170,10 @@ const contentByRouteName: Record<AppRouteName, RouteContent> = {
 };
 
 const defaultAuthBoundary: AuthBoundary = {
+  deleteCurrentAccount: async () => undefined,
   signInWithApple: async () => undefined,
   redeemClaimCode: async () => undefined,
+  signOut: async () => undefined,
 };
 
 const defaultInviteBoundary: InviteBoundary = {
@@ -217,6 +228,22 @@ function editSetupPlan(plan: PlanListItem): PlanSetup {
       name: plan.title,
     }
   );
+}
+
+function filterDeletedPlans(
+  snapshot: PlanListSnapshot,
+  deletedPlanIds: Set<string>,
+): PlanListSnapshot {
+  if (deletedPlanIds.size === 0) {
+    return snapshot;
+  }
+
+  return {
+    created: snapshot.created.filter((plan) => !deletedPlanIds.has(plan.id)),
+    joined: snapshot.joined,
+    decided: snapshot.decided,
+    history: snapshot.history,
+  };
 }
 
 export default function App({
@@ -345,7 +372,11 @@ export default function App({
       onAppleSignInSucceeded={() =>
         dispatch({ type: "appleSignInSucceeded" })
       }
+      onAccountDeleted={() => dispatch({ type: "authSignedOut" })}
       onClaimCodeRedeemed={() => dispatch({ type: "claimCodeRedeemed" })}
+      onCloseSettings={() => dispatch({ type: "closeSettings" })}
+      onOpenSettings={() => dispatch({ type: "openSettings" })}
+      onPlanDeleted={() => setPlanListNotice("Plan deleted.")}
       onQuizExited={() => dispatch({ type: "returnToPlans" })}
       onQuizSubmitted={() => dispatch({ type: "waitForVerdict" })}
       onSessionEnded={() => {
@@ -357,6 +388,7 @@ export default function App({
         await planRepository.savePlan(plan);
         dispatch({ type: "returnToPlans" });
       }}
+      onSignedOut={() => dispatch({ type: "authSignedOut" })}
     />
   );
 }
@@ -365,13 +397,18 @@ export function MobileAppShell({
   authBoundary = defaultAuthBoundary,
   onCreatePlan,
   onLaunchSetup,
+  onAccountDeleted,
   onAppleSignInSucceeded,
   onClaimCodeRedeemed,
+  onCloseSettings,
+  onOpenSettings,
   onOpenPlan,
+  onPlanDeleted,
   onQuizExited,
   onQuizSubmitted,
   onSaveSetup,
   onSessionEnded,
+  onSignedOut,
   onVerdictReady,
   planRepository = fakePlanRepository,
   planListNotice = null,
@@ -389,6 +426,20 @@ export function MobileAppShell({
   );
   const [planListStatus, setPlanListStatus] =
     useState<PlanListStatus>("idle");
+  const [deletedPlanIds, setDeletedPlanIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+
+  const handleDeletePlan = async (plan: PlanListItem) => {
+    await planRepository.deletePlan({ planId: plan.id });
+    const nextDeletedPlanIds = new Set(deletedPlanIds).add(plan.id);
+
+    setDeletedPlanIds(nextDeletedPlanIds);
+    setPlanSnapshot(
+      filterDeletedPlans(await planRepository.listPlans(), nextDeletedPlanIds),
+    );
+    onPlanDeleted?.();
+  };
 
   useEffect(() => {
     if (route.name !== "planList") {
@@ -405,7 +456,7 @@ export function MobileAppShell({
           return;
         }
 
-        setPlanSnapshot(snapshot);
+        setPlanSnapshot(filterDeletedPlans(snapshot, deletedPlanIds));
         setPlanListStatus("loaded");
       })
       .catch(() => {
@@ -417,7 +468,7 @@ export function MobileAppShell({
     return () => {
       isCurrent = false;
     };
-  }, [planRepository, route.name]);
+  }, [deletedPlanIds, planRepository, route.name]);
 
   if (route.name === "setup") {
     return (
@@ -428,6 +479,20 @@ export function MobileAppShell({
           mode={setupPlan.id ? "edit" : "create"}
           onLaunch={onLaunchSetup ?? (async () => undefined)}
           onSave={onSaveSetup ?? (async () => undefined)}
+        />
+      </View>
+    );
+  }
+
+  if (route.name === "settings") {
+    return (
+      <View style={styles.root}>
+        <StatusBar style="light" />
+        <SettingsScreen
+          authBoundary={authBoundary}
+          onAccountDeleted={onAccountDeleted}
+          onClose={onCloseSettings}
+          onSignedOut={onSignedOut}
         />
       </View>
     );
@@ -484,7 +549,9 @@ export function MobileAppShell({
         <PlanListContent
           notice={planListNotice}
           onCreatePlan={onCreatePlan}
+          onDeletePlan={handleDeletePlan}
           onOpenPlan={onOpenPlan}
+          onOpenSettings={onOpenSettings}
           plans={planSnapshot}
           status={planListStatus}
         />
@@ -507,8 +574,10 @@ export function MobileAppShell({
 
 function PlanListContent({
   notice,
+  onDeletePlan,
   onCreatePlan,
   onOpenPlan,
+  onOpenSettings,
   plans,
   status,
 }: PlanListContentProps) {
@@ -518,7 +587,9 @@ function PlanListContent({
         <PlanListScreen
           notice={notice}
           onCreatePlan={onCreatePlan}
+          onDeletePlan={onDeletePlan}
           onOpenPlan={onOpenPlan}
+          onOpenSettings={onOpenSettings}
           plans={plans}
         />
       );
@@ -538,6 +609,117 @@ function PlanListContent({
         </View>
       );
   }
+}
+
+type SettingsScreenProps = {
+  authBoundary: AuthBoundary;
+  onAccountDeleted?: () => void;
+  onClose?: () => void;
+  onSignedOut?: () => void;
+};
+
+function SettingsScreen({
+  authBoundary,
+  onAccountDeleted,
+  onClose,
+  onSignedOut,
+}: SettingsScreenProps) {
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [actionFailed, setActionFailed] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleDeleteConfirm = async () => {
+    setActionFailed(null);
+    setIsSubmitting(true);
+
+    try {
+      await authBoundary.deleteCurrentAccount();
+      onAccountDeleted?.();
+    } catch {
+      setActionFailed("Delete failed. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setActionFailed(null);
+    setIsSubmitting(true);
+
+    try {
+      await authBoundary.signOut();
+      onSignedOut?.();
+    } catch {
+      setActionFailed("Sign out failed. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <View style={styles.surface}>
+      <Pressable
+        accessibilityLabel="Close Settings"
+        accessibilityRole="button"
+        onPress={onClose}
+        style={styles.closeButton}
+      >
+        <Text style={styles.closeButtonLabel}>X</Text>
+      </Pressable>
+      <Text style={styles.eyebrow}>Your account</Text>
+      <Text style={styles.title}>Just one thing here for now.</Text>
+      <Text style={styles.subtitle}>
+        Deletes everything: your sessions, your votes, your taste profile.
+        Rooms you joined keep going - your spot in them clears. Can't be
+        undone.
+      </Text>
+      {actionFailed ? (
+        <Text accessibilityRole="alert" style={styles.inlineError}>
+          {actionFailed}
+        </Text>
+      ) : null}
+      {isDeleteConfirmOpen ? (
+        <View style={styles.confirmCard}>
+          <Text style={styles.routeTitle}>Delete your data?</Text>
+          <Text style={styles.subtitle}>This can't be undone.</Text>
+          <Pressable
+            accessibilityLabel="Confirm delete account"
+            accessibilityRole="button"
+            disabled={isSubmitting}
+            onPress={handleDeleteConfirm}
+            style={[styles.secondaryButton, isSubmitting && styles.disabledButton]}
+          >
+            <Text style={styles.secondaryButtonLabel}>Delete forever</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={isSubmitting}
+            onPress={() => setIsDeleteConfirmOpen(false)}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonLabel}>Cancel</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          onPress={() => setIsDeleteConfirmOpen(true)}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonLabel}>Delete my data</Text>
+        </Pressable>
+      )}
+      <Pressable
+        accessibilityRole="button"
+        disabled={isSubmitting}
+        onPress={handleSignOut}
+        style={styles.secondaryButton}
+      >
+        <Text style={styles.secondaryButtonLabel}>Sign out</Text>
+      </Pressable>
+    </View>
+  );
 }
 
 type SignInGateProps = {
@@ -727,6 +909,30 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     minHeight: 56,
     paddingHorizontal: mobileTokens.spacing[4],
+  },
+  closeButton: {
+    alignItems: "center",
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: 999,
+    borderWidth: 1,
+    minHeight: 44,
+    justifyContent: "center",
+    marginBottom: mobileTokens.spacing[8],
+    width: 44,
+  },
+  closeButtonLabel: {
+    color: mobileTokens.color.paper,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  confirmCard: {
+    backgroundColor: "rgba(255,255,255,0.10)",
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: mobileTokens.spacing[3],
+    marginBottom: mobileTokens.spacing[3],
+    padding: mobileTokens.spacing[4],
   },
   primaryButton: {
     alignItems: "center",
