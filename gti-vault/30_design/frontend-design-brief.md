@@ -13,7 +13,6 @@ related:
 
 # Frontend Design Brief — GetToIt 0.1.0
 
-> **Superseded — design exploration archived.** The design work this brief kicked off shipped as the `design-system/` package (Sunset Pop). Kept as a historical record of the kickoff brief.
 
 ## What it is
 

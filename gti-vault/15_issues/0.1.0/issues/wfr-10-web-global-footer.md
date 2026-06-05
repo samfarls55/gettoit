@@ -38,4 +38,3 @@ None (soft block on support email — ships without mailto, see body).
 
 ## Comments
 
-- 2026-05-26 — Closed via AFK PR. Landed a `<Footer/>` component (`web/components/Footer.tsx`) wired into the root layout (`web/app/layout.tsx`). Renders Privacy / Terms / Help-coming-soon on every route — verified by Next.js build emitting the footer into all 7 static + dynamic routes (`/`, `/privacy`, `/terms`, `/places-fallback`, `/join/[roomId]`, `/s/[sessionId]`, `/_not-found`). Help affordance is a non-interactive `<span aria-disabled="true">Help (coming soon)</span>`; explicitly does NOT render `mailto:support@gettoit.app` until TB-16 ships the mailbox. Footer uses design-system CSS vars only (no orphan hex; `node design-system/scripts/verify.mjs` green). Body became a flex column to anchor the footer with `margin-top: auto` while still flowing inline after long legal articles.

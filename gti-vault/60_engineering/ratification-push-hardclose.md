@@ -36,7 +36,6 @@ The mechanics that convert the verdict from "agreement" to "commitment." Three l
 - **iOS â€” `ios/Sources/App/`**
   - `PushCoordinator.swift` â€” owns the once-per-session permission ask. Seams: `PushPermissionCenter`, `PushRegistrationDriver`, `PushTokenWriter`, `PushDenialFlagStore` (each backed by a `System*` / `Supabase*` adapter in production, stubbed in tests).
   - `RatificationStore.swift` â€” observable count/total/hasRatified. Writes ratification rows via PostgREST; refreshes count + member total on appear. The `apply(event:)` seam is exercised by tests + the future Realtime subscriber.
-  - `LockedScreen.swift` â€” S06 SwiftUI port. Veil + shutter motion ms-exact to `design-system/motion.md` Â§"Hard-close shutter". Reduced motion â†’ fade variant.
   - `VerdictScreen.swift` â€” extended with:
     - `.committed` flavor (mode `.committed` OR local "I'm in" tap) renders sun-fill pill, ink check prefix, `"You're in Â· N of M"` label.
     - Window countdown reads `"Window closes in {seconds}s"`.
@@ -75,7 +74,6 @@ Body: `{ "aps": { "alert": { "title", "body" }, "sound": "default" }, ...custom 
 
 ## Hard-close motion â€” locked timings
 
-Mirrors `design-system/motion.md` Â§"Hard-close shutter":
 
 | Step | Wall-clock delay | Duration | Animation |
 |---|---|---|---|
@@ -110,6 +108,4 @@ Both close paths land at the same end state (`status='locked', locked_at` set). 
 - [[../10_prds/0.1.0-prd|0.1.0 PRD]] Â§"User stories 36â€“40, 60â€“64" + Â§"PushCoordinator"
 - [[apple-keys-setup|apple-keys-setup.md]] Â§"Key 3 â€” APNs auth key" (the `.p8` wiring TB-08 consumes)
 - [[stack-patterns|stack-patterns.md]] Â§"Push notifications"
-- [[../../design-system/surfaces/05-verdict|S05 spec]] Â§"Modes" + Â§"Copy register" (the locked pre-permission line)
-- [[../../design-system/surfaces/06-hard-close|S06 spec]] (full hard-close surface)
 - [[../15_issues/0.1.0/issues/tb-08-ratification-push-hard-close|TB-08 ticket]]

@@ -66,6 +66,5 @@ Concurrency cap: 2 (default).
 
 Result: 7/7 ready merged, 0 escalated. 1 mid-flight resume (bug-24). bug-27 deferred on `needs-info`.
 
-Spec amendments that landed this run (all in `design-system/CHANGELOG.md`): S05 chrome row + `Home` affordance (bug-22), C-26 FAB T1 ink-fill + `GTIShadow.fab` (bug-23, BREAKING), new C-27 ActionSheet primitive (bug-24), C-13 cuts drawer retired (bug-26), solo time-badge audience suppression (bug-28).
 
 Subagent ergonomics note: 1 of 7 subagents (bug-24) ended before reaching `gh pr merge`. The "finish the job" reminder added to the bug-26 + bug-28 briefs appears to have prevented the same drop-out on those two â€” both ran end-to-end including the watch + merge step. Consider promoting that wording into `SUBAGENT-BRIEF.md` as a permanent step-7 emphasis.

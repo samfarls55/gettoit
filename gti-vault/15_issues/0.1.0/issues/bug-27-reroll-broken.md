@@ -106,7 +106,6 @@ CI notes (re: `[[feedback_pr_merge_no_ci_gate]]`): no branch protection. Confirm
 - `supabase/migrations/20260514000300000_rerolls.sql` â€” TB-10 schema.
 - `supabase/migrations/20260515000000000_votes_generic_jsonb.sql` â€” TB-04 generic jsonb rewrite of apply_reroll.
 - `supabase/migrations/20260523000000000_reroll_window_deadline.sql` â€” ADR 0016 window guard.
-- `design-system/surfaces/05-verdict.md` + `07-reroll.md` â€” surface contracts.
 - [[bug-20-web-verdict-live-update-unwired]] â€” web analog (different surface, same "feature not wired" pattern; resolved).
 
 ## Surfaced by

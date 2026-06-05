@@ -38,4 +38,3 @@ None â€” can start immediately.
 
 ## Comments
 
-- 2026-05-26 â€” Shipped contrast bump. Closed-state Action Dot trigger raised from `TextOnGradient.tertiary` (white 0.6) to `TextOnGradient.secondary` (white 0.78) via a new `ActionDotMenu.triggerForegroundColor(isOpen:)` resolver; open-state stays at `primary` (white 1.0) so the open/closed toggle delta still reads. Picked "raise visual weight" over "first-launch hint" because the contrast bump is the simpler ship (no onboarding state to plumb, no copy to lock) and resolves both acceptance bullets with a single primitive-level change. Spec sources updated: `design-system/components.md Â§C-25`, `design-system/code/components.jsx`, `design-system/surfaces/00-plan-list.md`. Tests in `ios/Tests/ActionDotMenuTests.swift` pin the resolver contract at the type level so a future regression that softens the dot back to 0.6 fails CI.

@@ -108,7 +108,6 @@ CI notes (re: `[[feedback_pr_merge_no_ci_gate]]`): no branch protection. Confirm
 - `ios/Sources/App/RoomStore.swift` â€” room mint, unchanged.
 - `ios/Sources/App/TelemetryWriter.swift:226` â€” `inviteShared` emitter, currently unused.
 - Commit `87e803a` (PR #180, tb-WF-4) â€” retired InitiatorScreen.swift; reference for the original share-sheet shape.
-- `design-system/surfaces/01-setup.md` â€” surface contract; "Set it once. Share when you're ready." copy still accurate post-fix.
 - `[[tb-wf-4-wire-plan-setup-surface]]` â€” PR #180 spec; share treatment was an omission, not a deliberate removal.
 - `[[bug-27-reroll-broken]]` â€” sibling pattern (feature built end-to-end but never wired into host).
 

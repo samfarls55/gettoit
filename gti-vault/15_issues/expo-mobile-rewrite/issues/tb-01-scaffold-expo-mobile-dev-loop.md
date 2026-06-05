@@ -1,4 +1,4 @@
-﻿---
+---
 status: ready-for-agent
 type: AFK
 github_issue: 326
@@ -19,7 +19,6 @@ Create the new Expo managed React Native + TypeScript app foundation for the mob
 - [ ] A new Expo managed TypeScript app exists as the active future mobile client scaffold.
 - [ ] Root scripts expose mobile typecheck, mobile tests, mobile web preview, and a combined mobile verification command.
 - [ ] The mobile app can render a placeholder GetToIt surface in Expo web.
-- [ ] The mobile app has a token adapter path from the design system, even if only a minimal subset is wired.
 - [ ] Typecheck and tests pass locally on Windows.
 - [ ] A screen smoke test proves React Native Testing Library can render and assert visible output.
 

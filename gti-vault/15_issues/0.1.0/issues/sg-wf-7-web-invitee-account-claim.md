@@ -75,11 +75,9 @@ architecture in [[../../../60_engineering/adr/0015-web-invitee-account-claim-bri
 The destination is already built â€” S00a's `SignInScreen` already routes
 an in-keychain anonymous session through `linkApple`. The build is the
 transport only: a `claim_codes` table + migration, two edge functions
-(mint / redeem), an S00a design-system amendment, and web affordances
 on Waiting + the read-only verdict card.
 
 **Next step:** decompose via `/to-issues` along the established sg â†’ tb
-pairing (the build spans a design-system amendment + schema + edge
 functions + web/iOS wiring â€” larger than one AFK slice). The web-side
 build slice is sequenced after tb-WF-11 / tb-WF-12 (which build the web
 Waiting screen + read-only verdict card the mint affordance attaches

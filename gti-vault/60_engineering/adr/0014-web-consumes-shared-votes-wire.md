@@ -53,7 +53,6 @@ Two existing ADRs frame how this monorepo shares code:
   enforced package boundaries," assuming cross-imports would be
   *accidental* and caught in review.
 - [[0003-web-fallback-nextjs-vercel|ADR 0003]] ruled that **`web/`
-  must not import from `design-system/code/`** â€” the design-system
   JSX is *spec*, web re-implements it, and the `verify.mjs` drift
   gate is the contract.
 
@@ -90,14 +89,12 @@ monorepo.
    "No package" and "no shared file" are different claims; ADR 0004
    only made the first.
 3. **ADR 0003's prohibition is about visual spec, and does not
-   transfer.** `web/` must not import `design-system/code/` because
    that JSX is a *visual* spec and `verify.mjs` is the drift gate. A
    vote contract is a *data* contract: drift in it is **silent and
    dangerous** (a malformed vote, a verdict computed on the wrong
    shape), and no drift gate can catch it the way `verify.mjs` catches
    an orphan hex. For a data contract, importing the one true source
    is *safer* than re-implementing it â€” the opposite of the
-   design-system case.
 4. **The seam is already narrow.** The web invitee grill (Â§Q1/Â§Q2)
    pinned the shellâ†”quiz boundary to exactly a vote envelope and a
    progress envelope. `votes-wire.ts` *is* that boundary made into a
@@ -115,9 +112,7 @@ monorepo.
   `supabase/functions/_shared`, not as a precedent that the whole
   directory is web-importable.
 - **From [[0003-web-fallback-nextjs-vercel|ADR 0003]].** ADR 0003's
-  literal rule ("`web/` must not import from `design-system/code/`")
   is **not violated** â€” `votes-wire.ts` lives under
-  `supabase/functions/_shared`, not `design-system/`. But ADR 0003's
   *spirit* â€” "web re-implements rather than imports" â€” is being
   deliberately set aside for this one data-contract module, because
   the reasoning behind that spirit (visual spec, drift gate) does not
@@ -131,11 +126,7 @@ monorepo.
 - **Publish a real shared npm package (pnpm workspaces).** Rejected â€”
   reintroduces exactly the publish / version / pin overhead ADR 0004
   declined, to share one leaf file. ADR 0004's re-evaluation trigger
-  for workspaces ("external consumer of the design-system appears")
   has not fired.
-- **Put the shared types in `design-system/`.** Rejected â€” ADR 0003
-  explicitly forbids `web/` importing `design-system/code/`, and a
-  vote wire shape is not a design-system artifact in the first place.
 - **Generate the web copy from `votes-schema.ts` via a codegen
   step.** Rejected â€” a codegen script is more machinery than a direct
   import, and it still leaves two files that can diverge between

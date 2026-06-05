@@ -11,7 +11,6 @@ purpose: Cross-cutting audit checks that apply to every surface regardless of wh
 Three layers of audit gates. Run **before** drilling into named patterns. Failure on any of these is grounds for rework regardless of which patterns the surface uses. Source: Tidwell/Brewer/Valencia *Designing Interfaces* 3rd ed., chapters 1, 5, 11â€“12.
 
 - **P-01..P-13** â€” Cognition + behavior. How users actually perceive and use software (ch.1). Run on every surface.
-- **V-01..V-06** â€” Visual style. Whether visual choices reinforce â€” or fight â€” the interaction (ch.5). Most token concerns live in repo-root `design-system/`; these are workflow-impacting lenses.
 - **S-01..S-06** â€” System discipline. Whether the codebase treats UI as a system (ch.11â€“12). Prerequisite to consistent pattern execution.
 - **B-01..B-04** â€” Beyond-the-screen. Connected devices, anticipatory systems, assistive inputs, natural UIs. Flag only when relevant.
 
@@ -129,7 +128,6 @@ Foundation violations tend to be **systemic** (whole app has bug). Pattern misus
 
 ## Visual style (V-01..V-06)
 
-Workflow-impacting visual checks. Most token mechanics live in repo-root `design-system/`. These lenses surface visual choices that defeat interaction.
 
 ### V-01. Visual hierarchy
 
@@ -190,10 +188,8 @@ Pick one consciously per product. Mixing styles across one product = strong red 
 
 Audit lenses on whether the codebase treats UI as a system. Prerequisite to consistent pattern execution.
 
-### S-01. Design system exists + enforced
 
 - **Check**: Single source of truth for tokens + component primitives? Screens consume rather than redefine?
-- **Signals present**: `design-system/` package; tokens (color/type/space/motion); shared component lib imported by every screen; lint/PR rules blocking raw screen styles.
 - **Red flag**: Inline styles diverging across screens; control copies with drifting padding/colors; per-screen CSS bundles redefining primitives.
 
 ### S-02. Atomic-design hierarchy visible in code
@@ -213,7 +209,6 @@ Five layers; codebase should reflect them:
 
 ### S-03. UI framework choice + discipline
 
-- **Check**: Which framework / design system underlies the app? Framework components used or hand-rolled? Overrides isolated + documented?
 - **Signals present**: One framework; theming layer for brand; almost no per-screen forks.
 - **Red flag**: Multiple frameworks coexisting; framework overridden so aggressively semantics lost; custom component reinventing framework primitive.
 

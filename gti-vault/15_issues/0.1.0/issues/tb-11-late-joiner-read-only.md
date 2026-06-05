@@ -28,7 +28,6 @@ This is the implementation of [[03-s05-late-joiner-read-only|spec-gap issue 03]]
 - **Deep-link router update** â€” when the link is tapped, the join handler checks `rooms.status`:
   - `status IN ('open', 'firing')` â€” proceed to quiz (existing TB-04 path).
   - `status IN ('verdict_ready', 'locked', 'expired')` â€” route to S05 in `read-only` mode.
-- **S05 read-only mode** â€” apply the changes in [[03-s05-late-joiner-read-only|spec-gap 03]] to the design-system spec + JSX, then port to SwiftUI. Visible: eyebrow `"Tonight's verdict"`, verdict hero + meta + time badge + rule chip + voice receipts (late-joiner NOT in receipts). Suppressed: ratification CTA, reroll, "Start over" secondary. Replace primary CTA with `"Start a new decision"` (white pill).
 - **Re-invite flow** â€” tapping `"Start a new decision"` opens S01 with `timer_minutes` and `radius_meters` pre-populated from the prior room. The user is the new initiator.
 - **Tests** â€” deep link to a room with `status='locked'` routes to read-only; voice-receipt row excludes the late-joiner; re-invite CTA creates a new room with the prior room's defaults; late-joiner is not added to `members` of the closed room.
 

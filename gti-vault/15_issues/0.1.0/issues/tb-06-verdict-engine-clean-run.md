@@ -31,7 +31,6 @@ The server-authoritative VerdictEngine for the **clean-run path only** â€” 
   4. Random fallback within survivors if Q5 variance is below a flat-signal threshold.
   5. Write `verdicts` row with `method âˆˆ {'manual'}` for TB-06 and `rule_text` generated per [[../../../50_product/verdict-screen-spec|verdict-screen-spec]] Â§2 (aggregate-rule attribution, never names a person).
   6. Write `option_cuts` rows for every eliminated option with the cut reason and cut text.
-- **S05 default mode** â€” SwiftUI port of [[../../../../design-system/surfaces/05-verdict|S05]] `default` mode with locked choreography per `VERDICT_CHOREO` in `ScreenVerdict.jsx`. Hero + meta + time badge + rule chip + 4 voice receipts. Cuts drawer collapsed by default; expand renders `option_cuts` rows. CTA reads `"I'm in"` â€” non-functional in TB-06 (ratification wiring lands in TB-08).
 - **Tests** â€” fixture-based VerdictEngine tests: a clean-run fixture returns the correct verdict; a single-survivor fixture short-circuits Q5; regret tiebreaker picks max-sum; flat-regret falls back to random within survivors; rule_text never names a person; private-constraint anonymization produces attribute attribution. SwiftUI snapshot test for the verdict default state.
 
 ## Acceptance criteria

@@ -15,7 +15,6 @@
 // The Q1-Q4 surface constants (cuisine ids, budget tiers, reputation
 // chips, vibe labels) re-implement the mobile `QuizCuisine` / `QuizReputation`
 // / `QuizConstants` vocabularies. Per ADR 0003 the web fallback
-// re-implements design-system surfaces rather than importing the JSX;
 // the id strings are the engine contract and must match mobile exactly.
 
 import {
@@ -78,7 +77,6 @@ export const REPUTATION_OPTIONS: Array<{ id: string; label: string }> = [
 // ───────────────────────────────────────────────────────────────────────
 
 /** Q4 vibe vocabulary — the quiz-redesign energy/loudness scale. Mirrors the
- *  design-system `vibe-labels` token (`QUIET · CHILL · SOCIAL · LIVELY ·
  *  ROWDY`) and mobile `GTIVibeLabels.all`. The pre-redesign `HUSHED · MELLOW · BUZZY
  *  · LOUD · ROWDY` vocabulary was retired by the quiz redesign. */
 export const VIBE_LABELS = ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"] as const;

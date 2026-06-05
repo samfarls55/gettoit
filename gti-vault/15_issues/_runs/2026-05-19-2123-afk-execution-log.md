@@ -23,7 +23,6 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
 
 | Issue | GitHub | State | Branch | PR | Notes |
 |---|---|---|---|---|---|
-| bug-15 | [#152](https://github.com/samfarls55/gettoit/issues/152) | merged | `afk/bug-15` | [#153](https://github.com/samfarls55/gettoit/pull/153) | shape-time primary-class gate + entertainment-venue backstop in `shapeFoursquareResult`; ADR 0012 amended (2026-05-19); 325 deno tests green, iOS + web + design-system lanes green |
 
 ## Event log
 - 21:23 â€” preflight green: tree clean, on `main`, even with `origin/main`; bug-15 docs committed (612915e)
@@ -52,4 +51,3 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
 - Case-insensitive matching via lower-cased `Set<string>` constructed per call (small constant sets; no measurable cost) plus a documentary case-insensitivity test that pins the behaviour
 - Regression fixture sourced live from prod `options` row for room `d11b3983-â€¦`, embedded inline as a `Readonly` constant in `foursquare.test.ts` rather than added as a separate JSON file â€” keeps the regression test self-contained and a top-of-fixture comment names the prod row + verdict timestamp
 - ADR 0012 amended in-place under a new "Amendment 2026-05-19 â€” Shape-time primary-class gate" section (not a fresh ADR) to keep the candidate-pool-floor record contiguous; `adr/_index.md` line stamped `amended-2026-05-19`
-- iOS and design-system untouched â€” the fix is server-side only, landing at the single `shapeFoursquareResult` enforcement point that already reaches the Q5 probe, the candidate-pool union, and the verdict pool

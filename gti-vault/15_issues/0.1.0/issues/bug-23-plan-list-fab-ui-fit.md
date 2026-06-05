@@ -16,13 +16,10 @@ closed: 2026-05-24
 
 ## Symptom
 
-The `+` floating action button on the home page (S00 Plan list â€” `C-26 FloatingActionButton`, bottom-right glass + sun-glyph circle) looks out of place against the rest of the Sunset Pop surface. The visual treatment reads as generic / templated rather than part of the design system.
 
-User report: "The + button on the homepage doesn't fit the design system very well. Use Impeccable to fix."
 
 ## Open question for grill â€” "Impeccable"
 
-The fix instruction names **Impeccable** as a reference. That term does not appear in the vault, the design system, or any memory. Grill must resolve: is Impeccable
 
 - a Refero / Mobbin reference library to mine for FAB treatments,
 - a third-party iOS / design library,
@@ -48,10 +45,6 @@ User dogfood, 2026-05-24.
 
 ## References
 
-- `design-system/components.md` Â§C-26 Floating Action Button.
-- `design-system/code/components.jsx` â€” `FloatingActionButton` export.
-- `design-system/surfaces/00-plan-list.md` Â§Components used â€” `C-26 FloatingActionButton`.
-- `design-system/tokens.json` â€” `gradient.surfaces.initiator`, glass tokens, sun glyph.
 - iOS port site (grep for `FloatingActionButton` / `FAB` in `ios/Sources/App/PlanListScreen.swift`).
 
 ## Grill outcome (2026-05-24)
@@ -87,24 +80,17 @@ User dogfood, 2026-05-24.
 
 ### Fix scope
 
-- **Token edit** â€” `design-system/tokens.json`:
   - Add `shadow.fab = "0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08)"`.
-  - Run `node design-system/scripts/gen-css.mjs` to regenerate `code/tokens.css`. Commit both.
-- **Spec edit** â€” `design-system/components.md` Â§C-26:
   - Replace `Background`, `Border`, `Shadow` rows of the Visual spec table with the T1 values above.
   - Amend the Â§"Why a custom FAB" rationale: keep the FAB-vs-chrome-vs-dock paragraph (sg-WF-4 founder lock); rewrite the glass-vs-sun-fill paragraph to reflect the T1 ink-fill decision, citing the impeccable grill (2026-05-24) and naming the absolute-ban motivation. The line 752 sun-fill rejection rationale stays â€” T1 is neither glass nor sun-fill but ink-fill, and the sun-fill argument still applies if anyone reopens that path.
-- **Spec edit** â€” `design-system/code/components.jsx`:
   - Update `FloatingActionButton` style to T1: drop `background: 'rgba(255,255,255,0.18)'`, `backdropFilter`, `border` (set to `none`); replace `boxShadow` with `var(--shadow-fab)`; set `background: 'var(--ink-2)'`.
 - **iOS port** â€” `ios/Sources/App/PlanListScreen.swift` (the `FloatingActionButton` SwiftUI primitive):
   - Replace `.background(.ultraThinMaterial, in: Circle())` with `.background(GTIColor.ink2, in: Circle())`.
   - Remove the `.overlay(Circle().stroke(.white.opacity(0.32), lineWidth: 0.75))` glass border.
   - Replace `.shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 8)` with the regenerated `GTIShadow.fab` (sun-tinted halo).
-- **No surface edit** â€” `design-system/surfaces/00-plan-list.md` is **not** touched. The FAB's external contract (diameter, position, behavior, components-used list) is unchanged. Only the FAB's fill/border/shadow change.
-- **CHANGELOG** â€” `design-system/CHANGELOG.md`: one-line entry, prefix `BREAKING:` (the FAB's visual identity shifts â€” any external consumer assuming the glass treatment will see a different rendering).
 
 ### Verification
 
-- `node design-system/scripts/verify.mjs` green.
 - Sunset Pop gradient + ink puck + sun glyph composition reviewed on iPhone simulator across the three S00 states (Pending only, Decided only, both populated). FAB still legible against the brightest gradient stop.
 - Confirm the empty-state hero (`PillCTA fill="white"`) still suppresses the FAB â€” no change to that path.
 
@@ -129,4 +115,3 @@ Shipped on `afk/bug-23`. Token + spec + JSX + iOS all landed in one PR:
 - New `scripts/test-fab-rework.mjs` (34 assertions, mirrors `test-plan-list.mjs` pattern) gates the whole rework.
 - iOS `FloatingActionButtonTests` extended with two new tests pinning `GTIShadow.fab` recipe values + asserting it is not equal to `GTIShadow.ctaWhite` (the generic-dark recipe).
 
-Verification: `node design-system/scripts/verify.mjs` green; `node design-system/scripts/test-fab-rework.mjs` 34/34; all 5 sibling structural tests still green; `cd web && npm test` 152/152 passing; `npm run build` clean. iOS test suite runs in CI (no Mac locally).

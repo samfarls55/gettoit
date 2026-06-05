@@ -13,7 +13,6 @@ Top-level map of every folder. Start here, drill into a folder's own `_index.md`
 - [[10_prds/_index|10_prds]] — Product Requirements Documents.
 - [[15_issues/_index|15_issues]] — Issue tracker: features, PRDs, implementation tickets (vault-based).
 - [[20_plan/_index|20_plan]] — Roadmap, priorities, session planning.
-- [[30_design/_index|30_design]] — Design: visual exploration artifacts (superseded by `design-system/` at repo root) + interaction-patterns workflow-audit framework.
 - [[40_marketing_branding/_index|40_marketing_branding]] — Positioning, voice, copy guidelines.
 - [[50_product/_index|50_product]] — Product vision, decisions, feature context.
 - [[60_engineering/_index|60_engineering]] — Architecture, conventions, runbooks, ADRs.

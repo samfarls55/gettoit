@@ -1,8 +1,6 @@
 // GetToIt web — Surface web-01 §A "First-landing name entry".
 //
 // tb-WF-11 — the name-entry-alone surface a cold Web invitee reaches on
-// the first click of `/join/<roomId>`. Canonical spec: the design-system
-// surface doc `design-system/surfaces/web-01-invitee-shell.md` §A.
 //
 // Pure presentational component — it owns the input value + the
 // CTA-enable rule, and hands the trimmed name up via `onSubmit`. The

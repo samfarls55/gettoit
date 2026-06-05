@@ -16,11 +16,9 @@ created: 2026-05-19
 
 ## Parent
 
-[[../../../50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] Â§Q5 â€” the three nav verbs (`Back`, `Exit`, `Delete`). This issue lands the design-system spec for the two in-quiz verbs (`Back` and `Exit`); `Delete` lives on the Plan list surface, which is a separate spec-gap.
 
 ## What to build
 
-A design-system update to `design-system/surfaces/03-quiz.md` and `design-system/code/screens/ScreenQuiz.jsx` that adds two chrome affordances to every quiz screen (Q1 through Q5):
 
 - **`Back`** â€” top-leading chrome on Q2 through Q5 only. Tapping it steps one question backward with the prior answer preserved and re-editable. Per-member; never affects room state. Q1 must not render a Back affordance (no prior question to return to).
 - **`Exit`** â€” top-trailing chrome on **all** of Q1 through Q5. Tapping it opens a small confirmation sheet/alert, then on confirm drops the member from the active room (discards their in-flight answers), and returns them to the Plan list surface. The room remains alive for the remaining participants. For a solo session, exit == abandon the room; the Plan returns to `pending` on the user's list.
@@ -60,10 +58,6 @@ Solo session (no joiners, never shared the invite):
 
 ### Files to write / edit
 
-- **Update:** `design-system/surfaces/03-quiz.md` â€” add a `Quiz chrome (Back + Exit)` section documenting placement, treatment, role-conditional labels, and the confirmation copy. Per-question rules (Q1 omits Back).
-- **Update:** `design-system/code/screens/ScreenQuiz.jsx` â€” render both affordances per the rules; preserve the prior answer when `Back` is tapped.
-- **Update:** `design-system/CHANGELOG.md` with a one-line entry.
-- **Run:** `node design-system/scripts/verify.mjs` and confirm green.
 
 ## Acceptance criteria
 
@@ -80,4 +74,3 @@ None â€” the verb definitions are locked in CONTEXT.md and the decisions do
 
 ## Comments
 
-- **2026-05-19** â€” AFK agent closed on `afk/sg-wf-2`. Added `QuizChrome` to `code/components.jsx` (Back top-leading on Q2â€“Q5, Exit/Leave top-trailing on Q1â€“Q5, with confirmation alert + locked copy variants). Rendered on all five `code/screens/ScreenQ*.jsx` files; Q1 passes `canBack={false}`. C-02 TopBar's `Ã—` made conditional and suppressed on quiz surfaces (chrome above owns Exit). Surface doc `surfaces/03-quiz.md` gained the Â§"Quiz chrome (Back + Exit)" section and the legacy "no back arrow / friction is the feature" cross-quiz invariant was retired in line with the workflow-overhaul plan Â§Q5. Accessibility doc updated (tap-target table + quiz focus order). CONTEXT.md "Plan exit" amended â€” the spec said "Q2 onward" which contradicted the parent decision doc + the Plan-back entry; harmonised to "Q1â€“Q5". Structural test landed at `design-system/scripts/test-quiz-chrome.mjs` (43 assertions, all green). `verify.mjs` green.

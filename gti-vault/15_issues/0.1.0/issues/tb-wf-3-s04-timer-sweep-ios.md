@@ -18,7 +18,6 @@ pr: 171
 
 ## Parent
 
-[[sg-wf-3-s04-timer-sweep|sg-WF-3]] â€” the design-system sweep that removes the timer countdown sections from `surfaces/04-waiting.md` + `ScreenWaiting.jsx`. This issue is the iOS port: delete the corresponding iOS code so the implementation matches the spec.
 
 ## What to build
 
@@ -61,7 +60,6 @@ End-to-end behavior delivered: the S04 Waiting surface on iOS no longer renders 
 
 ## Blocked by
 
-- [[sg-wf-3-s04-timer-sweep|sg-WF-3]] â€” the design-system spec must land first so this iOS port stays in sync with the canonical doc.
 
 ## Comments
 

@@ -14,7 +14,6 @@
 //                 routes to the "you left this plan" terminal; a
 //                 subsequent re-click is a fresh first-landing.
 //
-// Spec: design-system/surfaces/web-01-invitee-shell.md §B / §C / §D / §E.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";

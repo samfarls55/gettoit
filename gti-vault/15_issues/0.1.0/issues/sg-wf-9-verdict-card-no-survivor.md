@@ -16,7 +16,6 @@ triaged: 2026-05-22
 
 ## Symptom
 
-`design-system/surfaces/web-01-invitee-shell.md` Â§C ("Read-only verdict card")
 specs the web invitee verdict card as **plan name + verdict venue only**. It
 does not address a decided plan whose verdict is `method: no_survivor` â€” a
 verdict row exists, the plan *is* decided, but there is no winning venue to put
@@ -56,11 +55,9 @@ posture and the locked Sunset Pop copy register. `verify.mjs` must stay green.
 ## Surfaced by
 
 Flagged during the bug-17 `/grill-with-docs` session (2026-05-22, Q2) as a
-design-system spec-gap follow-up.
 
 ## References
 
-- `design-system/surfaces/web-01-invitee-shell.md` Â§C â€” the locked spec with
   the gap.
 - [[bug-17-web-verdict-surface-conformance|bug-17]] â€” ships the interim
   no-survivor variant this spec-gap ratifies.
@@ -86,9 +83,7 @@ call.
 
 #### Agent Brief
 
-**Category:** spec-gap â€” design-system surface amendment.
 
-**Summary:** Amend `design-system/surfaces/web-01-invitee-shell.md` Â§C
 ("Read-only verdict card") with a `no_survivor` variant, codifying the interim
 no-survivor treatment bug-17 ships in web code into the locked Â§C spec.
 
@@ -124,13 +119,9 @@ web code describe the same surface regardless of which merges first:
 
 **Key interfaces:**
 
-- `design-system/surfaces/web-01-invitee-shell.md` Â§C â€” the no-survivor variant
   is added here: a layout note / sub-table for the no-survivor case, the card
   copy, the eyebrow decision, and the copy-register entry. The doc is
   `status: locked`; this is a deliberate amendment to a locked surface â€” follow
-  `design-system/AGENTS.md` for how the `locked-date` is handled.
-- `design-system/CHANGELOG.md` â€” a one-line entry (date, what, why) for the Â§C
-  amendment, per `design-system/AGENTS.md`.
 
 **Acceptance criteria:**
 
@@ -140,8 +131,6 @@ web code describe the same surface regardless of which merges first:
       "No spot fits"-style card, no votes-derived meta line.
 - [ ] The variant explicitly states no primary CTA and retains the "Getting
       the app?" mint line, consistent with Â§C's venue case.
-- [ ] `design-system/CHANGELOG.md` carries a one-line entry for the amendment.
-- [ ] `node design-system/scripts/verify.mjs` passes â€” including the web-01
       presence / completeness check.
 
 **Out of scope:**
@@ -177,4 +166,3 @@ iOS S05 no-survivor screen-reader copy verbatim. TDD via a new
 `scripts/test-verdict-no-survivor.mjs` structural test (redâ†’green,
 18/18 passing) â€” mirrors `test-account-claim.mjs`; `verify.mjs`'s
 web-invitee-doc check tests only fixed marker strings and cannot catch a
-missing variant. `node design-system/scripts/verify.mjs` green.

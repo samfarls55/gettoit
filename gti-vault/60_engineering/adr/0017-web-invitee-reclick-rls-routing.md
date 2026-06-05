@@ -15,7 +15,6 @@ Accepted — 2026-05-21. Outcome of building tb-WF-12 (the web invitee shell re-
 
 ## Context
 
-The web invitee shell (`design-system/surfaces/web-01-invitee-shell.md`) specs four re-click surfaces: §B resume, §C read-only verdict card, §D "this plan is closed" terminal, and §E leave. tb-WF-12 wires them on the tb-WF-11 foundation, under a hard constraint: **no new schema, no new server code** — every server piece already exists.
 
 On a re-click the shell must route the invitee to the right surface. Two of those surfaces — §A first-landing name entry and §D the closed terminal — both correspond to "this anon user has no `members` row for the room":
 
@@ -50,7 +49,6 @@ The shell uses the presence of a `members` row as the primary routing signal, an
 
 ## References
 
-- `design-system/surfaces/web-01-invitee-shell.md` §A / §B / §C / §D — the surface contract.
 - [[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]] §Q5 / §Q6 — the locked re-click behavior.
 - [[0006-privacy-posture-0.1.0|ADR 0006]] — the 30-day anonymous-user TTL whose sweep purges the `members` row.
 - `supabase/migrations/20260513210000000_rooms_and_members.sql` — the `rooms_select_members` membership-gated SELECT policy.

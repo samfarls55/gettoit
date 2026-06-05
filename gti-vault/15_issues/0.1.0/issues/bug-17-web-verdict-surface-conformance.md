@@ -21,7 +21,6 @@ shaping helpers â€” renders a full TB-15-era verdict: venue hero, a meta li
 fixed "7:00 PM" time badge, the rule text, a row of per-member receipt chips, a
 collapsible "what got cut" drawer, and a "Start a new decision" CTA.
 
-The locked design-system spec `design-system/surfaces/web-01-invitee-shell.md`
 Â§C ("Read-only verdict card", status `locked`, 2026-05-21) says the web invitee
 verdict card is **plan name + verdict venue only** â€” and spells out, verbatim,
 "No receipts, no per-axis cuts, no rule chip" and "No primary CTA". The surface
@@ -60,7 +59,6 @@ far smaller read.
 - **Q2 â€” no-survivor.** Â§C does not spec the `no_survivor` decided-plan case.
   bug-17 ships a minimal no-survivor variant (plan name + a "No spot fits"
   card, no votes-derived meta line); the Â§C gap is flagged as a separate
-  design-system spec-gap follow-up.
 - **Q3 â€” claim-code mint line.** Â§C requires the "Getting the app?" mint line
   on the verdict card (a returning invitee of a decided plan lands on Â§C, not
   Waiting, so a Waiting-only affordance strands them). It is currently wired
@@ -70,7 +68,6 @@ far smaller read.
 
 ## References
 
-- `design-system/surfaces/web-01-invitee-shell.md` Â§C â€” the locked spec this
   issue conforms to ("Read-only verdict card").
 - `web/lib/verdict.ts`, `web/components/VerdictReadOnly.tsx`,
   `web/components/SessionRoom.tsx` â€” the verdict-read path.
@@ -116,7 +113,6 @@ The web invitee verdict surface now conforms to the locked
   stale `verdict_for_room` RPC comment removed.
 
 Verified: `npm test` (149 pass), `tsc --noEmit` clean, `next build`
-green, `design-system/scripts/verify.mjs` all gates green, both
 verdict-bearing routes (`/join`, `/s`) serve in a real Next.js dev
 server. The two grill follow-ups (bug-20 Â§C live-update, and the Â§C
 no-survivor spec-gap) remain tracked separately.
@@ -239,7 +235,6 @@ The web invitee verdict surface conforms to `web-01-invitee-shell.md` Â§C:
 - Any edit to `web-01-invitee-shell.md` itself â€” Â§C is correct and locked; this
   is a code-conformance fix, not a spec change.
 - The absence of a `no_survivor` case from the Â§C spec text â€” flagged as a
-  separate design-system spec-gap follow-up (grill Q2). This issue ships a
   minimal no-survivor variant in the meantime.
 - The iOS verdict surface â€” iOS keeps its full receipt surface.
 - bug-18's `tsc --noEmit` test-file type errors â€” tracked separately.

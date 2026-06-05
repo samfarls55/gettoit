@@ -49,10 +49,8 @@ Shipped the group path on the post-Q5 router:
 
 - New `SessionSnapshotStore` reads the room snapshot â€” members (id+role), the answered user-id set from `votes`, and room status â€” in a **single PostgREST round-trip** via an embedded-resource query (`rooms?select=status,members(user_id,role),votes(user_id)`). Both `members.room_id` and `votes.room_id` carry FKs to `rooms.id`, so PostgREST resolves the embeds without a relationship hint. Replaces the three-parallel-select shape the web fallback's `SessionRoom` uses.
 - `PostQuizHost` gained a `waiting` phase. The entry phase is the routing decision (`SoloPath` via `context.isSolo`): solo â†’ `resolving`, group â†’ `waiting` with a fresh `WaitingStore`. The group poll re-bootstraps that store from a fresh snapshot every cadence tick (`bootstrap` is documented idempotent), then advances to `verdict` when the verdict row lands.
-- `PostQuizHostScreen` renders the existing locked S04 `WaitingScreen` for the `.waiting` phase â€” no new design-system tokens or components.
 
 Decisions of note:
 - The host owns the verdict routing, not `WaitingScreen` â€” the host advances only on an actual `verdicts` row, never on a snapshot's `verdict_ready` status alone (avoids racing ahead of the committed row). `WaitingScreen.onAdvanceToVerdict` is wired to a no-op.
 - An unknown `rooms.status` string degrades to `.open` rather than dropping the whole snapshot.
 
-Verified: `ios` lane green (unit + integration), `design-system/scripts/verify.mjs` green. Out-of-scope items (Realtime channel, ratifyâ†’S06 / reroll CTAs) untouched â€” adjacency on bug-07.

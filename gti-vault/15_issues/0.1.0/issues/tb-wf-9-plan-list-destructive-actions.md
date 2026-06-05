@@ -17,7 +17,6 @@ pr: 188
 
 ## Parent
 
-[[sg-wf-4-plan-list-surface|sg-WF-4]] â€” design-system spec for the Plan list surface. Locked decisions in [[../../../50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]] Â§Q4 (delete affordance + confirm sheet copy).
 
 Builds on [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] and [[tb-wf-8-plan-list-decided-history|tb-WF-8]]. Adds destructive actions across all sections + roles.
 
@@ -106,4 +105,3 @@ The four confirm-sheet variants live in `PlanDestructiveConfirmSheet`. The copy 
 
 Backend journey: `PlanDeleteCoordinator` looks up the linked room first, flips it to `status='expired'` (the existing session-ended signal joiners observe via `WaitingStore.RoomStatus.expired` from TB-07), then deletes the Plan. Order matters â€” if the Plan were deleted first, the `rooms.plan_id` FK would go NULL via `on delete set null` and a joiner who hadn't yet received the realtime status flip would see a live room. Joiner leave reuses `MemberLeaveStore.leave(...)` from tb-WF-2 â€” same `Plan exit` semantic (drop the membership, room continues for everyone else). No new migration was needed; existing RLS (`plans_delete_creator` from tb-WF-1, `rooms_update_creator` from TB-05, `members_delete_self` from tb-WF-2) covers authorization.
 
-iOS test lane green (3m53s); design-system verify green; supabase-db + functions lanes green. With this merge the workflow-overhaul phase tracer-bullet sequence (tb-WF-1..9) is fully landed.

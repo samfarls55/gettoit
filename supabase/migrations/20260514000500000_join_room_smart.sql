@@ -8,7 +8,6 @@
 --      the legacy `RoomStore.joinRoom` path (write a `members` row,
 --      route to the quiz).
 --   2. Otherwise route the late-joiner to the S05 surface in
---      `read-only` mode (see `design-system/surfaces/05-verdict.md`
 --      Â§`read-only`). They MUST NOT be added to `members` of the
 --      closed room â€” that would imply they contributed.
 --

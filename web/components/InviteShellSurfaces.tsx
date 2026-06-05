@@ -12,12 +12,10 @@
 //   §E `LeaveConfirmSheet`  — the confirm step reusing the locked
 //                             `joinedLeave` copy from S00 Plan list.
 //
-// Canonical spec: `design-system/surfaces/web-01-invitee-shell.md`
 // §C / §D / §E. Behavior is locked in the decision doc
 // `gti-vault/50_product/workflow-overhaul-web-invitee-flow.md`
 // §Q6 (decided re-click) and §Q7 (leave).
 //
-// Per ADR 0003 the web fallback re-implements design-system surfaces
 // rather than importing the JSX; every color resolves to a registered
 // Sunset Pop token (CSS custom properties from `tokens.css`) or an
 // rgba-white the orphan-hex sweep ignores — no new token, no new

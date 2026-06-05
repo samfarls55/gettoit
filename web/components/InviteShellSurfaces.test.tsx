@@ -10,7 +10,6 @@
 //   * §E `LeaveConfirmSheet`  — the confirm step reusing the locked
 //     `joinedLeave` copy from surfaces/00-plan-list.md.
 //
-// Spec: design-system/surfaces/web-01-invitee-shell.md §C / §D / §E.
 
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";

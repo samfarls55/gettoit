@@ -5,7 +5,6 @@ purpose: Single entry point for the interaction-patterns framework. Routes agent
 
 # Interaction Patterns
 
-This folder is a workflow-design framework adapted from Tidwell, Brewer, Valencia, *Designing Interfaces: Patterns for Effective Interaction Design*, 3rd ed., O'Reilly, 2020. It is organized into a flat pattern catalog, a foundation principle system, surface-by-surface playbooks, end-to-end workflow recipes, and a machine-readable index for programmatic use. Visual tokens (color, type, motion) live in repo-root `design-system/`; this hub covers how users get things done.
 
 ## How to use this hub
 
@@ -124,7 +123,6 @@ Use cases:
 
 ## What this framework does NOT cover
 
-- Visual aesthetics (color, type, spacing tokens) -- repo-root `design-system/` owns that.
 - Voice / conversational UI, AR, brain-computer interfaces, gesture-only interaction -- the source book deliberately excludes these (see its preface).
 - Domain-specific copy and voice rules -- see `40_marketing_branding/`.
 - Accessibility audit -- touched in [[principles#V-01. Visual hierarchy]], [[principles#V-02. Color]], and [[principles#V-04. Readability]] at a heuristic level only; for WCAG compliance use a dedicated checklist.

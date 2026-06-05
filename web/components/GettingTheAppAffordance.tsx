@@ -8,11 +8,9 @@
 // across; the app side that RECEIVES it is the S00a "Voted on the web?"
 // entry (tb-WF-14).
 //
-// Canonical spec: `design-system/surfaces/web-01-invitee-shell.md`
 // §"Getting the app?" mint affordance (sg-WF-8). This is pure
 // composition of existing primitives — the `eyebrow`-token text-link
 // treatment for the collapsed line, the `Glass` `soft` card + the
-// `mono-tag` type token for the revealed code. No new design-system
 // component, no new token, no inline hex.
 //
 // ── Lazy mint ───────────────────────────────────────────────────────
@@ -46,7 +44,6 @@ type MintState =
 
 // The collapsed quiet line — `eyebrow`-token text-link treatment:
 // Inter 700 / 11 / tracking 0.18em / UPPERCASE, white 0.6, a 44pt-tall
-// hit row. The same low-key treatment the rest of the design system
 // uses for secondary text links.
 const quietLine: CSSProperties = {
   appearance: "none",

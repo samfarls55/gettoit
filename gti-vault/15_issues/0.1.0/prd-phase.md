@@ -1,6 +1,5 @@
 ---
 folder: 15_issues/0.1.0
-purpose: 0.1.0 PRD phase (formerly the "v1" batch) â€” tracer-bullet build slices + design-system spec-gap issues
 ---
 
 > **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
@@ -15,9 +14,7 @@ Implementation tickets feeding the [[../../10_prds/0.1.0-prd|0.1.0 PRD]]. This p
 Two issue groups:
 
 - **Tracer-bullet build slices** (`tb-NN-*`) â€” vertical slices that cut through every layer (schema â†’ Edge â†’ iOS / web â†’ tests) and are demoable end-to-end. Picked up by an AFK agent in dependency order. Some are HITL (external accounts, legal, recruitment).
-- **Design-system spec-gap issues** (`NN-*`) â€” surface-level changes to the locked `design-system/` spec that the PRD requires. Each is consumed by exactly one tracer bullet (cross-referenced via `implements_spec_gap` in the tracer bullet's frontmatter).
 
-All 5 design-system spec-gap issues (`01`â€“`05`) landed 2026-05-12; all tracer bullets (TB-00 â†’ TB-17) shipped 2026-05-12 â†’ 2026-05-14 (TB-17 deferred â€” see table). See `design-system/CHANGELOG.md`.
 
 ## Tracer-bullet build slices
 
@@ -54,9 +51,7 @@ TB-00 â†’ TB-01 â†’ TB-02 â†’ TB-04 â†’ TB-05 â†’ TB-06
 - TB-12 (Apple link) â€” branches off TB-02; can run very early in parallel with TB-04 onward.
 - TB-15 (web fallback) â€” branches off TB-07.
 
-## Design-system spec-gap issues
 
-These are surface-level changes to the locked `design-system/` spec required by the PRD. Each is referenced by exactly one tracer bullet via `implements_spec_gap` in that tracer bullet's frontmatter.
 
 | # | Title | Status | GitHub | Consumed by |
 |---|---|---|---|---|

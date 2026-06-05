@@ -13,7 +13,6 @@ Vault root has [[_index|_index.md]] — master map of every folder. Read it firs
 - 01_raw/                  — inbox for unprocessed notes, dumps, and assets
 - 10_prds/                 — product requirements documents (PRDs)
 - 20_plan/                 — roadmap, priorities, and session planning
-- 30_design/               — design system: tokens, components, previews, briefs (single source of truth)
 - 40_marketing_branding/   — positioning, voice, and copy guidelines
 - 50_product/              — product vision, decisions, and feature context
 - 60_engineering/          — architecture, conventions, runbooks, and ADRs

@@ -1,7 +1,6 @@
 // GetToIt web — the web invitee verdict surface (web-01 §C).
 //
 // The web invitee verdict surface is the locked
-// `design-system/surfaces/web-01-invitee-shell.md` §C "Read-only
 // verdict card": plan name + verdict venue only — "No receipts, no
 // per-axis cuts, no rule chip", "No primary CTA". This is a far
 // smaller read than the mobile S05 Verdict surface; web/mobile verdict

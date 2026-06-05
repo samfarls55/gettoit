@@ -1,7 +1,6 @@
 // GetToIt web — Surface web-01 §A "First-landing name entry" test.
 //
 // tb-WF-11 — the name-entry-alone surface a cold Web invitee reaches on
-// the first click of `/join/<roomId>`. Spec: design-system surface doc
 // `surfaces/web-01-invitee-shell.md` §A.
 
 import { describe, expect, it, vi } from "vitest";

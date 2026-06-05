@@ -59,4 +59,3 @@ None â€” can start immediately. `SoloPath`, `VerdictStore`, and `VerdictScr
 
 Verdict-ready detection is by polling, not Realtime â€” a Realtime channel on `verdicts` is a later slice, per bug-07 Â§Fix scope. The full S04 Waiting surface (avatar row, countdown, nudge) is tb-20; a group session holds on the same neutral resolving surface for now and still reaches S05.
 
-Tests: `VerdictPollerTests`, `PostQuizHostTests`, `PostQuizHostScreenTests` â€” cover verdict-found stopping the loop, teardown stopping the loop, the solo-skip routing decision, and the phase machine. Design-system `verify.mjs` green (token-only consumption, no spec change).

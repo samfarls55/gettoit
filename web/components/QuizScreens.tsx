@@ -3,10 +3,8 @@
 // Web equivalents of the mobile redesigned quiz surfaces (`QuizQ1Cuisine`,
 // `QuizQ2Budget`, `QuizQ3Reputation`, `QuizQ4Vibe`, `QuizQ5Regret`,
 // `QuizQ5NoResults`). The authoritative spec is
-// `design-system/surfaces/03-quiz.md` — these are 1:1 ports threaded
 // onto real data (props instead of internal state) so `SessionRoom` can
 // hold the quiz state. Per ADR 0003 the web fallback re-implements the
-// design-system surfaces rather than importing the JSX.
 //
 // Quiz redesign (tb-WF-10): the retired pre-redesign questions (Q1 dietary vetoes, Q3
 // walk-distance) are replaced by the redesigned scenario questions (Q1 cuisine
@@ -497,7 +495,6 @@ function Q5Loading() {
   );
 }
 
-// `no-results` mode — design-system surfaces/03-quiz.md §"no-results
 // mode". Centered headline + body in place of the rater cards; the
 // `Drop the verdict` CTA is replaced by `Head to the verdict`. Locked
 // copy — do not paraphrase.

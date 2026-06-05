@@ -41,7 +41,6 @@ TB-17 verifies the native iOS runtime pieces that Windows-local mobile tests can
 
 ## Build notes
 
-- First EAS build `1001` failed in Metro because `mobile/` was uploaded as the project root and the app imported `../../../design-system/tokens.json`. Fixed by bundling the mobile-used token snapshot inside `mobile/src/design/`.
 - Local production bundling then exposed Supabase Realtime's Node `ws` fallback import. Fixed by making Metro prefer package ESM and stubbing the unreachable Node `ws` fallback for React Native.
 - EAS production env now has `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` copied from the repo Supabase public config, so TestFlight builds do not launch into missing-env errors.
 - `mobile/eas.json` records App Store Connect app id `6769440299`, so future production submits can run non-interactively after a successful build.

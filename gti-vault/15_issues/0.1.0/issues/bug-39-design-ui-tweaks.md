@@ -36,5 +36,4 @@ _(add bullets as they surface)_
 
 ## References
 
-- `design-system/` — tokens, components, surfaces (source of truth for any change)
 - [[project_pre_public_launch_milestone]] (memory)

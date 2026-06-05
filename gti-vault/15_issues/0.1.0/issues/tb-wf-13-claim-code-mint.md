@@ -35,7 +35,6 @@ The code carries the whole identity, not one Plan — one redemption later bring
 
 ## Blocked by
 
-- [[sg-wf-8-account-claim-design-system|sg-WF-8]] (#194) — the web mint-affordance design-system spec.
 - [[tb-wf-12-web-invitee-shell-reclick|tb-WF-12]] (#193) — builds the 0.1.0 web Waiting screen + read-only verdict card the affordance attaches to.
 
 ## Comments
@@ -70,7 +69,6 @@ Tests: 16 new edge-function tests (mint success, unauthed rejection,
 code uniqueness / collision retry, encryption round-trip) + 11 shared
 claim-code primitive tests + 13 new web tests (affordance render, lazy
 mint, re-mint, failure). Full suites green (432 edge, 158 web),
-`npm run build` and `node design-system/scripts/verify.mjs` green.
 
 Follow-up: the live `mint-claim-code` function returns
 `mint_claim_code_misconfigured` until the `CLAIM_CODE_ENC_KEY` repo

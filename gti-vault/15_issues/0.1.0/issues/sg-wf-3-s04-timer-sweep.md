@@ -17,7 +17,6 @@ closed: 2026-05-19
 
 ## Parent
 
-[[../../../50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] â€” surfaced during the grill that `design-system/surfaces/04-waiting.md` is partially stale: it still describes a timer countdown + `"Auto-fires in 7:42"` mono-tag + `rooms.deadline_at` cron-auto-fire mechanism that the 0.1.0 quiz redesign PRD (US34, US35, Â§line 115) explicitly retired on 2026-05-15.
 
 A `partially-superseded-by` frontmatter marker + a top-of-file banner already landed in S04 on 2026-05-19 as part of the grill. **This issue completes the sweep**: actually edits the doc + JSX to remove the dead sections.
 
@@ -25,7 +24,6 @@ The iOS port (deleting `TimerCoordinator.swift`, removing the countdown renderin
 
 ## What to build
 
-A design-system edit pass on `design-system/surfaces/04-waiting.md` and `design-system/code/screens/ScreenWaiting.jsx` that:
 
 1. **Deletes the retired sections** rather than leaving them stale-marked:
    - The `Countdown timer (all members)` section in the surface doc.
@@ -47,10 +45,6 @@ A design-system edit pass on `design-system/surfaces/04-waiting.md` and `design-
 
 ### Files to edit
 
-- `design-system/surfaces/04-waiting.md` â€” delete retired sections, rewrite verdict-trigger section, drop the stale-markers + banner, refresh `locked-date`.
-- `design-system/code/screens/ScreenWaiting.jsx` â€” delete the countdown mono-tag, the `"Auto-fires"` copy line, any timer-tick state, and any conditional rendering keyed on timer expiry.
-- `design-system/CHANGELOG.md` â€” `BREAKING: ...` entry.
-- Run `node design-system/scripts/verify.mjs`.
 
 ### Out of scope
 
@@ -65,7 +59,6 @@ A design-system edit pass on `design-system/surfaces/04-waiting.md` and `design-
 - [ ] `ScreenWaiting.jsx` no longer renders the countdown mono-tag, the `"Auto-fires"` copy, or any timer-tick state.
 - [ ] The `partially-superseded-by` + `stale-sections` frontmatter and the top-of-file banner are removed from `surfaces/04-waiting.md` once the retired sections are gone. `locked-date` refreshed to `2026-05-19`.
 - [ ] `CHANGELOG.md` carries a `BREAKING:` entry.
-- [ ] `node design-system/scripts/verify.mjs` is green.
 
 ## Blocked by
 
@@ -73,4 +66,3 @@ None â€” the 0.1.0 PRD ruling has been canonical since 2026-05-15; this iss
 
 ## Comments
 
-- **2026-05-19 â€” done (afk/sg-wf-3, PR #TBD).** Surface doc `surfaces/04-waiting.md` had the `Countdown timer (all members)` section, the timer-elapse branch of `Verdict fire trigger`, the `Timer expiry no-quorum edge case`, the `partially-superseded-by` + `stale-sections` frontmatter and the top-of-file banner all removed. `Verdict fire trigger` rewritten to the 0.1.0 canonical model (all-Q5 OR initiator-closes-voting); minimum quorum documented as one member; the `Decide now` CTA is now always tappable for the initiator (no `need 2 in` gate). `locked-date` refreshed to `2026-05-19`. `ScreenWaiting.jsx` lost the `secondsRemaining` prop, the `countdownLabel` binding, the mono-tag render, and the `quorum >= 2` gate on the Decide-now PillCTA. `motion.md` lost the `Waiting countdown tick` row and the `Decide-now CTA quorum unlock` row (the always-tappable CTA has no quorum unlock to animate) â€” flagged as an adjacency in the PR. `CHANGELOG.md` carries a BREAKING entry. `node design-system/scripts/verify.mjs` is green. iOS port remains tb-WF-3 (#162); `rooms.timer_minutes` / `rooms.deadline_at` schema cleanup remains out of scope.

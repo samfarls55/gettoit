@@ -28,7 +28,6 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
 
 | Issue | GitHub | State | Branch | PR | Notes |
 |---|---|---|---|---|---|
-| sg-WF-4 | [#157](https://github.com/samfarls55/gettoit/issues/157) | merged | `afk/sg-wf-4` | [#179](https://github.com/samfarls55/gettoit/pull/179) | new `00-plan-list` surface + C-25 ActionDotMenu + C-26 FAB; S00 superseded; 3 design-system gates green |
 | tb-WF-4 | [#163](https://github.com/samfarls55/gettoit/issues/163) | merged | `afk/tb-wf-4` | [#180](https://github.com/samfarls55/gettoit/pull/180) | new SwiftUI `SetupScreen` (mode-conditional 5/6 controls); `InitiatorScreen` + `ParametersScreen` deleted; `RoomStore.createRoom` gains optional `planID` |
 | tb-WF-5 | [#174](https://github.com/samfarls55/gettoit/issues/174) | merged | `afk/tb-wf-5` | [#181](https://github.com/samfarls55/gettoit/pull/181) | iOS `PlanListScreen` foundation; `LandingScreen.swift` deleted; Settings entry orphaned (flagged for follow-up) |
 | tb-WF-6 | [#175](https://github.com/samfarls55/gettoit/issues/175) | merged | `afk/tb-wf-6` | [#182](https://github.com/samfarls55/gettoit/pull/182) | C-26 `FloatingActionButton.swift` + `PlanDisambigSheet.swift` + `PlanListScreen` API: `onRequestDisambig` / `onPickGroupMode` |
@@ -113,7 +112,6 @@ Goal: execute all open AFK issues not blocked by a HITL issue.
 - `20260521000000000_members_quiz_progress.sql` (tb-WF-7) â€” `members.quiz_progress jsonb` for resume-from-state on Joined cards
 - `20260522000000000_plans_decided_history_lifecycle.sql` (tb-WF-8) â€” `plans.verdict_fired_at` + `plans.expired_at` + 2 RPCs (`plans_decided_for_user`, `plans_history_for_user`) + `check_ins` trigger to transition `decided-active â†’ expired`
 
-### Design-system additions landed
 
 - New surface: `surfaces/00-plan-list.md` + `code/screens/ScreenPlanList.jsx` (replaces superseded `00-landing.md`)
 - New components: C-25 Action Dot Menu, C-26 Floating Action Button

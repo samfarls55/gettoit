@@ -1,6 +1,5 @@
 // GetToIt web — Surface 04 (Waiting), web fallback variant.
 //
-// Web equivalent of `design-system/code/screens/ScreenWaiting.jsx`.
 // Differences from the mobile app version, enforced by TB-15 scope:
 //   * No Auth Upgrade Chip (ADR 0007 forbids Apple Sign-in on web).
 //   * No "Decide now" CTA — the web fallback never has the initiator
@@ -14,7 +13,6 @@
 // the dock when the caller is on the web fallback AND anonymous (the
 // canonical web invitee state). Suppressed when the user has a real
 // identity. Mirrors the conditional render in
-// `design-system/code/screens/ScreenWaiting.jsx`'s sg-03 branch.
 
 // tb-WF-13 (workflow-overhaul) addition — the sg-WF-8 "Getting the app?"
 // claim-code mint affordance. Renders as a quiet line below the
@@ -22,7 +20,6 @@
 // invitee shell on the Waiting screen). It is the same affordance the
 // §C read-only verdict card carries; it is absent from the quiz chrome
 // and from the §D / §E terminals. See
-// `design-system/surfaces/web-01-invitee-shell.md` §"Getting the app?".
 
 "use client";
 
@@ -237,7 +234,6 @@ export function WaitingScreen({
           {/*
             sg-03 / TB-02 (quiz redesign) — "Download the app" CTA dock. Mirrors
             the `platform === 'web' && isAnonymous` branch in
-            `design-system/code/screens/ScreenWaiting.jsx`. We don't
             check `platform` explicitly because this component IS the
             web-fallback render path; the mobile app never instantiates
             it (per the TB-15 comment at the top of the file). Apple-

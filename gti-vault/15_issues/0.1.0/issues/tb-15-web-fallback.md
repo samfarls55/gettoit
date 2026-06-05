@@ -23,7 +23,6 @@ adr: 0003
 
 The hosted web fallback so the viral loop survives invitees who don't have iOS or don't want to install. A non-installer taps the Universal Link, lands on a Next.js page at `gettoit.app/s/<sessionId>`, authenticates anonymously against Supabase, answers the same 5-question quiz in the browser, and sees the verdict when it ships.
 
-Per [[../../../60_engineering/adr/0003-web-fallback-nextjs-vercel|ADR 0003]], the web fallback consumes `design-system/code/tokens.css` directly but re-implements the components with real-data wiring (no import from `design-system/code/components.jsx`).
 
 - **Routes** â€”
   - `/join/{roomId}` â€” the iMessage unfurl unfurls to OG meta + a "Sender sent you a session" landing card. Click â†’ `/s/{sessionId}` (the actual web session route).
@@ -32,7 +31,6 @@ Per [[../../../60_engineering/adr/0003-web-fallback-nextjs-vercel|ADR 0003]], th
 - **Realtime + auth** â€” `supabase-js` anon auth, Realtime Broadcast subscriber, RLS-scoped reads.
 - **No web claims** â€” Apple Sign-in is not offered in the browser per ADR 0007.
 - **No web push** â€” check-in does not fire for web-only participants per ADR 0003 + ADR 0005. Documented as accepted gap.
-- **Visual gates** â€” drift checker â€” `node design-system/scripts/verify.mjs` extended to scan `web/` for orphan hex / out-of-token usage, mirroring the iOS / JSX checks.
 - **Tests** â€” a web user joins the same room as iOS members and submits a vote that participates in the verdict; the web verdict renders the same content as the iOS verdict; the orphan-hex sweep is clean for `web/`.
 
 ## Acceptance criteria
@@ -40,8 +38,6 @@ Per [[../../../60_engineering/adr/0003-web-fallback-nextjs-vercel|ADR 0003]], th
 - [x] `/join/{roomId}` route renders the unfurl card and routes to `/s/<sessionId>`.
 - [x] `/s/<sessionId>` route handles join, anon auth, 5-question quiz submission, live waiting, verdict read-only.
 - [x] `supabase-js` Realtime subscription updates the web Waiting + Verdict surfaces in lockstep with iOS.
-- [x] Web fallback consumes `design-system/code/tokens.css` directly with no inline hex.
-- [x] `node design-system/scripts/verify.mjs` extended to scan `web/`; orphan-hex sweep passes.
 - [x] Integration tests for a mixed-platform room (iOS + web members) where both contribute to a verdict.
 
 ## Blocked by
@@ -59,6 +55,5 @@ Items spotted during TB-15 build, surfaced for future tickets â€” none sile
 
 ## Notes
 
-- The web fallback is a fresh React port of the design-system JSX rather than an import. Per ADR 0003 Â§"Design-system relationship", `web/` MUST NOT import from `design-system/code/`. The drift gate is `verify.mjs` â€” extended in this PR to sweep `web/` for orphan hex codes.
 - Verdict surface on web is **read-only**: no ratification, no reroll, no check-in, no widen-radius. The `VerdictReadOnly` component intentionally suppresses every mutating affordance the iOS S05 surface offers. See `VerdictReadOnly.test.tsx` for the assertion that the iOS-only copy never appears on the web variant.
 - The `members` table requires the caller to be authenticated to insert (`with check (user_id = auth.uid())`). The web fallback uses `auth.signInAnonymously()` on first mount and then UPSERTs the member row â€” the unique `(room_id, user_id)` PK makes the call idempotent across reloads.

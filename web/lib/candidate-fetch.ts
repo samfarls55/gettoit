@@ -15,10 +15,8 @@
 // MapKit escape hatch, so a thin / failed Foursquare response degrades
 // straight to the no-results path — there is no second data source.
 //
-// Per ADR 0003 the web fallback re-implements design-system / mobile-app logic
 // rather than importing it; only the vote WIRE shape is a sanctioned
 // cross-sibling import (ADR 0014, `votes-wire.ts`). The factorial /
-// classifier are not on the design-system spec path — they are pure
 // product logic ported here so the web quiz produces the same Q5 probe
 // shape the mobile app does.
 //

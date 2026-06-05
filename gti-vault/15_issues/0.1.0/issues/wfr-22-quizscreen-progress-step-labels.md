@@ -38,4 +38,3 @@ None â€” can start immediately.
 
 ## Comments
 
-- 2026-05-26 â€” AFK shipped on `afk/wfr-22`. Added compact `Q{n} of 5` text under the 5-segment progress capsules in `QuizScreen.topBar`, and bound the locked `"Question {n} of 5"` accessibility label from `design-system/accessibility.md` Â§4 to the combined strip+label element. Two static helpers (`QuizScreen.progressAccessibilityLabel(forStep:)` and `QuizScreen.progressVisibleLabel(forStep:)`) own the copy so tests can pin it without touching the view. Snapshot smoke covers Q1..Q5 render; source-level tests pin the topBar's a11y wiring (same pattern as bug-25 centering test). Decision: chose VStack(capsules, Text) inside the centred slot rather than placing the label adjacent â€” keeps the bug-25 horizontal symmetry intact and the label tracks the same step transitions VoiceOver already announces via the parent label.

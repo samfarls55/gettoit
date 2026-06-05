@@ -15,7 +15,6 @@ created: 2026-05-21
 
 ## Parent
 
-[[sg-wf-5-web-invitee-flow|sg-WF-5]] â€” the web invitee shell design-system surface doc. Behavior locked in [[../../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]] Â§Q3 (identity) and Â§Q4 (name entry).
 
 First of the two shell-wiring tracer-bullets; [[tb-wf-12-web-invitee-shell-reclick|tb-WF-12]] builds the re-click behaviors on top of this foundation. Delivery pair with [[tb-wf-10-web-quiz-v11-port|tb-WF-10]] (the redesigned web quiz the shell hands off to).
 
@@ -55,7 +54,6 @@ The web invitee shell scaffold and the first-landing name entry, end-to-end: a c
 
 ## Blocked by
 
-- [[sg-wf-5-web-invitee-flow|sg-WF-5]] â€” the design-system surface doc this slice implements.
 
 ## Comments
 
@@ -65,4 +63,3 @@ The web invitee shell scaffold and the first-landing name entry, end-to-end: a c
 - **Server** â€” `compute-verdict.fetchVotes` now reads `members.display_name` for the room and resolves each member's name through the new pure `compute-verdict/member-display-name.ts` helper: joined name when set, the legacy `m<uuid>` placeholder when NULL. `votes`/`members` carry no FK, so the join is a separate read folded into a map rather than a PostgREST embed; a failed members read degrades to "all placeholders" (pre-column behavior).
 - **Web** â€” `/join/[roomId]` now renders the new `InviteShell` state machine (`components/InviteShell.tsx`): ensures the anon Supabase session, looks up the `members` row, and on a first landing shows the name-entry surface (`components/NameEntry.tsx`, web-01 Â§A) before handing into the quiz. Surface A built per the sg-WF-5 surface doc â€” single text input, 30-char `maxLength` cap, CTA disabled until trimmed-non-empty, `Your name` placeholder. Data layer in `lib/invitee-shell.ts`.
 
-All five acceptance criteria met; web suite (69 tests) + edge-function suite (394 tests) + `design-system/scripts/verify.mjs` all green. Adjacency flagged: `InviteWebCard` + the `/s/[roomId]` route are now unreferenced (the old invite-card flow) â€” left in place, candidate cleanup for tb-WF-12.

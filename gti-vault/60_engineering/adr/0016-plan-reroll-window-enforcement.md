@@ -88,7 +88,6 @@ Scope of sg-WF-6 (AFK):
 
 - A new migration (sorting after `20260522000000000`) amends `set_plan_decided_active` to compute the search-area-TZ formula in place of the `now() + interval '2 days'` placeholder, and adds the time-exact guard to `apply_reroll`.
 - iOS: the Decided-card tap path resolves current Plan `status` at tap/appear time. No `VerdictScreen` API change anticipated â€” read-only mode already suppresses the reroll affordance.
-- `design-system/surfaces/07-reroll.md` carries an additive amendment section documenting the outer time bound and the three-way close.
 
 ## References
 

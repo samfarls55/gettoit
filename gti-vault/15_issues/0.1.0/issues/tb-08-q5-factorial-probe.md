@@ -22,7 +22,6 @@ created: 2026-05-15
 - **Factorial card generator (pure).** Input: a member's Q1-Q4 answers and their fetched pool. Output: three strict-factorial cards â€” each deviates from the member's stated profile on **exactly one** axis (cuisine, reputation, vibe) and matches the other two; never a 100% match. Which two of the member's cuisines are probed is a member-local feasibility rule (best card-generation feasibility in the pool) â€” group state never influences card selection.
 - **Q5 surface.** Renders the three **real** candidate venues and captures a 1-5 excitement rating for each, written to the `Q5` jsonb slot. Q5 never shows a placeholder or sample restaurant.
 
-Any new Q5 card UI is designed with the Refero MCP and the design-system in unison (authority granted for this issue). Q5 card info-availability UX (default vs expanded content) is out of scope per the PRD â€” ship the minimal real-venue card.
 
 ## Acceptance criteria
 
@@ -31,7 +30,6 @@ Any new Q5 card UI is designed with the Refero MCP and the design-system in unis
 - [ ] Card cuisine selection is member-local (pool feasibility) and never influenced by group state.
 - [ ] Each card captures a 1-5 excitement rating; the three ratings persist to the `Q5` jsonb slot.
 - [ ] The card generator has pure unit tests: one-axis deviation, no perfect match, member-local cuisine selection honored.
-- [ ] Any new card UI is specified in `design-system/`, tokens only; `verify.mjs` green.
 
 ## Blocked by
 
@@ -85,16 +83,12 @@ the iOS side.
   which shapes factorial cards into `[QuizCandidate]` carrying the
   real `fsq_place_id` and venue name â€” so ratings key on real venue
   ids, never placeholders. The Q5 surface section in
-  `design-system/surfaces/03-quiz.md` is the "visual shell only"; no
-  new component or token was needed, so no design-system spec change.
 - **Q5 framing copy.** The 0.1.0 `QuizQ5Regret` view carried the 0.1.0
   "regret" wording ("how much would you mind?", "DON'T MIND" / "REALLY
   MIND"). The 0.1.0 PRD and the surface spec fix Q5 as an *excitement*
   probe ("How excited does each of these make you?"). Updated the
   view's question header and the rating-scale end labels to the
-  excitement framing. The JSX in `design-system/code/screens/` keeps
   its 0.1.0 sample copy â€” illustrative, not locked (see the surface doc's
-  own JSX-rename note + the `design-system scope` project note).
 - **Tests.** 15 pure unit tests in `Q5FactorialCardGeneratorTests` â€”
   one-axis deviation per card, no perfect match (the deliberately-
   perfect pool venue is never picked), member-local cuisine selection

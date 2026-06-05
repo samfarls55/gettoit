@@ -21,14 +21,12 @@ related:
 ## Resolved Changes
 
 1. `AGENTS.md` is the primary repo instruction file; `CLAUDE.md` files are tracked compatibility shims that say `Read AGENTS.md`.
-2. Added nested `AGENTS.md` files for `design-system/` and `gti-vault/`.
 3. Removed the obsolete `.devcontainer/` files and the old devcontainer setup runbook.
 4. Added [[github-actions-secrets]] as the durable replacement for the deleted devcontainer secret roster.
 5. Made the migrated Codex web-search agent load modules from `.codex/agents/web-search-modules/`.
 6. Made the research-deep validator path repo-relative: `.agents/skills/research/validate_json.py`.
 7. Fixed the issue-tracker contract: GitHub Issues are the remote tracker; vault issue notes provide local context.
 8. Added `docs/agents/verification.md` plus root `npm run verify:*` scripts for Codex check selection.
-9. Updated active README, design-system, CI, and runbook references away from Claude/pre-code wording.
 
 ## Remaining Historical Mentions
 

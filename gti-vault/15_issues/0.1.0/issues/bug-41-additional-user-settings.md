@@ -31,13 +31,11 @@ The set of settings is a product call. Some entries (sign-out, account deletion,
 
 - [ ] Founder has enumerated the settings to add.
 - [ ] Each setting has a defined storage backend (local prefs, Supabase row, derived).
-- [ ] Each setting has confirmed copy + interaction pattern (consult `design-system/`).
 - [ ] Per-setting build issues spawned.
 
 ## Code breadcrumbs
 
 - `ios/Sources/App/SettingsScreen.swift` â€” current settings host
-- `design-system/surfaces/settings.md` (if present) â€” surface contract
 - `supabase/migrations/` â€” for any new user-pref columns/tables
 
 ## References

@@ -18,7 +18,6 @@
 -- text)` form.
 --
 -- The quiz redesign PRD locked the timer out (US34) and sg-WF-3 finalised the
--- design-system retirement. This migration is the iOS-port paired
 -- slice (tb-WF-3) cleaning up the orphaned database references:
 --
 --   * Drop `cron_auto_fire_or_expire()` â€” the function that scanned

@@ -62,7 +62,6 @@ Record the resolved category ids and probe results in ADR 0012's Open items sect
 - Cuisine stays a Stage-2 soft scoring axis — do **not** make cuisine a fetch-time strict filter (kills the Q5 factorial's cuisine-drop card).
 - Profile dietary wiring into the per-member fetch — a separate tracer bullet.
 - Any change to the verdict engine, the Q5 factorial card generator, or the running-union logic — the floor changes only what the fetch returns; downstream code is unaffected by construction.
-- New design-system components or tokens — no UI work.
 
 ## Blocked by
 

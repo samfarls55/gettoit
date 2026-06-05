@@ -39,7 +39,6 @@ Leaving C-23 as the active label would invite future agents to preserve the old 
 - density preview pins inside the selected circle
 - explicit `USE THIS AREA` commit
 
-C-23 LocationPicker becomes historical context. Existing MapKit/current-location/typeahead code may be reused internally, but active product language and design-system ownership move to Search area / C-28.
 
 No schema change is part of this decision. Persist Search area into the existing center/radius fields (`location_*`, `distance_meters`, `radius_meters`) for 0.1.0.
 
@@ -55,12 +54,9 @@ Rejected for Setup scope because it creates two geography primitives without a r
 
 ### Rename C-23 in place
 
-Rejected because ADR 0009 and existing design-system references carry old assumptions: bottom sheet, no map thumbnail, typeahead selection as the main editor, no radius. A new component number makes the reversal visible and searchable.
 
 ## Consequences
 
-- `design-system/components.md` should add `C-28 SearchAreaPicker` and mark `C-23 LocationPicker` superseded/historical for Setup.
-- `design-system/surfaces/01-setup.md` should replace `Where to` + `How far` with one Search area chip.
 - iOS should replace `LocationPickerChip` / `LocationPickerSheet` and the Setup distance slider with the Search area flow.
 - Tests that assert C-23 empty/loading/manual states as Setup behavior need to move to C-28 semantics.
 - Separate timing docs that mention "search-area timezone" remain a known conflict. Search area has no timezone or timing semantics; timing behavior needs its own correction.

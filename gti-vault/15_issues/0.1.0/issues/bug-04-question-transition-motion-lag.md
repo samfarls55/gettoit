@@ -27,18 +27,13 @@ User confirmed: the lag happens on **every** question transition, not isolated t
 
 Per-screen / per-primitive surgical fix to align the gradient curve's duration with the card transition duration.
 
-- Identify the offending `CHOREO` constants in `design-system/code/screens/` â€” likely in the question-screen primitives (the shared transition wrapper if one exists, or each `ScreenQNN.jsx` if duplicated).
 - Adjust the gradient interpolation duration to match the card transition duration exactly. Match `ms` values, do not round.
-- Per [[../../../../AGENTS|root AGENTS.md]] design-system rules: never inline raw durations / easing literals â€” values come from existing tokens or, if a new motion token is needed, register in `tokens.json` first.
 
 If verification (below) surfaces another offender, fold into the same fix. This is NOT a broader motion review â€” that would be a separate issue.
 
 ## Acceptance criteria
 
 - [ ] On a real iOS device, walking the quiz from Q1 through the final question shows no perceptible lag between card transition and gradient interpolation on any transition.
-- [x] `node design-system/scripts/verify.mjs` green.
-- [x] `design-system/CHANGELOG.md` entry referencing this issue.
-- [x] If a new motion token was introduced (rather than tuning an existing one), `design-system/motion.md` updated. *(No new motion token introduced â€” aliased the existing `--grad-tween` token (1100ms ease-in-out) onto the iOS content router. `motion.md` was still updated with a new Â§"Question card cross-fade" section documenting the pairing so future readers see why the card matches the gradient duration exactly.)*
 
 ## Resolution
 

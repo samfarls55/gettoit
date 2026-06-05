@@ -167,7 +167,6 @@ two edge functions mint (authed by the live web session) and redeem
   it encrypted, single-use, short-TTL. Low stakes â€” the protected
   asset is an anonymous web invitee's vote in one dinner Plan.
 - **New surface area.** A `claim_codes` table + migration, two edge
-  functions, an S00a design-system amendment (the "Voted on the web?"
   affordance), and web affordances on Waiting + the read-only verdict
   card.
 - **Skip = stranded.** A user who signs in with Apple without claiming

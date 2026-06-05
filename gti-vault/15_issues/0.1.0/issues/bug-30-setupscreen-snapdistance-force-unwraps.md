@@ -78,6 +78,5 @@ AFK execution closed via [PR #244](https://github.com/samfarls55/gettoit/pull/24
 - Applied the spec body verbatim: `distanceSteps.first ?? 0` and `distanceSteps.last ?? Self.maxDistanceMiles`, lifted into `firstStop` / `lastStop` locals so each optional is only evaluated once.
 - Fallback constants kept inline (not hoisted) â€” single use, comment cites OPT-001 + bug-30 so the rationale is at the read site.
 - Added `testSnapDistance_bug30AcceptanceCriteria` in `SetupScreenTests.swift` pinning the three exact acceptance cases (`-1` â†’ first, `100` â†’ last, `distanceSteps[2]` passthrough). Existing `testSnapDistanceMaps_endpoints_andInterior` was not touched (regression lock, surgical-changes rule).
-- All CI gates green including `ios (xcodebuild test)`. No design-system / surface change.
 
 Next swift-code-review sweep should find this site clean.

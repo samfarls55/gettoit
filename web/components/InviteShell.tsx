@@ -4,7 +4,6 @@
 // the Account-disjoint Plan-member subtype: no homepage, no Plan list,
 // one Plan reached through the iMessage/SMS deep link.
 //
-// Canonical spec: `design-system/surfaces/web-01-invitee-shell.md`.
 // Behavior is locked in the decision doc
 // `gti-vault/50_product/workflow-overhaul-web-invitee-flow.md`.
 //

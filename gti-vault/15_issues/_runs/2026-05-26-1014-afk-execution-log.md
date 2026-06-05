@@ -73,7 +73,6 @@ Concurrency cap: 2.
 - 12:15 â€” wfr-16 MERGED (PR #289). wfr-18 spawned (slot freed; on merge will unblock wfr-19 + wfr-20).
 - 12:31 â€” wfr-17 subagent dropped at "wait CI"; PR #291 open + all checks green except iOS in-progress. orchestrator watching CI inline (background bv1duidrc).
 - 12:32 â€” wfr-18 MERGED (PR #292). wfr-19 + wfr-20 unblocked. spawning both.
-- 12:55 â€” main CI failing on run 26468607338 (e994c6a/wfr-18 head): `supabase (functions deploy)` exit 1 on `supabase secrets set` returning HTTP 502 (Supabase API infra flake â€” not our code, not breaking prod since deploy is post-merge). All other lanes green (web vitest, ios xcodebuild test, design-system verify, db push, AASA, invite-link canary, testflight upload). Prior fail at bea3125 (wfr-16) was unrelated vitest flake on `InviteShell.reclick.test.tsx` â€” not reproducible on wfr-18 run.
 - 12:56 â€” user requested cancel + main triage. cancelled wfr-19 + wfr-20 subagents (mid-plan, no PR opened). cancelled wfr-17 PR #291 watch (iOS lane still in_progress, will re-watch).
 - 12:56 â€” `gh run rerun 26468607338 --failed` triggered for supabase deploy lane.
 - 13:05 â€” main CI rerun completed: all 9 lanes green. main healthy on e994c6a.

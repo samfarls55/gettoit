@@ -53,9 +53,7 @@ Same migration. Amend `apply_reroll(uuid, text, text, text, int)` to reject a re
 
 The Decided-card tap path must resolve the Plan's *current* `status` at tap/appear time (not from a possibly-stale list snapshot) so a Plan that expired since the list was last loaded routes to the read-only `VerdictScreen` â€” which already suppresses the reroll affordance â€” rather than the full one. No `VerdictScreen` API change is anticipated; confirm against `DecidedHistoryTapDestination` and the tb-WF-8 tap router.
 
-### 4. design-system â€” S07 additive amendment
 
-Add an additive amendment section to `design-system/surfaces/07-reroll.md` documenting:
 - the **outer time bound** â€” the reroll window closes at end of the next calendar day (search-area TZ), independent of the burn budget;
 - the **three-way close** â€” window close / 3rd burn / check-in, whichever first;
 - what the verdict-screen reroll affordance shows once the window has closed (a `decided-expired` Plan opens the read-only verdict screen, which renders no reroll tertiary â€” distinct from the cap-exhausted `"No rerolls left"` edge case already documented).
@@ -68,8 +66,6 @@ Append a `CHANGELOG.md` line. The S07 friction model (3-burn cap, reason-as-cons
 - [ ] Migration amends `apply_reroll` with the time-exact `window_closed` guard; null-`plan_id` rooms pass through.
 - [ ] `supabase/functions` Deno tests cover: the TZ formula (incl. a non-UTC zone and the UTC fallback), the guard rejecting an expired Plan, the guard rejecting a `decided-active` Plan past `reroll_window_closes_at`, and the null-`plan_id` passthrough.
 - [ ] iOS Decided-card tap resolves current Plan `status` at tap time; an expired Plan routes to the read-only verdict screen.
-- [ ] `design-system/surfaces/07-reroll.md` carries the additive amendment; `CHANGELOG.md` updated.
-- [ ] `node design-system/scripts/verify.mjs` green.
 
 ## Adjacency flagged (NOT in scope)
 
@@ -82,4 +78,3 @@ The existing check-in feature has a latent inconsistency surfaced during the gri
 
 ## Comments
 
-- **2026-05-21** â€” done. AFK run on `afk/sg-WF-6` (PR #201). New migration `20260523000000000_reroll_window_deadline.sql` amends `set_plan_decided_active` to the search-area-TZ `date_trunc('day', now() AT TIME ZONE tz) + interval '2 days' - interval '1 second' AT TIME ZONE tz` deadline (placeholder removed) and adds the time-exact `{"error":"window_closed"}` guard to `apply_reroll` (null-`plan_id` rooms pass through). The deadline formula is also ported to `supabase/functions/_shared/reroll-window.ts` so the Deno lane can exercise the math end-to-end (non-UTC zone, UTC fallback, calendar-boundary, spring-forward DST). iOS: `PlansStore.fetchPlanStatus(planID:)` + a pure `PlanListScreen.tapRoute(role:status:)` overload â€” the Decided-card tap path re-resolves the Plan's live `status` at tap time, so a Plan whose window closed since the list loaded routes to the read-only verdict screen. `design-system/surfaces/07-reroll.md` carries the additive reroll-window amendment + CHANGELOG line. The check-in `snoozed` adjacency (flagged above, NOT in scope) is tracked separately as a 0.1.0 bug.

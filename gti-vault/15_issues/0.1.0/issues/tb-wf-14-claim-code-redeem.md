@@ -38,7 +38,6 @@ The end-to-end win: a web invitee who installs the app and claims keeps their `u
 
 ## Blocked by
 
-- [[sg-wf-8-account-claim-design-system|sg-WF-8]] (#194) â€” the S00a design-system spec.
 - [[tb-wf-13-claim-code-mint|tb-WF-13]] (#195) â€” the `claim_codes` table + a real minted code to redeem.
 
 ## Comments

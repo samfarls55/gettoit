@@ -36,7 +36,6 @@ The server contract is already merged (tb-23) and accepts the shape â€” thi
 ## Out of scope
 
 - The `compute-verdict` read path â€” already merged in tb-23.
-- Any Q5 surface visual / motion change â€” the factorial cards already render; only the data write changes. No design-system consult needed.
 
 ## Blocked by
 

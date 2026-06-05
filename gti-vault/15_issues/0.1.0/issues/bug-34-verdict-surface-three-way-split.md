@@ -42,14 +42,10 @@ ADR 0018 (accepted 2026-05-26) decomposes the surface into three: `VerdictScreen
 - `room.plan.status == .decidedExpired` OR (deep-link arrival AND viewer not in room) â†’ `VerdictReadOnlyScreen` with `showHomeChrome` set per arrival vector
 - otherwise â†’ `VerdictScreen` with appropriate flavor
 
-### Design-system surface docs
 
-Sweep `design-system/surfaces/05-verdict.md`:
 
 - Strip the `.readOnly` and `.noSurvivor` mode rows from the mode table.
 - Keep the three live flavors (`default` / `committed` / `solo`) on `05-verdict.md`.
-- Spawn `design-system/surfaces/05a-verdict-read-only.md` for the read-only surface. Copy the read-only-specific eyebrow / CTA / chrome rules from `05-verdict.md` history.
-- Spawn `design-system/surfaces/05b-no-survivor.md` for the no-survivor surface. Same shape â€” extract from `05-verdict.md`.
 - Note: if grill #4 (PlanList History as separate Multilevel destination) lands FIRST and produces a History-detail surface doc, `05a` may collapse into that doc instead. Coordinate via `[[bug-37]]` if the grill #4 issue lands first.
 
 ### Test work
@@ -72,7 +68,6 @@ Sweep `design-system/surfaces/05-verdict.md`:
 - [ ] All `mode == .readOnly` and `mode == .noSurvivor` reads are gone from the codebase (grep clean).
 - [ ] Shared value types (`Verdict`, `TimeBadge`, `Receipt`, `Cut`) live in one place (in `VerdictScreen.swift` and re-imported, OR extracted to `VerdictModels.swift` â€” agent's call).
 - [ ] Snapshot suite covers all three surfaces; existing read-only and no-survivor fixtures relocated to the new suites.
-- [ ] `design-system/surfaces/05-verdict.md` covers only the three live flavors. `05a-verdict-read-only.md` and `05b-no-survivor.md` exist and reference each other + `05-verdict.md`.
 - [ ] CONTEXT.md "Verdict surfaces" vocabulary section (added 2026-05-26 alongside ADR 0018) is consistent with the file shapes shipped.
 - [ ] Snapshot baseline images regenerated where layout shifts (chrome row presence, CTA label differences are pre-existing per-mode behavior â€” visual diffs should be minimal-to-zero for content; mostly file/struct boundaries).
 - [ ] Audit finding #16 issue (when surfaced by the separate `/to-issues` session for findings #6-31) gets re-opened with the re-scoped framing â€” flagged in the PR body, not done in this PR.
@@ -90,7 +85,6 @@ Sweep `design-system/surfaces/05-verdict.md`:
 
 ## Comments
 
-- 2026-05-26 â€” AFK run executed the split per ADR 0018. Three Swift files in `ios/Sources/App/`: `VerdictScreen.swift` keeps the live shell with a three-case `Flavor` enum (`.default` / `.committed` / `.solo`); `VerdictReadOnlyScreen.swift` is the new closed-verdict surface with the arrival-vector-aware `showHomeChrome` flag; `NoSurvivorScreen.swift` is the new widen-and-retry surface. The shared `Verdict` / `TimeBadge` / `Receipt` / `Cut` value types stayed nested on `VerdictScreen` (no `VerdictModels.swift` extraction needed â€” the new screens reference them via `VerdictScreen.Verdict`, etc.). `VerdictRerollHost` is now a dispatcher: callers pass a `Surface` enum (`.live(flavor:)` / `.readOnly(showHomeChrome:)` / `.noSurvivor`), and the host mounts the right leaf â€” with the `RerollStore` plumbing only on `.live`. The `VerdictScreen.Mode` enum moved to `VerdictStore.Mode` (it's the data-layer signal, not the view's render flavor). `design-system/surfaces/05-verdict.md` now covers only the three live flavors; `05a-verdict-read-only.md` and `05b-no-survivor.md` are the new sibling surface docs. The `design-system/scripts/verify.mjs` pairing rule was extended to accept `jsx: []` for sub-surface docs that share a parent's JSX (one JSX file, three Swift files â€” explicit sub-surface opt-out beats double-claim or orphan jsx errors). Finding #16 (`Restore Escape affordance on VerdictScreen .readOnly`) is flagged in the PR body for re-scoping but not modified or closed in this PR per spec.
 
 ## References
 
@@ -100,6 +94,5 @@ Sweep `design-system/surfaces/05-verdict.md`:
 - Audit report: `gti-vault/15_issues/_runs/2026-05-26-0958-workflow-review.md` finding #1, finding #16
 - `ios/Sources/App/VerdictScreen.swift` â€” current 5-mode struct
 - `ios/Sources/App/VerdictRerollHost.swift` â€” caller hub
-- `design-system/surfaces/05-verdict.md` â€” current spec (5 modes; to be split)
 - [[bug-22]] â€” prior verdict-chrome refactor (Home repositioning)
 - [[bug-32]] â€” VerdictScreen.modeSnapshot eyebrow exhaustive switch (the last 5-mode lock)

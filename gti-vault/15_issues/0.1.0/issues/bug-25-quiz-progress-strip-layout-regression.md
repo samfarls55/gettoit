@@ -46,12 +46,10 @@ User dogfood after the tb-WF-2 quiz-chrome ship, 2026-05-24.
 
 - `ios/Sources/App/QuizScreen.swift` â€” `topBar` composition + `VStack(spacing: 0)` host (lines ~115â€“195).
 - `ios/Sources/App/QuizChromeView.swift` â€” chrome row, `canBack` slot, 44pt spacer.
-- `design-system/surfaces/03-quiz.md` Â§"Quiz skeleton" + Â§"Quiz chrome (Back + Exit)" â€” the locked layout the iOS port must match.
 - tb-WF-2 / sg-WF-2 â€” the chrome work that introduced the regression.
 
 ## Grill outcome (2026-05-24)
 
-`/grill-with-docs` confirmed the issue body's theory at the code level: `QuizScreen.swift:171-174` has a leading `Color.clear.frame(width: 32, height: 32)` spacer in the `topBar` HStack but **no trailing counterpart**. The 5-bar HStack consequently sits right-of-centre by exactly the unbalanced 32pt. `design-system/surfaces/03-quiz.md` Â§"Quiz skeleton" is correct; the iOS port drifted during tb-WF-2 when the chrome row was inserted above `topBar`. Classified `bug` + `AFK`. No spec change.
 
 ### Fix scope
 
@@ -69,7 +67,6 @@ User dogfood after the tb-WF-2 quiz-chrome ship, 2026-05-24.
   - The 5-bar HStack's Y-coordinate is identical on every question (no Q1 down-shift).
   - The 5-bar HStack's X-center is identical to the screen's X-center on every question (no right-skew).
 - `xcodebuild test` green (existing quiz-screen layout tests still pass).
-- Visual reviewer pass: `design-system/surfaces/03-quiz.md` Â§"Quiz skeleton" matches the rendered layout.
 
 ### Out of scope
 

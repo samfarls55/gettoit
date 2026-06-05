@@ -23,7 +23,6 @@ prd: 0.1.0-prd
 Every member who joins a room can answer all 5 quiz questions and have their answers persisted as a single `votes` row. The gradient surface hue-shifts continuously through the quiz per the locked spec. Q5 is a placeholder regret rater that uses dummy candidates â€” real candidates land via TB-05.
 
 - **Schema** â€” `votes (room_id uuid, user_id uuid, q1_vetoes text[], q2_budget int, q3_walk_minutes int, q4_vibe int, q5_regret jsonb, created_at)` with unique constraint on `(room_id, user_id)` and RLS limiting writes to the row's own user.
-- **SwiftUI ports** â€” `ScreenQ1Vetoes`, `ScreenQ2Budget`, `ScreenQ3Distance`, `ScreenQ4Vibe`, `ScreenQ5Regret` per [[../../../../design-system/surfaces/03-quiz|S03]] and the matching JSX. Use generated `GTITokens.swift` for all tokens; no inline hex/px.
 - **Gradient surface tween** â€” between adjacent quiz screens, all 4 gradient stops interpolate over 1100ms via the locked `ease-in-out` curve. SwiftUI implementation per `tokens.md` Â§1.4 with `@State` color array + `withAnimation`.
 - **Quiz-state coordinator** â€” holds Q1â€“Q4 answers locally as the user advances; writes the complete `votes` row only on Q5 submit. Single round-trip, idempotent on retry. Q5 uses dummy candidate IDs from a local fixture until TB-05 wires real candidates.
 - **Placeholder copy** â€” strings from PRD Â§"Quiz copy â€” placeholder regime." Tagged in source with `// placeholder: marketing-branding pass`.
@@ -32,7 +31,6 @@ Every member who joins a room can answer all 5 quiz questions and have their ans
 ## Acceptance criteria
 
 - [x] `votes` migration lands with unique constraint + RLS. _(2026-05-13 â€” `supabase/migrations/20260513215000000_votes.sql`; PK on `(room_id, user_id)` is the unique constraint, RLS SELECT scoped to room members, INSERT scoped to `user_id = auth.uid()` AND room membership, no UPDATE/DELETE policies.)_
-- [x] Five SwiftUI Quiz surfaces match the locked design-system spec (visual, copy register, motion). _(2026-05-13 â€” `QuizQ1Vetoes.swift`, `QuizQ2Budget.swift`, `QuizQ3Distance.swift`, `QuizQ4Vibe.swift`, `QuizQ5Regret.swift`. All tokens consumed from `GTITokens.swift`; placeholder copy tagged `// placeholder: marketing-branding pass`.)_
 - [x] Quiz-state coordinator writes a complete `votes` row on Q5 submit, with all five answer fields populated. _(2026-05-13 â€” `QuizCoordinator.swift` holds Q1â€“Q4 locally; `submit()` writes the row in a single round-trip; `testFullQuizSubmissionWritesASingleVotesRow` and `testSubmitWritesASingleRowOnQ5` cover the path.)_
 - [x] Gradient surface tween between screens lands ms-exact per `motion.md`. _(2026-05-13 â€” `QuizScreen.applyTween` interpolates the 4 stops via `withAnimation(.timingCurve(GTIMotion.Easing.inOut..., duration: GTIMotion.Duration.gradTween))` = 1100ms locked. Reduced-motion drops to 300ms linear.)_
 - [x] No back arrow; `Ã—` close exits to home. _(2026-05-13 â€” top bar in `QuizScreen` renders only `Ã—` + 5-segment progress; tap calls the `onClose` route in `RootView` which clears `activeQuiz` and routes back to the initiator surface.)_

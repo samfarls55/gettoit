@@ -1939,9 +1939,7 @@
     },
     {
       "id": "S-01",
-      "name": "Design system exists + enforced",
       "kind": "system",
-      "anchor": "principles.md#S-01. Design system exists + enforced"
     },
     {
       "id": "S-02",

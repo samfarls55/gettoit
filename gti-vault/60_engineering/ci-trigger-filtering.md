@@ -28,9 +28,7 @@ paths-ignore:
   `/execute-issues` run writes issue files, run logs, and `_index.md`
   updates. None of it is source.
 - The ignore list is **deliberately conservative**. `**/*.md` would also
-  swallow `design-system/surfaces/*.md`, and those `.md` files feed
   `verify.mjs` (surfaceâ†”jsx pairing gate). A new surface doc must still
-  trip the `design-system` lane. So `.md` is matched at repo root only.
 
 ## Why it matters beyond saving runners
 

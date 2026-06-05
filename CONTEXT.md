@@ -17,7 +17,7 @@ A Supabase auth session whose `user_id` has an Apple identity attached, either v
 _Avoid_: signed-in user, authenticated user, Apple account (the account is on Apple's side, the session is ours).
 
 **S00a Sign-in Gate**:
-The surface (`design-system/surfaces/00a-signin.md`) rendered on mobile launch when the current auth state is anything other than Linked-Apple. One Sign-in-with-Apple pill, no skip. 0.1.0 closure of the mobile-app half of [[gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s anonymous-default. Active implementation belongs in the React Native app under `mobile/`.
+The surface rendered on mobile launch when the current auth state is anything other than Linked-Apple. One Sign-in-with-Apple pill, no skip. 0.1.0 closure of the mobile-app half of [[gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s anonymous-default. Active implementation belongs in the React Native app under `mobile/`.
 _Avoid_: sign-up page, sign-up screen, onboarding screen, welcome screen, account creation page (see Flagged ambiguities).
 
 **Account claim**:
@@ -182,16 +182,13 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 
 ## Flagged ambiguities
 
-- "S01 + S04 surface specs are stale on timer/countdown": `design-system/surfaces/01-initiator.md` (locked 2026-05-12) and `design-system/surfaces/04-waiting.md` describe a timer chip group + `"Auto-fires in 7:42"` countdown that the 0.1.0 PRD (2026-05-15) explicitly retired (US34, US35, §115). Surfaces need a sweep to remove the timer chip, the countdown mono-tag, the `"Auto-fires"` copy, and any related state in `code/screens/Screen*.jsx` + `tb-03` / `tb-07` carryover. Workflow-overhaul setup screen (post-grill) does not include a Timer control.
 - "sign-up" vs "sign-in": product / founder voice uses "sign-up page" loosely for any account-creation moment. Engineering uses "sign-in gate" because the surface only ever signs in with an existing Apple identity (Apple owns account creation; the app never sees a "new vs returning" distinction). When the founder says "sign-up page," they almost always mean the **S00a Sign-in Gate**.
 - "anonymous user" vs "no user": pre-S00a these were the same in practice (every legacy mobile install minted an anonymous user on launch). Post-S00a they diverge - no user = pre-S00a state; anonymous user = legacy carryover that must pass through S00a via `linkApple`.
 - "Search-area timezone" conflict: the existing **Plan reroll window** definition says the close boundary uses `plans.location.timeZoneIdentifier`, but the Search area grill on 2026-06-03 clarified that **Search area** has no timing or timezone semantics. The timing model needs a separate correction; do not use the map selector work to reinforce the old search-area-timezone language.
-- "C-23 LocationPicker" vs "C-28 SearchAreaPicker": the 2026-06-03 Search area grill clarified that the active Setup component should be a new **C-28 SearchAreaPicker**, not a relabeled C-23 LocationPicker. C-23 remains historical until the design-system and mobile cleanup retires its active references.
 
 ## See also
 
 - `gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade.md` - Auth ADR
 - `gti-vault/50_product/0.1.0-workflow-overhaul-plan-setup.md` - Plan setup screen decisions (the 11 grilled outcomes that defined the Plan vocabulary above)
 - `gti-vault/10_prds/0.1.0-quiz-redesign-prd.md` - source of the Verdict trigger ruling (no timer, no shot clock)
-- `design-system/surfaces/00a-signin.md` - S00a surface spec
 - `docs/agents/domain.md` - consumer rules for this file

@@ -17,7 +17,6 @@ pr: 184
 
 ## Parent
 
-[[sg-wf-4-plan-list-surface|sg-WF-4]] â€” design-system spec for the Plan list surface. Locked decisions in [[../../../50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]] Â§Q3 (JOINED chip) and Â§Q8 (resume-from-state).
 
 Builds on [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]]. Adds the joiner-side journey end-to-end.
 

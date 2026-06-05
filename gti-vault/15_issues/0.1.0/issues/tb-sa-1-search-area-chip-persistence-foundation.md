@@ -45,4 +45,3 @@ Persist the committed Search area through existing center/radius storage. No sch
 
 ## Blocked by
 
-- [[sg-sa-1-searchareapicker-design-system-spec|sg-SA-1 - SearchAreaPicker design-system spec]] (GH [#317](https://github.com/samfarls55/gettoit/issues/317))

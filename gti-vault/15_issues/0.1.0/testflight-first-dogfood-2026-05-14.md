@@ -20,15 +20,12 @@ close-to-verbatim so we don't lose the original intent during triage.
   the surface. Need to revisit the on-gradient text colors against the
   initiator gradient, or rethink the yellowâ†’white pairing on the home
   surface specifically.
-  - Cross-ref: [[design-system/accessibility.md]] contrast tables;
-    [[design-system/tokens.json]] `color.text.on-gradient.*`.
 
 ## Missing surfaces / flows
 
 - **Landing page.** The app needs a proper landing surface â€” what users see
   before they enter a session. Today it drops straight into the initiator.
 - **Account creation flow.** No surface for sign-up today. Sign in with
-  Apple exists ([[design-system/components.md]] AuthUpgradeChip) but the
   full "create account" path isn't built out.
 
 ## Geography / location
@@ -45,8 +42,6 @@ close-to-verbatim so we don't lose the original intent during triage.
   select an answer â€” the UI advances to the next question instantly, but
   the background gradient lags ~1s behind. Should be a seamless single
   transition where UI + background animate together.
-  - Cross-ref: [[design-system/motion.md]]; per-screen `CHOREO` constants
-    in `design-system/code/screens/`. Likely a `CHOREO` timing mismatch
     between the foreground card transition and the gradient interpolation.
 
 ## Question content
@@ -98,7 +93,6 @@ close-to-verbatim so we don't lose the original intent during triage.
 
 - Several of these (landing page, account flow, geography permission)
   are missing-surface gaps â€” they're spec-level decisions that have to
-  start in `design-system/` and/or `10_prds/` before any code goes in.
 - The 404 + plain-text link are real bugs against shipped functionality
   and should jump the queue.
 - The motion lag is a localized fix in the relevant `CHOREO` constants.

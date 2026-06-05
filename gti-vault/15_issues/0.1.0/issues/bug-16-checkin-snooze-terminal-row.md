@@ -15,7 +15,6 @@ prd: 0.1.0-prd
 
 ## Symptom
 
-The S08 next-day check-in offers three options: `We went` / `We skipped` / `Ask me later`. "Ask me later" is meant as a snooze â€” `design-system/surfaces/08-checkin.md` says it "exists because users at 6:43 PM the next day might not be ready to answer truthfully. Forcing a binary at that moment corrupts the metric." The copy implies the user gets re-asked.
 
 They never do. Worse: once a user taps "Ask me later", they can **never** report a real outcome for that verdict.
 
@@ -44,14 +43,11 @@ A honors the locked S08 intent; B is a one-surface copy change. Recommendation d
 
 ## Acceptance criteria (after triage)
 
-- [ ] Fork resolved; `design-system/surfaces/08-checkin.md` reconciled with the chosen behavior.
 - [ ] If A: snooze no longer writes a terminal `check_ins` row; a snoozer can later report `went` / `skipped`; the re-prompt path (or its deliberate absence) is specified.
 - [ ] If B: the option copy no longer implies a re-ask; the S08 copy register is updated.
-- [ ] `node design-system/scripts/verify.mjs` green if any design-system file is touched.
 
 ## References
 
-- `design-system/surfaces/08-checkin.md` â€” S08 spec ("Three options (not yes/no)").
 - `ios/Sources/App/CheckinScreen.swift` â€” `handleTap` / `SupabaseCheckinWriter.record`.
 - `supabase/migrations/20260514000400000_checkins_and_events.sql` â€” `check_ins` schema (`(room_id, user_id)` PK).
 - `supabase/migrations/20260514000430000_checkin_no_signal_sweeper.sql` â€” the no-signal sweeper.
@@ -79,14 +75,12 @@ S08 offers three outcomes: went / skipped / "Ask me later". "Ask me later" immed
 Keep the immediate `snoozed` write unchanged (it stays metric-excluded by design). Re-label the third option and its supporting copy so it no longer implies a re-prompt â€” a "didn't decide / not this time" register rather than a "snooze". Reconcile the S08 surface spec so its rationale matches the terminal-write reality.
 
 **Key interfaces:**
-- The S08 surface spec (`design-system/surfaces/08-checkin.md`) â€” the "three options (not yes/no)" section, including the rationale paragraph that frames the third option as a deferral. Copy and rationale both updated to the chosen register.
 - The iOS check-in screen â€” the third option's label string. The committed outcome value (`snoozed`) and the write path do not change.
 
 **Acceptance criteria:**
 - [ ] The S08 third-option copy no longer implies the user will be re-asked.
 - [ ] The S08 surface spec's rationale is reconciled with the terminal-write behavior.
 - [ ] The option still commits the `snoozed` outcome â€” no behavior change to the write path.
-- [ ] `node design-system/scripts/verify.mjs` passes.
 
 **Out of scope:**
 - Fork A â€” no re-prompt scheduler, no re-arming of the check-in dispatch.
@@ -109,7 +103,6 @@ moved:
   itself implied a re-ask): headline `Ok â€” no worries.`, body `We've
   left this one blank â€” no follow-up. See you next session.`
 
-Reconciled `design-system/surfaces/08-checkin.md` (three-options
 section, copy register, coercion-defense line, edge cases), the C-18
 component spec in `components.md`, the canonical `ScreenCheckin.jsx`, and
 `gti-vault/60_engineering/checkin-telemetry.md` so the rationale matches
@@ -120,4 +113,3 @@ Added two regression-guard tests (`testThirdOptionCopyDoesNotPromiseAReAsk`,
 `testSnoozedConfirmationBodyDoesNotPromiseAReAsk`) that fail if any
 deferral-implying word ("later", "snooze", "tomorrow", "pop back", â€¦)
 re-enters the third-option or snoozed-confirmation copy. CI `ios` lane
-green. `node design-system/scripts/verify.mjs` all six gates green.

@@ -23,7 +23,6 @@ User report: "In solo mode, 'All one of you' appears under the verdict time, whi
 
 Confirmed in code:
 
-- `design-system/surfaces/05-verdict.md` Â§solo (locked): *"Time-badge audience reads `"You"` rather than `"All N of you"` â€” communal frame doesn't apply to a single voice."*
 - `ios/Sources/App/VerdictStore.swift:25-26,266` carries the audience-copy contract and a comment acknowledging `"All one of you"` is wrong-pitched.
 - `ios/Sources/App/VerdictScreen.swift:435` renders `verdict.timeBadge.audience.uppercased()` â€” the renderer is correct; the producer (`VerdictStore`) is presumably falling through the templated path on solo rooms instead of branching to `"You"`.
 
@@ -42,7 +41,6 @@ User dogfood, 2026-05-24.
 
 ## References
 
-- `design-system/surfaces/05-verdict.md` Â§solo â€” the locked "You" / "All N of you" contract.
 - `ios/Sources/App/VerdictStore.swift:25-26,88,146,266` â€” `TimeBadge` construction + the in-code note.
 - `ios/Sources/App/VerdictScreen.swift:50,60,68,91,435` â€” `TimeBadge` surface render.
 
@@ -59,12 +57,10 @@ The user's framing: *"We don't need to say what is already understood."*
 
 ### Fix scope
 
-- **Spec edit** â€” `design-system/surfaces/05-verdict.md`:
   - Â§solo (line 57 / Â§"solo" block): remove the sentence *"Time-badge audience reads `"You"` rather than `"All N of you"` â€” communal frame doesn't apply to a single voice."* Replace with: *"Time badge renders the timestamp only â€” no audience subtitle. The communal frame self-cancels with `N = 1`; the solo voter already knows it's them."*
   - Â§Formatting (line 75): keep the `"ALL FOUR OF YOU"` group rule. Update the solo carve-out to: *"In `solo` the audience subtitle is **omitted** â€” the badge renders the timestamp alone."*
   - Â§"VO order" (around line 97): the solo VO sequence drops the audience node. Sequence on solo is `eyebrow â†’ hero â†’ meta â†’ time (timestamp only) â†’ rule chip â†’ CTA`.
   - Â§solo VO body (around line 104): rewrite the time-badge sentence: *"Time badge renders the timestamp only. Audience subtitle is suppressed in solo â€” the communal `"All N of you"` frame does not apply, and replacing it with `"You"` would only restate what the solo voter already knows."*
-- **Spec edit** â€” `design-system/accessibility.md`:
   - Update the Â§"Time badge audience" VO entry: group keeps `"All N of you"` announced after the timestamp; solo no longer announces an audience string.
 - **iOS port** â€” `ios/Sources/App/VerdictStore.swift`:
   - In the `TimeBadge` construction, when `isSolo` (a.k.a. `members.length === 1` AND the initiator did not share â€” per `surfaces/05-verdict.md` Â§solo trigger), set `audience = nil` (or whatever the appropriate Swift `nil`/empty-Optional pattern is on that type).
@@ -77,7 +73,6 @@ The user's framing: *"We don't need to say what is already understood."*
 
 ### Verification
 
-- `node design-system/scripts/verify.mjs` green.
 - iOS simulator: solo verdict screen renders the time badge as a single line (just the timestamp). No `"YOU"`, no `"ALL ONE OF YOU"`.
 - iOS simulator: group verdict screen (â‰¥ 2 members) renders the time badge with two lines, the second being `"ALL N OF YOU"`. Unchanged from current behavior.
 
@@ -89,4 +84,3 @@ The user's framing: *"We don't need to say what is already understood."*
 
 ## Comments
 
-- 2026-05-24 â€” AFK execution complete. Spec amended (`design-system/surfaces/05-verdict.md` Â§Modes / Â§"Copy register" / Â§solo, `design-system/accessibility.md` Â§"Verdict (solo mode)" + Â§"VoiceOver labels", `design-system/CHANGELOG.md`). JSX (`design-system/code/screens/ScreenVerdict.jsx`) drops the subtitle entirely on solo. iOS port: `VerdictStore.audienceCopy(forMemberCount:)` returns `""` for `n == 1`; `VerdictScreen.timeBadge` renders the subtitle `Text` only when audience is non-empty; `ScreenFixtures.soloFixture()` updated. Test suite updated: `VerdictStoreTests.testAudienceCopyForSolo` now asserts empty string; `VerdictScreenSoloTests.testSoloFixtureTimeBadgeAudienceIsOmitted` (renamed from `â€¦IsYou`); new `VerdictScreenSnapshotTests.testTimeBadgeRendersWithoutCrashingWhenAudienceIsEmpty` covers the renderer's empty-subtitle path. `node design-system/scripts/verify.mjs` green.

@@ -29,26 +29,17 @@ This issue does NOT introduce distance or time sliders — those are out of 0.1.
 
 ## Scope
 
-- **New surface document** in `design-system/surfaces/` — propose `00-landing.md` (numbered before the existing `01-initiator.md`). Describe:
   - Two-button layout (Start a Decision + Account Settings).
   - Routing: Start a Decision → existing initiator surface; Account Settings → existing settings surface.
   - Explicit deferral note: visual / brand design lands in a separate polish ticket post-launch.
   - Behavior: launching the app (after first-launch sign-in per [[sg-03-account-creation-surfaces|sg-03]]) lands here, not directly on S01.
-- **New JSX** at `design-system/code/screens/ScreenLanding.jsx` rendering the two-button layout with tokens. No inline hex.
-- **No new components** unless a primary-CTA button variant is genuinely missing — check `design-system/components.md` first.
 - **Tokens** — confirm no new tokens needed. Surface is layout + existing typography + existing color roles.
 
 ## Acceptance criteria
 
-- [x] `design-system/surfaces/00-landing.md` (or chosen filename) exists describing the two-button surface, routing, and visual-polish deferral.
-- [x] `design-system/code/screens/ScreenLanding.jsx` renders the surface with tokens-only styling.
-- [x] `design-system/components.md` updated if any new component variant is introduced (none expected).  *(N/A — no new components introduced; existing `C-05` Primary Pill CTA `white` + `ghost` variants cover the two buttons.)*
-- [x] `node design-system/scripts/verify.mjs` green.
-- [x] `design-system/CHANGELOG.md` entry referencing this issue.
 
 ## Resolution
 
-Landed 2026-05-14 on branch `spec/sg-02-landing-page-surface`. Surface ships at `design-system/surfaces/00-landing.md` with JSX at `design-system/code/screens/ScreenLanding.jsx`. Reuses `initiator` gradient stop + `C-05 PillCTA` `white` and `ghost` variants — no new components, no new tokens. `verify.mjs` reports `10 surface docs claim 15 screens, no orphans / double-claims` and all drift / hex sweeps green. Downstream wire is [[tb-01-landing-page-wire|TB-01]].
 
 ### Adjacency surfaced (not actioned)
 

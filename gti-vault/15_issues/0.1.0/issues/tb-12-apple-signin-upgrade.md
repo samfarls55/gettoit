@@ -25,18 +25,13 @@ pr: 29
 The non-blocking upgrade path from anonymous identity to a claimed Apple-linked identity. Surfaced as a chip on the S04 Waiting surface with copy `"Save this taste profile"` / `"Maybe later"`. On tap â†’ Apple authentication flow â†’ Supabase `auth.link_identity` attaches the Apple identity to the existing anonymous `user_id`. No data loss.
 
 - **AuthCoordinator** â€” extend the TB-01 anon-only implementation to handle the link upgrade path. `link_apple()` triggers the Authentication Services framework Apple Sign-in flow, then calls `supabase.auth.linkIdentity({ provider: 'apple', idToken })`. On success, the existing `user_id` survives â€” all `votes`, `members`, `events` rows already keyed to it remain attached. On failure or user dismissal, no state changes.
-- **S04 design-system spec change** â€” add a new chip component or chip variant for the auth-upgrade affordance. Add a `C-NN` entry in `design-system/components.md`; implement in `code/components.jsx` (or a dedicated file if motion/state warrants). Update `design-system/surfaces/04-waiting.md` to call out the placement (secondary to the primary "N of M are in" headline), hierarchy, and dismiss behavior. Update `code/screens/ScreenWaiting.jsx` to render the chip in the canonical state. Copy register: voluntary warm-friend â€” `"Save this taste profile"` + `"Maybe later"`. NEVER `"Sign up"` / `"Create account"` / `"Confirm"`. On success, replace chip with a quiet `"Saved."` confirmation or hide it. On dismiss, persist `auth_prompt_dismissed_at` and suppress re-prompts for 30 days. Web fallback does NOT render the chip (no Sign in with Apple in browser).
-- **iOS port** â€” port the new chip from the design-system JSX into the SwiftUI ScreenWaiting view. Chip is secondary to the primary "N of M are in" waiting state; tap target â‰¥44pt.
 - **30-day re-prompt suppression** â€” `users.auth_prompt_dismissed_at` column (or equivalent). The chip checks this on render and hides if dismissed within 30 days.
 - **Web fallback** â€” chip is NOT rendered in the web fallback per ADR 0007 ("Web fallback voters stay anonymous indefinitely"). Web S04 shows only the primary waiting state.
 - **Tests** â€” anonymous user upgrades to Apple-linked retains all existing rows (`votes`, `members`, `ratifications`); dismiss persists the timestamp; re-prompt is suppressed for 30 days; the linked-user can sign in on a second iOS device and see the prior `user_id`'s history.
 
 ## Acceptance criteria
 
-- [x] New chip component entry added to `design-system/components.md` + `code/components.jsx`.
-- [x] `design-system/surfaces/04-waiting.md` describes the chip placement, copy, and dismiss behavior.
 - [x] `code/screens/ScreenWaiting.jsx` renders the chip in canonical state.
-- [x] `node design-system/scripts/verify.mjs` passes; `design-system/CHANGELOG.md` updated.
 - [x] AuthCoordinator implements `link_apple()` with `supabase.auth.linkIdentity`.
 - [x] Anonymous-to-Apple merge preserves the `user_id` and all related rows.
 - [x] S04 SwiftUI view renders the chip with the canonical states (default, in-progress, success, dismissed).

@@ -35,7 +35,6 @@ The metric loop that makes the 0.1.0 thesis observable. 12â€“24 hours after
     - `metric_invite_acceptance` â€” distinct rooms with `invite_shared` vs. distinct (room, user) `member_joined` and `quiz_completed` events.
 - **iOS â€” `ios/Sources/App/`**
   - `TelemetryWriter.swift` â€” thin wrapper writing into the `events` table. Owns the canonical event-type vocabulary (`room_created`, `quiz_completed`, `verdict_ready`, `ratified`, `rerolled`, `invite_shared`, `member_joined`). `TelemetryEventSink` protocol seam; `SupabaseTelemetrySink` production adapter; capture-spy test adapter.
-  - `CheckinScreen.swift` â€” full SwiftUI port of `design-system/code/screens/ScreenCheckin.jsx`. Three tap rows; reason-chip row after `We skipped`; confirmation plate after commit; mono-tagged footer eyebrow before commit. `CheckinWriter` protocol seam; `SupabaseCheckinWriter` production adapter.
 - **iOS tests â€” `ios/Tests/`**
   - `TelemetryWriterTests.swift` â€” every documented event-type emits the right `event_type` string; the row shape (`room_id` / `user_id` / `properties`) matches the schema; custom properties carry through; errors propagate.
   - `CheckinScreenTests.swift` â€” locked copy register (`"Did you go?"`, three option labels, sub-copy, reason chip taxonomy, confirmation headline); choreo timing (320ms fade-up); writer fires once on commit with the correct outcome + reason mapping; view materializes under default + skipped + snoozed + went states.
@@ -151,5 +150,4 @@ The writer exposes one dedicated method per event_type so callers can never typo
 - [[adr/0005-telemetry-supabase-event-store|ADR 0005]] â€” telemetry as Supabase tables + SQL views
 - [[waiting-fire-trigger|waiting-fire-trigger.md]] â€” the canonical pg_cron + pg_net dispatcher pattern that TB-14 mirrors
 - [[ratification-push-hardclose|ratification-push-hardclose.md]] Â§"Adjacencies" â€” TB-08's note that per-trigger APNs fanout wiring lands in TB-14
-- [[../../design-system/surfaces/08-checkin|S08 spec]] â€” locked surface spec
 - [[../15_issues/0.1.0/issues/tb-14-checkin-telemetry|TB-14 ticket]]

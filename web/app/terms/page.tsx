@@ -4,8 +4,6 @@
 // "TOS hosted at gettoit.app/terms" and required for App Store
 // submission. Pairs with the Privacy Policy at /privacy.
 //
-// Not an mobile design-system surface (no entry in
-// `design-system/surfaces/`) — web-only legal page consuming the
 // canonical tokens for typography and color so it stays on-brand
 // without forcing a long-form-text surface into the locked spec.
 

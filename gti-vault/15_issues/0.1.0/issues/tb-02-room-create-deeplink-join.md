@@ -26,7 +26,6 @@ The first multi-user vertical. An initiator opens the app on Device A, taps the 
 - **InviteLink module (iOS)** â€” generates `https://gettoit.app/join/{roomId}?inviteToken={token}` Universal Links. Parses incoming links into `(roomId, inviteToken)` tuples. Pure functions on `URLComponents`.
 - **AASA file** â€” update `https://gettoit.app/.well-known/apple-app-site-association` (TB-00) with the real Apple Team ID and Bundle ID. `paths: ["/join/*"]`.
 - **iOS â€” Associated Domains entitlement** â€” `applinks:gettoit.app`. Universal Link handler in the App's `onOpenURL` (or `UIScene` equivalent) routes to a "join screen."
-- **S01 minimal port** â€” SwiftUI port of [[../../../../design-system/surfaces/01-initiator|S01]] with only the food vertical enabled and the primary CTA wired. **Defer the timer chip + radius slider to TB-03** â€” they will be added in the next tracer bullet. Just the visual locked port + share-sheet trigger.
 - **Join screen** â€” minimal SwiftUI view that calls `signInAnonymously` (if no session), inserts a `members` row with `role='participant'`, and displays `"Joined room <id>"`.
 - **Integration tests** â€” room creation writes the row with `role='owner'`; deep-link join writes a `members` row with `role='participant'`; RLS rejects reads from non-members.
 
@@ -38,7 +37,6 @@ The first multi-user vertical. An initiator opens the app on Device A, taps the 
 - [x] Tapping the link on Device B with the app installed deep-links to the join screen. _(2026-05-13 â€” routing wired via `.onOpenURL` + `.onContinueUserActivity(NSUserActivityTypeBrowsingWeb)` in RootView; entitlement `applinks:gettoit.app` added)_
 - [x] Deep-link join writes a `members` row. _(2026-05-13 â€” verified by `testJoinRoomWritesParticipantMembershipForADifferentUser`)_
 - [x] Integration tests for room create, member add, RLS pass. _(2026-05-13 â€” 3 tests in `RoomStoreIntegrationTests.swift`, all green on the iOS lane)_
-- [x] S01 SwiftUI port matches the locked design-system spec for the parts in scope (no timer/radius controls yet â€” those land in TB-03). _(2026-05-13)_
 - [x] Share-sheet flow tested on a real device (or simulator with simulated share). _(2026-05-13 â€” `UIActivityViewController` wired via `ShareSheet` UIViewControllerRepresentable; PR test plan flags real-device verification as a follow-up before TestFlight)_
 
 ## Blocked by

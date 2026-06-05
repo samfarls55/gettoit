@@ -38,12 +38,10 @@ The rewrite is a parallel migration to full pre-launch parity, not a bridge insi
 
 Locked choices:
 
-- `mobile/` lives at the repo root as a sibling to `ios/`, `web/`, `supabase/`, and `design-system/`.
 - Expo web is a dev-only preview target, not a replacement for the existing Next.js web fallback.
 - The migration target is behavioral parity, not pixel parity.
 - Swift iOS is feature-frozen immediately: only critical bug/security/TestFlight fixes go to `ios/`.
 - New mobile feature work goes to `mobile/`.
-- Source of truth is design-system surfaces + `CONTEXT.md`; Swift code/tests are reference evidence, not unquestioned product law.
 - Navigation uses an explicit app-state router/state machine first. Expo Router may handle shell/deep-link entry, but product routing stays centralized and unit-testable.
 - The Expo app talks to the same Supabase project directly through a typed repository/service layer.
 - Supabase schema/RPC cleanup is allowed during migration when it serves a migrated flow. No speculative backend rewrite.

@@ -19,7 +19,6 @@ Restyle DELETE MY DATA from white-pill primary (SettingsScreen.swift:127-129) to
 
 ## Acceptance criteria
 
-- [ ] DELETE renders in destructive style per `design-system/components.md`.
 - [ ] DONE is the visually dominant primary.
 - [ ] Snapshot test on SettingsScreen render covers new hierarchy.
 
@@ -38,4 +37,3 @@ None â€” can start immediately.
 
 ## Comments
 
-- 2026-05-26 (AFK): DONE promoted to C-05 white PillCTA; DELETE MY DATA demoted to C-05 ghost (transparent fill, 1.5pt white-0.5 stroke). No red anywhere â€” `tokens.md Â§1.3` no-red contract preserved; destructive weight lives in outline + copy + native two-step confirm alert. Surface spec `surfaces/09-settings.md` and JSX `code/screens/ScreenSettings.jsx` updated; iOS contract pinned via `SettingsScreen.Style` static constants. `node design-system/scripts/verify.mjs` clean. Closed by PR #275.

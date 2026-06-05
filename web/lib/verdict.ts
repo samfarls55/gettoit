@@ -1,7 +1,6 @@
 // GetToIt web — verdict shaping helpers.
 //
 // The web invitee verdict surface is the locked
-// `design-system/surfaces/web-01-invitee-shell.md` §C "Read-only
 // verdict card": plan name + verdict venue only. §C spells out,
 // verbatim, "No receipts, no per-axis cuts, no rule chip" and "No
 // primary CTA" — the web invitee card is a far smaller read than the
@@ -42,7 +41,6 @@ export type VerdictRow = {
  *  - `default`: a venue was chosen. `verdictPlaceName` is the winning
  *    venue name.
  *  - `no-survivor`: the engine emitted `no_survivor`. §C does not spec
- *    this case (flagged as a separate design-system spec-gap
  *    follow-up); bug-17 ships a minimal variant — plan name plus a
  *    "No spot fits" card in the venue slot, no votes-derived meta line
  *    (its only data source, `votes`, is gone by decided-time). */

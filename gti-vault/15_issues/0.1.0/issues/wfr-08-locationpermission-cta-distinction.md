@@ -40,4 +40,3 @@ None â€” can start immediately.
 
 ## Comments
 
-- **2026-05-26** â€” Closed via PR #277. The view body already rendered the spec-correct treatments (white pill primary + eyebrow text-link secondary per `design-system/surfaces/00b-location-permission.md`); finding #8 was based on a pre-fix snapshot of the screen. The PR extracts the CTA treatment into static spec data (`primaryCtaTreatment` / `secondaryCtaTreatment`) so the view body reads from it, and adds `LocationPermissionScreenSnapshotTests.swift` with a load-bearing distinct-treatment regression guard. Pixel-identical to `main`; the change is structural.

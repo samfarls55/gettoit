@@ -21,7 +21,7 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 | `HITL`            | Tracer-bullet build slice that requires a human in the loop       |
 | `0.1.0`           | Scoped to the 0.1.0 pre-launch development cycle                  |
 | `tracer-bullet`   | A vertical-slice build issue (`tb-NN-*` in the vault)            |
-| `spec-gap`        | A design-system spec change required by the PRD                  |
+| `spec-gap`        | A PRD-backed spec change is required                              |
 
 ## Storage mechanism
 

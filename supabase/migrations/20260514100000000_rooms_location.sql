@@ -1,7 +1,6 @@
 -- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
 -- TB-03 (quiz redesign) â€” add location columns to `rooms`.
 --
--- Owned by tb-03 per `design-system/surfaces/01-initiator.md` Â§
 -- "Persistent location selector â€” C-23 LocationPicker": the resolved
 -- place is written to `rooms.location_*` when the CTA fires.
 --

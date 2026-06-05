@@ -33,7 +33,6 @@ End-to-end behavior:
 
 - Add SwiftUI view consuming the `ScreenLocationPermission` JSX spec from [[sg-04-geo-permission-and-location-selector|sg-04]] verbatim.
 - Wire native `CLLocationManager` permission request from the pre-prime CTA. Handle all three outcomes: granted, denied, restricted.
-- Implement the persistent location-selector component per the [[sg-04-geo-permission-and-location-selector|sg-04]] HITL component decision (either consume a new `LocationPicker` from `design-system/code/components.jsx` or extend `MapKitPlacesFallback`).
 - Add deep-link to iOS Settings from the manual-entry empty state for re-enabling permission.
 - Confirm `PlacesService` consumes the selected location regardless of source (GPS vs manual). The downstream API call shape should not differ.
 

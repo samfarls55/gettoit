@@ -42,4 +42,3 @@ None â€” ships as a chrome-only add now.
 
 ## Comments
 
-- 2026-05-26 â€” Shipped via PR #289 (squash-merged). `.readOnly` now renders the chrome row with a `Done` verb (not `Home`) wired to `onAdvance` â€” Solo Setup is the only honest destination for the late-joiner since they have no Plan list. Every iOS-reachable verdict mode now carries a top-leading escape slot. Spec amendment: `design-system/surfaces/05-verdict.md` Â§"Verdict chrome (Home / Done)" replaces the prior "Home omitted on read-only" rule. No new tokens / components; reused the existing eyebrow row primitive. `ModeSnapshot` gained `homeChromeLabel` + `chromeFiresAdvance` so the view body stays free of mode branching.

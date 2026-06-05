@@ -16,7 +16,6 @@ closed: 2026-05-20
 
 ## Parent
 
-[[sg-wf-4-plan-list-surface|sg-WF-4]] â€” design-system spec for the Plan list surface. Locked decisions in [[../../../50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]].
 
 Foundation slice for the entire Plan list iOS port. Subsequent tracer-bullets (tb-WF-6 / tb-WF-7 / tb-WF-8 / tb-WF-9) layer additional capabilities on top of this shell.
 
@@ -28,7 +27,6 @@ End-to-end vertical slice covering the solo user's Create â†’ List â†’
 
 ### iOS changes
 
-- **Add:** `ios/Sources/App/PlanListScreen.swift` â€” SwiftUI view rendering the Plan list per the design-system spec from sg-WF-4. Three sections (`Pending` / `Decided` / `History`); empty sections render nothing per Q1.
   - **In this slice:** Pending section is the only one that ever has rows (no Decided/History transition logic shipped yet â€” those land in tb-WF-8).
   - 1-line Pending cards: name only, glass row treatment per C-19 lineage.
   - Hero pill (giant C-05 primary pill, mid-screen) rendered when ALL sections are empty.
@@ -38,7 +36,6 @@ End-to-end vertical slice covering the solo user's Create â†’ List â†’
 - **Delete:** `ios/Sources/App/LandingScreen.swift`. Remove all references.
 - **Add:** PlansStore extension method â€” `plansForList(userId: UUID) async throws -> [Plan]` (or equivalent), filtered to `status == .pending` for this slice. Sorted `created_at DESC`. Decided/History queries can stub-return empty arrays here; they get real implementations in tb-WF-8.
 
-### Design-system spec consumption
 
 - C-25 Action Dot Menu and C-26 FAB land in sg-WF-4's surface doc + JSX. **Neither is consumed by this slice** (FAB lands in tb-WF-6; menu lands in tb-WF-9). This slice ships the underlying `PlanListScreen` skeleton that those will plug into.
 - 1-line Pending card visuals follow sg-WF-4's surface doc. Match exactly.
@@ -76,7 +73,6 @@ None. tb-WF-1 already shipped the Plans table + PlansStore; this slice just adds
 
 ## Blocked by
 
-- [[sg-wf-4-plan-list-surface|sg-WF-4]] â€” design-system spec + JSX must land first to provide the visual blueprint (#157).
 - [[tb-wf-4-wire-plan-setup-surface|tb-WF-4]] â€” amended Setup screen with `.solo` mode (#163). This slice invokes `SetupScreen(mode: .solo)`; that constructor must exist.
 
 ## Comments

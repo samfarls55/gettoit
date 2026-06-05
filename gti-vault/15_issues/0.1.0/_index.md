@@ -8,13 +8,11 @@ purpose: 0.1.0 pre-launch development cycle â€” every issue, PRD slice, dog
 
 # 0.1.0 â€” Pre-launch development cycle
 
-All issues, build slices, bugs, and design-system spec-gaps shipped during the pre-launch build of GetToIt. This folder collapses what was previously labeled the `v1` PRD batch, the `v1.1` dogfood batch, and the `workflow-overhaul` phase into a single `0.1.0` cycle, since `v1` is now reserved for the first public-launch release.
 
 The phases below are organizational only â€” same cycle, distinct decomposition sessions.
 
 ## Phases
 
-- [[prd-phase|PRD phase (formerly the "v1" batch)]] â€” 18 tracer-bullet build slices (TB-00 â†’ TB-17) decomposed from the [[../../10_prds/0.1.0-prd|0.1.0 PRD]] plus 5 design-system spec-gap issues. All merged 2026-05-12 â†’ 2026-05-14.
 - [[dogfood-phase|Dogfood follow-ups (formerly the "v1.1" batch)]] â€” first-install TestFlight feedback (2026-05-14), the quiz-redesign + verdict-engine PRD ([[../../10_prds/0.1.0-quiz-redesign-prd|0.1.0 Quiz Redesign PRD]]), Q5-wiring fix, premium-data follow-ups, post-Q5 router fix, verdict-pipeline integration, candidate-pool floor, verdict-spinner diagnosis, solo-session post-mortem, AFK-run follow-ups, UI dogfood batch.
 - [[workflow-overhaul-phase|Workflow overhaul (formerly "workflow-overhaul")]] â€” Plans as persistent named items, list-as-landing, collapsed Setup screen, three nav verbs (Back/Exit/Delete), web invitee shell + account-claim bridge.
 - [[search-area-picker-prd|Search area picker PRD]] (GH [#316](https://github.com/samfarls55/gettoit/issues/316)) â€” replace active Setup `Where to` + `How far` controls with C-28 SearchAreaPicker.
@@ -37,7 +35,6 @@ Decomposed from [[search-area-picker-prd|Search area picker PRD]] on 2026-06-03 
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|
-| sg-SA-1 | [[issues/sg-sa-1-searchareapicker-design-system-spec|SearchAreaPicker design-system spec]] | AFK (done) | [#317](https://github.com/samfarls55/gettoit/issues/317) | â€” |
 | tb-SA-1 | [[issues/tb-sa-1-search-area-chip-persistence-foundation|Search area chip + persistence foundation]] | AFK | [#318](https://github.com/samfarls55/gettoit/issues/318) | sg-SA-1 |
 | tb-SA-2 | [[issues/tb-sa-2-map-viewport-selection-editor|Map viewport selection editor]] | AFK | [#319](https://github.com/samfarls55/gettoit/issues/319) | tb-SA-1 |
 | tb-SA-3 | [[issues/tb-sa-3-search-area-jumps|Search area jumps]] | AFK | [#320](https://github.com/samfarls55/gettoit/issues/320) | tb-SA-2 |

@@ -18,7 +18,6 @@ closed: 2026-05-20
 
 ## Parent
 
-[[../../../50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] â€” the headline iOS port. Lands the iOS Setup screen that consumes [[sg-wf-1-plan-setup-surface|sg-WF-1]]'s design-system spec and [[tb-wf-1-plans-table-schema|tb-WF-1]]'s `plans` table + PlansStore. End-to-end: a user can create a named Plan via the new Setup screen, save it for later or drop the invite link immediately, and (once edits are in scope) tap a pending Plan from the list to re-open the Setup screen in Edit mode.
 
 ## What to build
 
@@ -89,7 +88,6 @@ The disambig sheet itself + FAB wire + hero pill routing are NOT in this issue's
 
 ## Blocked by
 
-- [[sg-wf-1-plan-setup-surface|sg-WF-1]] â€” the design-system spec (done).
 - [[tb-wf-1-plans-table-schema|tb-WF-1]] â€” the `plans` table + PlansStore (done).
 - [[sg-wf-4-plan-list-surface|sg-WF-4]] â€” the Plan list surface spec (done â€” grilled 2026-05-20).
 
@@ -105,7 +103,6 @@ Promoted from `needs-info` â†’ `ready-for-agent`. Scope amended to include 
 
 AFK execution shipped on `afk/tb-wf-4`. Highlights of the autonomous calls:
 
-- **Pure deletion of `InitiatorScreen.swift` + `ParametersScreen.swift`** (plus their tests). The issue body offered either pure deletion or a feature-flag transition window; deletion is simpler and avoids a half-state window. The retired surface docs (`design-system/surfaces/01-initiator.md`, `01b-parameters.md`) stay in the tree as spec history; the README is updated to note iOS retirement.
 - **Temporary "Start a Decision" entry point** on S00 Landing opens Setup in `.create + .group` mode. The disambig sheet that lifts solo vs group out of Setup (tb-WF-6) is not yet wired; the canonical first-paint of the JSX has group selected, so this matches. A user who wants the solo path must wait for tb-WF-6.
 - **Late-joiner re-invite path** now opens Setup in `.create + .group` rather than the legacy `InitiatorScreen` with timer + radius prefill. The legacy `timer_minutes` + `radius_meters` prefill no longer maps cleanly â€” Setup uses the new distance slider and lifts the radius onto a per-Plan column. The prefill semantics are dropped (the late-joiner picks Setup defaults; one extra tap if they want a custom distance).
 - **`Save for later` destination** lands on S00 Landing until tb-WF-5 wires the iOS Plan list. The issue body explicitly permits this stub.

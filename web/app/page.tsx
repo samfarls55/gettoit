@@ -3,7 +3,6 @@
 // TB-01 walking skeleton. Real fallback (web invite + quiz + verdict)
 // lands in TB-15 against the same Sunset Pop tokens loaded in
 // `layout.tsx`. The styles below reference the generated CSS custom
-// properties so any token mutation in `design-system/tokens.json`
 // flows here without code changes.
 
 export default function Page() {

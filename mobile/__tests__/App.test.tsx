@@ -261,7 +261,7 @@ describe("App", () => {
     },
   );
 
-  it("uses the design-system token adapter", () => {
+  it("uses the mobile token adapter", () => {
     expect(mobileTokens.color.sun).toBe("#FFD23F");
   });
 

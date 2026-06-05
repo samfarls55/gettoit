@@ -1,5 +1,4 @@
 ---
-title: Sunset Pop â€” Design System Handover Brief
 description: Self-contained brief for a fresh Claude design session. Pulls "Sunset Pop" direction from the 0.1.0 prototype and asks for a full token + component system around it.
 type: handover-brief
 status: superseded
@@ -14,9 +13,7 @@ related:
 > **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
 
 
-# Sunset Pop â€” Design System Handover Brief
 
-> **Superseded â€” design system shipped.** The handover this brief requested was completed; the Sunset Pop design system lives at `design-system/` (repo root). Kept as a historical record of the handover brief.
 
 This file is the prompt to feed to a fresh Claude design session. Everything between the horizontal rules is self-contained â€” paste it as context along with the five screenshots (drag-and-dropped into the session).
 
@@ -32,7 +29,6 @@ Screenshots (filenames are stable; expect them attached in the session):
 
 ## Brief
 
-You're designing a full design system for **GetToIt**, an iOS app that kills group decision paralysis in 60 seconds. The 0.1.0 vertical is **food**: a group decides where to eat by answering 5 quick questions on their own phones, then the app returns one verdict the group commits to.
 
 The five attached screenshots show the locked aesthetic direction â€” codename **Sunset Pop**. It's loud, gradient-driven, display-typography forward. The job *of the app* is to end the conversation; the visual language is built to match that finality.
 
@@ -48,7 +44,6 @@ This is why finality matters, why the loser must feel heard, why the check-in ca
 
 ### What you're building
 
-A production-ready design system: tokens, components, and motion language. Output should be structured markdown I can drop into `gti-vault/30_design/sunset-pop/` and translate to SwiftUI later.
 
 ### Hard product constraints (do not negotiate)
 
@@ -80,7 +75,6 @@ These come from prior research; the visual system has to live inside them.
 
 ### Drift risks specific to this direction (design defenses)
 
-Sunset Pop's confidence and gradient bombast carry two specific risks that the design system must actively defend against. These are not optional callouts â€” they're load-bearing:
 
 1. **Algorithm-as-decider drift.** A loud, definitive verdict screen can read as "the app decided for us." That violates aggregate-rule attribution and damages the relational signal that drives follow-through. **Defense:** the rule chip and voice-receipt row are not decoration. They are the proof that the verdict came from the inputs, not from the app. Treat them as primary content â€” not secondary chrome â€” and make sure they read in the verdict's first 2 seconds.
 2. **Equity-celebration drift.** Bright accent + display-size winner can tip into "we won!" energy, which converts a communal frame into an exchange frame ("your turn next time"). **Defense:** no celebration motifs (confetti, trophies, sparkles). The verdict is a statement of fact, delivered with finality â€” not a reward. Loud, not festive.

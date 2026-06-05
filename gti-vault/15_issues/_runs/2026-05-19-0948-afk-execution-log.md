@@ -25,7 +25,6 @@ unblocked and queued.
 
 | Issue | GitHub | State | Branch | PR | Notes |
 |---|---|---|---|---|---|
-| sg-05 | #136 | merged | afk/sg-05 | [#138](https://github.com/samfarls55/gettoit/pull/138) | Q5 no-results mode â€” design-system surface spec |
 | tb-26 | #137 | merged | afk/tb-26 | [#139](https://github.com/samfarls55/gettoit/pull/139) | Remove fictitious fallback venues; render the Q5 no-results screen |
 
 ## Event log
@@ -33,7 +32,6 @@ unblocked and queued.
 - 09:48 â€” Work set: 1 ready (sg-05), 1 waiting (tb-26 <- sg-05), 0 excluded.
 - 09:48 â€” sg-05 `blockers-unparseable` flag reviewed: false positive ("None"). Queued.
 - 09:48 â€” Wave 1: spawning subagent for sg-05.
-- 09:55 â€” sg-05 MERGED. PR #138 squash-merged; issue #136 closed. design-system gates green. tb-26 unblocked.
 - 09:55 â€” Wave 2: tb-26 now ready. Spawning subagent.
 - 10:16 â€” tb-26 MERGED. PR #139 squash-merged; issue #137 closed; branch deleted. `QuizDummyCandidates` removed, `QuizQ5NoResults` screen added, ADR 0013 filed. ios + Deno CI lanes green (309 Deno tests).
 - 10:16 â€” Wave 3 scan: ready empty. Run complete.
@@ -41,7 +39,6 @@ unblocked and queued.
 ## Close-out
 
 - **Completed (2):**
-  - sg-05 â€” [PR #138](https://github.com/samfarls55/gettoit/pull/138). Q5 `no-results` mode added to the design system (`surfaces/03-quiz.md` Â§Q5 + `ScreenQ5Regret.jsx` `mode` prop); `verify.mjs` gates green.
   - tb-26 â€” [PR #139](https://github.com/samfarls55/gettoit/pull/139). `QuizDummyCandidates` deleted from the iOS app target; `QuizQ5NoResults` renders the no-results screen on all four no-results paths; skip-ahead CTA submits Q1â€“Q4 + empty Q5; ADR 0013 filed.
 - **Skipped (HITL / needs-info / unparseable):** none.
 - **Escalated / failed:** none.

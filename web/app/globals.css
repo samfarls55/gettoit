@@ -1,8 +1,5 @@
-/* GetToIt — Sunset Pop · design tokens (canonical)
-   GENERATED from design-system/tokens.json — do not edit by hand.
-   Re-run:  node design-system/scripts/gen-css.mjs
-   Verify:  node design-system/scripts/gen-css.mjs --check */
-
+/* GetToIt web runtime styles.
+   Runtime CSS for current web app. */
 /* Registered properties so the gradient stops can actually tween */
 @property --g1 { syntax: '<color>'; inherits: true; initial-value: #FF8868; }
 @property --g2 { syntax: '<color>'; inherits: true; initial-value: #FF9F6B; }

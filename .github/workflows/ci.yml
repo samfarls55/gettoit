@@ -1,8 +1,6 @@
 # GetToIt CI — single workflow, lanes per ADR 0004 §"One CI lane".
 #
 # Lanes:
-#   * design-system  — Node 20, runs `verify.mjs` (CSS drift gate
-#                      + orphan-hex sweep + surface↔jsx pairing).
 #   * mobile         — Ubuntu, runs TypeScript + Jest checks for the
 #                      active React Native / Expo app in `mobile/`.
 #   * edge           — Ubuntu, runs `deno test` over `supabase/functions/`.
@@ -33,8 +31,7 @@ on:
     # `concurrency` group below. `gti-vault/**` is the Obsidian knowledge
     # base (issue files, AFK run logs, _index.md churn — never source);
     # `docs/**` is agent/runbook docs; `*.md` is root-only (AGENTS.md,
-    # CLAUDE.md shim, CONTEXT.md, README) — deliberately NOT `**/*.md`, because
-    # `design-system/surfaces/*.md` feeds verify.mjs surface↔jsx pairing.
+    # CLAUDE.md shim, CONTEXT.md, README).
     paths-ignore:
       - 'gti-vault/**'
       - 'docs/**'
@@ -57,17 +54,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  design-system:
-    name: design-system (verify)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-      - name: Verify design system (drift gate + orphan-hex sweep)
-        run: node design-system/scripts/verify.mjs
-
   web:
     name: web (tsc + next build + vitest)
     runs-on: ubuntu-latest
@@ -251,9 +237,8 @@ jobs:
   supabase-db:
     name: supabase (db push)
     runs-on: ubuntu-latest
-    # Only push when the migrations directory actually changes — keeps
-    # design-system-only PRs from hitting the prod DB unnecessarily and
-    # avoids burning the rate-limited supabase API tokens.
+    # Only push when the migrations directory actually changes. This avoids
+    # burning the rate-limited Supabase API tokens.
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

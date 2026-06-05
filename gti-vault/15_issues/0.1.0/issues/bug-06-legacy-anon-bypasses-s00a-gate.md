@@ -55,8 +55,6 @@ A fresh install with no session at all continues to mint a Linked-Apple session 
 
 ### Spec
 
-- `design-system/surfaces/00a-signin.md` Two-launch boundary table: add a row for "Legacy pre-S00a anonymous session in Keychain" describing the linkApple upgrade path and prior-data preservation. Cross-link to [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s merge invariant ("the userID before and after linkApple is the same").
-- `design-system/CHANGELOG.md`: one-line entry under 2026-05-14 referencing this issue.
 
 ## Acceptance criteria
 
@@ -65,13 +63,9 @@ A fresh install with no session at all continues to mint a Linked-Apple session 
 - [ ] The Linked-Apple `user_id` after sign-in equals the prior Anonymous `user_id` (verified via the `AuthCoordinator.linkApple` invariant â€” already enforced by `LinkError.userIDChanged` throw if violated).
 - [ ] A fresh install with no Keychain entry continues to land on S00a and sign in via `signInWithApple` as today; subsequent launches skip the gate.
 - [ ] Unit test covers both `SignInScreen` tap branches (`.idle` â†’ `signInWithApple`, `.anonymous` â†’ `linkApple`) via the existing injectable `AppleSignInProviding` + `AuthCoordinator` seams.
-- [ ] `design-system/surfaces/00a-signin.md` Two-launch boundary table includes the legacy-anonymous row.
-- [ ] `design-system/CHANGELOG.md` entry exists.
-- [ ] `node design-system/scripts/verify.mjs` green.
 
 ## Out of scope
 
-- **AuthUpgradeChip (C-22) removal on iOS S04 Waiting.** Per [[../../../../design-system/surfaces/00a-signin|S00a Â§"Interaction with C-22"]] the chip stays in the spec as a fallback even though no iOS user will be anonymous post-fix. No deletion in this PR.
 - **`AuthCoordinator.signInWithApple` defensive throw.** The `SignInError.haveAnonymousSession` guard at the top of the method remains as a safety net for any future caller that reaches it with an anonymous session in hand. Post-fix, `SignInScreen` will never call `signInWithApple` while `.anonymous`, so the throw is unreachable in production but cheap to keep.
 - **ADR change.** [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s 0.1.0 supersedence already covers "iOS forced sign-in"; this is a wiring fix, not a policy change.
 - **Web fallback.** Anonymous sessions remain the default on web per ADR 0007 Â§"Web fallback voters stay anonymous indefinitely." No web changes.
@@ -87,7 +81,6 @@ None â€” can start immediately. The required `AuthCoordinator.linkApple` pa
 - `RootView.shouldRenderSignInGate` returns `true` for `.idle` **and** `.anonymous`, so a pre-S00a install carrying an anonymous session in Keychain now renders the S00a gate instead of falling through to S00 Landing.
 - `SignInScreen.onSaveTapped` captures the coordinator state at tap time: `.anonymous` â†’ `auth.linkApple` (preserves `user_id` and every owned `rooms` / `votes` / `members` / `events` row), otherwise â†’ `auth.signInWithApple`.
 - `SignInScreenTests` covers both tap branches plus the user-cancel path through the injectable `AppleSignInProviding` + `StubAuthLinker` seams.
-- `design-system/surfaces/00a-signin.md` Two-launch boundary table gained the "Legacy pre-S00a anonymous session in Keychain" row; `design-system/CHANGELOG.md` has the dated entry.
 
 The fix commit added this issue file but never flipped its tracker state. This AFK run reconciled the tracker only â€” `status: done` here, the `0.1.0/_index.md` row, and GitHub issue #63 closed via the `Closes #63` PR. No code changed in this PR.
 

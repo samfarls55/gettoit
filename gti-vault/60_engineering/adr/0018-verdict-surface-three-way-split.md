@@ -82,7 +82,6 @@ The host keeps the same plumbing it has today; only the leaf changes.
 ## Consequences
 
 - **Audit finding #16** (`Restore Escape affordance on VerdictScreen .readOnly`, `Blocked by: 1`) is **re-scoped**, not closed. The Home chrome will exist on `VerdictReadOnlyScreen` by default (it's a real surface with a real destination â€” see Web-invitee Plan-list-equivalent question, deferred to grill #2 / #3 / #4 resolution). The "restore escape affordance" framing becomes "ensure `VerdictReadOnlyScreen` renders chrome appropriate to its arrival vector." Re-open and re-scope; do not modify it here.
-- **Surface docs** under `design-system/surfaces/` need a sweep: `05-verdict.md` covers all five modes today; the split spawns `05a-verdict-read-only.md` (or moves the read-only content out into the History-detail surface, pending grill #4) and `05b-no-survivor.md` (or merges into an existing `06-no-survivor.md` if one is already drafted).
 - **Snapshot tests** drop from five-mode combinatorial coverage on one struct to three independent suites. Net test count likely falls.
 - **Implementation work** spawns as an AFK issue (mirrored to GitHub per [[feedback_always_mirror_issues_to_github]]). Issue carries the file-shape and the dispatch contract; AFK agent owns the actual extraction.
 
@@ -94,4 +93,3 @@ The host keeps the same plumbing it has today; only the leaf changes.
 - Audit report: `gti-vault/15_issues/_runs/2026-05-26-0958-workflow-review.md` finding #1, #16
 - `ios/Sources/App/VerdictScreen.swift` â€” current 5-mode struct
 - `ios/Sources/App/VerdictRerollHost.swift` â€” caller hub
-- `design-system/surfaces/05-verdict.md` â€” current spec (covers all 5 modes; needs split per Consequences)

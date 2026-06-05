@@ -48,7 +48,6 @@ shipped fiction.
 
 **The app never surfaces a fictitious venue.** `QuizDummyCandidates` is
 deleted from the iOS app target. In its place Q5 gains a **`no-results`
-mode** â€” specced in the design system by
 [[../../15_issues/0.1.0/issues/sg-05-q5-no-results-mode|sg-05]] and
 consumed by iOS in
 [[../../15_issues/0.1.0/issues/tb-26-remove-fictitious-fallback-venues|tb-26]].
@@ -102,7 +101,6 @@ their fetch. This is intentional:
    has `no-survivor`; the web app has `PlacesEmptyState`. The Q5
    `no-results` mode is the same pattern â€” a centered honest message, an
    action-shaped CTA, no filler. It is built entirely from existing
-   design-system primitives (C-01 / C-02 / C-03 / C-05) and existing
    tokens â€” no new component, no new token.
 3. **The flow must never stall.** The forward CTA preserves the
    no-back-arrow quiz invariant: a member with no candidates still
@@ -181,7 +179,6 @@ Built by tb-26 (2026-05-19):
 ## References
 
 - [[../../15_issues/0.1.0/issues/sg-05-q5-no-results-mode|sg-05]] â€” the
-  Q5 `no-results` mode design-system surface spec.
 - [[../../15_issues/0.1.0/issues/tb-26-remove-fictitious-fallback-venues|TB-26]]
   â€” the iOS consumption of sg-05; this ADR records its decision.
 - [[0010-generic-jsonb-votes-schema|ADR 0010]] â€” the generic `votes`

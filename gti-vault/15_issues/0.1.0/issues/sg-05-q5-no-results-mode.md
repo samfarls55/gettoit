@@ -1,6 +1,5 @@
 ---
 issue: sg-05
-title: Q5 no-results mode â€” design-system surface spec
 status: done
 type: AFK
 github_issue: 136
@@ -21,17 +20,14 @@ session decided to remove all fictitious venues â€” the app must never surf
 made-up place to a user. Q5 therefore needs a real specced state for "the
 per-member venue fetch produced nothing rateable."
 
-This issue specs that state in `design-system/`. The iOS consumption is the
 paired tracer bullet (tb-26), which is blocked on this spec â€” mirroring the
 existing `sg-02`â†’`tb-01` / `sg-04`â†’`tb-03` pairing.
 
 ## What to build
 
 Add a **`no-results` mode** to the Q5 quiz surface. Today Q5
-(`design-system/surfaces/03-quiz.md` Â§Q5, `design-system/code/screens/ScreenQ5Regret.jsx`)
 renders exactly one layout: three factorial candidate cards with 1â€“5 excitement
 raters. The new mode is the second layout â€” structured the same way the Verdict
-surface documents its `no-survivor` mode (`design-system/surfaces/05-verdict.md`),
 which is the canonical precedent to follow.
 
 The mode composes entirely from existing primitives â€” **no new component, no new
@@ -53,7 +49,6 @@ The copy below is locked â€” reproduce it exactly.
 - **Headline:** `No spots to rate near you.`
 - **Body:** `Couldn't line up rateable spots in your radius tonight. Your other answers still count â€” the verdict lands without this step.`
 - **CTA:** `Head to the verdict` (C-05, sun fill â€” action-shaped, per the
-  design system's ban on generic `Next` / `Continue` / `OK` CTAs).
 
 ## Acceptance criteria
 
@@ -67,8 +62,6 @@ The copy below is locked â€” reproduce it exactly.
       existing tokens â€” no new component, no new token, no inline hex / px /
       easing literals.
 - [ ] The locked copy is reproduced exactly (headline, body, CTA label).
-- [ ] `design-system/CHANGELOG.md` has an entry for the new mode.
-- [ ] `node design-system/scripts/verify.mjs` passes â€” all gates green.
 
 ## Out of scope
 
@@ -94,5 +87,4 @@ The copy below is locked â€” reproduce it exactly.
   a Modes table + a `no-results` section documenting the trigger, rendered
   / suppressed elements, and the locked copy. No new component, no new
   token â€” composes from existing C-01 / C-02 / C-03 / C-05 and existing
-  tokens. `node design-system/scripts/verify.mjs` passes all gates. tb-26
   is now unblocked.

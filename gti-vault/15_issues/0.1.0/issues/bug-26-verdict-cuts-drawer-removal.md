@@ -21,7 +21,6 @@ User report: "'See what got cut' button is unnecessary altogether."
 
 ## Suggested direction (triage to confirm)
 
-This is a spec change to `design-system/surfaces/05-verdict.md` â€” the `cuts` mode (and the `default` mode's cuts trigger) and the underlying `C-XX` cuts-drawer component. Open questions for grill:
 
 - **Full removal vs hide.** Delete the drawer + the trigger entirely from spec, JSX, and iOS port (preferred per the user's wording), vs keep the underlying primitive but suppress its surfacing on S05. Full removal is simpler and matches "unnecessary altogether."
 - **Mode collapse.** S05's `cuts` mode exists explicitly for the drawer's expanded state. If the drawer is gone, does the `cuts` mode collapse into `default`? Likely yes.
@@ -36,10 +35,6 @@ User dogfood, 2026-05-24.
 
 ## References
 
-- `design-system/surfaces/05-verdict.md` Â§Modes â€” `cuts`, `default`; Â§read-only "Cuts drawer is available".
-- `design-system/components.md` â€” search for "Cuts drawer" / "See what got cut" (likely a C-NN entry).
-- `design-system/code/screens/ScreenVerdict.jsx:182` â€” `"See what got cut â†’"` button.
-- `design-system/accessibility.md:105,181` â€” Cuts trigger tap-target + VO entries.
 - iOS port: search for `cuts` / `seeWhatGotCut` in `ios/Sources/App/VerdictScreen.swift`.
 - Web port: search in `web/components/VerdictReadOnly.tsx` / `WebVerdictCard.tsx`.
 
@@ -55,18 +50,13 @@ This motivation is load-bearing because it interacts with bug-22 (the verdict `H
 
 ### Fix scope (full removal)
 
-- **Spec edit** â€” `design-system/surfaces/05-verdict.md`:
   - Remove the `cuts` row from the Â§Modes table. Collapse the `cuts` mode into `default` â€” `default` no longer mentions a cuts trigger.
   - Remove the `"See what got cut â†’"` cuts-trigger line from the Â§Formatting / Â§Composition entries of every mode that referenced it.
   - Update the Â§read-only entry: remove the *"Cuts drawer is available (informational, not actionable)."* sentence.
   - Update the Â§no-survivor and Â§solo entries: remove any *"Cuts drawer remains available"* sentences.
-- **Spec edit** â€” `design-system/components.md`:
-  - Delete the C-NN entry for the cuts-drawer component (search `components.md` for "Cuts drawer" / "See what got cut" to locate the assigned C-NN). Re-number nothing â€” leave the slot empty; the design system tolerates gaps.
-- **Spec edit** â€” `design-system/accessibility.md`:
   - Delete the Â§"Cuts trigger" tap-target row (line 105 reference).
   - Delete the Â§VO entry for the cuts trigger (line 181 reference).
   - Update the Â§VO order entry for S05 to remove the cuts-trigger node from the sequence.
-- **Spec edit** â€” `design-system/code/screens/ScreenVerdict.jsx`:
   - Delete the `"See what got cut â†’"` button (line 182 reference) and its expanded drawer JSX.
   - Delete the `showCutsDrawer` state and any cuts-related props on the screen.
 - **iOS port** â€” `ios/Sources/App/VerdictScreen.swift`:
@@ -74,12 +64,9 @@ This motivation is load-bearing because it interacts with bug-22 (the verdict `H
   - Delete the supporting `VerdictStore` cuts state if present (search for `cuts`, `seeWhatGotCut`, `dismissedOptions` in `VerdictStore.swift`).
 - **Web port** â€” `web/components/VerdictReadOnly.tsx` and/or `WebVerdictCard.tsx`:
   - Delete the cuts trigger and cuts-drawer render. The web read-only mode is now purely informational without the drawer (verdict card + plan-name + venue, per the locked `web-01-invitee-shell.md` Â§C contract â€” the bug-17 alignment work is preserved).
-- **CHANGELOG** â€” `design-system/CHANGELOG.md`: one-line entry, prefix `BREAKING:` (the `cuts` mode is being deleted; any JSX consumer that assumed the cuts trigger / drawer / mode existed will break).
 
 ### Verification
 
-- `node design-system/scripts/verify.mjs` green. The orphan-hex sweep and surfaceâ†”jsx pairing should remain green (deletions are well-localised; no new tokens introduced).
-- Grep the design system for any remaining `cuts` / `seeWhatGotCut` / `getCut` references â€” should be zero hits after the edit.
 - iOS simulator walk: verdict screen renders without the cuts trigger; the layout's vertical rhythm is unbroken (no dangling spacer where the trigger used to sit).
 - Web walk: invitee-only verdict view renders without the cuts row.
 
@@ -89,4 +76,3 @@ If the verdict screen's vertical rhythm reads off after the trigger is removed (
 
 ## Comments
 
-- **2026-05-24, AFK execution complete.** Spec + JSX + iOS port + accessibility + motion all carry the deletion; bug-26 grill outcome matched verbatim. Web side already conforms (bug-17 already retired the Â§C cuts row). `Verdict.cuts` value-type field retained â€” the engine still writes `option_cuts` rows for receipts / analytics; the surface simply no longer reads them. `design-system/scripts/test-bug-26.mjs` added as the structural gate (32 assertions). Sibling structural tests (`test-bug-24`, `test-fab-rework`, `test-plan-list`, `test-plan-setup`, `test-quiz-chrome`, `test-verdict-no-survivor`, `test-account-claim`) all still pass; `design-system/scripts/verify.mjs` green. Adjacency above did not surface in code review â€” the JSX/SwiftUI removal is clean (the entire conditional view is deleted, not just the inner button; no dangling spacer).

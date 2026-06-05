@@ -30,7 +30,6 @@ This implements [[04-s05-no-survivor-terminal|spec-gap issue 04]] plus the engin
   2. If survivors = 0 AND any soft preferences are active, relax in order: most-cited cuisine veto first; if still 0, relax the vibe floor by 1 stop; if still 0, widen radius by 0.5 mi (capped at 5 mi); re-run pruning. Silent â€” no UI update.
   3. Hard-need vetoes (Q1 dietary as menu-compliance, Q2 budget cap) never relax.
   4. If after exhausting soft-pref relax survivors are still 0 â†’ write `verdicts` row with `method = 'no_survivor'`, `option_id = null`, `rule_text` describing which hard-need vetoes survived without naming a person.
-- **S05 no-survivor mode** â€” apply the changes in [[04-s05-no-survivor-terminal|spec-gap 04]] to the design-system spec + JSX, then port to SwiftUI. Visible: eyebrow `"Tonight"`, hero `"NO SPOT / FITS"`, hard-need meta line, rule chip in aggregate-rule register, "Widen radius" sun-pill CTA (inline expansion), ghost "Start over" secondary. Suppressed: voice receipts, ratification, reroll, "Start over" primary path.
 - **Widen-radius inline expansion** â€” tapping the CTA expands a radius slider inline (current value + 1.0 mi default, range 1â€“10 mi). On commit, the engine re-runs with the new radius. Does not consume a reroll.
 - **Tests** â€” engine fixture tests: cascade order (cuisine â†’ vibe â†’ radius); hard-need never relaxes; terminal `no_survivor` when exhausted; rule_text never names a person; widen-radius commit re-runs the engine with new radius. SwiftUI snapshot for the no-survivor mode.
 

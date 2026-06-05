@@ -38,4 +38,3 @@ None â€” can start immediately.
 
 ## Comments
 
-- 2026-05-26 â€” Closed by [#287](https://github.com/samfarls55/gettoit/pull/287). Added a shared `onCancel` closure wired to RootView's `deepLink = nil`. Cancel tertiary on `.joining` (11pt eyebrow, 55% opacity â€” matches RerollScreen cancel), "Try another link" tertiary on `.error` (regular eyebrow, 78% opacity â€” matches LockedScreen home chrome). `.joined` deliberately has no escape (host hops straight into the quiz). In-flight join `Task` auto-cancelled by SwiftUI's `.task` modifier on unmount. All CI checks green (ios xcodebuild test 3m50s pass, design-system verify pass).

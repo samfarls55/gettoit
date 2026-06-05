@@ -15,7 +15,6 @@ related:
 
 # Refero Pattern Extract â€” Quiz + Verdict Loop
 
-> **Superseded â€” design exploration archived.** These patterns fed the 0.1.0 prototype directions; the chosen direction (Sunset Pop) shipped as the `design-system/` package. Kept as a historical record.
 
 Patterns harvested from Refero screen + flow search for the surfaces GetToIt 0.1.0 needs: quiz (5 questions, one-decision-per-screen) and verdict reveal (single recommendation, copy-framework-locked). Apps cited are reference points, not models to copy.
 

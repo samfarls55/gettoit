@@ -20,21 +20,13 @@ prd: 0.1.0-prd
 
 ## What to build
 
-The first end-to-end vertical slice. The iOS app boots, signs in anonymously against the Supabase project, and displays its `user_id` on screen. The web app is scaffolded but only renders a placeholder. The design-system Swift token generator is in place so no later iOS work touches raw hex.
 
-- **Monorepo scaffolding** per [[../../../60_engineering/adr/0004-monorepo-layout|ADR 0004]] â€” `ios/`, `web/`, `supabase/functions/`, `docs/` siblings of the existing `design-system/` and `gti-vault/`. Add a top-level `package.json` (workspaces optional), an `.editorconfig`, and a unified `.gitignore`.
 - **iOS Xcode project** in `ios/` â€” SwiftUI App template, iOS 17 minimum deployment target per [[../../../60_engineering/adr/0008-ios-min-target-17|ADR 0008]]. Bundle ID matches TB-00. Add `supabase-swift` via Swift Package Manager.
-- **`design-system/scripts/gen-swift.mjs`** â€” reads `design-system/tokens.json`, emits `ios/Sources/GTITokens.swift` with `GTIColor` enum, `GTIGradient` helper, `GTIFont` constants, motion duration / easing constants, spacing / radii numeric constants. Idempotent â€” `--check` mode for CI. Extend `design-system/scripts/verify.mjs` to require Swift output be byte-identical to a fresh regeneration.
-- **Web app** in `web/` â€” Next.js App Router with `app/page.tsx` rendering a placeholder. Pull `design-system/code/tokens.css` directly. No supabase-js yet beyond the dependency install.
 - **Supabase migrations baseline** in `supabase/migrations/` â€” empty bootstrap migration that enables PostGIS, pg_cron, pgmq. No tables yet.
 - **iOS hello-world flow** â€” on app launch, the app calls `signInAnonymously()`, renders a single screen showing `"User ID: <uuid>"`. Integration test: anon auth succeeds, JWT contains expected claims.
-- **CI workflow** â€” single GitHub Actions workflow runs four lanes: `xcodebuild test`, `deno test` (empty for now), `node design-system/scripts/verify.mjs`, web build. Per [[../../../60_engineering/adr/0004-monorepo-layout|ADR 0004]] Â§"One CI lane."
 
 ## Acceptance criteria
 
-- [x] Repo has `ios/`, `web/`, `supabase/`, `docs/` siblings of `design-system/` and `gti-vault/`. _(2026-05-13)_
-- [x] `node design-system/scripts/gen-swift.mjs` writes `ios/Sources/GTITokens.swift`; `--check` mode passes. _(2026-05-13)_
-- [x] `node design-system/scripts/verify.mjs` includes the Swift output in its byte-identical check. _(2026-05-13)_
 - [x] iOS app builds on iOS 17 simulator, signs in anonymously, displays `user_id` on launch. _(2026-05-13 â€” iOS 17.5 sim under Xcode 16.2 on macOS-14 runner)_
 - [x] Integration test for anon auth passes. _(2026-05-13)_
 - [x] CI workflow runs all four lanes green. _(2026-05-13 â€” PR #24)_

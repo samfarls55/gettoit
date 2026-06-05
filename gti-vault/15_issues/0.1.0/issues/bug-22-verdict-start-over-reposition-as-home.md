@@ -22,7 +22,6 @@ User report: "The verdict screen start over button should be moved and repositio
 
 ## Suggested direction (triage to confirm)
 
-This is a spec change to `design-system/surfaces/05-verdict.md` â€” the tertiary "Start over" slot's label, behavior, and position. Open questions for grill:
 
 - **Verb/label.** "Home", "Done", iOS-glyph house, or text+glyph? The Sunset Pop register currently prefers text-only verbs.
 - **Position.** Tertiary slot under the primary CTA (current), top-leading chrome row (mirror of the quiz `Back`/`Exit` chrome from tb-WF-2), or top-trailing dot menu (mirror of the Plan list per-card menu)? Each has different precedent.
@@ -37,16 +36,11 @@ User dogfood, 2026-05-24.
 
 ## References
 
-- `design-system/surfaces/05-verdict.md` â€” S05 spec; modes table and the tertiary slot.
-- `design-system/code/screens/ScreenVerdict.jsx` â€” `showStartOverSecondary` and the tertiary CTA.
 - `ios/Sources/App/VerdictScreen.swift:810` â€” `Button(action: onStartOver)`.
 - `ios/Sources/App/PostQuizHostScreen.swift` â€” `onStartOver: onEndSession` wiring.
-- `design-system/surfaces/00-plan-list.md` â€” destination surface for a "Home" verb.
-- `design-system/surfaces/03-quiz.md` Â§"Quiz chrome (Back + Exit)" â€” possible visual precedent for a chrome-row affordance.
 
 ## Grill outcome (2026-05-24)
 
-`/grill-with-docs` resolved this as a `spec-gap` on `design-system/surfaces/05-verdict.md` + paired iOS port change. Bundle the spec edit and the iOS port in a single AFK PR (per "AFK full autonomy default"). Classified `spec-gap` + `AFK`.
 
 ### Resolved sub-questions
 
@@ -59,11 +53,9 @@ User dogfood, 2026-05-24.
 
 ### Fix scope
 
-- **Spec edit** â€” `design-system/surfaces/05-verdict.md`:
   - Add a chrome-row entry to the surface's structural section, mirroring `surfaces/03-quiz.md` Â§"Quiz chrome (Back + Exit)". Top-leading slot carries the text verb `Home`; top-trailing slot remains empty (S05 has no `Exit` counterpart â€” the verdict screen is not exitable; the Plan persists by design).
   - Remove the `Start over` tertiary slot from every mode's component list (the affordance is being moved into the chrome row, not duplicated).
   - Update the accessibility section: add VO order entry `chrome â†’ eyebrow â†’ hero â€¦` so the chrome row reads first; add VO label `"Home, button"` for the new affordance.
-- **Spec edit** â€” `design-system/code/screens/ScreenVerdict.jsx`:
   - Remove the `showStartOverSecondary` tertiary CTA composition.
   - Add a chrome row above the eyebrow with a leading `Home` text button. Wire the click handler to `onHome` (new prop), default-pop-to-list semantics.
 - **iOS port** â€” `ios/Sources/App/VerdictScreen.swift` + `ios/Sources/App/PostQuizHostScreen.swift`:
@@ -71,11 +63,9 @@ User dogfood, 2026-05-24.
   - Re-wire `onStartOver: onEndSession` to a new `onHome: navigateToPlanList` handler. Drop the session-teardown call entirely â€” Home is pure nav.
 - **Web port** â€” `web/components/VerdictReadOnly.tsx` / `WebVerdictCard.tsx`:
   - No change. Web `read-only` mode is unaffected by this issue (web invitees have no Plan list).
-- **CHANGELOG** â€” `design-system/CHANGELOG.md`: one-line entry, prefix `BREAKING:` (the `Start over` tertiary slot is being removed; any unknown JSX consumer assuming the prop will break).
 
 ### Verification
 
-- `node design-system/scripts/verify.mjs` green.
 - Manual iOS walk: verdict â†’ tap `Home` â†’ land on Plan list with the just-decided Plan visible in the Decided section.
 - Manual iOS walk in `no-survivor` and `solo` modes â€” Home present and works.
 - Tap Plan card â†’ returns to verdict (Plan was not torn down).

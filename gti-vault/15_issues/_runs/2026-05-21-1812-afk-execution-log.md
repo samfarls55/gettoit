@@ -72,7 +72,6 @@ Concurrency cap: 2 (default).
 Completed (issue â€” PR):
 - bug-11 â€” [#198](https://github.com/samfarls55/gettoit/pull/198) â€” iOS fixture factories moved off the app target + hygiene guard
 - sg-WF-5 â€” [#199](https://github.com/samfarls55/gettoit/pull/199) â€” Web-01 invitee shell surface doc
-- sg-WF-8 â€” [#200](https://github.com/samfarls55/gettoit/pull/200) â€” S00a account-claim design-system amendment
 - sg-WF-6 â€” [#201](https://github.com/samfarls55/gettoit/pull/201) â€” reroll-window deadline mechanism + ADR 0016
 - tb-WF-10 â€” [#202](https://github.com/samfarls55/gettoit/pull/202) â€” web quiz v1.1 port + votes-wire leaf module
 - tb-WF-11 â€” [#203](https://github.com/samfarls55/gettoit/pull/203) â€” web invitee shell foundation + members.display_name

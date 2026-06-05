@@ -31,19 +31,15 @@ The cuisine likes/dislikes profile editor is **deferred** to the pre-public-laun
 
 ### 1. First-launch Apple sign-in gate
 
-- **New onboarding surface** in `design-system/surfaces/` â€” propose `00a-signin.md` or similar (precedes [[sg-02-landing-page-surface|sg-02]] landing). Describes:
   - Single "Sign in with Apple" affordance, no skip / continue-as-guest path.
   - Visual treatment using existing tokens; no new components expected.
   - Behavior: shown on every fresh install until sign-in completes. Subsequent launches with an existing session skip this surface.
-- **New JSX** at `design-system/code/screens/ScreenSignIn.jsx` (or rename / fold into an existing onboarding surface if one already approximates this shape).
 - Confirm interaction with [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] â€” this surface effectively closes the "anonymous default" half of that ADR for iOS-launched sessions while keeping anonymous as the implicit default for invite-link arrivals on web. Document the boundary in the surface doc.
 
 ### 2. Waiting-screen "Download the app" CTA (web)
 
-- **Edit existing waiting-surface spec** in `design-system/surfaces/` (the waiting / quorum surface â€” likely S04 per [[../../../10_prds/0.1.0-prd|0.1.0 PRD]]). Add:
   - A "Download the app" CTA visible only when the consuming surface is the web fallback AND the current user is anonymously authenticated.
   - Tap behavior: open App Store iOS download link.
-- **Update `design-system/code/screens/ScreenWaiting.jsx`** (or equivalent) with the conditional CTA. Mark the iOS path: CTA suppressed (user already has the app).
 
 ### Token / component check
 
@@ -52,11 +48,6 @@ The cuisine likes/dislikes profile editor is **deferred** to the pre-public-laun
 
 ## Acceptance criteria
 
-- [x] Sign-in surface spec exists and describes the forced first-launch gate, with reference to [[../../../60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]. â€” `design-system/surfaces/00a-signin.md`
-- [x] Waiting-surface spec updated for the web-only "Download the app" CTA. â€” `design-system/surfaces/04-waiting.md` Â§"Download the app" CTA (web fallback, anonymous-only)
-- [x] Corresponding JSX exists in `design-system/code/screens/`. â€” `ScreenSignIn.jsx` (new); `ScreenWaiting.jsx` updated with the conditional web-anonymous CTA branch
-- [x] `node design-system/scripts/verify.mjs` green. â€” 5/5 gates pass (drift-check CSS + Swift, orphan-hex sweep JSX + web, surfaceâ†”jsx pairing 10 docs / 15 screens)
-- [x] `design-system/CHANGELOG.md` entry referencing this issue. â€” three lines added under 2026-05-14, referencing sg-03
 
 ## Open questions
 

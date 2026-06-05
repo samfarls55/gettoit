@@ -38,13 +38,9 @@ User dogfood on the post-tb-WF-5..9 Plan list, 2026-05-24.
 
 - `ios/Sources/App/ActionDotMenu.swift` â€” `ActionDotMenu.Trigger`, `triggerDiameter`.
 - `ios/Sources/App/PlanListScreen.swift` â€” `PlanCard` host row + trailing-slot composition (around the `padding(.trailing, ActionDotMenu.triggerDiameter)` sites).
-- `design-system/components.md` Â§C-25 Action Dot Menu â€” locked visual spec for the trigger.
-- `design-system/surfaces/00-plan-list.md` Â§Card content â€” the host row's tap target spec.
-- `design-system/accessibility.md` â€” 44pt HIG minimum.
 
 ## Grill outcome (2026-05-24)
 
-`/grill-with-docs` resolved this as a pure bug (no design-system spec change). C-25's locked visual diameter (36pt) is preserved; the fix is implementation-only in the iOS port. Classified `bug` + `AFK`.
 
 ### Fix scope
 
@@ -73,7 +69,6 @@ Fixed in [PR #229](https://github.com/samfarls55/gettoit/pull/229) (merged 2026-
 - `ActionDotMenu.triggerDiameter` (36) stays the C-25 **visible** lock; a new `ActionDotMenu.triggerHitDiameter` (44) is the load-bearing tap target. Pair-of-constants approach pins both halves of the contract.
 - `ActionDotMenu.Trigger` body now renders the visible glyph inside a `ZStack { ... }.frame(44).contentShape(Rectangle())`. The 44pt frame is the Button's actual tap footprint; `contentShape` paints it as the hit-test surface so taps in the 36â€“44pt corona land on the trigger instead of the card row.
 - No `simultaneousGesture` / `highPriorityGesture` wiring needed â€” SwiftUI already gives the inner sibling Button precedence over the outer card-row Button in the ZStack overlay arrangement. The corona-fall-through happened because the inner Button's frame was only 36pt; widening to 44pt is sufficient on its own.
-- No design-system spec change. The C-25 spec table reads "Tap target: 36Ã—36 visible button inside a 44pt-tall host row" â€” the visible value stays 36pt. The "44pt host row" promise was unrealized on iOS because the row's vertical padding pads the card visual, not a tap-eating zone. iOS-port-only fix.
 - Three new tests pin the contract: `testTriggerHitDiameterClearsHIG`, `testTriggerHitDiameterStrictlyExceedsVisualDiameter`, and `testTriggerRendersAtHitDiameter` (uses `UIHostingController.sizeThatFits` so a future regression that collapses the hit area back to 36pt fails CI).
 
 Pending: on-device verification on the next TestFlight build.

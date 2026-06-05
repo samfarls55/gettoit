@@ -1,11 +1,6 @@
 // GetToIt web fallback — root layout.
-//
-// Pulls `design-system/code/tokens.css` directly so the placeholder
-// surface (and every future surface) renders against the canonical
-// Sunset Pop tokens — no token duplication on the web side.
-
 import type { Metadata } from "next";
-import "../../design-system/code/tokens.css";
+import "./globals.css";
 
 import { Footer } from "../components/Footer";
 

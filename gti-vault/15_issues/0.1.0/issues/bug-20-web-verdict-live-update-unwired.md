@@ -14,7 +14,6 @@ created: 2026-05-22
 
 ## Symptom
 
-`design-system/surfaces/web-01-invitee-shell.md` Â§C ("Read-only verdict card")
 specs a **live update**: "During `decided-active` the card live-updates on the
 existing Realtime rebroadcast â€” if a reroll changes the verdict while the
 invitee has the card open, the venue name cross-fades to the new value
@@ -60,7 +59,6 @@ static-conformance scope.
 
 ## References
 
-- `design-system/surfaces/web-01-invitee-shell.md` Â§C "Live update".
 - `web/components/SessionRoom.tsx` â€” the verdict-fetch effect.
 - `web/components/VerdictReadOnly.tsx` â€” the web verdict surface.
 - [[bug-17-web-verdict-surface-conformance|bug-17]] â€” the Â§C conformance fix
@@ -171,7 +169,6 @@ venue name changes; the fix is solely to make the re-fetch fire.
 - [ ] An integration test covers open-card â†’ rebroadcast â†’ re-fetch â†’ updated
       venue, written test-first (red before green).
 - [ ] `web/` `npm test`, `npm run build`, `npm run typecheck` pass; and
-      `node design-system/scripts/verify.mjs` is green.
 
 **Out of scope:**
 - The venue-name cross-fade animation itself â€” already wired; do not re-implement.
@@ -209,4 +206,3 @@ venue name changes â€” untouched.
 covers: rebroadcast â†’ re-fetch â†’ updated venue; default â†” no-survivor variant
 flips both directions; and the single-fetch-on-first-render guard. Full web
 suite (152 tests), `npm run build`, `npm run typecheck`, and
-`design-system/scripts/verify.mjs` all green.

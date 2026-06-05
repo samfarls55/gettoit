@@ -1,6 +1,5 @@
 -- tb-WF-8 (workflow-overhaul) — Plan list Decided + History lifecycle.
 --
--- The S00 Plan list surface (sg-WF-4, design-system/surfaces/00-plan-list.md)
 -- renders the user's Plans in three sections: Pending, Decided, History.
 -- tb-WF-5 shipped Pending + the stubbed Decided/History slots; tb-WF-7
 -- added the Joined-card resume. This migration lights up the Decided +
@@ -50,7 +49,6 @@
 --
 -- References:
 --   * gti-vault/15_issues/0.1.0/issues/tb-wf-8-plan-list-decided-history.md
---   * design-system/surfaces/00-plan-list.md (locked spec)
 --   * supabase/migrations/20260519000000000_workflow_overhaul_plans_table.sql
 --     (the tb-WF-1 baseline this migration extends)
 

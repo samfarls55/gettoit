@@ -111,7 +111,6 @@ None â€” schema can land independently of any spec-gap. The user-facing wir
 
 ## Comments
 
-- **2026-05-20** â€” Merged via [PR #167](https://github.com/samfarls55/gettoit/pull/167). Schema applied to `gettoit-prod` by the `supabase-db` CI lane. iOS / Deno / web / design-system lanes all green; `ios` lane caught and fixed an `Optional<Double>` accuracy-overload type error in the test file. PostgreSQL function `set_plan_decided_active` ships with a placeholder `now() + interval '2 days'` for `reroll_window_closes_at`; sg-WF-6 owns the exact TZ-aware computation. `observe(planID:)` shipped as a 5-second foreground poll per the issue spec's fallback option; Realtime swap is a follow-up tracer-bullet.
 
   Two non-obvious calls worth tagging for future readers:
   - **`Location.source` typed as `String` (not enum) on `PlansStore.Location`** â€” keeps the Plan-side decoder tolerant of any future source value without forcing a Plan struct revision. Canonical enum stays on `RoomStore.RoomLocation.Source`.

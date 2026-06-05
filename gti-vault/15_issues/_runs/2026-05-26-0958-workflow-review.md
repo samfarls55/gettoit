@@ -109,7 +109,6 @@ Surfaces audited:
       Blocked by: None
       What to build: Restyle DELETE MY DATA from white-pill primary (line 127-129) to destructive style (red outline or text-only); promote DONE to primary pill. Keep existing two-step confirm alert.
       Acceptance criteria:
-        - [ ] DELETE renders in destructive style per `design-system/components.md`.
         - [ ] DONE is the visually dominant primary.
         - [ ] Snapshot test on SettingsScreen render covers new hierarchy.
       Hub anchors: [[patterns#Settings Editor]], [[principles#V-01. Visual hierarchy]]

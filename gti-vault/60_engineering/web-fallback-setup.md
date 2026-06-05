@@ -64,9 +64,7 @@ Per [[adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] Â§"Web fallback
 
 ## Drift gate
 
-`design-system/scripts/verify.mjs` now sweeps `web/**/*.{ts,tsx,js,jsx,css}` for orphan hex codes alongside the iOS / JSX sweep. Every hex in the web source must be present in `design-system/tokens.json` â€” extend `tokens.json` first if you need a new color.
 
-The web build pulls `design-system/code/tokens.css` directly via `app/layout.tsx`, so token mutations flow into the web surface without a code change.
 
 ## 0.1.0 quiz port (tb-WF-10)
 

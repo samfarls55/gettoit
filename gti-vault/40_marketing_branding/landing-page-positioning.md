@@ -27,7 +27,6 @@ Inputs the future grill needs to resolve:
 - **Positioning copy.** One-sentence what-GetToIt-is. Voice guidelines do not yet exist in `40_marketing_branding/` — they get drafted alongside this surface, not before.
 - **CTA hierarchy.** App Store badge (primary) + something else? Sign-up-for-launch-email? Demo video? Pre-launch the answer is probably "App Store + nothing else" but the future grill confirms.
 - **Background sections.** What the product does, who it's for, the problem framing. Length and depth depend on the marketing voice that does not yet exist.
-- **Visual register.** Dark Sunset Pop register lives in `design-system/tokens.json`; the landing page either inherits that register or chooses something deliberately different for marketing voice. Future grill decides.
 - **Mobile vs desktop.** This is the first GetToIt surface a desktop visitor sees; everything else in the app is mobile-first. Layout breakpoints + desktop hero composition are open.
 
 ## What pre-launch the surface does NOT need
@@ -35,7 +34,6 @@ Inputs the future grill needs to resolve:
 - A "get notified at launch" signup form. Out of scope — adds account-creation work + email-list infra that doesn't pay for itself pre-launch.
 - A press kit, blog, or product-update feed. Out of scope.
 - Internationalisation. US-only beta ([[../60_engineering/adr/0006-privacy-posture-0.1.0|ADR 0006]]).
-- A11y review beyond the design-system defaults. The page must pass the design-system gates; bespoke a11y work is post-launch.
 
 ## Status
 

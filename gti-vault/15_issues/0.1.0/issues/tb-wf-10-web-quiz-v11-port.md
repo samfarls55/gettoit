@@ -36,7 +36,6 @@ A vertical slice that brings the web quiz to redesign parity and makes the vote 
 
 ### Part 2 â€” Port the web quiz to the redesigned quiz
 
-Bring the web quiz to parity with the iOS redesigned quiz. The design-system spec is the existing [[../../../design-system/surfaces/03-quiz|surfaces/03-quiz.md]]; this is a port, not a redesign.
 
 - **Scenario questions** â€” the scenario-composite question model (a plain-language scenario answer compiling to a recipe of Foursquare filters). See [[../../../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]].
 - **Generic jsonb votes** â€” the web app writes the five generic `q1`..`q5` jsonb `{ meta, answer }` slots via the `votes-wire.ts` contract, not the retired typed columns.

@@ -11,7 +11,6 @@
 // rendered page body. The page itself is `force-dynamic` because the
 // shell is a client component driven by the per-browser anon session.
 //
-// Canonical spec: design-system/surfaces/web-01-invitee-shell.md.
 
 import type { Metadata } from "next";
 

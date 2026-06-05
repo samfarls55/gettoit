@@ -23,7 +23,6 @@ prd: 0.1.0-prd
 The friction surface that converts a rejected verdict into a stated revision of the group's constraints. Capped at 3 per session; each reroll requires a reason from a fixed taxonomy; the reason becomes a real new constraint; the reason is visible to the group on the next verdict.
 
 - **Schema** â€” `rerolls (id uuid, room_id uuid, user_id uuid, reason text, detail text null, created_at)`. Constraint: `count(rerolls WHERE room_id = X) <= 3`.
-- **S07 SwiftUI port** â€” full port of [[../../../../design-system/surfaces/07-reroll|S07]] Reroll Sheet. 5-reason taxonomy: `cost Â· dist Â· mood Â· diet Â· avail`. Each tile shows a glyph + label. Reason-required gate on the primary CTA. "2 LEFT" stamp prominent. CTA copy: `"Reroll Â· burns 1 of 3"` (changes to `"Reroll Â· last one"` on the 3rd). Optional detail input under the selected tile. Cancel CTA reads `"Cancel Â· keep <Place>"`.
 - **Reason-to-constraint mapping** â€” server-side function applies the reroll reason as a new constraint before re-running the engine:
   - `cost` â†’ tighten `q2_budget` by one tier (engine-applied, not user-edited).
   - `dist` â†’ reduce `q3_walk_minutes` cap by 5 (floor at 5).
@@ -57,5 +56,4 @@ The friction surface that converts a rejected verdict into a stated revision of 
 
 ## Adjacencies
 
-- **S05 surface doc lacks reroll-tertiary spec.** `design-system/surfaces/05-verdict.md` mentions reroll only in the suppressed list for `read-only` / `no-survivor` and as the friction-bearing path conceptually. The default/committed-mode tertiary affordance â€” `"REROLL"` button â†’ `"No rerolls left"` exhausted footer â€” is implemented in SwiftUI but not documented on the surface. A spec-doc-only follow-up would add a row to the modes table and a "reroll affordance" section. Flag, not block.
 - **`ScreenVerdict.jsx` has no reroll affordance.** The JSX twin is not updated to mirror the Swift tertiary button. Follow-up to keep the spec / Swift / JSX triangle synced.

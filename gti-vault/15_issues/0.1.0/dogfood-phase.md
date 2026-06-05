@@ -128,7 +128,6 @@ Decision: the app must never surface a made-up place. Q5 instead renders a `no-r
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| sg-05 | [[issues/sg-05-q5-no-results-mode\|Q5 no-results mode â€” design-system surface spec]] âœ… done | AFK | [#136](https://github.com/samfarls55/gettoit/issues/136) | â€” |
 | TB-26 (dogfood) | [[issues/tb-26-remove-fictitious-fallback-venues\|Remove fictitious fallback venues; render the Q5 no-results screen]] âœ… done | AFK | [#137](https://github.com/samfarls55/gettoit/issues/137) | sg-05 |
 
 ## Verdict-spinner diagnosis (2026-05-19)
@@ -174,7 +173,6 @@ Eight UI-specific issues from a post-tb-WF-9 dogfood pass. `/grill-with-docs` cl
 |---|---|---|---|---|---|
 | bug-21 | [[issues/bug-21-plan-list-action-dot-hitbox-too-small\|Plan list â‹¯ trigger hitbox too small â€” taps open the verdict by accident]] | done (bug) â€” PR #229 | AFK | [#221](https://github.com/samfarls55/gettoit/issues/221) | â€” |
 | bug-22 | [[issues/bug-22-verdict-start-over-reposition-as-home\|Verdict "Start over" â†’ text "Home" in top-leading chrome row]] | done (spec-gap) â€” PR #230 | AFK | [#222](https://github.com/samfarls55/gettoit/issues/222) | â€” |
-| bug-23 | [[issues/bug-23-plan-list-fab-design-system-fit\|Plan list FAB rework â€” T1 ink-fill, new `shadow.fab` token]] | done (spec-gap) â€” PR #231 | AFK | [#223](https://github.com/samfarls55/gettoit/issues/223) | â€” |
 | bug-24 | [[issues/bug-24-bottom-sheet-ios-shape\|Split sheet primitive â€” keep C-16; add C-27 native-iOS Action Sheet]] | done (spec-gap) â€” PR #232 | AFK | [#224](https://github.com/samfarls55/gettoit/issues/224) | â€” |
 | bug-25 | [[issues/bug-25-quiz-progress-strip-layout-regression\|topBar trailing-spacer fix + Q1 chrome-row height-invariance audit]] | done (bug) â€” PR #233 | AFK | [#225](https://github.com/samfarls55/gettoit/issues/225) | â€” |
 | bug-26 | [[issues/bug-26-verdict-cuts-drawer-removal\|Full removal of the cuts drawer â€” collapse `cuts` mode into `default`]] | done (spec-gap) â€” PR #235 | AFK | [#226](https://github.com/samfarls55/gettoit/issues/226) | â€” |

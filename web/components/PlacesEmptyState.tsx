@@ -5,7 +5,6 @@
 // mobile app: the web client has no native maps escape hatch, so this is the terminal
 // surface when Foursquare can't supply candidates.
 //
-// Tokens via CSS custom properties from `design-system/code/tokens.css`
 // — no hand-coded hex / px / easing literals (CLAUDE.md hard rule).
 // The fallback retries the original quiz state on the user's tap
 // rather than navigating away; TB-15 wires the retry handler into

@@ -30,7 +30,6 @@ End-to-end behavior:
 
 ## Scope
 
-- Add a new SwiftUI view consuming the `ScreenLanding` JSX spec from [[sg-02-landing-page-surface|sg-02]] verbatim. Tokens via the iOS token consumer (whatever shape `design-system/` exposes once a Swift generator lands â€” until then, manual token consumption that matches the JSX).
 - Modify the iOS launch routing to land on the new view after sign-in, not directly on the initiator surface.
 - Route the two buttons to the existing destinations. No changes to those destinations in this issue.
 

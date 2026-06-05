@@ -193,7 +193,6 @@ describe("QuizQ5", () => {
   // wfr-23 — the Q5 default-state primary CTA reads "Drop the verdict",
   // a finish-shaped label that differs from the generic "Next" CTA used
   // on Q1..Q4. Locked-copy test defending against paraphrase drift —
-  // the spec lives in `design-system/surfaces/03-quiz.md` §Q5.
   it("renders the finish-shaped 'Drop the verdict' CTA on the default state", () => {
     render(
       <QuizQ5

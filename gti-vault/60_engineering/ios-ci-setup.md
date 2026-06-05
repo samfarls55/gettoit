@@ -43,7 +43,6 @@ xcodebuild test ... \
 
 The values themselves come from `gh secret`. Locally, the same path works by sourcing `.env` before running XcodeGen / xcodebuild.
 
-If neither env var is set, the integration test (`AnonAuthIntegrationTests`) self-skips via `throw XCTSkip(...)` so design-system-only PRs aren't blocked.
 
 ## Signing
 

@@ -23,7 +23,6 @@ These notes migrate the durable Claude project memories into the vault so Codex 
 
 ## How To Use This
 
-- Start from `AGENTS.md`, `CONTEXT.md`, `docs/agents/`, and the relevant vault/design-system docs.
 - Use this note as a compact memory bridge from the Claude era.
 - Do not treat Claude transcripts, command history, or pasted setup material as migrated memory.
 - Current issue tracker truth: GitHub Issues are remote; vault issue notes mirror/preserve local context. The old Claude note saying "vault-based, no remote" is stale.
@@ -75,15 +74,10 @@ These notes migrate the durable Claude project memories into the vault so Codex 
 - Watch for over-confident "the algorithm picked" framing; copy should preserve aggregate-rule attribution.
 - Logo direction: lead with standalone abstract/geometric/pictorial app-icon marks in the Linear/Vercel/Stripe/Ramp neighborhood. Avoid wordmarks, letterform tricks, or typographic-first concepts unless explicitly requested.
 
-## Design System Memory
 
-- `design-system/` lives at repo root and is authoritative for tokens, components, surfaces, motion, and accessibility.
-- `design-system/tokens.json` is canonical.
 - Generated consumers should not be hand-edited:
   - CSS from `scripts/gen-css.mjs`
   - Future Swift tokens from a generator when added
-- User-visible design-system changes should update `design-system/CHANGELOG.md`.
-- Read `design-system/AGENTS.md` before touching that tree.
 
 ## Brand And Repo Rename Memory
 
@@ -100,7 +94,6 @@ These notes migrate the durable Claude project memories into the vault so Codex 
 - Pre-empt likely objections and state how the recommendation should be defended.
 - Honest hedging belongs in narrow re-evaluation triggers, not in the recommendation itself.
 - Re-evaluation triggers should be grounded in real conditions the user has signaled or observable operational thresholds. Avoid speculative org/strategy hypotheticals.
-- Git policy memory: track load-bearing docs, vault notes, ADRs, design-system files, and code. Ignore only machine-specific config, secrets, and generated/build output.
 
 ## Not Migrated
 

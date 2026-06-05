@@ -26,7 +26,6 @@ Rework `QuizCoordinator`'s Q1-Q4 to the new question semantics, writing each ans
 - **Q3 â€” reputation / discovery.** A chip picker: Popular / Hidden gem / Classic / New / No preference.
 - **Q4 â€” vibe energy.** A 5-point scale: Quiet â†’ Chill â†’ Social â†’ Lively â†’ Rowdy.
 
-Where the new questions need UI the design system does not yet have (the chip picker, the energy scale), design it with the Refero MCP and the design-system in unison and add the component spec to `design-system/` (authority granted for this issue). The flow must advance through Q1-Q4 without stalling.
 
 ## Acceptance criteria
 
@@ -57,14 +56,12 @@ quiz Q1-Q4 to the 0.1.0 question semantics.
   chips, disabled state at the cap), `QuizQ3Distance` â†’ `QuizQ3Reputation`
   (single-select chip picker reusing the shared `QuizChipFlow`). Q2/Q4
   surfaces kept; Q4 picks up the new vocabulary via the regenerated
-  `GTIVibeLabels`. No new design-system components â€” Q1/Q3 use C-04 Chip,
   Q4 uses C-08; the Refero MCP search confirmed those primitives cover
   the chip-picker and energy-scale patterns.
 - **Wire shape.** `QuizCoordinator.VoteRow` emits the generic `{meta,answer}`
   jsonb envelopes from tb-04. Q1's kind is the new `cuisine_craving`
   (`answer: {cuisines, no_preference}`), Q3's is the new `reputation`
   (`answer: {reputation}`). Q2 keeps `budget_cap`, Q4 keeps `vibe`.
-- **Design system.** `vibe-labels` token changed to
   `QUIETÂ·CHILLÂ·SOCIALÂ·LIVELYÂ·ROWDY` (0.1.0 amendments Â§2); regenerated
   `GTITokens.swift` + `tokens.css`. C-08 renamed Vibe Slider â†’ Vibe Energy
   Scale; C-04 gained a capped-multi-select rule; S03 Â§Q1-Q4 rewritten.

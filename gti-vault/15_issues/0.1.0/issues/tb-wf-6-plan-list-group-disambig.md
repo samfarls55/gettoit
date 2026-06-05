@@ -16,7 +16,6 @@ closed: 2026-05-20
 
 ## Parent
 
-[[sg-wf-4-plan-list-surface|sg-WF-4]] â€” design-system spec for the Plan list surface. Locked decisions in [[../../../50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]].
 
 Builds on the [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] foundation. This slice adds the Group creation path and replaces the temporary chrome `+` with the C-26 FAB.
 
@@ -90,4 +89,3 @@ Autonomous decisions (full list on the PR):
 - FAB pressed-state via a dedicated `ButtonStyle` (driving `scale(0.96)` over 140ms ease-out per the spec).
 - Test simulation hooks (`simulateTap`, `simulatePick`, `simulateFABTap`) for SwiftUI test-target ergonomics (no synchronous "press the button" API).
 
-iOS CI lane green; `node design-system/scripts/verify.mjs` green (no spec changes â€” purely consumed the existing spec).

@@ -24,7 +24,6 @@ Q5 shows the `no-results` mode (specced in sg-05) with a forward CTA so the
 member is never stranded mid-flow.
 
 This is the iOS consumption of the [[sg-05-q5-no-results-mode|sg-05]]
-design-system spec.
 
 ## What to build
 
@@ -96,18 +95,15 @@ the `{droppedAxis, score}` vote shape.
 
 ## Out of scope
 
-- The design-system spec for the no-results mode â€” that is sg-05; this issue
   consumes it.
 - Any change to the verdict engine, the Q5 factorial card generator, or the
   running-union logic.
 - The web app â€” web already degrades to an empty-state message
   (`PlacesEmptyState`) and ships no fictitious venues.
-- New design-system components or tokens.
 
 ## Blocked by
 
 - [[sg-05-q5-no-results-mode|sg-05]] (GitHub #136) â€” the Q5 no-results mode
-  design-system spec. The iOS no-results screen must match it.
 
 ## Comments
 

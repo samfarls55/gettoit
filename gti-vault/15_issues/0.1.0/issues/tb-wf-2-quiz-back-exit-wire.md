@@ -16,7 +16,6 @@ created: 2026-05-19
 
 ## Parent
 
-[[sg-wf-2-quiz-back-exit-chrome|sg-WF-2]] â€” the design-system spec for the two in-quiz nav verbs. This issue is the iOS port: render the chrome, wire the back-step navigation, and wire the exit/leave member-drop with confirmation.
 
 ## What to build
 
@@ -64,8 +63,6 @@ End-to-end behavior delivered: a participant on any quiz screen (Q1â€“Q5) c
 
 ## Blocked by
 
-- [[sg-wf-2-quiz-back-exit-chrome|sg-WF-2]] â€” the design-system spec must land first.
 
 ## Comments
 
-- **2026-05-20** â€” AFK agent closed on `afk/tb-wf-2` (PR [#170](https://github.com/samfarls55/gettoit/pull/170)). Wired `QuizChromeView` above the C-02 TopBar (Back top-leading on Q2-Q5, Exit/Leave top-trailing on Q1-Q5), suppressed the TopBar's `Ã—` (chrome owns the exit verb), added `QuizCoordinator.back()` (prior answers survive via existing `@Observable` state), and built `MemberLeaveStore` to fire the `members` DELETE-self + (solo initiator) `rooms.status = 'expired'` round-trip. Locked confirmation copy pinned by `QuizChromeCopyTests`. Post-exit destination is S00 Landing â€” `QuizChromePostExitDestination.current = .landing` until tb-WF-4 lands the visible Plan list surface; `QuizChromePostExitTests` catches a future flip. The issue spec said "RLS already permits self-delete," but `members` shipped with SELECT + INSERT policies only; added `members_delete_self` migration (`20260520000000000_members_self_delete.sql`) scoped to `user_id = auth.uid()`. iOS CI lane green; design-system gates green.

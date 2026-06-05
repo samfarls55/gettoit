@@ -7,8 +7,6 @@
 // and must stay in lock-step with the Privacy Nutrition Labels filed
 // in App Store Connect.
 //
-// Not a mobile design-system surface (no entry in
-// `design-system/surfaces/`) — web-only legal page consuming the
 // canonical tokens for typography and color so it stays on-brand
 // without forcing a long-form-text surface into the locked spec.
 

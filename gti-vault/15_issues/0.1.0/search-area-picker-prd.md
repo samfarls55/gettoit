@@ -105,7 +105,6 @@ The feature does not require a schema change. The committed Search area persists
 - Add accessibility-focused tests or assertions for the minus/plus controls and radius value exposure.
 - Update or replace existing C-23 and distance-slider tests that currently describe active Setup behavior. Keep any reusable current-location/typeahead tests that still describe internals after the ownership rename.
 - Prior art: the existing LocationCoordinator tests cover permission/typeahead state, the existing Setup tests cover validation and persistence mapping, and the existing map/fetch planner tests cover radius forwarding. Use those patterns rather than inventing a new testing style.
-- Verification should follow the repo matrix. Design-system-only changes run the design-system verifier; Swift implementation runs the iOS CI or XcodeBuildMCP lane when available.
 
 ## Out of Scope
 

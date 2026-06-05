@@ -12,7 +12,6 @@ created: 2026-05-21
 
 ## Parent
 
-[[sg-wf-5-web-invitee-flow|sg-WF-5]] — the web invitee shell design-system surface doc. Behavior locked in [[../../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]] §Q5 (resume), §Q6 (decided re-click), §Q7 (leave).
 
 Second of the two shell-wiring tracer-bullets — builds the re-click behaviors on the [[tb-wf-11-web-invitee-shell-foundation|tb-WF-11]] foundation.
 
@@ -30,7 +29,6 @@ Everything that happens when a web invitee re-opens their `/join/<roomId>` link 
 
 - **Resume (§Q5)** — read `members.quiz_progress` (a plain select on boot; the existing `members_progress_upsert` RPC for writes) and route to the last-answered question. "Already voted → Waiting" and "verdict → Verdict" via `SessionRoom.boot`. No new server code.
 - **Decided re-click (§Q6)** — read-only verdict card via the existing `plans_decided_for_user` / `plans_history_for_user` RPCs (a web invitee returns `role='joined'`); the card live-updates on the existing Realtime rebroadcast during `decided-active`. Terminal fallback when membership does not resolve.
-- **Leave (§Q7)** — a `Leave` affordance on the Q1–Q5 quiz chrome only; a confirm step reusing the locked `joinedLeave` copy from [[../../../design-system/surfaces/00-plan-list|surfaces/00-plan-list.md]]; drop the `members` row via the existing `members_delete_self` RLS policy (`quiz_progress` rides along on the row delete); a "you left this plan" terminal; soft rejoin (a re-click after leave is a fresh first-landing — no tombstone, no hard block).
 
 This slice adds **no new schema and no new server code** — every server-side piece (the `quiz_progress` column + `members_progress_upsert` RPC, the decided/history RPCs, the `members_delete_self` policy) already exists. It is a vertical slice that integrates through those existing layers up to the web UI.
 

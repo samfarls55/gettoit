@@ -1,24 +1,13 @@
-// GetToIt web — Sunset Pop component port.
-//
-// Re-implementation of `design-system/code/components.jsx` for the web
-// fallback. Per ADR 0003 §"Design-system relationship" we MUST NOT
-// import from `design-system/code/components.jsx` — that JSX is the
-// spec, not production source. This file is a 1:1 port to React + TS
-// with all hex codes either threaded through the design-system tokens
-// (CSS custom properties from `design-system/code/tokens.css`, loaded
-// in `app/layout.tsx`) or registered in `tokens.json` so the
-// `verify.mjs` orphan-hex sweep stays clean.
+// GetToIt web - Sunset Pop component primitives.
 
 "use client";
 
 import Link from "next/link";
 import { type CSSProperties, type ReactNode } from "react";
 
-// ── The 4-stop gradient map. Mirrors `GTI_GRADIENTS` in components.jsx ──
+// The 4-stop gradient map.
 //
-// These hex values are registered in `design-system/tokens.json`
 // under `gradient.surfaces.<stop>`. They live here too because the
-// web build does not import from `design-system/code/` per ADR 0003.
 // Drift is gated by `verify.mjs` — every hex below must be present in
 // tokens.json or the sweep fails.
 export const GTI_GRADIENTS: Record<string, [string, string, string, string]> = {
@@ -51,7 +40,6 @@ export function GradientSurface({
   const [g1, g2, g3, g4] = GTI_GRADIENTS[stop] ?? GTI_GRADIENTS.initiator;
   const style: CSSProperties = {
     // CSS custom properties for the gradient stops. Picked up by the
-    // `.gti-gradient` rule in `design-system/code/tokens.css` which
     // animates the transition between surfaces (hue shift on advance).
     ["--g1" as string]: g1,
     ["--g2" as string]: g2,

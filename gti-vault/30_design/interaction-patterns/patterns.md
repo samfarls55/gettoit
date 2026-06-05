@@ -706,7 +706,6 @@ For cognition/visual/system principles see [[principles]]. For surface playbooks
   - Put space between adjacent targets so the user can't trigger the wrong one.
   - Where visual design demands a smaller visible button, extend the hit area into surrounding whitespace (extended `hitSlop`).
   - Verify with a device test, not just a simulator - fingers behave differently than mice.
-- Signals present (in code/spec): `hitSlop` / `padding` on `Pressable`/`Button`; minHeight 44/48 enforced via a `Button` design-system primitive; spacing tokens applied between list rows.
 - Signals missing (red flag): icon-only buttons in a tight toolbar; close (X) buttons sized to their glyph; inline text links with no extra padding; multiple adjacent CTAs with no gap.
 - Anti-patterns / mis-applications: huge visible buttons that waste screen but leave no whitespace between them (still mis-tap); pretending CSS padding is enough when the actual `Pressable` hit area is smaller; tiny "x" close buttons on toasts and modals.
 - Related: [[#Vertical Stack]], [[#Bottom Navigation]], [[principles#P-03. Satisficing]]

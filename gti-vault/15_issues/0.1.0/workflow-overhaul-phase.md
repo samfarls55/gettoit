@@ -31,14 +31,10 @@ The decision doc captures the eleven grilled outcomes with rejected alternatives
 
 | # | Title | Type | GitHub | Blocked by |
 |---|---|---|---|---|
-| sg-WF-1 | [[issues/sg-wf-1-plan-setup-surface\|Plan setup surface â€” design-system spec + JSX]] | AFK | [#154](https://github.com/samfarls55/gettoit/issues/154) | done 2026-05-19 |
 | sg-WF-2 | [[issues/sg-wf-2-quiz-back-exit-chrome\|Quiz Back + Exit chrome â€” S03 surface additions]] | AFK | [#155](https://github.com/samfarls55/gettoit/issues/155) | done 2026-05-19 |
 | sg-WF-3 | [[issues/sg-wf-3-s04-timer-sweep\|S04 timer sweep â€” finalize removal beyond the stale marker]] | AFK | [#156](https://github.com/samfarls55/gettoit/issues/156) | done 2026-05-19 |
-| sg-WF-4 | [[issues/sg-wf-4-plan-list-surface\|Plan list surface â€” design-system spec + JSX]] | AFK | [#157](https://github.com/samfarls55/gettoit/issues/157) | done 2026-05-20 |
-| sg-WF-5 | [[issues/sg-wf-5-web-invitee-flow\|Web invitee single-link flow â€” design-system surface doc]] | AFK | [#158](https://github.com/samfarls55/gettoit/issues/158) | done 2026-05-21 |
 | sg-WF-6 | [[issues/sg-wf-6-reroll-window-deadline\|Reroll window deadline mechanism]] | AFK | [#159](https://github.com/samfarls55/gettoit/issues/159) | done 2026-05-21 |
 | sg-WF-7 | [[issues/sg-wf-7-web-invitee-account-claim\|Web invitee account claim â€” cross-context identity bridge]] | HITL | [#191](https://github.com/samfarls55/gettoit/issues/191) | done 2026-05-22 |
-| sg-WF-8 | [[issues/sg-wf-8-account-claim-design-system\|Account-claim design-system amendment â€” S00a + web mint affordance]] | AFK | [#194](https://github.com/samfarls55/gettoit/issues/194) | done 2026-05-21 |
 | sg-WF-9 | [[issues/sg-wf-9-verdict-card-no-survivor\|web-01-invitee-shell Â§C does not spec the no-survivor decided-plan case]] | AFK | [#215](https://github.com/samfarls55/gettoit/issues/215) | done 2026-05-22 â€” PR #217 |
 
 ### Tracer-bullets

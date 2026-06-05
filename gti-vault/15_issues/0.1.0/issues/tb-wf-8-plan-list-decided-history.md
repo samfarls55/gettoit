@@ -16,7 +16,6 @@ closed: 2026-05-20
 
 ## Parent
 
-[[sg-wf-4-plan-list-surface|sg-WF-4]] â€” design-system spec for the Plan list surface. Locked decisions in [[../../../50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]].
 
 Builds on [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] and [[tb-wf-7-plan-list-joiner-resume|tb-WF-7]]. Adds the visible Plan lifecycle end-to-end â€” verdict-fires â†’ Decided section appears â†’ window closes â†’ History section appears.
 
@@ -68,7 +67,6 @@ End-to-end vertical slice that makes the **full lifecycle of a Plan visible on t
 
 ## Acceptance criteria
 
-- [ ] `PlanListScreen` renders Decided + History sections per the design-system spec; 2-line cards with name + verdict place name.
 - [ ] History section is collapsible; expanded/collapsed state persists per user across launches within a session.
 - [ ] Sections ordered correctly: Decided `verdict_fired_at DESC`, History `expired_at DESC`.
 - [ ] Created tap routing: Decided â†’ `VerdictScreen` (with reroll), History â†’ `VerdictScreen` read-only.

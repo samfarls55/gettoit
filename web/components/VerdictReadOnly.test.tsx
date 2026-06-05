@@ -1,7 +1,6 @@
 // GetToIt web — VerdictReadOnly render test (web-01 §C).
 //
 // Proves the web invitee verdict surface conforms to the locked
-// `design-system/surfaces/web-01-invitee-shell.md` §C "Read-only
 // verdict card": eyebrow, plan name, the verdict venue card, and the
 // "Getting the app?" mint line — and nothing else (bug-17). No
 // receipts, no cuts drawer, no rule text, no time badge, no primary

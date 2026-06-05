@@ -16,7 +16,6 @@ The product still needs a complete iOS client before launch. The rewrite must pr
 
 ## Solution
 
-Build a new Expo managed React Native + TypeScript mobile client as the active future iOS app. The Expo app will be migrated in parallel to full pre-launch parity with the Swift app, using design-system surfaces and `CONTEXT.md` as the source of truth. The existing Swift client becomes legacy reference and is feature-frozen.
 
 Expo web is a development-only preview target. It helps inspect mobile surfaces and run smoke tests from Windows, but it does not replace the existing Next.js Web invitee fallback. The Expo app talks directly to Supabase through typed repositories/services and may simplify Supabase contracts during migration because there are no public users yet.
 
@@ -31,7 +30,6 @@ Expo web is a development-only preview target. It helps inspect mobile surfaces 
 7. As the founder, I want behavior parity rather than pixel parity, so that the rewrite can improve iteration speed without being blocked by exact SwiftUI reproduction.
 8. As a future agent, I want one explicit app-state router, so that navigation precedence is understandable and testable.
 9. As a future agent, I want route transitions tested as reducer/state-machine behavior, so that deep-link, quiz, verdict, and settings bugs can be caught locally.
-10. As a future agent, I want product contracts derived from design-system surfaces and `CONTEXT.md`, so that stale Swift implementation details do not become accidental requirements.
 11. As an Account member, I want the S00a Sign-in Gate to appear whenever my session is not Linked-Apple, so that iOS keeps the post-S00a identity invariant.
 12. As an Account member, I want Sign in with Apple to remain the only iOS entry path, so that auth behavior matches the current product model.
 13. As a Web invitee installing the app, I want to enter a Claim code before Apple sign-in, so that my Anonymous session can be upgraded instead of stranded.
@@ -82,7 +80,6 @@ Expo web is a development-only preview target. It helps inspect mobile surfaces 
 - Freeze Swift iOS feature work immediately. Critical fixes are allowed, but new product scope goes to Expo.
 - Aim for full product behavior parity before public launch.
 - Do not require pixel parity with SwiftUI. The Expo app must feel polished and recognizably GetToIt, but exact screenshot matching is not required.
-- Treat design-system surfaces and `CONTEXT.md` as product source of truth.
 - Treat Swift code and XCTest coverage as reference evidence for edge cases, fixtures, and hidden behavior.
 - Use an explicit app-state router/state machine for product routing. File-based routing may wrap app launch and deep-link entry, but core precedence lives in one tested routing model.
 - Preserve the current auth model: S00a Sign-in Gate, Sign in with Apple, Account claim before Apple sign-in, and `user_id` preservation when upgrading an Anonymous session.
@@ -146,7 +143,6 @@ Prior art:
 
 - The current iOS suite has focused state/coordinator tests for auth, Plan list, Setup, quiz, waiting, verdict, reroll, and Supabase integration.
 - The current web stack already uses React/TypeScript, Vitest, and Testing Library-style patterns.
-- The design system already uses generated tokens and verification scripts that can inform a React Native token adapter.
 
 ## Out of Scope
 
