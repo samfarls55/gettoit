@@ -20,7 +20,21 @@ TB-18 swaps active iOS release ownership from the retired SwiftUI app in `ios/` 
 - App Store Connect app id: `6769440299`
 - Universal Links entitlement: `applinks:gettoit.app`
 
-## Release commands
+## TestFlight shipping workflow
+
+Active TestFlight shipping is owned by `.github/workflows/testflight.yml`.
+
+- Trigger: manual `workflow_dispatch`.
+- Codex command: `/ship`, backed by `.codex/commands/ship.md` and `scripts/ship-testflight.ps1`.
+- Default ref: `main`; explicit branch, tag, or SHA override is allowed.
+- EAS profile: `production`.
+- Submit mode: defaults to TestFlight submit; build-only is available for CI shakedown.
+- Required GitHub secret: `EXPO_TOKEN`.
+- Required GitHub Environment: `testflight`, with required reviewer approval.
+
+The workflow checks out the requested ref, installs `mobile/` dependencies, runs `npm run verify`, then runs `eas build` for iOS with `--wait` and JSON summary output. When submit mode is true, it uses EAS auto-submit with the production submit profile and forwards optional release notes as TestFlight "What to Test" notes.
+
+## Manual fallback commands
 
 Run from `mobile/`:
 

@@ -1,0 +1,132 @@
+name: testflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      git_ref:
+        description: "Branch, tag, or SHA to ship"
+        required: true
+        default: "main"
+        type: string
+      submit:
+        description: "Submit successful iOS build to TestFlight"
+        required: true
+        default: true
+        type: boolean
+      release_notes:
+        description: "Optional TestFlight What to Test notes"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  ios-testflight:
+    name: iOS TestFlight (EAS)
+    runs-on: ubuntu-latest
+    environment: testflight
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git_ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Require EXPO_TOKEN
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_TOKEN:-}" ]; then
+            echo "EXPO_TOKEN is not set. Add it as a GitHub secret or testflight environment secret." >&2
+            exit 1
+          fi
+
+      - run: npm ci
+      - run: npm run verify
+
+      - name: Resolve release notes
+        env:
+          INPUT_GIT_REF: ${{ inputs.git_ref }}
+          INPUT_RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: |
+          set -euo pipefail
+          notes="${INPUT_RELEASE_NOTES}"
+          if [ -z "$notes" ]; then
+            notes="Internal TestFlight build from ${INPUT_GIT_REF}."
+          fi
+          {
+            echo "RELEASE_NOTES<<__GETTOIT_RELEASE_NOTES__"
+            printf '%s\n' "$notes"
+            echo "__GETTOIT_RELEASE_NOTES__"
+          } >> "$GITHUB_ENV"
+
+      - name: EAS build and submit to TestFlight
+        if: ${{ inputs.submit }}
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --wait \
+            --auto-submit-with-profile production \
+            --what-to-test "$RELEASE_NOTES" \
+            --json | tee "$RUNNER_TEMP/eas-build.json"
+
+      - name: EAS build only
+        if: ${{ !inputs.submit }}
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@latest build \
+            --platform ios \
+            --profile production \
+            --non-interactive \
+            --wait \
+            --json | tee "$RUNNER_TEMP/eas-build.json"
+
+      - name: Write shipment summary
+        if: always()
+        env:
+          INPUT_GIT_REF: ${{ inputs.git_ref }}
+          INPUT_SUBMIT: ${{ inputs.submit }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### TestFlight shipment"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Git ref | \`${INPUT_GIT_REF}\` |"
+            echo "| EAS profile | \`production\` |"
+            echo "| Submit to TestFlight | \`${INPUT_SUBMIT}\` |"
+            echo ""
+            if [ -f "$RUNNER_TEMP/eas-build.json" ]; then
+              echo "#### EAS build metadata"
+              echo '```json'
+              jq '. as $root | if type == "array" then . else [$root] end | map({
+                id,
+                platform,
+                status,
+                profile,
+                appVersion,
+                appBuildVersion,
+                buildDetailsPageUrl
+              })' "$RUNNER_TEMP/eas-build.json" || cat "$RUNNER_TEMP/eas-build.json"
+              echo '```'
+            else
+              echo "No EAS metadata file was written."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

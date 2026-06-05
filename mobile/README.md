@@ -38,9 +38,11 @@ Expo web is a development-only preview target for mobile surfaces. It does not r
 npm run web --prefix mobile
 ```
 
-## EAS TestFlight Release
+## TestFlight Release
 
-Run from `mobile/` after the release branch is ready:
+Preferred path: ask Codex to run `/ship`. The command dispatches the manual GitHub Actions workflow in `.github/workflows/testflight.yml`, which checks out the requested ref, runs `npm run verify` in `mobile/`, then runs the EAS production iOS build. The workflow is gated by the GitHub Environment named `testflight`.
+
+Manual fallback from `mobile/`:
 
 ```sh
 npx eas-cli login
