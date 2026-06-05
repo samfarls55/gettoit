@@ -48,7 +48,7 @@ function authedPost(body: unknown): Request {
   });
 }
 
-/** A fetched-venue payload entry — the iOS writer persists the full
+/** A fetched-venue payload entry — the mobile writer persists the full
  *  `ShapedPlace`; the union keys on `fsq_place_id`. */
 function venue(id: string, extra: Record<string, unknown> = {}) {
   return { fsq_place_id: id, name: `Venue ${id}`, price_tier: 2, ...extra };

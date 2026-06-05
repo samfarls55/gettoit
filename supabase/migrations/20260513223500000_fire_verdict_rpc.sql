@@ -1,4 +1,5 @@
--- TB-07 — fire_verdict(room_id) RPC.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-07 â€” fire_verdict(room_id) RPC.
 --
 -- The initiator's "Decide now" tap on S04 Waiting calls this RPC. It
 -- enforces the original minimum-quorum rule and flips `rooms.status` to
@@ -7,33 +8,33 @@
 -- in the Edge Function `compute-verdict`; this RPC is intentionally
 -- the dispatcher, not the engine.
 --
--- Quorum rule (PRD §"Group size, fire trigger, timer"):
+-- Quorum rule (PRD Â§"Group size, fire trigger, timer"):
 --   * Minimum 2 answers to fire: initiator + at least one invitee.
---   * Initiator-only — the room creator is the only caller allowed to
+--   * Initiator-only â€” the room creator is the only caller allowed to
 --     manually fire. RPC checks `creator_user_id = auth.uid()`.
 --
 -- Outcomes the RPC surfaces in its return JSON:
---   * `{"status":"firing"}`             — happy path, status flipped
---   * `{"status":"already_firing"}`     — concurrent press OR cron beat
+--   * `{"status":"firing"}`             â€” happy path, status flipped
+--   * `{"status":"already_firing"}`     â€” concurrent press OR cron beat
 --     the caller; the row is already in `firing` / `verdict_ready` /
 --     `locked` / `expired`. Treated as a no-op success so the iOS UI
 --     doesn't surface a spurious failure on a double-tap or a race
 --     against the cron job.
---   * `{"error":"not_initiator"}`       — caller isn't the room owner.
---   * `{"error":"below_quorum"}`        — fewer than 2 votes exist.
---   * `{"error":"room_not_found"}`      — no row, or RLS hides it.
+--   * `{"error":"not_initiator"}`       â€” caller isn't the room owner.
+--   * `{"error":"below_quorum"}`        â€” fewer than 2 votes exist.
+--   * `{"error":"room_not_found"}`      â€” no row, or RLS hides it.
 --
 -- The RPC is SECURITY DEFINER so it can run the votes count + the
 -- rooms UPDATE without the caller needing direct write permission
 -- on `rooms.status`. Without DEFINER the UPDATE would need a wider
--- UPDATE policy on `rooms` than the original schema admits (the iOS client
+-- UPDATE policy on `rooms` than the original schema admits (the mobile client
 -- never writes `rooms.status` directly).
 --
 -- Idempotency:
 --   * Re-entry on a row already in `firing` returns `already_firing`
 --     without re-flipping. The downstream `compute-verdict` is
 --     idempotent (`verdicts.room_id` unique constraint) so even if
---     the iOS client invokes the function twice in quick succession,
+--     the mobile client invokes the function twice in quick succession,
 --     the second call returns the already-computed verdict.
 --   * Concurrent calls from two clients are race-safe: the UPDATE
 --     uses a `WHERE status = 'open'` predicate, so the second call
@@ -70,12 +71,12 @@ begin
 
     -- A room that already left `open` is either firing, already
     -- verdict_ready, locked, or expired. All four are terminal-ish
-    -- states for the "Decide now" tap path — return as no-op success.
+    -- states for the "Decide now" tap path â€” return as no-op success.
     if v_room.status <> 'open' then
         return jsonb_build_object('status', 'already_firing', 'room_status', v_room.status);
     end if;
 
-    -- Quorum check — strictly ≥ 2 distinct user votes.
+    -- Quorum check â€” strictly â‰¥ 2 distinct user votes.
     select count(*)::int
     into v_vote_cnt
     from public.votes
@@ -85,7 +86,7 @@ begin
         return jsonb_build_object('error', 'below_quorum', 'vote_count', v_vote_cnt);
     end if;
 
-    -- Race-safe flip — only succeeds if the row is still in `open`.
+    -- Race-safe flip â€” only succeeds if the row is still in `open`.
     update public.rooms
     set status = 'firing'
     where id = p_room_id

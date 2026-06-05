@@ -1,6 +1,6 @@
 ---
 title: Search area picker PRD
-status: ready-for-agent
+status: done
 feature: 0.1.0
 artifact: prd
 created: 2026-06-03
@@ -9,6 +9,9 @@ source:
   - "[[../../50_product/0.1.0-search-area-picker|Search area picker locked decisions]]"
   - "[[../../60_engineering/adr/0020-search-area-picker-replaces-locationpicker|ADR 0020]]"
 ---
+
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
 
 # Search area picker PRD
 
@@ -120,3 +123,7 @@ The feature does not require a schema change. The committed Search area persists
 - Source decisions are locked in [[../../50_product/0.1.0-search-area-picker|0.1.0-search-area-picker]] and accepted in [[../../60_engineering/adr/0020-search-area-picker-replaces-locationpicker|ADR 0020]].
 - ADR 0009 is superseded for active Setup geography work. Do not use it as active guidance for the new component.
 - The known "search-area timezone" language conflict remains a separate documentation and product correction.
+
+## Closure note
+
+Closed 2026-06-05. All child TB-SA implementation issues (#318 through #322) are closed in GitHub.

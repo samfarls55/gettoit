@@ -3,7 +3,10 @@ run: 2026-05-26-1014
 status: running
 ---
 
-# AFK Execution Run — 2026-05-26 10:14
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# AFK Execution Run â€” 2026-05-26 10:14
 
 Goal: execute all open AFK issues not blocked by a HITL issue. Source: 2026-05-26 workflow-review batch (wfr-06..wfr-31).
 
@@ -49,30 +52,30 @@ Concurrency cap: 2.
 
 ## Event log
 
-- 10:14 — run started; preflight clean after committing wfr batch + ADR-0018 (592dbf0).
-- 10:14 — ready-issues scanner: 22 ready, 4 waiting, 0 excluded.
-- 10:14 — batch 1 spawned: wfr-06, wfr-07.
-- 10:27 — wfr-06 MERGED (PR #274). cleanup: removed worktree + 2 stale branches + remote.
-- 10:27 — wfr-08 spawned (slot freed by wfr-06).
-- 10:28 — wfr-07 MERGED (PR #275). cleanup: removed worktree + 2 stale branches.
-- 10:28 — wfr-09 spawned (slot freed by wfr-07).
-- 10:40 — wfr-08 MERGED (PR #277). cleanup + main fast-forwarded (wfr-07+wfr-08 docs).
-- 10:40 — wfr-10 spawned (slot freed by wfr-08).
-- 10:53 — wfr-09 MERGED (PR #278, +follow-up #282 vault closeout). cleanup + main fast-forwarded.
-- 10:53 — wfr-11 spawned (slot freed by wfr-09).
-- 10:58 — wfr-11 subagent crashed mid-run (socket error, no PR, no remote push). cleanup: removed worktree + branches. respawning fresh.
-- 11:02 — wfr-10 MERGED (PR #283). wfr-30 unblocked. wfr-12 spawned (slot freed).
-- 11:17 — wfr-11 MERGED (PR #284, retry success). wfr-13 spawned (slot freed).
-- 11:29 — wfr-12 MERGED (PR #285). wfr-14 spawned (slot freed).
-- 11:42 — wfr-14 MERGED (PR #287). wfr-15 spawned (slot freed).
-- 11:50 — wfr-13 MERGED (PR #286, 1 CI rerun for Supabase auth rate-limit). wfr-16 spawned (slot freed).
-- 12:03 — wfr-15 MERGED (PR #288). wfr-17 spawned (slot freed).
-- 12:15 — wfr-16 MERGED (PR #289). wfr-18 spawned (slot freed; on merge will unblock wfr-19 + wfr-20).
-- 12:31 — wfr-17 subagent dropped at "wait CI"; PR #291 open + all checks green except iOS in-progress. orchestrator watching CI inline (background bv1duidrc).
-- 12:32 — wfr-18 MERGED (PR #292). wfr-19 + wfr-20 unblocked. spawning both.
-- 12:55 — main CI failing on run 26468607338 (e994c6a/wfr-18 head): `supabase (functions deploy)` exit 1 on `supabase secrets set` returning HTTP 502 (Supabase API infra flake — not our code, not breaking prod since deploy is post-merge). All other lanes green (web vitest, ios xcodebuild test, design-system verify, db push, AASA, invite-link canary, testflight upload). Prior fail at bea3125 (wfr-16) was unrelated vitest flake on `InviteShell.reclick.test.tsx` — not reproducible on wfr-18 run.
-- 12:56 — user requested cancel + main triage. cancelled wfr-19 + wfr-20 subagents (mid-plan, no PR opened). cancelled wfr-17 PR #291 watch (iOS lane still in_progress, will re-watch).
-- 12:56 — `gh run rerun 26468607338 --failed` triggered for supabase deploy lane.
-- 13:05 — main CI rerun completed: all 9 lanes green. main healthy on e994c6a.
-- 13:10 — wfr-17 PR #291 iOS lane hung 25+ min (started 18:46:33 UTC). cancelled run 26468165632 and triggered rerun. will merge inline when green.
-- 13:30 — wfr-17 rerun green; PR #291 squash-merged. cleanup of stale worktree + branches. main fast-forwarded.
+- 10:14 â€” run started; preflight clean after committing wfr batch + ADR-0018 (592dbf0).
+- 10:14 â€” ready-issues scanner: 22 ready, 4 waiting, 0 excluded.
+- 10:14 â€” batch 1 spawned: wfr-06, wfr-07.
+- 10:27 â€” wfr-06 MERGED (PR #274). cleanup: removed worktree + 2 stale branches + remote.
+- 10:27 â€” wfr-08 spawned (slot freed by wfr-06).
+- 10:28 â€” wfr-07 MERGED (PR #275). cleanup: removed worktree + 2 stale branches.
+- 10:28 â€” wfr-09 spawned (slot freed by wfr-07).
+- 10:40 â€” wfr-08 MERGED (PR #277). cleanup + main fast-forwarded (wfr-07+wfr-08 docs).
+- 10:40 â€” wfr-10 spawned (slot freed by wfr-08).
+- 10:53 â€” wfr-09 MERGED (PR #278, +follow-up #282 vault closeout). cleanup + main fast-forwarded.
+- 10:53 â€” wfr-11 spawned (slot freed by wfr-09).
+- 10:58 â€” wfr-11 subagent crashed mid-run (socket error, no PR, no remote push). cleanup: removed worktree + branches. respawning fresh.
+- 11:02 â€” wfr-10 MERGED (PR #283). wfr-30 unblocked. wfr-12 spawned (slot freed).
+- 11:17 â€” wfr-11 MERGED (PR #284, retry success). wfr-13 spawned (slot freed).
+- 11:29 â€” wfr-12 MERGED (PR #285). wfr-14 spawned (slot freed).
+- 11:42 â€” wfr-14 MERGED (PR #287). wfr-15 spawned (slot freed).
+- 11:50 â€” wfr-13 MERGED (PR #286, 1 CI rerun for Supabase auth rate-limit). wfr-16 spawned (slot freed).
+- 12:03 â€” wfr-15 MERGED (PR #288). wfr-17 spawned (slot freed).
+- 12:15 â€” wfr-16 MERGED (PR #289). wfr-18 spawned (slot freed; on merge will unblock wfr-19 + wfr-20).
+- 12:31 â€” wfr-17 subagent dropped at "wait CI"; PR #291 open + all checks green except iOS in-progress. orchestrator watching CI inline (background bv1duidrc).
+- 12:32 â€” wfr-18 MERGED (PR #292). wfr-19 + wfr-20 unblocked. spawning both.
+- 12:55 â€” main CI failing on run 26468607338 (e994c6a/wfr-18 head): `supabase (functions deploy)` exit 1 on `supabase secrets set` returning HTTP 502 (Supabase API infra flake â€” not our code, not breaking prod since deploy is post-merge). All other lanes green (web vitest, ios xcodebuild test, design-system verify, db push, AASA, invite-link canary, testflight upload). Prior fail at bea3125 (wfr-16) was unrelated vitest flake on `InviteShell.reclick.test.tsx` â€” not reproducible on wfr-18 run.
+- 12:56 â€” user requested cancel + main triage. cancelled wfr-19 + wfr-20 subagents (mid-plan, no PR opened). cancelled wfr-17 PR #291 watch (iOS lane still in_progress, will re-watch).
+- 12:56 â€” `gh run rerun 26468607338 --failed` triggered for supabase deploy lane.
+- 13:05 â€” main CI rerun completed: all 9 lanes green. main healthy on e994c6a.
+- 13:10 â€” wfr-17 PR #291 iOS lane hung 25+ min (started 18:46:33 UTC). cancelled run 26468165632 and triggered rerun. will merge inline when green.
+- 13:30 â€” wfr-17 rerun green; PR #291 squash-merged. cleanup of stale worktree + branches. main fast-forwarded.

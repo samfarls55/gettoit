@@ -10,23 +10,26 @@ github_issue: 247
 github_pr: 274
 ---
 
-# wfr-06 — SettingsScreen has no UI entry point anywhere in the app
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-06 â€” SettingsScreen has no UI entry point anywhere in the app
 
 ## Workflow design
 
-**Nav model.** GetToIt app shell is **Hub-and-Spoke** ([[../../30_design/interaction-patterns/surfaces#Navigation models]]). `PlanListScreen` is the hub. Spokes are `SettingsScreen` (now), `ProfileScreen`, `HelpScreen` (later — same glyph evolves into a menu sheet when cardinality > 1).
+**Nav model.** GetToIt app shell is **Hub-and-Spoke** ([[../../30_design/interaction-patterns/surfaces#Navigation models]]). `PlanListScreen` is the hub. Spokes are `SettingsScreen` (now), `ProfileScreen`, `HelpScreen` (later â€” same glyph evolves into a menu sheet when cardinality > 1).
 
 Considered + rejected:
-- **Flat** (current de-facto) — breaks the moment Settings ships; user has no way in.
-- **Bottom Navigation** ([[../../30_design/interaction-patterns/patterns#Bottom Navigation]]) — overkill for 1 spoke; consumes thumb real estate; signals "many destinations" when there's really one hub.
-- **Hamburger drawer** — hides the hub identity; PlanList *is* the app, the user shouldn't drawer-open to remember that.
-- **Multilevel / Tree** — premature; would force History into its own destination before cardinality demands it (see [[#Grill #4 outcome]] note in run report).
+- **Flat** (current de-facto) â€” breaks the moment Settings ships; user has no way in.
+- **Bottom Navigation** ([[../../30_design/interaction-patterns/patterns#Bottom Navigation]]) â€” overkill for 1 spoke; consumes thumb real estate; signals "many destinations" when there's really one hub.
+- **Hamburger drawer** â€” hides the hub identity; PlanList *is* the app, the user shouldn't drawer-open to remember that.
+- **Multilevel / Tree** â€” premature; would force History into its own destination before cardinality demands it (see [[#Grill #4 outcome]] note in run report).
 
 **Pattern.** Top-trailing **[[../../30_design/interaction-patterns/patterns#Sign-In Tools]]** cluster. Apple convention (Settings, Maps, Music, Mail all park utility chrome top-right). One glyph today (`gearshape`); evolves into avatar+menu when Profile lands.
 
 **Foundations.**
-- [[../../30_design/interaction-patterns/principles#P-07. Habituation]] — top-right gear is the iOS convention; zero novelty cost.
-- [[../../30_design/interaction-patterns/principles#P-09. Spatial Memory]] — glyph stays at the same screen coordinate across PlanList empty + populated states; users can muscle-memory it.
+- [[../../30_design/interaction-patterns/principles#P-07. Habituation]] â€” top-right gear is the iOS convention; zero novelty cost.
+- [[../../30_design/interaction-patterns/principles#P-09. Spatial Memory]] â€” glyph stays at the same screen coordinate across PlanList empty + populated states; users can muscle-memory it.
 
 ## What to build
 
@@ -44,7 +47,7 @@ Add a `gearshape` chrome glyph to `PlanListScreen` top-trailing (toolbar). Tap f
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Surfaced by
 
@@ -52,4 +55,4 @@ None — can start immediately.
 
 ## Comments
 
-- 2026-05-26 — Closed via [PR #274](https://github.com/samfarls55/gettoit/pull/274). PlanListScreen now hosts a top-trailing `gearshape` chrome glyph in both empty + populated states; tap fires `onOpenSettings` and RootView flips `showingSettings = true`. SettingsScreen continues to render via the existing precedence chain; Done returns to the Plan list. iOS lane green (5m7s).
+- 2026-05-26 â€” Closed via [PR #274](https://github.com/samfarls55/gettoit/pull/274). PlanListScreen now hosts a top-trailing `gearshape` chrome glyph in both empty + populated states; tap fires `onOpenSettings` and RootView flips `showingSettings = true`. SettingsScreen continues to render via the existing precedence chain; Done returns to the Plan list. iOS lane green (5m7s).

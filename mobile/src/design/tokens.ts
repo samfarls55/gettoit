@@ -1,4 +1,4 @@
-import designTokens from "../../../design-system/tokens.json";
+import designTokens from "./tokens.snapshot.json";
 import type { TextStyle } from "react-native";
 
 type FontWeight = NonNullable<TextStyle["fontWeight"]>;

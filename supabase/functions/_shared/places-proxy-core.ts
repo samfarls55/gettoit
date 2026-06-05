@@ -1,3 +1,4 @@
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // PlacesProxy core orchestrator.
 //
 // This module is independent of Supabase and Deno's HTTP server so it
@@ -30,19 +31,19 @@ export interface CacheRow {
 
 export interface CachePayload {
   places: ShapedPlace[];
-  /** Disclaimers carried over from the original query — preserved so
+  /** Disclaimers carried over from the original query â€” preserved so
    *  the client can render the rule chip even on a cache hit. */
   disclaimers: string[];
 }
 
-/** Storage adapter — abstracted so unit tests can plug an in-memory
+/** Storage adapter â€” abstracted so unit tests can plug an in-memory
  *  Map and the production Edge Function can plug supabase-js. */
 export interface CacheAdapter {
   get(geo_h3: string, query_signature: string): Promise<CacheRow | null>;
   put(row: CacheRow): Promise<void>;
 }
 
-/** Fetch wrapper — same `fetch` signature so tests can stub a
+/** Fetch wrapper â€” same `fetch` signature so tests can stub a
  *  recorded Foursquare response. */
 export type FetchFn = (
   input: string | URL,
@@ -55,11 +56,11 @@ export interface ProxyDeps {
   apiKey: string;
   /** Time-source override for deterministic tests. */
   now?: () => Date;
-  /** Hot-zone TTL — applied when the cached row has the
+  /** Hot-zone TTL â€” applied when the cached row has the
    *  `hot_zone: true` flag. Currently marks every zone hot until the
    *  zone-detection heuristic lands; see follow-up note in TB-05. */
   hotZoneTtlMs?: number;
-  /** Cold-zone TTL — applied when `hot_zone: false`. */
+  /** Cold-zone TTL â€” applied when `hot_zone: false`. */
   coldZoneTtlMs?: number;
 }
 
@@ -69,19 +70,19 @@ export const DEFAULT_COLD_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 /** Output emitted to the iOS / web client. */
 export interface ProxyResponse {
   places: ShapedPlace[];
-  /** Disclaimers — chip ids that had no Foursquare signal. The verdict
-   *  rule chip surfaces these per the dietary-tag research §spec-change-proposal. */
+  /** Disclaimers â€” chip ids that had no Foursquare signal. The verdict
+   *  rule chip surfaces these per the dietary-tag research Â§spec-change-proposal. */
   disclaimers: string[];
   /** True when fewer than THIN_RESULTS_THRESHOLD usable rows came back.
    *  iOS uses this signal to trigger its MapKit fallback per ADR 0002.
    *  Web uses it to render the "couldn't load options nearby" empty state. */
   is_thin: boolean;
   /** Whether this response was served from cache. Informational for
-   *  observability — clients should not branch behavior on it. */
+   *  observability â€” clients should not branch behavior on it. */
   served_from_cache: boolean;
   /** Set when Foursquare was reached but answered a non-2xx the proxy
    *  degrades over (a 4xx/5xx other than the hard-failing 410). The
-   *  value is `foursquare_upstream_<status>` — e.g. `foursquare_upstream_429`
+   *  value is `foursquare_upstream_<status>` â€” e.g. `foursquare_upstream_429`
    *  on credit exhaustion. Absent on a healthy response. Lets the client
    *  and the deploy diagnostic tell an upstream fault apart from a
    *  genuine empty result set. */
@@ -121,7 +122,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     radius > 100_000
   ) {
     throw new PlacesProxyInputError(
-      "radius_meters must be a finite positive number ≤ 100000",
+      "radius_meters must be a finite positive number â‰¤ 100000",
     );
   }
   const filters = (obj.filters ?? {}) as Record<string, unknown>;
@@ -132,7 +133,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     ? filters.price_tier
     : undefined;
   // `open_at` is Foursquare's `[1-7]THHMM` weekday + local-time token.
-  // A present-but-malformed value is a client bug — reject it loudly
+  // A present-but-malformed value is a client bug â€” reject it loudly
   // (400) rather than swallowing it, the same failure mode that hid the
   // epoch-format outage. An absent value is fine: the filter is optional.
   let open_at: string | undefined;
@@ -145,7 +146,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     }
     open_at = filters.open_at;
   }
-  // Cuisine advisory tag (tb-17) — a `QuizCuisine` id on a per-cuisine
+  // Cuisine advisory tag (tb-17) â€” a `QuizCuisine` id on a per-cuisine
   // call, absent on the general call. A non-string / missing value
   // drops to undefined: decode stays tolerant, the call degrades to
   // the general query rather than erroring.
@@ -172,8 +173,8 @@ export function isCacheRowFresh(row: CacheRow, deps: ProxyDeps): boolean {
   return now - cachedAt < ttlForRow(row, deps);
 }
 
-/** Core entry point. Composes cache lookup → Foursquare fetch → cache
- *  write → response shaping. Pure with respect to its `deps` argument. */
+/** Core entry point. Composes cache lookup â†’ Foursquare fetch â†’ cache
+ *  write â†’ response shaping. Pure with respect to its `deps` argument. */
 export async function handlePlacesProxy(
   input: PlacesProxyInput,
   deps: ProxyDeps,
@@ -193,7 +194,7 @@ export async function handlePlacesProxy(
     };
   }
 
-  // 2. Cache miss — call Foursquare.
+  // 2. Cache miss â€” call Foursquare.
   const plan = buildFoursquareQuery(input);
   const url = `${FOURSQUARE_BASE_URL}/places/search?${plan.query.toString()}`;
   const response = await deps.fetch(url, {
@@ -205,12 +206,12 @@ export async function handlePlacesProxy(
   });
 
   if (!response.ok) {
-    // Surface upstream errors as a thin response — the client decides
+    // Surface upstream errors as a thin response â€” the client decides
     // whether to MapKit-fallback (iOS) or empty-state (web). We log
     // the upstream status for observability without 500ing.
     const body = await response.text().catch(() => "");
     if (response.status === 410) {
-      // Hard signal that the API version pin slipped — fail loud so a
+      // Hard signal that the API version pin slipped â€” fail loud so a
       // human notices in CI / logs. Per ADR 0002, the legacy host
       // returns 410 and the new host can return 410 if the version
       // header is unset.
@@ -220,7 +221,7 @@ export async function handlePlacesProxy(
       );
     }
     // Non-410 upstream failure. Degrade to a thin response, but surface
-    // the upstream status as a named error + a loud log — a swallowed
+    // the upstream status as a named error + a loud log â€” a swallowed
     // 4xx is what hid the 2026-05-16 credit-exhaustion outage (the proxy
     // answered an unmarked empty 200 and looked like "no venues here").
     console.error(
@@ -252,7 +253,7 @@ export async function handlePlacesProxy(
     disclaimers: plan.post_filters.disclaimers,
   };
 
-  // 3. Write through to cache. Failures here are not fatal — a cache
+  // 3. Write through to cache. Failures here are not fatal â€” a cache
   // write error must not break the user's session; we'll re-query
   // Foursquare on the next request.
   try {
@@ -263,7 +264,7 @@ export async function handlePlacesProxy(
       cached_at: (deps.now ?? (() => new Date()))().toISOString(),
     });
   } catch (_err) {
-    // Swallow — observability is the Edge Function's runtime concern.
+    // Swallow â€” observability is the Edge Function's runtime concern.
   }
 
   return {

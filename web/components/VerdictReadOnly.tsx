@@ -4,7 +4,7 @@
 // `design-system/surfaces/web-01-invitee-shell.md` §C "Read-only
 // verdict card": plan name + verdict venue only — "No receipts, no
 // per-axis cuts, no rule chip", "No primary CTA". This is a far
-// smaller read than the iOS S05 Verdict surface; web/iOS verdict
+// smaller read than the mobile S05 Verdict surface; web/mobile verdict
 // parity is not a goal (bug-17).
 //
 // `SessionRoom` reaches this surface when a room flips to

@@ -1,33 +1,34 @@
-// PreferenceFunction — the per-member preference engine (TB-22 quiz redesign).
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// PreferenceFunction â€” the per-member preference engine (TB-22 quiz redesign).
 //
-// A faithful TypeScript port of the Swift `PreferenceFunction` module
-// (`ios/Sources/App/PreferenceFunction.swift`, TB-09 — PRD modules A + E).
-// The Swift app builds a member's `prefFn` on-device; bug-08 locked the
+// A faithful TypeScript port of the legacy Swift `PreferenceFunction` module
+// (`legacy Swift ios/Sources/App/PreferenceFunction.swift`, TB-09 â€” PRD modules A + E).
+// The legacy Swift app builds a member's `prefFn` on-device; bug-08 locked the
 // server-side fork (Option 2): the union + preference scoring runs
 // server-side at verdict fire time. The verdict path is TypeScript, so
 // the preference-function math has to live here too.
 //
-// This module is the pure-logic port only — no live integration. Wiring
+// This module is the pure-logic port only â€” no live integration. Wiring
 // it into the `compute-verdict` edge function's `prefFn` injection seam
 // is TB-23.
 //
-// `buildPreferenceFunction` takes a member's stated Q1–Q4 profile and
+// `buildPreferenceFunction` takes a member's stated Q1â€“Q4 profile and
 // their three Q5 factorial ratings and returns a `prefFn(venue) -> number`
-// that scores any axis-profiled venue on the 1…5 scale the verdict
+// that scores any axis-profiled venue on the 1â€¦5 scale the verdict
 // engine's satisficing floor reads.
 //
 // Pure: no I/O, no clock, no randomness, no group state. The returned
-// closure is itself pure — a deterministic function of `member` and the
+// closure is itself pure â€” a deterministic function of `member` and the
 // Q5 ratings it was built from.
 //
-// Design source — gti-vault/50_product/0.1.0-quiz-amendments §3
-// ("Q5 — the preference probe"):
+// Design source â€” gti-vault/50_product/0.1.0-quiz-amendments Â§3
+// ("Q5 â€” the preference probe"):
 //
 //   * Stated-weight initialization. The three axis weights seed at an
-//     equal 1/3. Q1–Q4 give the member's *position* on each axis, not
+//     equal 1/3. Q1â€“Q4 give the member's *position* on each axis, not
 //     how much they care; the weight hierarchy is Q5's job, so the prior
 //     is deliberately neutral. An explicit "No preference" (the Q3 chip,
-//     or Q1 left empty) is a genuine zero-weight signal — that axis is
+//     or Q1 left empty) is a genuine zero-weight signal â€” that axis is
 //     zeroed and its weight redistributed equally to the survivors.
 //   * Soft re-weight. For each axis,
 //     `marginal_value = avg(two keep-card ratings) - drop-card rating`,
@@ -36,29 +37,29 @@
 //     `w_final = (1 - alpha) * w_prior + alpha * w_revealed`. Blending
 //     toward a non-zero prior means an axis the member positively
 //     selected is never discounted all the way to zero by a thin 3-card
-//     probe — only an explicit "No preference" zeroes an axis.
+//     probe â€” only an explicit "No preference" zeroes an axis.
 //   * Hard-contradiction override. A strict, two-condition trigger:
 //     fires for an axis only when BOTH that axis's keep-cards score
 //     strictly below its drop-card AND the drop-card is rated 4 or 5.
 //     Action is demote to no-preference (weight zeroed, axis stops
-//     scoring) — never invert toward the drop-card's value.
-//   * Score normalization. Each axis produces a 1…5 match score; the
+//     scoring) â€” never invert toward the drop-card's value.
+//   * Score normalization. Each axis produces a 1â€¦5 match score; the
 //     venue score is the weighted average over nonzero-weight axes. A
-//     match scores 5; a soft non-match scores ~2 — below threshold T —
+//     match scores 5; a soft non-match scores ~2 â€” below threshold T â€”
 //     so the satisficing floor has teeth.
 //
-// Cohort-zero constants — `matchScore=5`, `softNonMatchScore~2`,
-// `thresholdT=3`, `alpha=0.5` — are tunable post-cohort (amendments §3).
+// Cohort-zero constants â€” `matchScore=5`, `softNonMatchScore~2`,
+// `thresholdT=3`, `alpha=0.5` â€” are tunable post-cohort (amendments Â§3).
 // They are kept byte-identical with the Swift module so the ported test
 // vectors reproduce the Swift scores exactly.
 
-// ───────────────────────────────────────────────────────────────────────
-// Cohort-zero constants (tunable post-cohort — amendments §3)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Cohort-zero constants (tunable post-cohort â€” amendments Â§3)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** A full axis match scores 5. */
 export const MATCH_SCORE = 5.0;
-/** A soft non-match scores ~2 — deliberately below `THRESHOLD_T` so the
+/** A soft non-match scores ~2 â€” deliberately below `THRESHOLD_T` so the
  *  satisficing floor can eliminate a venue in aggregate. */
 export const SOFT_NON_MATCH_SCORE = 2.0;
 /** The satisficing threshold T the verdict engine's floor keeps venues
@@ -69,8 +70,8 @@ export const THRESHOLD_T = 3.0;
  *  from the prior toward the Q5-revealed weights. */
 export const ALPHA = 0.5;
 
-/** The number of stops on the Q4 / vibe energy scale (Quiet…Rowdy).
- *  Mirrors `GTIVibeLabels.all.count` in the Swift module — the vibe
+/** The number of stops on the Q4 / vibe energy scale (Quietâ€¦Rowdy).
+ *  Mirrors `GTIVibeLabels.all.count` in the Swift module â€” the vibe
  *  scorer grades by distance over `VIBE_SCALE_STOPS - 1` steps. */
 export const VIBE_SCALE_STOPS = 5;
 
@@ -79,9 +80,9 @@ export const VIBE_SCALE_STOPS = 5;
  *  reputation zeroes the whole reputation axis. */
 export const REPUTATION_NO_PREFERENCE = "no_preference";
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Public types
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // `Axis` and `Q5Rating` are the tiny wire-contract types. ADR 0014
 // makes `votes-wire.ts` the single, leaf-module home for them so the
@@ -92,7 +93,7 @@ import type { Axis, Q5Rating } from "./votes-wire.ts";
 
 const ALL_AXES: readonly Axis[] = ["cuisine", "reputation", "vibe"];
 
-/** A member's stated Q1–Q4 profile. Mirrors the Swift
+/** A member's stated Q1â€“Q4 profile. Mirrors the Swift
  *  `Q5MemberProfile` struct. */
 export interface Q5MemberProfile {
   /** Q1 craved cuisines (`QuizCuisine` ids). Empty when the member
@@ -101,31 +102,31 @@ export interface Q5MemberProfile {
   /** Q3 reputation answer (`QuizReputation` id). May be
    *  `no_preference`. */
   reputation: string;
-  /** Q4 vibe level, 0…4. */
+  /** Q4 vibe level, 0â€¦4. */
   vibe: number;
 }
 
-/** An axis-profiled venue. Mirrors the Swift `Q5VenueProfile` struct —
+/** An axis-profiled venue. Mirrors the legacy Swift `Q5VenueProfile` struct â€”
  *  the already-classified shape the preference function consumes. */
 export interface Q5VenueProfile {
-  /** The venue's cuisine — a `QuizCuisine` id, or `null` when the venue
+  /** The venue's cuisine â€” a `QuizCuisine` id, or `null` when the venue
    *  has no classifiable cuisine. A `null` cuisine can never match. */
   cuisine: string | null;
-  /** The venue's reputation bucket — a `QuizReputation` id. Never
+  /** The venue's reputation bucket â€” a `QuizReputation` id. Never
    *  `no_preference`: that is a member answer, not a venue property. */
   reputation: string;
-  /** The venue's vibe energy level, 0…4. */
+  /** The venue's vibe energy level, 0â€¦4. */
   vibe: number;
 }
 
-/** A pure venue-scoring function — the result of `buildPreferenceFunction`. */
+/** A pure venue-scoring function â€” the result of `buildPreferenceFunction`. */
 export type PreferenceFn = (venue: Q5VenueProfile) => number;
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Axis scorers (PRD module E)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/** Cuisine axis — a clean set-membership match. The venue's cuisine is
+/** Cuisine axis â€” a clean set-membership match. The venue's cuisine is
  *  either one the member craved (a match) or it is not (a soft
  *  non-match). An unclassified (`null`) venue cuisine can never match. */
 export function scoreCuisineAxis(
@@ -138,11 +139,11 @@ export function scoreCuisineAxis(
   return SOFT_NON_MATCH_SCORE;
 }
 
-/** Reputation axis — a categorical match. The member states one
+/** Reputation axis â€” a categorical match. The member states one
  *  reputation bucket (Popular / Hidden gem / Classic / New); a venue in
  *  that bucket matches, any other bucket is a soft non-match.
  *
- *  `statedReputation` is never `no_preference` here — a no-preference
+ *  `statedReputation` is never `no_preference` here â€” a no-preference
  *  reputation zeroes the whole axis upstream, so the scorer is never
  *  consulted for it. */
 export function scoreReputationAxis(
@@ -154,9 +155,9 @@ export function scoreReputationAxis(
     : SOFT_NON_MATCH_SCORE;
 }
 
-/** Vibe axis — the one *graded* axis. Vibe is a cardinal 0…4 energy
- *  scale (Quiet…Rowdy); the score is graded by distance: 5 at an exact
- *  match, descending linearly toward the bottom of the 1…5 scale at the
+/** Vibe axis â€” the one *graded* axis. Vibe is a cardinal 0â€¦4 energy
+ *  scale (Quietâ€¦Rowdy); the score is graded by distance: 5 at an exact
+ *  match, descending linearly toward the bottom of the 1â€¦5 scale at the
  *  maximum distance (4 steps apart). */
 export function scoreVibeAxis(venueVibe: number, statedVibe: number): number {
   const maxDistance = VIBE_SCALE_STOPS - 1; // 4
@@ -166,9 +167,9 @@ export function scoreVibeAxis(venueVibe: number, statedVibe: number): number {
   return MATCH_SCORE - fraction * (MATCH_SCORE - 1.0);
 }
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Weight resolution
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** The resolved per-axis weights, post-init, post-reweight,
  *  post-override. A zeroed axis drops out of the weighted average. */
@@ -186,7 +187,7 @@ function dropCardScore(axis: Axis, q5Ratings: Q5Rating[]): number | null {
 }
 
 /** The ratings of the cards that keep `axis` (the factorial cards whose
- *  `droppedAxis` is some *other* axis — each of them keeps this axis). */
+ *  `droppedAxis` is some *other* axis â€” each of them keeps this axis). */
 function keepCardScores(axis: Axis, q5Ratings: Q5Rating[]): number[] {
   return q5Ratings
     .filter((r) => r.droppedAxis !== axis)
@@ -195,7 +196,7 @@ function keepCardScores(axis: Axis, q5Ratings: Q5Rating[]): number[] {
 
 /** An axis's marginal value: the average of its two keep-card ratings
  *  minus its drop-card rating. A large positive value means dropping
- *  that axis hurt the member's excitement — the axis matters. */
+ *  that axis hurt the member's excitement â€” the axis matters. */
 function marginalValue(axis: Axis, q5Ratings: Q5Rating[]): number {
   const drop = dropCardScore(axis, q5Ratings);
   if (drop === null) return 0;
@@ -209,7 +210,7 @@ function marginalValue(axis: Axis, q5Ratings: Q5Rating[]): number {
  *  when BOTH the axis's keep-cards score strictly below its drop-card
  *  AND the drop-card is rated 4 or 5.
  *
- *  "Both keep-cards below" — not the averaged margin — rules out a
+ *  "Both keep-cards below" â€” not the averaged margin â€” rules out a
  *  confound from the keep-cards' differing other-axis deviations; a
  *  single odd rating cannot fire it. */
 function overrideFires(axis: Axis, q5Ratings: Q5Rating[]): boolean {
@@ -223,7 +224,7 @@ function overrideFires(axis: Axis, q5Ratings: Q5Rating[]): boolean {
 }
 
 /** The Q5-revealed weights for the surviving axes, normalized to sum to
- *  1. If every marginal value is 0 (all cards rated equal — the
+ *  1. If every marginal value is 0 (all cards rated equal â€” the
  *  degenerate case), the revealed distribution falls back to the equal
  *  prior so the blend leaves the weights untouched. */
 function revealedWeights(
@@ -263,10 +264,10 @@ function resolveWeights(
   if (member.cuisines.length > 0) active.add("cuisine");
   if (member.reputation !== REPUTATION_NO_PREFERENCE) active.add("reputation");
   // Vibe is always a stated answer (the Q4 scale has no "no preference"
-  // stop) — it is always active at init.
+  // stop) â€” it is always active at init.
   active.add("vibe");
 
-  // Hard-contradiction override — demote any axis whose strict
+  // Hard-contradiction override â€” demote any axis whose strict
   // two-condition trigger fires. A demoted axis joins the no-preference
   // set: weight zeroed.
   for (const axis of ALL_AXES) {
@@ -283,7 +284,7 @@ function resolveWeights(
   const prior = new Map<Axis, number>();
   for (const axis of active) prior.set(axis, priorEach);
 
-  // Soft re-weight — blend the prior toward the Q5-revealed weights.
+  // Soft re-weight â€” blend the prior toward the Q5-revealed weights.
   const revealed = revealedWeights(active, q5Ratings);
 
   const final = new Map<Axis, number>();
@@ -300,19 +301,19 @@ function resolveWeights(
   };
 }
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Preference function (PRD module A)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/** Build a member's preference function from their stated Q1–Q4 profile
+/** Build a member's preference function from their stated Q1â€“Q4 profile
  *  and their three Q5 factorial ratings.
  *
- *  @param member   the member's stated Q1–Q4 profile.
+ *  @param member   the member's stated Q1â€“Q4 profile.
  *  @param q5Ratings the three Q5 card ratings, one per axis. Order is
- *                   irrelevant — each rating carries its own
+ *                   irrelevant â€” each rating carries its own
  *                   `droppedAxis`.
  *  @returns a pure `prefFn(venue) -> number` scoring any axis-profiled
- *           venue 1…5. */
+ *           venue 1â€¦5. */
 export function buildPreferenceFunction(
   member: Q5MemberProfile,
   q5Ratings: Q5Rating[],
@@ -323,7 +324,7 @@ export function buildPreferenceFunction(
   const statedVibe = member.vibe;
 
   return (venue: Q5VenueProfile): number => {
-    // Per-axis 1…5 match scores.
+    // Per-axis 1â€¦5 match scores.
     const contributions: { weight: number; score: number }[] = [];
 
     if (weights.cuisine > 0) {
@@ -346,7 +347,7 @@ export function buildPreferenceFunction(
     }
 
     // Every axis zeroed (the member no-prefed all three, or every axis
-    // was demoted) — no preference signal at all, so every venue is
+    // was demoted) â€” no preference signal at all, so every venue is
     // equally acceptable. Score at the match ceiling.
     const totalWeight = contributions.reduce((a, c) => a + c.weight, 0);
     if (totalWeight <= 0) return MATCH_SCORE;

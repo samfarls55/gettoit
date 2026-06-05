@@ -2,7 +2,7 @@
   "name": "gettoit-web",
   "version": "0.1.0",
   "private": true,
-  "description": "GetToIt web fallback — Next.js App Router. Renders the same Sunset Pop tokens as the iOS app.",
+  "description": "GetToIt web fallback — Next.js App Router. Renders the same Sunset Pop tokens as the mobile app.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

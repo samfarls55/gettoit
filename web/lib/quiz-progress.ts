@@ -10,7 +10,7 @@
 //
 // The column shape (per the migration comment) is
 //   { "last_index": 0..5, "answers": { ... } }.
-// The iOS Joined-card resume packs the `answers` slots in the
+// The mobile Joined-card resume packs the `answers` slots in the
 // `{ meta, answer }` votes envelope; the column is `jsonb` precisely so
 // each platform can carry the shape it needs without a migration. The
 // web shell only resumes its OWN writes, so this module uses a flat

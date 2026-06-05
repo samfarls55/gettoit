@@ -1,11 +1,12 @@
-// ops-01 — one-off prod remediation: re-fire the rooms wedged in
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// ops-01 â€” one-off prod remediation: re-fire the rooms wedged in
 // `status='firing'` so they resolve to a terminal verdict.
 //
 // Background
 // ----------
 // Before bug-13 shipped, `compute-verdict` returned `no_candidates`
 // (HTTP 404) on an empty candidate pool and never wrote a `verdicts`
-// row, so the room stayed `status='firing'` forever — a wedge. bug-13
+// row, so the room stayed `status='firing'` forever â€” a wedge. bug-13
 // (commit f6eb35c) made an empty pool a terminal `no_survivor` verdict
 // (HTTP 200) that advances the room out of `firing`.
 //
@@ -18,7 +19,7 @@
 // A room is re-fired iff it is `status='firing'` AND has no `verdicts`
 // row. A room with no `votes` rows is reported separately and NOT
 // counted as resolved: `compute-verdict` hard-404s a vote-less room
-// (`no_votes`) — there is no group to render a verdict for, so that is
+// (`no_votes`) â€” there is no group to render a verdict for, so that is
 // an abandoned room, not the bug-13 empty-pool wedge. Re-firing it is
 // harmless (it just 404s again and writes nothing) but it can never
 // leave `firing` via this path.
@@ -30,7 +31,7 @@
 // skips any firing room that already has a verdict before re-firing,
 // so no room with a valid pre-existing verdict is ever re-fired. All
 // wedged rooms are the founder's own dogfood test data in
-// `gettoit-prod` (TestFlight, pre-public-launch — no real users).
+// `gettoit-prod` (TestFlight, pre-public-launch â€” no real users).
 //
 // Usage
 // -----
@@ -87,7 +88,7 @@ async function refire(roomId) {
   const res = await fetch(`${PROJECT_URL}/functions/v1/compute-verdict`, {
     method: "POST",
     headers: restHeaders,
-    // `deadline` — the wedged rooms were auto-fired by the deadline
+    // `deadline` â€” the wedged rooms were auto-fired by the deadline
     // path; stamp the durable verdict row to reflect that.
     body: JSON.stringify({ room_id: roomId, method: "deadline" }),
   });
@@ -101,14 +102,14 @@ async function refire(roomId) {
 }
 
 async function main() {
-  console.log(`ops-01 refire — ${DRY_RUN ? "DRY RUN" : "LIVE"} — ${new Date().toISOString()}`);
+  console.log(`ops-01 refire â€” ${DRY_RUN ? "DRY RUN" : "LIVE"} â€” ${new Date().toISOString()}`);
 
   // 1. Enumerate every firing room.
   const firingRooms = await restGetAll("rooms?status=eq.firing&select=id");
   const firingIds = new Set(firingRooms.map((r) => r.id));
   console.log(`firing rooms: ${firingIds.size}`);
 
-  // 2. Enumerate every room that already has a verdict — these are
+  // 2. Enumerate every room that already has a verdict â€” these are
   //    skipped, never re-fired (acceptance criterion 5).
   const verdicts = await restGetAll("verdicts?select=room_id");
   const roomsWithVerdict = new Set(verdicts.map((v) => v.room_id));
@@ -125,7 +126,7 @@ async function main() {
   for (const id of firingIds) {
     if (roomsWithVerdict.has(id)) {
       alreadyResolved++;
-      continue; // pre-existing verdict — never touch.
+      continue; // pre-existing verdict â€” never touch.
     }
     if (roomsWithVotes.has(id)) wedgedWithVotes.push(id);
     else wedgedNoVotes.push(id);
@@ -136,7 +137,7 @@ async function main() {
   console.log(`  - wedged, NO votes (abandoned, cannot resolve via re-fire): ${wedgedNoVotes.length}`);
 
   if (DRY_RUN) {
-    console.log("dry run — no re-fire performed.");
+    console.log("dry run â€” no re-fire performed.");
     return;
   }
 
@@ -159,7 +160,7 @@ async function main() {
     }
   }
 
-  // 6. Re-fire vote-less rooms too — harmless, and confirms the
+  // 6. Re-fire vote-less rooms too â€” harmless, and confirms the
   //    `no_votes` classification rather than assuming it.
   let noVotesConfirmed = 0;
   for (const roomId of wedgedNoVotes) {
@@ -196,10 +197,10 @@ async function main() {
     if (failures.length > 25) console.log(`  ... and ${failures.length - 25} more`);
   }
   if (stillWedged.length > 0) {
-    console.error("FAIL — some re-fireable rooms did not resolve.");
+    console.error("FAIL â€” some re-fireable rooms did not resolve.");
     process.exit(1);
   }
-  console.log("OK — every re-fireable wedged room resolved.");
+  console.log("OK â€” every re-fireable wedged room resolved.");
 }
 
 main().catch((e) => {

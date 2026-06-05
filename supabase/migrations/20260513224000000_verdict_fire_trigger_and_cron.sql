@@ -1,19 +1,20 @@
--- TB-07 — verdict fire trigger + pg_cron auto-fire path.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-07 â€” verdict fire trigger + pg_cron auto-fire path.
 --
 -- Two server-side paths drive the VerdictEngine originally:
 --
---   1. `AFTER INSERT ON votes` trigger — fires the engine the moment
+--   1. `AFTER INSERT ON votes` trigger â€” fires the engine the moment
 --      the last expected member submits. The trigger predicate is:
 --      `(rooms.status = 'firing' OR now() >= rooms.deadline_at) AND
 --      count(votes WHERE room_id = NEW.room_id) >= 2`.
 --      Note: the initiator's `fire_verdict(room_id)` RPC sets
 --      `status = 'firing'` BEFORE the vote-count threshold gates,
 --      so a manual fire on a room that already has 2+ votes triggers
---      the engine on the NEXT vote insert by another member… which
+--      the engine on the NEXT vote insert by another memberâ€¦ which
 --      is exactly the wrong shape for the Decide-now path. To handle
 --      "decide now after I already voted," the trigger ALSO fires
 --      when it observes the room is already in `firing` state with
---      ≥2 votes — and the manual-fire RPC + this trigger combine to
+--      â‰¥2 votes â€” and the manual-fire RPC + this trigger combine to
 --      cover both ordering directions.
 --
 --      To handle the case "initiator presses Decide now AFTER they
@@ -21,18 +22,18 @@
 --      ALSO invokes the dispatcher inline after flipping status.
 --      That's a one-line addition to the RPC below.
 --
---   2. `pg_cron` job — runs every minute, scans rooms whose deadline
+--   2. `pg_cron` job â€” runs every minute, scans rooms whose deadline
 --      has elapsed, flips status, and invokes the engine. Two
 --      sub-paths within the job:
 --        (a) `status='open' AND deadline_at<=now() AND vote_count>=2`
---            → flip to `firing` + dispatch.
+--            â†’ flip to `firing` + dispatch.
 --        (b) `status='open' AND deadline_at<=now() AND vote_count<2`
---            → flip to `expired` (the S04 no-quorum terminal lands
+--            â†’ flip to `expired` (the S04 no-quorum terminal lands
 --            via this path).
 --
 -- Dispatcher: invokes the `compute-verdict` Edge Function via
 -- `net.http_post` (`pg_net` extension, pre-installed on Supabase).
--- Fire-and-forget — the function returns 200 with the verdict body,
+-- Fire-and-forget â€” the function returns 200 with the verdict body,
 -- which the iOS Realtime subscriber consumes via the existing
 -- `verdicts INSERT` event. The dispatcher doesn't await the HTTP
 -- response (it returns the request id immediately) so the trigger
@@ -42,27 +43,27 @@
 --   * The `compute-verdict` Edge Function rejects duplicate
 --     invocations via the `verdicts.room_id` unique constraint
 --     and the `existingVerdict` short-circuit. Two dispatches for
---     the same room are safe — the second returns `already_computed`.
+--     the same room are safe â€” the second returns `already_computed`.
 --   * The trigger fires once per votes INSERT. A votes INSERT can
 --     only happen for a room in `status='open'` or `firing` (votes
 --     are gated to room members; once `verdict_ready` is set the
---     downstream surfaces stop accepting new votes — out of scope
+--     downstream surfaces stop accepting new votes â€” out of scope
 --     for TB-07's schema, locked by iOS-side guards).
 --
 -- Configuration:
 --   * The dispatcher reads the Supabase project URL and the service
---     role key from two GUC settings — `app.supabase_url` and
---     `app.service_role_key` — set at the project / cluster level
+--     role key from two GUC settings â€” `app.supabase_url` and
+--     `app.service_role_key` â€” set at the project / cluster level
 --     out of band. If either is missing the dispatch is silently
---     skipped (the manual fire path through the iOS client still
+--     skipped (the manual fire path through the mobile client still
 --     reaches the Edge Function via the SDK invoke). This matches
 --     how the local-dev Supabase CLI runs against a stack that
---     doesn't have pg_net configured — the trigger becomes a no-op
---     and the iOS layer's invoke is the live path.
+--     doesn't have pg_net configured â€” the trigger becomes a no-op
+--     and the mobile layer's invoke is the live path.
 
 create extension if not exists pg_net;
 
--- ── 1. Dispatcher function ──────────────────────────────────────────
+-- â”€â”€ 1. Dispatcher function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 create or replace function public.dispatch_compute_verdict(p_room_id uuid)
 returns void
@@ -75,7 +76,7 @@ declare
     v_key        text := current_setting('app.service_role_key', true);
     v_endpoint   text;
 begin
-    -- Bail silently when either GUC is missing — local dev / CI
+    -- Bail silently when either GUC is missing â€” local dev / CI
     -- environments often don't set them and we don't want the trigger
     -- to fail the votes INSERT in that case. The iOS-side compute
     -- invocation still drives the engine in production paths that
@@ -104,7 +105,7 @@ revoke all on function public.dispatch_compute_verdict(uuid) from public;
 -- Only the postgres role / trigger / cron context invokes this.
 -- No grant to authenticated.
 
--- ── 2. fire_verdict RPC — inline dispatch after status flip ────────
+-- â”€â”€ 2. fire_verdict RPC â€” inline dispatch after status flip â”€â”€â”€â”€â”€â”€â”€â”€
 -- Replaces the TB-07 RPC from 20260513223500000_fire_verdict_rpc.sql.
 -- Adds the dispatcher invocation after the successful status flip so
 -- the iOS "Decide now" tap fires the engine without depending on a
@@ -161,7 +162,7 @@ begin
         return jsonb_build_object('status', 'already_firing');
     end if;
 
-    -- Inline dispatch — fire-and-forget HTTP POST.
+    -- Inline dispatch â€” fire-and-forget HTTP POST.
     perform public.dispatch_compute_verdict(p_room_id);
 
     return jsonb_build_object('status', 'firing', 'vote_count', v_vote_cnt);
@@ -171,7 +172,7 @@ $$;
 revoke all on function public.fire_verdict(uuid) from public;
 grant execute on function public.fire_verdict(uuid) to authenticated;
 
--- ── 3. AFTER INSERT ON votes trigger ───────────────────────────────
+-- â”€â”€ 3. AFTER INSERT ON votes trigger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 create or replace function public.votes_maybe_fire_verdict()
 returns trigger
@@ -192,7 +193,7 @@ begin
         return new;
     end if;
 
-    -- Counting votes for the room — includes the row we just inserted
+    -- Counting votes for the room â€” includes the row we just inserted
     -- because the AFTER trigger fires post-INSERT, after the row is
     -- visible to same-transaction reads.
     select count(*)::int
@@ -241,7 +242,7 @@ create trigger votes_maybe_fire_verdict
     for each row
     execute function public.votes_maybe_fire_verdict();
 
--- ── 4. pg_cron — auto-fire / expire path ───────────────────────────
+-- â”€â”€ 4. pg_cron â€” auto-fire / expire path â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 create or replace function public.cron_auto_fire_or_expire()
 returns void

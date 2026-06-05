@@ -1,8 +1,11 @@
-﻿---
+---
 status: ready-for-agent
 type: AFK
 github_issue: 327
 ---
+
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
 
 # TB-02: Add explicit app-state router harness
 

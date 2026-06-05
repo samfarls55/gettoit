@@ -1,3 +1,4 @@
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // votes-schema preference-inputs extractor tests (TB-23 quiz redesign).
 //
 // TB-23 moves the verdict's live scoring onto the ported preference
@@ -6,20 +7,20 @@
 // scores the FULL candidate pool with it.
 //
 // `mapVotesRowToPreferenceInputs` is the slice of the schema-driven
-// mapping layer that produces those preference inputs — a
+// mapping layer that produces those preference inputs â€” a
 // `Q5MemberProfile` (cuisines / reputation / vibe) plus the three
 // `Q5Rating` cards. It dispatches each `votes` slot on
 // `meta.question_kind`, same as `mapVotesRowToMemberVote`:
 //
-//   * cuisine_craving — `answer.cuisines` → the member's craved set.
-//   * reputation      — `answer.reputation` → the stated bucket.
-//   * vibe            — `answer.level` → the 0..4 energy stop.
-//   * regret          — `answer.ratings` → the three Q5 card ratings,
+//   * cuisine_craving â€” `answer.cuisines` â†’ the member's craved set.
+//   * reputation      â€” `answer.reputation` â†’ the stated bucket.
+//   * vibe            â€” `answer.level` â†’ the 0..4 energy stop.
+//   * regret          â€” `answer.ratings` â†’ the three Q5 card ratings,
 //                       the preference probe. After TB-23 the regret
 //                       slot carries the probe ratings, NOT a
 //                       per-candidate score map.
 //
-// Design source: gti-vault/50_product/0.1.0-quiz-amendments §3.
+// Design source: gti-vault/50_product/0.1.0-quiz-amendments Â§3.
 
 import {
   assertAlmostEquals,
@@ -32,9 +33,9 @@ import {
 } from "./votes-schema.ts";
 import { buildPreferenceFunction } from "./preference-function.ts";
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Slot fixture helpers
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function cuisineSlot(cuisines: string[]): QuestionSlot {
   return {
@@ -91,9 +92,9 @@ function canonicalRow(overrides: Partial<VotesRow> = {}): VotesRow {
   };
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Happy path — a canonical quiz-redesign row maps to preference inputs.
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Happy path â€” a canonical quiz-redesign row maps to preference inputs.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("maps a canonical quiz-redesign row to a Q5MemberProfile + ratings", () => {
   const row = canonicalRow({
@@ -119,11 +120,11 @@ Deno.test("maps a canonical quiz-redesign row to a Q5MemberProfile + ratings", (
   ]);
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Slot dispatch is on question_kind, not column position.
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("dispatch is on question_kind — slots can be reordered", () => {
+Deno.test("dispatch is on question_kind â€” slots can be reordered", () => {
   const row: VotesRow = {
     user_id: "u",
     display_name: "n",
@@ -144,9 +145,9 @@ Deno.test("dispatch is on question_kind — slots can be reordered", () => {
   assertEquals(inputs.q5Ratings.length, 3);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// Defaults — absent / null slots fall back to no-preference.
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Defaults â€” absent / null slots fall back to no-preference.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("an absent cuisine slot defaults to an empty craved set", () => {
   const row = canonicalRow({ q1: null });
@@ -172,9 +173,9 @@ Deno.test("an absent regret slot yields no Q5 ratings", () => {
   assertEquals(inputs.q5Ratings, []);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// Malformed ratings — non-axis / non-numeric entries are dropped.
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Malformed ratings â€” non-axis / non-numeric entries are dropped.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("malformed Q5 rating entries are dropped, valid ones kept", () => {
   const row = canonicalRow({
@@ -197,8 +198,8 @@ Deno.test("malformed Q5 rating entries are dropped, valid ones kept", () => {
   ]);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// TB-26 — an empty Q5 ratings array (the iOS no-results path).
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// TB-26 â€” an empty Q5 ratings array (the iOS no-results path).
 //
 // When the per-member venue fetch produces no factorial-usable pool the
 // iOS app renders the Q5 no-results screen and submits a `votes` row
@@ -207,15 +208,15 @@ Deno.test("malformed Q5 rating entries are dropped, valid ones kept", () => {
 // produce a correct verdict for that member: the Q5 reader tolerates
 // the empty array, and the preference function degrades to the
 // equal-weight prior over the member's stated axes.
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("TB-26: an empty Q5 ratings array yields no Q5 ratings", () => {
   // The Q5 slot is present (the member reached Q5) but the no-results
-  // screen rated nothing — `ratings` is an empty array.
+  // screen rated nothing â€” `ratings` is an empty array.
   const row = canonicalRow({ q5: regretSlot([]) });
   const inputs = mapVotesRowToPreferenceInputs(row);
   assertEquals(inputs.q5Ratings, [],
-    "an empty ratings array maps to no Q5 ratings — no throw, no corruption");
+    "an empty ratings array maps to no Q5 ratings â€” no throw, no corruption");
 });
 
 Deno.test(
@@ -223,7 +224,7 @@ Deno.test(
   () => {
     // A member who saw the no-results screen: stated Q1/Q3/Q4 answers,
     // but an empty Q5 probe. The verdict must still rank venues for
-    // them — the prefFn falls back to an equal 1/3 weight across the
+    // them â€” the prefFn falls back to an equal 1/3 weight across the
     // member's stated axes (no revealed-weight signal to blend in).
     const row = canonicalRow({
       q1: cuisineSlot(["mexican"]),
@@ -235,7 +236,7 @@ Deno.test(
     assertEquals(inputs.q5Ratings, []);
 
     // The prefFn built from the empty probe must equal one built from a
-    // flat probe (all cards rated the same) — both reveal zero weight
+    // flat probe (all cards rated the same) â€” both reveal zero weight
     // signal, so both collapse to the equal-weight prior.
     const emptyProbeFn = buildPreferenceFunction(inputs.member, inputs.q5Ratings);
     const flatProbeFn = buildPreferenceFunction(inputs.member, [
@@ -244,7 +245,7 @@ Deno.test(
       { droppedAxis: "vibe", score: 3 },
     ]);
 
-    // Score a spread of venues with both functions — they must agree.
+    // Score a spread of venues with both functions â€” they must agree.
     const venues = [
       { cuisine: "mexican", reputation: "popular", vibe: 2 }, // perfect
       { cuisine: "italian", reputation: "hidden_gem", vibe: 4 }, // all miss
@@ -255,12 +256,12 @@ Deno.test(
         emptyProbeFn(v),
         flatProbeFn(v),
         0.0001,
-        "an empty Q5 probe scores identically to a flat probe — "
+        "an empty Q5 probe scores identically to a flat probe â€” "
           + "both degrade to the equal-weight prior",
       );
     }
 
-    // And the prior is genuinely active — a perfect venue still scores
+    // And the prior is genuinely active â€” a perfect venue still scores
     // the match ceiling, so the member's verdict is not degenerate.
     assertAlmostEquals(emptyProbeFn(venues[0]), 5.0, 0.0001);
   },

@@ -8,38 +8,41 @@ created: 2026-05-19
 prd: 0.1.0-quiz-redesign-prd
 ---
 
-# bug-15 — Pool-floor allows multi-category bars; primary "Bar" leaks into verdict
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# bug-15 â€” Pool-floor allows multi-category bars; primary "Bar" leaks into verdict
 
 ## Parent
 
-[[../_index|0.1.0 backlog]] — found during the 2026-05-19 solo-session post-mortem. The companion structural gap to [[../../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] / [[tb-25-candidate-pool-floor|TB-25]]: the candidate-pool floor floors *which categories Foursquare returns*, but cannot exclude a bar that *also* carries a floor-eligible category.
+[[../_index|0.1.0 backlog]] â€” found during the 2026-05-19 solo-session post-mortem. The companion structural gap to [[../../../60_engineering/adr/0012-candidate-pool-floor|ADR 0012]] / [[tb-25-candidate-pool-floor|TB-25]]: the candidate-pool floor floors *which categories Foursquare returns*, but cannot exclude a bar that *also* carries a floor-eligible category.
 
 ## What's broken
 
-A solo session on 2026-05-19 produced the verdict `Robert's Western World` (a Nashville honky-tonk) — confirmed in `gettoit-prod` at room `d11b3983-a8f6-4741-81a5-309ba038a2f6`, verdict computed at `2026-05-19T20:41:15Z`. The stored option payload is:
+A solo session on 2026-05-19 produced the verdict `Robert's Western World` (a Nashville honky-tonk) â€” confirmed in `gettoit-prod` at room `d11b3983-a8f6-4741-81a5-309ba038a2f6`, verdict computed at `2026-05-19T20:41:15Z`. The stored option payload is:
 
 ```
 categories = ["Bar", "Burger Joint", "Rock Club"]
 ```
 
-The Q5 verdict surface (`VerdictStore.swift:276`) renders `categories.first`, so the room sees the verdict displayed as a **Bar** — even though the ADR 0012 floor deliberately omits `Bar` from the eight allowed venue-type categories.
+The Q5 verdict surface (`VerdictStore.swift:276`) renders `categories.first`, so the room sees the verdict displayed as a **Bar** â€” even though the ADR 0012 floor deliberately omits `Bar` from the eight allowed venue-type categories.
 
 ## Root cause
 
-The candidate-pool floor is a **query-time OR allowlist** on Foursquare's `fsq_category_ids` parameter. It restricts which categories *can match*; it does not exclude any venue. Foursquare venues are multi-category — Robert's is tagged `Bar` *and* `Burger Joint` *and* `Rock Club`. `Burger Joint` is a child of the floor's `Restaurant` parent id, so Robert's matches the floor as a Burger Joint and enters the candidate pool legitimately. The `Bar` tag rides along on the shaped row.
+The candidate-pool floor is a **query-time OR allowlist** on Foursquare's `fsq_category_ids` parameter. It restricts which categories *can match*; it does not exclude any venue. Foursquare venues are multi-category â€” Robert's is tagged `Bar` *and* `Burger Joint` *and* `Rock Club`. `Burger Joint` is a child of the floor's `Restaurant` parent id, so Robert's matches the floor as a Burger Joint and enters the candidate pool legitimately. The `Bar` tag rides along on the shaped row.
 
 Nothing downstream re-checks venue type:
 
 - `shapeFoursquareResult` (`supabase/functions/_shared/foursquare.ts:637`) preserves all Foursquare category names in `payload.categories`, dropping nothing.
-- `VerdictEngine.prune` (`supabase/functions/_shared/verdict-engine.ts:480-530`) cuts on dietary tags, allergy tags, and cuisine-NEVERS only — no venue-type prune exists.
+- `VerdictEngine.prune` (`supabase/functions/_shared/verdict-engine.ts:480-530`) cuts on dietary tags, allergy tags, and cuisine-NEVERS only â€” no venue-type prune exists.
 
 So Robert's survives prune, wins the maximin in a 36-option pool of which 5 carry a bar-class tag, and `categories.first` renders it as "Bar."
 
 **Bucket evidence (across all 215 venues in the prod `options` table):**
 
-- **16 venues** have a primary-class nightlife tag and a meal tag riding along — the Robert's mechanism (Robert's, Tin Roof, Mother's Ruin, Acme Feed & Seed, Dierks Bentley's Whiskey Row, the Broadway honky-tonks).
-- **19 venues** are food-primary with a nightlife tag in the set — legitimate restaurants that happen to have a bar (Trattoria Il Mulino, J. Alexander's, Ted's Montana Grill, Germantown Cafe, …). These must remain eligible.
-- **14 venues** carry no food tag at all — leftover pre-floor leak in older rooms; the floor blocks them in new fetches.
+- **16 venues** have a primary-class nightlife tag and a meal tag riding along â€” the Robert's mechanism (Robert's, Tin Roof, Mother's Ruin, Acme Feed & Seed, Dierks Bentley's Whiskey Row, the Broadway honky-tonks).
+- **19 venues** are food-primary with a nightlife tag in the set â€” legitimate restaurants that happen to have a bar (Trattoria Il Mulino, J. Alexander's, Ted's Montana Grill, Germantown Cafe, â€¦). These must remain eligible.
+- **14 venues** carry no food tag at all â€” leftover pre-floor leak in older rooms; the floor blocks them in new fetches.
 
 ## Desired behavior
 
@@ -48,7 +51,7 @@ A new **shape-time primary-class gate**, applied alongside the existing query-ti
 1. **Primary-class gate.** `categories[0]` is a meal category. Sports Bar and Gastropub count as meal categories (ADR 0012 carve-out + ratified 2026-05-19).
 2. **Entertainment-venue backstop.** Even with a meal primary, drop the venue when its category set contains *both* a nightlife tag *and* an entertainment-venue tag (Music Venue / Rock Club / Night Club / Bowling Alley / Stadium). This catches venues like Pinewood Social, Ole Red, and Commodore Grille that are food-primary but functionally entertainment complexes.
 
-Enforced in `shapeFoursquareResult` — the row returns `null` (same path the existing `fsq_place_id` / `name` guards use). Q5 probe, candidate-pool union, and verdict pool all derive from the shaped output, so one enforcement point reaches all three (same architectural shape ADR 0012 used for the query-time floor).
+Enforced in `shapeFoursquareResult` â€” the row returns `null` (same path the existing `fsq_place_id` / `name` guards use). Q5 probe, candidate-pool union, and verdict pool all derive from the shaped output, so one enforcement point reaches all three (same architectural shape ADR 0012 used for the query-time floor).
 
 ## Known limitations (accepted, documented in ADR 0012 amendment)
 
@@ -58,11 +61,11 @@ Enforced in `shapeFoursquareResult` — the row returns `null` (same path the ex
 ## Agent Brief
 
 **Category:** bug
-**Summary:** The candidate-pool floor (ADR 0012) is a query-time OR allowlist on Foursquare's `fsq_category_ids` — it cannot exclude a bar that also carries a floor-eligible category. Add a shape-time primary-class gate plus an entertainment-venue backstop, enforced in `shapeFoursquareResult`. ADR 0012 amended to record the new contract and its known limitations.
+**Summary:** The candidate-pool floor (ADR 0012) is a query-time OR allowlist on Foursquare's `fsq_category_ids` â€” it cannot exclude a bar that also carries a floor-eligible category. Add a shape-time primary-class gate plus an entertainment-venue backstop, enforced in `shapeFoursquareResult`. ADR 0012 amended to record the new contract and its known limitations.
 
 **Current behavior:** `buildFoursquareQuery` seeds the 8-category floor on the general call. `shapeFoursquareResult` preserves every Foursquare category name verbatim. A multi-category venue (Robert's Western World, `["Bar","Burger Joint","Rock Club"]`) matches the floor's `Restaurant` parent and enters the pool; nothing downstream re-checks venue type; `VerdictStore.swift:276` renders `categories.first` so the verdict reads as a Bar.
 
-**Desired behavior:** `shapeFoursquareResult` returns `null` for any venue whose `categories[0]` is not a meal category, or whose category set contains both a nightlife tag and an entertainment-venue tag. Sports Bar and Gastropub are explicit meal-class carve-outs. Two new exported constants in `supabase/functions/_shared/foursquare.ts` hold the nightlife and entertainment-venue name sets — single source of truth, matched case-insensitively against Foursquare's display strings.
+**Desired behavior:** `shapeFoursquareResult` returns `null` for any venue whose `categories[0]` is not a meal category, or whose category set contains both a nightlife tag and an entertainment-venue tag. Sports Bar and Gastropub are explicit meal-class carve-outs. Two new exported constants in `supabase/functions/_shared/foursquare.ts` hold the nightlife and entertainment-venue name sets â€” single source of truth, matched case-insensitively against Foursquare's display strings.
 
 ## Acceptance criteria
 
@@ -79,10 +82,10 @@ Enforced in `shapeFoursquareResult` — the row returns `null` (same path the ex
 
 - A name-based bar-detection rescue (treat "Saloon"/"Honky Tonk" in the venue name as a nightlife signal). Foursquare names are unreliable; the rule stays category-only.
 - A cuisine-restaurant secondary rescue for false-cuts like City House. Trades 3 false-cuts for 1 false-keep (Losers Bar Downtown) and adds taxonomy fragility. Accepted as known limitation; revisit post-cohort.
-- Display-side fix to pick a non-Bar category from `categories[]` (lipstick — the bar still wins the verdict).
+- Display-side fix to pick a non-Bar category from `categories[]` (lipstick â€” the bar still wins the verdict).
 - Cleanup of pre-floor `options` rows (Bridgestone Arena, pure honky-tonks). Those came from rooms before TB-25 shipped; the fix is forward-looking.
-- The `MKPOICategoryRestaurant` raw-enum display leak (separate bug — file when convenient).
+- The `MKPOICategoryRestaurant` raw-enum display leak (separate bug â€” file when convenient).
 
 ## Comments
 
-- **2026-05-19 — done (PR forthcoming).** Shape-time primary-class gate + entertainment-venue backstop landed in `supabase/functions/_shared/foursquare.ts`. Two new exported constants (`NIGHTLIFE_CATEGORY_NAMES`, `ENTERTAINMENT_VENUE_CATEGORY_NAMES`), one pure decision helper (`shouldKeepByVenueClass`), one call site in `shapeFoursquareResult`. Eight new pure unit tests cover each rule branch (primary-bar cut, primary-music-venue cut, meal-primary + nightlife-only kept, meal-primary + nightlife + entertainment-venue cut, primary-Sports-Bar carve-out kept, primary-Gastropub carve-out kept, unknown-primary kept, case-insensitive match). A regression test replays the exact 36-option pool from prod room `d11b3983-a8f6-4741-81a5-309ba038a2f6` (queried from the live `options` table) and asserts Robert's Western World drops while both Sports-Bar-primary venues (Neighbors, Losers Bar) stay. ADR 0012 amended with a new "Shape-time primary-class gate" section that records the contract, the two carve-outs, the Foursquare-category-ordering-noise tradeoff, and the cross-time-instability caveat. Full deno suite green (325 tests).
+- **2026-05-19 â€” done (PR forthcoming).** Shape-time primary-class gate + entertainment-venue backstop landed in `supabase/functions/_shared/foursquare.ts`. Two new exported constants (`NIGHTLIFE_CATEGORY_NAMES`, `ENTERTAINMENT_VENUE_CATEGORY_NAMES`), one pure decision helper (`shouldKeepByVenueClass`), one call site in `shapeFoursquareResult`. Eight new pure unit tests cover each rule branch (primary-bar cut, primary-music-venue cut, meal-primary + nightlife-only kept, meal-primary + nightlife + entertainment-venue cut, primary-Sports-Bar carve-out kept, primary-Gastropub carve-out kept, unknown-primary kept, case-insensitive match). A regression test replays the exact 36-option pool from prod room `d11b3983-a8f6-4741-81a5-309ba038a2f6` (queried from the live `options` table) and asserts Robert's Western World drops while both Sports-Bar-primary venues (Neighbors, Losers Bar) stay. ADR 0012 amended with a new "Shape-time primary-class gate" section that records the contract, the two carve-outs, the Foursquare-category-ordering-noise tradeoff, and the cross-time-instability caveat. Full deno suite green (325 tests).

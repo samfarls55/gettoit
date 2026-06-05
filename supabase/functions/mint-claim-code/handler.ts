@@ -1,6 +1,7 @@
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // HTTP handler for the mint-claim-code Edge Function.
 //
-// tb-WF-13 / ADR 0015 — the mint half of the web-invitee account-claim
+// tb-WF-13 / ADR 0015 â€” the mint half of the web-invitee account-claim
 // bridge. A Web invitee on the web Waiting screen or the read-only
 // verdict card taps the low-key "Getting the app?" affordance; the web
 // client calls this function, which generates a single-use claim code,
@@ -8,17 +9,17 @@
 // (encrypted, ~30-min TTL), and returns the code for the user to type
 // into the iOS S00a "Voted on the web?" field.
 //
-// ── Why the request carries the refresh token in the body ────────────
+// â”€â”€ Why the request carries the refresh token in the body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // `linkApple` can only resume the *exact* web anonymous identity if the
 // app installs that session's refresh token into its keychain. There is
 // no Supabase server primitive to mint a session for an arbitrary
 // anonymous user, so the code must carry the session key itself
-// (ADR 0015 §Consequences). The web client already holds its own
+// (ADR 0015 Â§Consequences). The web client already holds its own
 // refresh token in `localStorage`; it sends it in the POST body. The
 // transport is HTTPS to a first-party endpoint, the token is the
 // caller's own, and it is encrypted before it ever lands in a row.
 //
-// ── Security invariant — the caller can only mint for themselves ─────
+// â”€â”€ Security invariant â€” the caller can only mint for themselves â”€â”€â”€â”€â”€
 // The handler validates the caller's access-token JWT (Authorization:
 // Bearer) and resolves it to a `user_id`. The body-supplied refresh
 // token is accepted only as the thing to encrypt; the recorded
@@ -26,10 +27,10 @@
 // from the body. An unauthed caller (no / bad / expired JWT) is
 // rejected with 401 before any row is written.
 //
-// ── Re-mintable ─────────────────────────────────────────────────────
+// â”€â”€ Re-mintable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Every call mints a fresh code. The web "Getting the app?" affordance
 // lazily mints on each tap; an earlier code simply expires unused. No
-// attempt is made to dedupe — a fresh code per tap is the spec.
+// attempt is made to dedupe â€” a fresh code per tap is the spec.
 
 import {
   encryptToken,
@@ -45,18 +46,18 @@ export const CLAIM_CODE_TTL_MS = 30 * 60 * 1000;
 const MAX_MINT_ATTEMPTS = 5;
 
 export interface MintClaimCodeEnv {
-  /** Supabase project URL — present on every Edge invocation. */
+  /** Supabase project URL â€” present on every Edge invocation. */
   SUPABASE_URL?: string;
-  /** Supabase service-role key — required to write `claim_codes`
+  /** Supabase service-role key â€” required to write `claim_codes`
    *  (the table is RLS-locked; only the service role reaches it). */
   SUPABASE_SERVICE_ROLE_KEY?: string;
   /** Base64-encoded 32-byte AES-GCM key the refresh token is encrypted
-   *  under before it is stored. A runtime secret — never in the
+   *  under before it is stored. A runtime secret â€” never in the
    *  database, never committed. */
   CLAIM_CODE_ENC_KEY?: string;
 }
 
-/** A row insert result — `ok` true means the code was stored, `false`
+/** A row insert result â€” `ok` true means the code was stored, `false`
  *  means a primary-key collision (the caller retries with a new code).
  *  Any other failure is thrown. */
 export type InsertResult = { ok: true } | { ok: false; collision: true };
@@ -87,7 +88,7 @@ export interface MintClaimCodeDeps {
   /** Generate a candidate claim code. Defaults to the shared
    *  `generateClaimCode`; injectable so a test can force a collision. */
   makeCode?: () => string;
-  /** Clock — injectable so tests can pin `expires_at`. */
+  /** Clock â€” injectable so tests can pin `expires_at`. */
   now?: () => number;
 }
 
@@ -124,7 +125,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Auth gate — the caller must present a live web-session JWT ─────
+  // â”€â”€ Auth gate â€” the caller must present a live web-session JWT â”€â”€â”€â”€â”€
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
     return jsonResponse({ error: "unauthorized" }, {
@@ -140,7 +141,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Config gate ───────────────────────────────────────────────────
+  // â”€â”€ Config gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const supabaseUrl = deps.env.SUPABASE_URL ?? "";
   const serviceRoleKey = deps.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const encKey = deps.env.CLAIM_CODE_ENC_KEY ?? "";
@@ -152,7 +153,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Resolve the caller from the validated JWT ─────────────────────
+  // â”€â”€ Resolve the caller from the validated JWT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let userId: string | null;
   try {
     userId = await deps.resolveCaller(deps.env, jwt);
@@ -170,8 +171,8 @@ export async function handleRequest(
     });
   }
 
-  // ── Read the refresh token from the body ──────────────────────────
-  // The code must carry the web session's refresh token (ADR 0015) —
+  // â”€â”€ Read the refresh token from the body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // The code must carry the web session's refresh token (ADR 0015) â€”
   // the web client supplies its own token here. A missing token is a
   // malformed request, not an auth failure.
   let refreshToken: string;
@@ -192,7 +193,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Encrypt the refresh token ─────────────────────────────────────
+  // â”€â”€ Encrypt the refresh token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let encryptedToken: string;
   try {
     encryptedToken = await encryptToken(refreshToken, encKey);
@@ -204,7 +205,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Mint — generate + INSERT, retrying on a PK collision ──────────
+  // â”€â”€ Mint â€” generate + INSERT, retrying on a PK collision â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const makeCode = deps.makeCode ?? generateClaimCode;
   const now = deps.now ?? Date.now;
   const expiresAt = new Date(now() + CLAIM_CODE_TTL_MS).toISOString();
@@ -232,7 +233,7 @@ export async function handleRequest(
       stored = true;
       break;
     }
-    // result.ok === false → collision; loop and try a fresh code.
+    // result.ok === false â†’ collision; loop and try a fresh code.
   }
 
   if (!stored) {

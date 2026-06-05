@@ -1,6 +1,8 @@
 # Components — Sunset Pop
 
-Every component in the prototype, spec'd. For each: visual at every state, sizes, spacing, accessibility, SwiftUI primitive.
+Every component in the prototype, spec'd. For each: visual at every state, sizes, spacing, accessibility, and implementation notes.
+
+> **Legacy mobile note:** SwiftUI / `ios/` references in this file are historical notes from the retired Swift app. Active mobile implementation is React Native / Expo in `mobile/`.
 
 States covered: **default**, **pressed**, **selected**, **disabled** where applicable.
 
@@ -165,9 +167,10 @@ fixes the question to a single axis — energy / loudness, not formality.)
 
 **Vocabulary** — the canonical Q4 energy scale is the `vibe-labels` token
 in `tokens.json`: `QUIET · CHILL · SOCIAL · LIVELY · ROWDY`. The scale runs
-low-energy → high-energy; index 0 is the quietest stop. Generated into
-`GTIVibeLabels.all` (`ios/Sources/GTITokens.swift`) by `gen-swift.mjs` — never
-hardcode the labels. (0.1.0 quiz redesign — `gti-vault/50_product/0.1.0-quiz-amendments` §2.)
+low-energy → high-energy; index 0 is the quietest stop. Active mobile
+implementations should read/map this through `mobile/src/design/`; never
+hardcode the labels. Historical Swift output was `GTIVibeLabels.all`.
+(0.1.0 quiz redesign — `gti-vault/50_product/0.1.0-quiz-amendments` §2.)
 
 **Why no real drag handle:** Q4 is **cardinal-scalar**, not interpolatable; tapping a stop is the canonical interaction. A drag handle would invite users to land between stops, which the preference math can't use.
 
@@ -368,11 +371,11 @@ Historical S01 Setup distance-slider configuration, retained as the non-uniform 
 - `steps={[0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]}` — granularity tracks the walk/drive cognitive shift (0.25 below 1 mi, 0.5 between 1 and 5, 1.0 above 5).
 - `tickAt={1.0}` — anchors the implicit walk/drive boundary without resurrecting the rejected transport-mode question (workflow-overhaul Q8).
 
-The token `color.slider.tick` (`rgba(255,255,255,0.55)`) was added with this variant; the same opacity already serves the chip outline and the S01 settings link, so the value lifts an existing visual into a registered semantic role. Generated into `GTIColor.Slider.tick` (`ios/Sources/GTITokens.swift`) by `gen-swift.mjs`.
+The token `color.slider.tick` (`rgba(255,255,255,0.55)`) was added with this variant; the same opacity already serves the chip outline and the S01 settings link, so the value lifts an existing visual into a registered semantic role. Active mobile implementations should map it through `mobile/src/design/`; the old generated Swift name was `GTIColor.Slider.tick`.
 
-**SwiftUI primitive (uniform step):** `Slider(value: $radius, in: 0.5...5.0, step: 0.5)` with `.tint(GTIColor.sun)` and a custom `.frame(height: 44)`. Render the value label separately above the slider so it can use `mono-tag` or similar treatment.
+**Legacy SwiftUI primitive (uniform step):** `Slider(value: $radius, in: 0.5...5.0, step: 0.5)` with `.tint(GTIColor.sun)` and a custom `.frame(height: 44)`. Render the value label separately above the slider so it can use `mono-tag` or similar treatment. Active mobile implementation lives in React Native / Expo under `mobile/`.
 
-**SwiftUI primitive (non-uniform steps + tick):** The native `Slider` API only supports uniform steps. The iOS port lays a custom track + thumb on top of a `Slider(value: $rawValue, in: 0.25...10.0)` (no step), binds `onChange` to snap to the nearest entry of the `steps` array, and overlays a 2×10 `Rectangle().fill(GTIColor.Slider.tick)` at the `tickAt` percentage. See tb-WF-4 for the specific Swift wiring.
+**Legacy SwiftUI primitive (non-uniform steps + tick):** The native `Slider` API only supports uniform steps. The retired Swift port laid a custom track + thumb on top of a `Slider(value: $rawValue, in: 0.25...10.0)` (no step), bound `onChange` to snap to the nearest entry of the `steps` array, and overlaid a 2×10 `Rectangle().fill(GTIColor.Slider.tick)` at the `tickAt` percentage. See tb-WF-4 for historical Swift wiring.
 
 **When NOT to use:** ordinal/cardinal-scalar inputs (vibe Q4) — use C-08 Vibe Energy Scale; users should land on discrete labeled stops, not in-between values.
 
@@ -1015,7 +1018,7 @@ struct DisambigSheet: View {
 }
 ```
 
-The iOS port pins the shape contract as `enum Shape` static constants on the host sheet view (`PlanDisambigSheet.Shape.usesNativeGrabber`, `Shape.detentCount`, etc.) so tests can assert the C-27 register without walking the SwiftUI view tree. See `ios/Sources/App/PlanDisambigSheet.swift` and `ios/Sources/App/PlanDestructiveConfirmSheet.swift`.
+The retired Swift port pinned the shape contract as `enum Shape` static constants on the host sheet view (`PlanDisambigSheet.Shape.usesNativeGrabber`, `Shape.detentCount`, etc.) so tests could assert the C-27 register without walking the SwiftUI view tree. Active mobile implementation lives in React Native / Expo under `mobile/`.
 
 ### Web JSX primitive
 

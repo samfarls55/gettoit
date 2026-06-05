@@ -1,18 +1,19 @@
--- TB-08 — rooms.lock-cycle columns + hard-close lock trigger.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-08 â€” rooms.lock-cycle columns + hard-close lock trigger.
 --
--- Three additions to the `rooms` table to support the S05 → S06
+-- Three additions to the `rooms` table to support the S05 â†’ S06
 -- correctability window and visible hard-close:
 --
---   * `correctability_window_seconds int default 30` — per-room
---     window length. PRD user story 60 admits 30–90s; original default is
+--   * `correctability_window_seconds int default 30` â€” per-room
+--     window length. PRD user story 60 admits 30â€“90s; original default is
 --     30s. Settable per room when the initiator's S01 flow grows a
 --     control (post-launch candidate); for now every room uses the
 --     default.
---   * `verdict_committed_at timestamptz` — null until the FIRST
+--   * `verdict_committed_at timestamptz` â€” null until the FIRST
 --     ratification on a verdict for this room. Set by the
 --     `tg_ratifications_open_window` trigger. Once non-null the
 --     correctability countdown is live and S06 is queued.
---   * `locked_at timestamptz` — when the room actually transitioned
+--   * `locked_at timestamptz` â€” when the room actually transitioned
 --     to `status='locked'`. Set by the same trigger when all members
 --     have ratified, or by the per-minute pg_cron worker when the
 --     window expires.
@@ -50,15 +51,15 @@ alter table public.rooms
     add column if not exists locked_at timestamptz;
 
 comment on column public.rooms.correctability_window_seconds is
-    'TB-08 — seconds between the first ratification (verdict_committed_at) and the room flipping to status=locked. PRD admits 30–90; original default 30.';
+    'TB-08 â€” seconds between the first ratification (verdict_committed_at) and the room flipping to status=locked. PRD admits 30â€“90; original default 30.';
 
 comment on column public.rooms.verdict_committed_at is
-    'TB-08 — when the first ratification landed on this room''s verdict. Null until then. Sets the start of the correctability window; the room locks at verdict_committed_at + correctability_window_seconds.';
+    'TB-08 â€” when the first ratification landed on this room''s verdict. Null until then. Sets the start of the correctability window; the room locks at verdict_committed_at + correctability_window_seconds.';
 
 comment on column public.rooms.locked_at is
-    'TB-08 — when the room transitioned to status=locked. Set by the ratifications trigger (all members ratified) or by the cron worker (window expired). Used for the mono-tagged footer on S06.';
+    'TB-08 â€” when the room transitioned to status=locked. Set by the ratifications trigger (all members ratified) or by the cron worker (window expired). Used for the mono-tagged footer on S06.';
 
--- ── 1. Trigger: open window on first ratification, close on full quorum ──
+-- â”€â”€ 1. Trigger: open window on first ratification, close on full quorum â”€â”€
 
 create or replace function public.tg_ratifications_open_or_close_window()
 returns trigger
@@ -84,7 +85,7 @@ begin
         return new;
     end if;
 
-    -- ── 1a. First ratification opens the window. ────────────────
+    -- â”€â”€ 1a. First ratification opens the window. â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     -- Only flip when room is still in verdict_ready AND
     -- verdict_committed_at hasn't been set yet (a second ratification
     -- must not reset the window).
@@ -96,8 +97,8 @@ begin
           and status = 'verdict_ready';
     end if;
 
-    -- ── 1b. Full-quorum ratification closes early. ──────────────
-    -- If every member of the room has ratified, lock the room now —
+    -- â”€â”€ 1b. Full-quorum ratification closes early. â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    -- If every member of the room has ratified, lock the room now â€”
     -- there's nothing left to wait for. The cron worker handles the
     -- timeout case below.
     select count(*)::int into v_member_cnt
@@ -130,7 +131,7 @@ create trigger tg_ratifications_open_or_close_window
     for each row
     execute function public.tg_ratifications_open_or_close_window();
 
--- ── 2. Cron worker: lock rooms whose window has elapsed ─────────────
+-- â”€â”€ 2. Cron worker: lock rooms whose window has elapsed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 create or replace function public.cron_lock_expired_correctability_windows()
 returns void

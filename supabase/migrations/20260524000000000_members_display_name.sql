@@ -1,12 +1,13 @@
--- tb-WF-11 (workflow-overhaul) — members.display_name column.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- tb-WF-11 (workflow-overhaul) â€” members.display_name column.
 --
--- The web invitee shell (sg-WF-5 surface doc, surface §A "First-landing
+-- The web invitee shell (sg-WF-5 surface doc, surface Â§A "First-landing
 -- name entry") introduces the system's FIRST real display-name source.
 -- A cold invitee who clicks the shared `/join/<roomId>` link enters a
 -- name on a name-entry-alone surface; that name is written here, onto
 -- their `members` row.
 --
--- Verified during the 0.1.0-workflow-overhaul-web-invitee-flow grill (§Q4):
+-- Verified during the 0.1.0-workflow-overhaul-web-invitee-flow grill (Â§Q4):
 -- there was no `members.display_name` column across the prior 27
 -- migrations. `compute-verdict` synthesizes a placeholder name,
 -- `"m" + userId.slice(0, 4)`, for every member. This migration is the
@@ -18,13 +19,13 @@
 --   * A single nullable `text` column on `public.members`.
 --
 -- Why nullable, no default:
---   * iOS members have no name-entry surface — they keep the
---     `m<uuid>` placeholder (decision doc §Q4, "Open follow-ups").
+--   * iOS members have no name-entry surface â€” they keep the
+--     `m<uuid>` placeholder (decision doc Â§Q4, "Open follow-ups").
 --     A NULL is the explicit "no name entered" signal the verdict
 --     fallback keys on; a non-NULL empty-string default would defeat
 --     that distinction.
 --   * Additive + nullable means every existing `members` row stays
---     valid with no backfill — the column simply reads NULL until a
+--     valid with no backfill â€” the column simply reads NULL until a
 --     Web invitee writes through the name-entry surface.
 --
 -- Writes:
@@ -34,11 +35,11 @@
 --     gates on `user_id = auth.uid()` and does not constrain which
 --     columns are written). No new policy is needed.
 --   * The column is intentionally NOT writable through
---     `members_progress_upsert` — that RPC is pinned to the
+--     `members_progress_upsert` â€” that RPC is pinned to the
 --     `quiz_progress` column only. A name is set once, at insert
---     time, and is not editable afterward (decision doc §Q4).
+--     time, and is not editable afterward (decision doc Â§Q4).
 --
--- Down-migration: drop the column. Reversible — the only data lost is
+-- Down-migration: drop the column. Reversible â€” the only data lost is
 -- the Web invitee display names, which a returning invitee re-enters
 -- on the name-entry surface.
 
@@ -46,10 +47,10 @@ alter table public.members
     add column if not exists display_name text;
 
 comment on column public.members.display_name is
-    'tb-WF-11 — the display name a Web invitee enters on the '
-    'name-entry surface (sg-WF-5 surface §A). NULL for iOS members, '
+    'tb-WF-11 â€” the display name a Web invitee enters on the '
+    'name-entry surface (sg-WF-5 surface Â§A). NULL for iOS members, '
     'which have no name-entry surface; `compute-verdict.fetchVotes` '
     'falls back to the `m<uuid>` placeholder for NULL rows. Set once '
     'at member-row insert time and not editable afterward '
-    '(decision doc §Q4). 30-char cap is enforced client-side by the '
+    '(decision doc Â§Q4). 30-char cap is enforced client-side by the '
     'name-entry surface.';

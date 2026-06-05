@@ -89,4 +89,4 @@ If a new requirement adds a row to this surface, that's a spec change — flag a
 - **Data export.** Per ADR 0006, deferred to v2.
 - **Sign out / unlink Apple identity.** Per ADR 0007, the Apple link is one-way at 0.1.0.
 - **Notification preferences.** No notifications toggle; the only notification is the next-day check-in push (S08), and that's opt-in at the system level (push permission prompt). If a user denies push, no toggle is needed because no notification fires.
-- **About / version / build info.** Not user-visible at 0.1.0. Engineering can read it from TestFlight metadata.
+- **About / version / build info.** Not user-visible at 0.1.0. Engineering can read it from EAS/TestFlight metadata for the active React Native app in `mobile/`.

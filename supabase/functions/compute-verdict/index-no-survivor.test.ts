@@ -134,7 +134,7 @@ Deno.test("compute-verdict — no-survivor exits 200 with method=no_survivor", a
     "no_survivor verdict carries no winning option_id");
   assertEquals(body.cuts.length, 0,
     "no_survivor mode suppresses the cuts drawer — no cuts rows persisted");
-  // The verdict row IS persisted so the iOS surface can read it.
+  // The verdict row IS persisted so the mobile surface can read it.
   assertEquals(inserts.length, 1);
   assertEquals(inserts[0].method, "no_survivor");
   assertEquals(inserts[0].option_id, null);

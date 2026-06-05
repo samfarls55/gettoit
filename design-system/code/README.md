@@ -2,7 +2,7 @@
 
 Clean React/JSX source for every surface. **No tweak machinery** — all values are canonical defaults from the locked Sunset Pop direction.
 
-This is what to lift into your SwiftUI port. Read each `.jsx` alongside the matching `surfaces/0N-*.md` doc — the markdown carries the **why** (copy register, anti-patterns, design defenses) that doesn't survive translation, the JSX carries the **what**.
+This is what to lift into the active React Native / Expo app in `mobile/`. Read each `.jsx` alongside the matching `surfaces/0N-*.md` doc — the markdown carries the **why** (copy register, anti-patterns, design defenses), the JSX carries the **what**.
 
 ---
 
@@ -51,7 +51,7 @@ If you ever want any of these back, the prototype repo has them.
 - **React 18.3.1** + ReactDOM (already in your stack or trivial to add)
 - **Inter** font (Google Fonts) — weights 500/600/700/800/900
 - **IBM Plex Mono** — used only in the hard-close timestamp footer
-- No other JS deps. No build step required for the JSX itself if you keep Babel inline (prototype does this); your SwiftUI port won't use the JSX directly anyway.
+- No other JS deps. No build step required for the JSX itself if you keep Babel inline (prototype does this); the React Native app uses these screens as reference, not as runtime source.
 
 ## How to consume (web reference)
 
@@ -79,20 +79,20 @@ If you want to render any screen for visual reference in a standalone web contex
 </html>
 ```
 
-## How to consume (SwiftUI port)
+## How to consume (React Native port)
 
-Each `.jsx` maps to a SwiftUI `View`. The translation is mechanical for the most part:
+Each `.jsx` maps to React Native components in `mobile/`. The translation is mechanical for the most part:
 
-| JSX | SwiftUI |
+| JSX | React Native |
 |---|---|
-| `<GradientSurface stop="q1">` | `GradientSurface(stop: .q1)` (your own wrapper around `LinearGradient`) |
-| `style={{display:'flex', flexDirection:'column'}}` | `VStack` |
-| `style={{padding:'14px 22px'}}` | `.padding(.horizontal, 22).padding(.vertical, 14)` |
-| `style={{position:'absolute', inset: 0}}` | `.frame(maxWidth:.infinity, maxHeight:.infinity)` + `ZStack` |
-| `.gti-grain` | `Image("grain").resizable(resizingMode:.tile).blendMode(.overlay).opacity(0.35)` |
-| `backdrop-filter: blur(...)` | `.background(.ultraThinMaterial)` |
-| `animation: 'gti-rise 700ms ...'` | `.transition(.move(edge:.bottom).combined(with:.opacity)).animation(.timingCurve(0.16,1,0.3,1, duration:0.7), value: state)` |
-| `@property --g1` color tween | `@State var g1: Color` inside `withAnimation(.timingCurve(0.65, 0, 0.35, 1, duration: 1.1)) { g1 = … }` |
+| `<GradientSurface stop="q1">` | Mobile gradient wrapper using the same surface stop key |
+| `style={{display:'flex', flexDirection:'column'}}` | `<View style={{ flexDirection: 'column' }}>` |
+| `style={{padding:'14px 22px'}}` | `paddingVertical: 14`, `paddingHorizontal: 22` |
+| `style={{position:'absolute', inset: 0}}` | `StyleSheet.absoluteFillObject` |
+| `.gti-grain` | Tiled image overlay at token opacity |
+| `backdrop-filter: blur(...)` | Expo/native blur where available, otherwise token-matched fallback |
+| `animation: 'gti-rise 700ms ...'` | Mobile animation with the same duration/easing token |
+| `@property --g1` color tween | Animated color values keyed by surface stop |
 
 See `../motion.md` §"Verdict reveal" for the explicit ms-by-ms timing table that the `ScreenVerdict.jsx` `VERDICT_CHOREO` constant encodes.
 
@@ -100,7 +100,7 @@ See `../motion.md` §"Verdict reveal" for the explicit ms-by-ms timing table tha
 
 If you're porting screen-by-screen:
 
-1. `tokens.css` + `components.jsx` → `GTITokens.swift` + small View library (`GradientSurface`, `GTIChip`, `PillCTA`, `ReceiptChip`).
+1. `tokens.css` + `components.jsx` → `mobile/src/design/` tokens + small component library (`GradientSurface`, chip, CTA, receipt primitives).
 2. `ScreenVerdict.jsx` → this is the hero. Get it perfect first. Everything else hangs off it.
 3. `ScreenQ1Vetoes.jsx` → the simplest quiz surface. Establishes the quiz skeleton (TopBar + QuestionHeader + content + CTADock).
 4. The rest fall into place.

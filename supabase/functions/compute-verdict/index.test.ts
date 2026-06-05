@@ -1,3 +1,4 @@
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // HTTP-layer tests for the `compute-verdict` Edge Function entry point.
 // Exercises auth gating, idempotency, and the happy path through the
 // engine without touching the supabase-js client.
@@ -30,9 +31,9 @@ interface AdapterSeed {
   options?: RoomOptionRow[];
   votes?: MemberVoteRow[];
   existing?: VerdictRow | null;
-  /** TB-12 — per-account sticky profile vetoes, keyed by user_id.
+  /** TB-12 â€” per-account sticky profile vetoes, keyed by user_id.
    *  A user_id absent from this map (or an absent map entirely) means
-   *  "no profile row" — the handler treats it as no profile vetoes. */
+   *  "no profile row" â€” the handler treats it as no profile vetoes. */
   profileVetoes?: Record<string, HardVeto[]>;
 }
 
@@ -115,11 +116,11 @@ function authedPost(body: unknown): Request {
   });
 }
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Auth / method / config gating
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — OPTIONS returns 204 with CORS headers", async () => {
+Deno.test("compute-verdict â€” OPTIONS returns 204 with CORS headers", async () => {
   const { adapter } = memoryAdapter();
   const res = await handleRequest(
     new Request("https://example/compute-verdict", { method: "OPTIONS" }),
@@ -132,7 +133,7 @@ Deno.test("compute-verdict — OPTIONS returns 204 with CORS headers", async () 
   );
 });
 
-Deno.test("compute-verdict — GET returns 405", async () => {
+Deno.test("compute-verdict â€” GET returns 405", async () => {
   const { adapter } = memoryAdapter();
   const res = await handleRequest(
     new Request("https://example/compute-verdict", { method: "GET" }),
@@ -141,7 +142,7 @@ Deno.test("compute-verdict — GET returns 405", async () => {
   assertEquals(res.status, 405);
 });
 
-Deno.test("compute-verdict — missing Authorization returns 401", async () => {
+Deno.test("compute-verdict â€” missing Authorization returns 401", async () => {
   const { adapter } = memoryAdapter();
   const res = await handleRequest(
     new Request("https://example/compute-verdict", { method: "POST" }),
@@ -150,7 +151,7 @@ Deno.test("compute-verdict — missing Authorization returns 401", async () => {
   assertEquals(res.status, 401);
 });
 
-Deno.test("compute-verdict — missing service-role returns 500", async () => {
+Deno.test("compute-verdict â€” missing service-role returns 500", async () => {
   const { adapter } = memoryAdapter();
   const res = await handleRequest(
     authedPost({ room_id: VALID_ROOM_ID }),
@@ -159,7 +160,7 @@ Deno.test("compute-verdict — missing service-role returns 500", async () => {
   assertEquals(res.status, 500);
 });
 
-Deno.test("compute-verdict — invalid JSON body returns 400", async () => {
+Deno.test("compute-verdict â€” invalid JSON body returns 400", async () => {
   const { adapter } = memoryAdapter();
   const res = await handleRequest(
     new Request("https://example/compute-verdict", {
@@ -172,7 +173,7 @@ Deno.test("compute-verdict — invalid JSON body returns 400", async () => {
   assertEquals(res.status, 400);
 });
 
-Deno.test("compute-verdict — non-uuid room_id returns 400", async () => {
+Deno.test("compute-verdict â€” non-uuid room_id returns 400", async () => {
   const { adapter } = memoryAdapter();
   const res = await handleRequest(
     authedPost({ room_id: "not-a-uuid" }),
@@ -183,11 +184,11 @@ Deno.test("compute-verdict — non-uuid room_id returns 400", async () => {
   assertEquals(body.error, "invalid_input");
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Idempotency
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — existing verdict returns 200 without re-computing", async () => {
+Deno.test("compute-verdict â€” existing verdict returns 200 without re-computing", async () => {
   const existing: VerdictRow = {
     id: "v-1",
     room_id: VALID_ROOM_ID,
@@ -208,11 +209,11 @@ Deno.test("compute-verdict — existing verdict returns 200 without re-computing
   assertEquals(inserts.length, 0, "must not re-insert a verdict that exists");
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Lookup failure modes
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — missing room returns 404", async () => {
+Deno.test("compute-verdict â€” missing room returns 404", async () => {
   const { adapter } = memoryAdapter({ room: null });
   const res = await handleRequest(
     authedPost({ room_id: VALID_ROOM_ID }),
@@ -221,8 +222,8 @@ Deno.test("compute-verdict — missing room returns 404", async () => {
   assertEquals(res.status, 404);
 });
 
-Deno.test("compute-verdict — empty candidate pool resolves to a no_survivor verdict (bug-13)", async () => {
-  // bug-13 — an empty `options` pool is a terminal no-survivor
+Deno.test("compute-verdict â€” empty candidate pool resolves to a no_survivor verdict (bug-13)", async () => {
+  // bug-13 â€” an empty `options` pool is a terminal no-survivor
   // outcome, not a 404. The room must leave `firing` with a verdict
   // row written so iOS can render the no-survivor screen; the old
   // `no_candidates` 404 left the room wedged forever.
@@ -251,7 +252,7 @@ Deno.test("compute-verdict — empty candidate pool resolves to a no_survivor ve
   assertEquals(inserts[0].method, "no_survivor");
 });
 
-Deno.test("compute-verdict — no votes returns 404", async () => {
+Deno.test("compute-verdict â€” no votes returns 404", async () => {
   const { adapter } = memoryAdapter({
     options: [
       { id: "opt-1", payload: { name: "Pico's" } },
@@ -267,11 +268,11 @@ Deno.test("compute-verdict — no votes returns 404", async () => {
   assertEquals(body.error, "no_votes");
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// Happy path — engine + writes
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Happy path â€” engine + writes
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — happy path writes verdict + cuts and returns 200", async () => {
+Deno.test("compute-verdict â€” happy path writes verdict + cuts and returns 200", async () => {
   const { adapter, inserts, cuts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's Taqueria", price_tier: 2 } },
@@ -316,7 +317,7 @@ Deno.test("compute-verdict — happy path writes verdict + cuts and returns 200"
   assertEquals(cuts[0][0].option_id, "opt-ren");
 });
 
-Deno.test("compute-verdict — single-survivor path writes one verdict and the cuts", async () => {
+Deno.test("compute-verdict â€” single-survivor path writes one verdict and the cuts", async () => {
   const { adapter, inserts, cuts } = memoryAdapter({
     options: [
       { id: "opt-pico",   payload: { name: "Pico's",  price_tier: 2 } },
@@ -346,11 +347,11 @@ Deno.test("compute-verdict — single-survivor path writes one verdict and the c
   assertEquals(cuts[0].length, 1);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// TB-07 — auto-fire method passthrough
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// TB-07 â€” auto-fire method passthrough
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — quorum method passes through to the verdict row", async () => {
+Deno.test("compute-verdict â€” quorum method passes through to the verdict row", async () => {
   const { adapter, inserts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
@@ -373,7 +374,7 @@ Deno.test("compute-verdict — quorum method passes through to the verdict row",
   assertEquals(inserts[0].method, "quorum");
 });
 
-Deno.test("compute-verdict — deadline method passes through to the verdict row", async () => {
+Deno.test("compute-verdict â€” deadline method passes through to the verdict row", async () => {
   const { adapter, inserts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
@@ -395,7 +396,7 @@ Deno.test("compute-verdict — deadline method passes through to the verdict row
   assertEquals(inserts[0].method, "deadline");
 });
 
-Deno.test("compute-verdict — unknown method falls back to manual", async () => {
+Deno.test("compute-verdict â€” unknown method falls back to manual", async () => {
   const { adapter, inserts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
@@ -415,7 +416,7 @@ Deno.test("compute-verdict — unknown method falls back to manual", async () =>
   assertEquals(inserts[0].method, "manual");
 });
 
-Deno.test("compute-verdict — happy path flips rooms.status to verdict_ready and emits a broadcast", async () => {
+Deno.test("compute-verdict â€” happy path flips rooms.status to verdict_ready and emits a broadcast", async () => {
   const { adapter, marked, broadcasts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
@@ -439,14 +440,14 @@ Deno.test("compute-verdict — happy path flips rooms.status to verdict_ready an
   assertEquals(broadcasts[0].verdict_id, "verdict-1");
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// TB-12 — profile vetoes (per-account allergy / dietary / cuisine NEVERS)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// TB-12 â€” profile vetoes (per-account allergy / dietary / cuisine NEVERS)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — TB-12: a member's stored profile veto prunes the matching venue", async () => {
+Deno.test("compute-verdict â€” TB-12: a member's stored profile veto prunes the matching venue", async () => {
   // The member has a sticky cuisine-NEVER profile veto for "sushi".
   // The `votes` row carries NO hard veto (profile data is per-account,
-  // not per-session) — the handler must fetch it from the profile
+  // not per-session) â€” the handler must fetch it from the profile
   // store and fold it into the engine's hard_vetoes channel.
   const { adapter, inserts } = memoryAdapter({
     options: [
@@ -478,7 +479,7 @@ Deno.test("compute-verdict — TB-12: a member's stored profile veto prunes the 
   assertEquals(inserts[0].option_id, "opt-taco");
 });
 
-Deno.test("compute-verdict — TB-12: profile vetoes are unioned with session hard_vetoes (not replaced)", async () => {
+Deno.test("compute-verdict â€” TB-12: profile vetoes are unioned with session hard_vetoes (not replaced)", async () => {
   // The votes row already carries a session hard_veto (an allergy tag);
   // the profile store adds a separate cuisine-NEVER. Both must prune.
   const { adapter } = memoryAdapter({
@@ -515,8 +516,8 @@ Deno.test("compute-verdict — TB-12: profile vetoes are unioned with session ha
   assert(body.cuts.some((c: { option_id: string }) => c.option_id === "opt-sushi"));
 });
 
-Deno.test("compute-verdict — TB-12: a member with no profile row contributes no profile veto", async () => {
-  // Absent profile store / absent member row — the handler treats it
+Deno.test("compute-verdict â€” TB-12: a member with no profile row contributes no profile veto", async () => {
+  // Absent profile store / absent member row â€” the handler treats it
   // as "no profile vetoes" and the run proceeds normally.
   const { adapter } = memoryAdapter({
     options: [
@@ -537,9 +538,9 @@ Deno.test("compute-verdict — TB-12: a member with no profile row contributes n
   assertEquals(body.verdict.option_id, "opt-sushi");
 });
 
-Deno.test("compute-verdict — engine no-survivor exits 200 with method=no_survivor (TB-09)", async () => {
+Deno.test("compute-verdict â€” engine no-survivor exits 200 with method=no_survivor (TB-09)", async () => {
   // TB-06 surfaced no-survivor as a 422 error. TB-09 made it a
-  // first-class terminal state — the handler persists a verdict
+  // first-class terminal state â€” the handler persists a verdict
   // row with `method=no_survivor` so the iOS S05 surface can read
   // and render the terminal mode. See `index-no-survivor.test.ts`
   // for the full TB-09 contract.

@@ -83,10 +83,24 @@ export type MobileAuthRepository = {
 };
 
 type ExpoProcess = {
-  env?: Record<string, string | undefined>;
+  env: Record<string, string | undefined>;
 };
 
-declare const process: ExpoProcess | undefined;
+declare const process: ExpoProcess;
+
+const bundledSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const bundledSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+function expoPublicEnv(): Record<string, string | undefined> {
+  const runtimeEnv = process.env;
+
+  return {
+    EXPO_PUBLIC_SUPABASE_URL:
+      bundledSupabaseUrl ?? runtimeEnv["EXPO_PUBLIC_SUPABASE_URL"],
+    EXPO_PUBLIC_SUPABASE_ANON_KEY:
+      bundledSupabaseAnonKey ?? runtimeEnv["EXPO_PUBLIC_SUPABASE_ANON_KEY"],
+  };
+}
 
 export type MobileSupabaseConfig = {
   supabaseUrl: string;
@@ -94,7 +108,7 @@ export type MobileSupabaseConfig = {
 };
 
 export function getMobileSupabaseConfig(
-  env: Record<string, string | undefined> = process?.env ?? {},
+  env: Record<string, string | undefined> = expoPublicEnv(),
 ): MobileSupabaseConfig {
   const supabaseUrl = env.EXPO_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = env.EXPO_PUBLIC_SUPABASE_ANON_KEY;

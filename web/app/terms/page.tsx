@@ -4,7 +4,7 @@
 // "TOS hosted at gettoit.app/terms" and required for App Store
 // submission. Pairs with the Privacy Policy at /privacy.
 //
-// Not an iOS design-system surface (no entry in
+// Not an mobile design-system surface (no entry in
 // `design-system/surfaces/`) — web-only legal page consuming the
 // canonical tokens for typography and color so it stays on-brand
 // without forcing a long-form-text surface into the locked spec.
@@ -122,7 +122,7 @@ export default function TermsPage() {
 
         <p style={pStyle}>
           These Terms of Service (the &quot;Terms&quot;) govern your use of
-          the GetToIt iOS app and the gettoit.app website (together, the
+          the GetToIt mobile app and the gettoit.app website (together, the
           &quot;Service&quot;). By installing or using the Service, you
           agree to these Terms. If you do not agree, please do not use the
           Service. Questions:{" "}
@@ -220,7 +220,7 @@ export default function TermsPage() {
           If you grant push permission, the Service will send you
           notifications related to your decision groups (for example, when
           a verdict is ready). You can revoke this permission at any time
-          from iOS Settings.
+          from device Settings.
         </p>
 
         <h2 style={h2Style}>8. Your data and privacy</h2>
@@ -318,7 +318,7 @@ export default function TermsPage() {
 
         <h2 style={h2Style}>16. Apple-specific terms</h2>
         <p style={pStyle}>
-          The iOS version of the Service is distributed through the Apple
+          The mobile app version of the Service is distributed through the Apple
           App Store. Apple is not a party to these Terms and has no
           obligation to provide support for the Service. Apple is a
           third-party beneficiary of these Terms with the right to enforce

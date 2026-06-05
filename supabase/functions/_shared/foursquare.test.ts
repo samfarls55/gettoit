@@ -1,5 +1,6 @@
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // Unit tests for the Foursquare shaping / filter-mapping primitives.
-// These are pure-function tests — no network, no Deno permissions.
+// These are pure-function tests â€” no network, no Deno permissions.
 //
 // Run from `supabase/functions/` via `deno test --allow-net --allow-env --allow-read`.
 
@@ -30,7 +31,7 @@ import {
 } from "./foursquare.ts";
 
 // ---------------------------------------------------------------------------
-// Pinned constants — guard against accidental floating-version regressions.
+// Pinned constants â€” guard against accidental floating-version regressions.
 // ---------------------------------------------------------------------------
 
 Deno.test("API version is pinned to the ADR 0002 verified date", () => {
@@ -44,23 +45,23 @@ Deno.test("Base URL points to the post-2025 migration host", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Geo bucketing — cache-key first tier.
+// Geo bucketing â€” cache-key first tier.
 // ---------------------------------------------------------------------------
 
-Deno.test("computeGeoBucket — nearby points share a bucket", () => {
+Deno.test("computeGeoBucket â€” nearby points share a bucket", () => {
   // Both points are inside a ~555 m square; cache key must collapse them.
   const a = computeGeoBucket(40.7128, -74.0060); // NYC City Hall
   const b = computeGeoBucket(40.7130, -74.0062);
   assertEquals(a, b);
 });
 
-Deno.test("computeGeoBucket — distant points get different buckets", () => {
+Deno.test("computeGeoBucket â€” distant points get different buckets", () => {
   const nyc = computeGeoBucket(40.7128, -74.0060);
   const sf = computeGeoBucket(37.7749, -122.4194);
   assertEquals(nyc === sf, false);
 });
 
-Deno.test("computeGeoBucket — string format is stable + deterministic", () => {
+Deno.test("computeGeoBucket â€” string format is stable + deterministic", () => {
   // 4dp on each axis ensures the bucket name is identical across
   // platforms regardless of float rendering quirks.
   const key = computeGeoBucket(40.7128, -74.0060);
@@ -68,10 +69,10 @@ Deno.test("computeGeoBucket — string format is stable + deterministic", () => 
 });
 
 // ---------------------------------------------------------------------------
-// Query building — wire parameters Foursquare expects.
+// Query building â€” wire parameters Foursquare expects.
 // ---------------------------------------------------------------------------
 
-Deno.test("buildFoursquareQuery — emits ll, radius, limit, fields", () => {
+Deno.test("buildFoursquareQuery â€” emits ll, radius, limit, fields", () => {
   const plan = buildFoursquareQuery({
     lat: 40.7128,
     lng: -74.0060,
@@ -83,7 +84,7 @@ Deno.test("buildFoursquareQuery — emits ll, radius, limit, fields", () => {
   assertExists(plan.query.get("fields"));
 });
 
-Deno.test("buildFoursquareQuery — halal + kosher chips emit category ids", () => {
+Deno.test("buildFoursquareQuery â€” halal + kosher chips emit category ids", () => {
   const plan = buildFoursquareQuery({
     lat: 40.7128,
     lng: -74.0060,
@@ -92,7 +93,7 @@ Deno.test("buildFoursquareQuery — halal + kosher chips emit category ids", () 
   });
   const ids = plan.query.get("fsq_category_ids");
   assertExists(ids);
-  // Sort-stable list — order doesn't depend on chip input order.
+  // Sort-stable list â€” order doesn't depend on chip input order.
   // Live Foursquare hex taxonomy ids (probed 2026-05-17): kosher
   // 52e81612bcbc57f1066b79fc sorts before halal 52e81612bcbc57f1066b79ff.
   assertEquals(
@@ -102,7 +103,7 @@ Deno.test("buildFoursquareQuery — halal + kosher chips emit category ids", () 
   assertEquals(plan.emitted_tags.sort(), ["halal", "kosher"]);
 });
 
-Deno.test("buildFoursquareQuery — gluten chip becomes a post-fetch filter, not a wire param", () => {
+Deno.test("buildFoursquareQuery â€” gluten chip becomes a post-fetch filter, not a wire param", () => {
   const plan = buildFoursquareQuery({
     lat: 40.7128,
     lng: -74.0060,
@@ -110,13 +111,13 @@ Deno.test("buildFoursquareQuery — gluten chip becomes a post-fetch filter, not
     filters: { dietary: ["gluten"] },
   });
   // Foursquare's free-tier search endpoint has no server-side `tastes`
-  // filter — coverage research recommended post-filtering instead.
+  // filter â€” coverage research recommended post-filtering instead.
   assertEquals(plan.query.has("tastes"), false);
   assertEquals(plan.post_filters.require_taste_tokens.length > 0, true);
   assertEquals(plan.emitted_tags, ["gluten_free_options"]);
 });
 
-Deno.test("buildFoursquareQuery — shellfish chip becomes a disclaimer, not a filter", () => {
+Deno.test("buildFoursquareQuery â€” shellfish chip becomes a disclaimer, not a filter", () => {
   // Lock 1 update pending: Foursquare carries no kitchen-protocol
   // allergen data, so the chip is recorded as a disclaimer for the
   // verdict rule chip and the engine never tries to filter on it.
@@ -127,7 +128,7 @@ Deno.test("buildFoursquareQuery — shellfish chip becomes a disclaimer, not a f
     filters: { dietary: ["shellfish"] },
   });
   // tb-25 / ADR 0012: a disclaimer-only chip contributes no category id,
-  // so the candidate-pool floor is seeded — fsq_category_ids is the
+  // so the candidate-pool floor is seeded â€” fsq_category_ids is the
   // eight-category floor, never empty.
   assertEquals(
     plan.query.get("fsq_category_ids"),
@@ -137,7 +138,7 @@ Deno.test("buildFoursquareQuery — shellfish chip becomes a disclaimer, not a f
   assertEquals(plan.post_filters.disclaimers, ["no_shellfish_unverified"]);
 });
 
-Deno.test("buildFoursquareQuery — 'Nothing tonight' chip is a no-op", () => {
+Deno.test("buildFoursquareQuery â€” 'Nothing tonight' chip is a no-op", () => {
   const plan = buildFoursquareQuery({
     lat: 40.7128,
     lng: -74.0060,
@@ -154,14 +155,14 @@ Deno.test("buildFoursquareQuery — 'Nothing tonight' chip is a no-op", () => {
   assertEquals(plan.emitted_tags, []);
 });
 
-Deno.test("buildFoursquareQuery — price_tier becomes max_price (clamped 1..4)", () => {
+Deno.test("buildFoursquareQuery â€” price_tier becomes max_price (clamped 1..4)", () => {
   const tier1 = buildFoursquareQuery({
     lat: 0, lng: 0, radius_meters: 100,
     filters: { price_tier: 1 },
   });
   assertEquals(tier1.query.get("max_price"), "1");
 
-  // Out-of-range inputs clamp rather than throw — the proxy should be
+  // Out-of-range inputs clamp rather than throw â€” the proxy should be
   // tolerant of forwards-incompatible quiz copy changes.
   const tier99 = buildFoursquareQuery({
     lat: 0, lng: 0, radius_meters: 100,
@@ -170,17 +171,17 @@ Deno.test("buildFoursquareQuery — price_tier becomes max_price (clamped 1..4)"
   assertEquals(tier99.query.get("max_price"), "4");
 });
 
-Deno.test("buildFoursquareQuery — open_at DHHMM token passes through verbatim", () => {
+Deno.test("buildFoursquareQuery â€” open_at DHHMM token passes through verbatim", () => {
   const plan = buildFoursquareQuery({
     lat: 0, lng: 0, radius_meters: 100,
     filters: { open_at: "3T1900" },
   });
-  // Foursquare wants the recurring weekday + local-time token as-is —
+  // Foursquare wants the recurring weekday + local-time token as-is â€”
   // never a timestamp. `3T1900` = Wednesday 19:00.
   assertEquals(plan.query.get("open_at"), "3T1900");
 });
 
-Deno.test("buildFoursquareQuery — malformed open_at is dropped by the pattern guard", () => {
+Deno.test("buildFoursquareQuery â€” malformed open_at is dropped by the pattern guard", () => {
   for (const bad of ["not-a-date", "2026-05-13T18:00:00Z", "1778695200", "0T1900", "3T2500"]) {
     const plan = buildFoursquareQuery({
       lat: 0, lng: 0, radius_meters: 100,
@@ -191,10 +192,10 @@ Deno.test("buildFoursquareQuery — malformed open_at is dropped by the pattern 
 });
 
 // ---------------------------------------------------------------------------
-// Cache-key signature — same filters always hash to the same string.
+// Cache-key signature â€” same filters always hash to the same string.
 // ---------------------------------------------------------------------------
 
-Deno.test("buildQuerySignature — chip order doesn't change the signature", () => {
+Deno.test("buildQuerySignature â€” chip order doesn't change the signature", () => {
   const a = buildQuerySignature({
     lat: 0, lng: 0, radius_meters: 100,
     filters: { dietary: ["halal", "kosher"] },
@@ -206,7 +207,7 @@ Deno.test("buildQuerySignature — chip order doesn't change the signature", () 
   assertEquals(a, b);
 });
 
-Deno.test("buildQuerySignature — different chip sets get different signatures", () => {
+Deno.test("buildQuerySignature â€” different chip sets get different signatures", () => {
   const halal = buildQuerySignature({
     lat: 0, lng: 0, radius_meters: 100,
     filters: { dietary: ["halal"] },
@@ -218,7 +219,7 @@ Deno.test("buildQuerySignature — different chip sets get different signatures"
   assertEquals(halal === kosher, false);
 });
 
-Deno.test("buildQuerySignature — signature does not encode the geo position", () => {
+Deno.test("buildQuerySignature â€” signature does not encode the geo position", () => {
   // Cache key is (geo_bucket, signature). The signature must be a
   // pure function of the *non-geo* filter set so two distant searches
   // with the same filters share signature rows.
@@ -233,7 +234,7 @@ Deno.test("buildQuerySignature — signature does not encode the geo position", 
   assertEquals(here, there);
 });
 
-Deno.test("buildQuerySignature — gluten post-filter is encoded", () => {
+Deno.test("buildQuerySignature â€” gluten post-filter is encoded", () => {
   const withGluten = buildQuerySignature({
     lat: 0, lng: 0, radius_meters: 100,
     filters: { dietary: ["gluten"] },
@@ -244,7 +245,7 @@ Deno.test("buildQuerySignature — gluten post-filter is encoded", () => {
   assertEquals(withGluten === without, false);
 });
 
-Deno.test("buildQuerySignature — disclaimer chip is encoded", () => {
+Deno.test("buildQuerySignature â€” disclaimer chip is encoded", () => {
   // A shellfish-only chip set produces no wire query parameter, but it
   // still has to produce a distinct cache row so its disclaimers
   // propagate to the client.
@@ -262,14 +263,14 @@ Deno.test("buildQuerySignature — disclaimer chip is encoded", () => {
 // Walk-time estimate.
 // ---------------------------------------------------------------------------
 
-Deno.test("estimateWalkMinutes — converts metres to minutes at 80 m/min", () => {
+Deno.test("estimateWalkMinutes â€” converts metres to minutes at 80 m/min", () => {
   // 800 m at 80 m/min = 10 minutes.
   assertEquals(estimateWalkMinutes(800), 10);
   // 1 m rounds up to the 1-min floor.
   assertEquals(estimateWalkMinutes(1), 1);
 });
 
-Deno.test("estimateWalkMinutes — undefined distance returns null", () => {
+Deno.test("estimateWalkMinutes â€” undefined distance returns null", () => {
   assertEquals(estimateWalkMinutes(undefined), null);
 });
 
@@ -291,13 +292,13 @@ const SAMPLE_RESULT: FoursquareSearchResult = Object.freeze({
   photos: [{ prefix: "https://img.fsq.com/", suffix: "/abc.jpg" }],
   tastes: ["vegan menu", "plant-based"],
   distance: 240,
-  // TB-16 — reputation-axis metadata.
+  // TB-16 â€” reputation-axis metadata.
   rating: 8.4,
   stats: { total_ratings: 312, total_tips: 18 },
   date_created: "2019-06-01",
 });
 
-Deno.test("shapeFoursquareResult — maps the documented fields", () => {
+Deno.test("shapeFoursquareResult â€” maps the documented fields", () => {
   const shaped = shapeFoursquareResult(SAMPLE_RESULT, []);
   assertExists(shaped);
   assertEquals(shaped.fsq_place_id, "fsq-abc-123");
@@ -313,7 +314,7 @@ Deno.test("shapeFoursquareResult — maps the documented fields", () => {
   assertEquals(shaped.photos[0], "https://img.fsq.com/400x400/abc.jpg");
 });
 
-Deno.test("shapeFoursquareResult — projects the reputation-axis metadata", () => {
+Deno.test("shapeFoursquareResult â€” projects the reputation-axis metadata", () => {
   // TB-16: rating / stats.total_ratings / date_created pass through for
   // the iOS Q5VenueClassifier's reputation axis.
   const shaped = shapeFoursquareResult(SAMPLE_RESULT, []);
@@ -323,8 +324,8 @@ Deno.test("shapeFoursquareResult — projects the reputation-axis metadata", () 
   assertEquals(shaped.date_created, "2019-06-01");
 });
 
-Deno.test("shapeFoursquareResult — reputation fields shape as null when absent", () => {
-  // Coverage is uneven across venues — a venue Foursquare returns no
+Deno.test("shapeFoursquareResult â€” reputation fields shape as null when absent", () => {
+  // Coverage is uneven across venues â€” a venue Foursquare returns no
   // rating / stats / date_created for shapes those fields as null
   // rather than dropping the whole row.
   const shaped = shapeFoursquareResult(
@@ -342,7 +343,7 @@ Deno.test("shapeFoursquareResult — reputation fields shape as null when absent
   assertEquals(shaped.date_created, null);
 });
 
-Deno.test("shapeFoursquareResult — projects the tastes vibe signal", () => {
+Deno.test("shapeFoursquareResult â€” projects the tastes vibe signal", () => {
   // TB-18: the raw `tastes` tag cloud passes through onto the shaped
   // row so the iOS Q5VenueClassifier can read it for the Q4 vibe axis.
   const shaped = shapeFoursquareResult(SAMPLE_RESULT, []);
@@ -350,9 +351,9 @@ Deno.test("shapeFoursquareResult — projects the tastes vibe signal", () => {
   assertEquals(shaped.tastes, ["vegan menu", "plant-based"]);
 });
 
-Deno.test("shapeFoursquareResult — tastes shapes as [] when absent", () => {
+Deno.test("shapeFoursquareResult â€” tastes shapes as [] when absent", () => {
   // A venue Foursquare returns no `tastes` for shapes as an empty
-  // array — no minimum-coverage drop, the classifier just gets nothing
+  // array â€” no minimum-coverage drop, the classifier just gets nothing
   // to nudge on.
   const shaped = shapeFoursquareResult(
     { ...SAMPLE_RESULT, tastes: undefined },
@@ -362,7 +363,7 @@ Deno.test("shapeFoursquareResult — tastes shapes as [] when absent", () => {
   assertEquals(shaped.tastes, []);
 });
 
-Deno.test("buildFoursquareQuery — requests the reputation-axis fields", () => {
+Deno.test("buildFoursquareQuery â€” requests the reputation-axis fields", () => {
   // TB-16: the fields param must ask Foursquare for rating / stats /
   // date_created or the reputation axis has nothing to classify on.
   const plan = buildFoursquareQuery({
@@ -376,8 +377,8 @@ Deno.test("buildFoursquareQuery — requests the reputation-axis fields", () => 
   assertEquals(fields.includes("date_created"), true);
 });
 
-Deno.test("shapeFoursquareResult — skips rows missing required fields", () => {
-  // Missing name → return null rather than emit a placeholder row.
+Deno.test("shapeFoursquareResult â€” skips rows missing required fields", () => {
+  // Missing name â†’ return null rather than emit a placeholder row.
   assertEquals(
     shapeFoursquareResult({ ...SAMPLE_RESULT, name: "" }, []),
     null,
@@ -391,7 +392,7 @@ Deno.test("shapeFoursquareResult — skips rows missing required fields", () => 
   );
 });
 
-Deno.test("shapeFoursquareResult — dietary tags pull from emitted_tags + categories", () => {
+Deno.test("shapeFoursquareResult â€” dietary tags pull from emitted_tags + categories", () => {
   // The vegan/vegetarian category id on the result alone is enough to
   // emit the tag even if the caller didn't query for it.
   const shaped = shapeFoursquareResult(SAMPLE_RESULT, []);
@@ -399,7 +400,7 @@ Deno.test("shapeFoursquareResult — dietary tags pull from emitted_tags + categ
   assertEquals(shaped.dietary_tags.includes("vegan_friendly"), true);
 });
 
-Deno.test("shapeFoursquareResult — gluten taste token surfaces as tag", () => {
+Deno.test("shapeFoursquareResult â€” gluten taste token surfaces as tag", () => {
   const shaped = shapeFoursquareResult({
     ...SAMPLE_RESULT,
     categories: [],
@@ -409,7 +410,7 @@ Deno.test("shapeFoursquareResult — gluten taste token surfaces as tag", () => 
   assertEquals(shaped.dietary_tags.includes("gluten_free_options"), true);
 });
 
-Deno.test("shapeFoursquareResult — disclaimer tags pass through from emitted set", () => {
+Deno.test("shapeFoursquareResult â€” disclaimer tags pass through from emitted set", () => {
   const shaped = shapeFoursquareResult({
     ...SAMPLE_RESULT,
     tastes: [],
@@ -423,7 +424,7 @@ Deno.test("shapeFoursquareResult — disclaimer tags pass through from emitted s
 });
 
 // ---------------------------------------------------------------------------
-// bug-15 — shape-time primary-class gate + entertainment-venue backstop.
+// bug-15 â€” shape-time primary-class gate + entertainment-venue backstop.
 //
 // ADR 0012 amendment: the query-time floor is an OR allowlist on
 // `fsq_category_ids` and cannot exclude a multi-category bar that also
@@ -438,7 +439,7 @@ Deno.test("shapeFoursquareResult — disclaimer tags pass through from emitted s
 // ---------------------------------------------------------------------------
 
 Deno.test("NIGHTLIFE_CATEGORY_NAMES carves Sports Bar + Gastropub out", () => {
-  // ADR 0012 carve-out — Sports Bar is the meal-class member of the Bar
+  // ADR 0012 carve-out â€” Sports Bar is the meal-class member of the Bar
   // branch (people eat full meals there); Gastropub is the food-primary
   // member of the gastronomy branch. Ratified 2026-05-19.
   const lc = NIGHTLIFE_CATEGORY_NAMES.map((n) => n.toLowerCase());
@@ -459,9 +460,9 @@ Deno.test("ENTERTAINMENT_VENUE_CATEGORY_NAMES contains the spec's five members",
   assertEquals(lc.includes("stadium"), true);
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — primary 'Bar' cut", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” primary 'Bar' cut", () => {
   // Robert's Western World shape: categories[0]='Bar' falls into the
-  // nightlife set → row drops to null. Burger Joint riding along does
+  // nightlife set â†’ row drops to null. Burger Joint riding along does
   // not rescue it.
   const shaped = shapeFoursquareResult({
     ...SAMPLE_RESULT,
@@ -475,7 +476,7 @@ Deno.test("shapeFoursquareResult — bug-15 — primary 'Bar' cut", () => {
   assertEquals(shaped, null);
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — primary 'Music Venue' cut", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” primary 'Music Venue' cut", () => {
   // A music-venue-primary row drops on the entertainment-venue branch.
   const shaped = shapeFoursquareResult({
     ...SAMPLE_RESULT,
@@ -488,8 +489,8 @@ Deno.test("shapeFoursquareResult — bug-15 — primary 'Music Venue' cut", () =
   assertEquals(shaped, null);
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — meal primary + nightlife-only kept (Trattoria Il Mulino)", () => {
-  // A food-primary restaurant that happens to have a bar inside — the
+Deno.test("shapeFoursquareResult â€” bug-15 â€” meal primary + nightlife-only kept (Trattoria Il Mulino)", () => {
+  // A food-primary restaurant that happens to have a bar inside â€” the
   // 19-venue bucket from the bug. Stays in the pool.
   const shaped = shapeFoursquareResult({
     ...SAMPLE_RESULT,
@@ -503,8 +504,8 @@ Deno.test("shapeFoursquareResult — bug-15 — meal primary + nightlife-only ke
   assertEquals(shaped.name, "Trattoria Il Mulino");
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — meal primary + nightlife + entertainment-venue cut (Pinewood Social)", () => {
-  // Entertainment-venue backstop — even though the primary is a
+Deno.test("shapeFoursquareResult â€” bug-15 â€” meal primary + nightlife + entertainment-venue cut (Pinewood Social)", () => {
+  // Entertainment-venue backstop â€” even though the primary is a
   // restaurant category, the combination of a nightlife tag and an
   // entertainment-venue tag marks the venue as a functional
   // entertainment complex and drops it.
@@ -520,7 +521,7 @@ Deno.test("shapeFoursquareResult — bug-15 — meal primary + nightlife + enter
   assertEquals(shaped, null);
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — primary 'Sports Bar' kept (carve-out)", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” primary 'Sports Bar' kept (carve-out)", () => {
   // Sports Bar is the explicit meal-class carve-out from the Bar branch.
   const shaped = shapeFoursquareResult({
     ...SAMPLE_RESULT,
@@ -531,7 +532,7 @@ Deno.test("shapeFoursquareResult — bug-15 — primary 'Sports Bar' kept (carve
   assertEquals(shaped.name, "Neighbors");
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — primary 'Gastropub' kept (carve-out)", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” primary 'Gastropub' kept (carve-out)", () => {
   // Gastropub is the second explicit carve-out.
   const shaped = shapeFoursquareResult({
     ...SAMPLE_RESULT,
@@ -542,7 +543,7 @@ Deno.test("shapeFoursquareResult — bug-15 — primary 'Gastropub' kept (carve-
   assertEquals(shaped.name, "Husk");
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — unknown primary kept", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” unknown primary kept", () => {
   // Taxonomy-drift guard: a primary name the gate does not recognise is
   // kept. The query-time floor already constrained the upstream set so
   // we do not over-cut on unfamiliar category strings.
@@ -555,7 +556,7 @@ Deno.test("shapeFoursquareResult — bug-15 — unknown primary kept", () => {
   assertEquals(shaped.name, "Brand New Concept");
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — case-insensitive name match", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” case-insensitive name match", () => {
   // Foursquare display strings have stable casing today, but the gate
   // matches on lower-cased names so a future surface that returns
   // 'BAR' or 'bar' still drops.
@@ -567,7 +568,7 @@ Deno.test("shapeFoursquareResult — bug-15 — case-insensitive name match", ()
   assertEquals(shaped, null);
 });
 
-Deno.test("shapeFoursquareResult — bug-15 — primary 'Sports Bar' + entertainment-venue is NOT cut by primary branch", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” primary 'Sports Bar' + entertainment-venue is NOT cut by primary branch", () => {
   // Sports Bar is not in the nightlife set, so the entertainment-venue
   // backstop (which requires both a nightlife AND an entertainment-venue
   // hit) does not trigger from a Sports-Bar-only nightlife signal.
@@ -581,10 +582,10 @@ Deno.test("shapeFoursquareResult — bug-15 — primary 'Sports Bar' + entertain
   assertEquals(shaped.name, "Carve-out Sports Bar Stadium");
 });
 
-// Regression — the exact 36-option pool that produced the Robert's verdict
+// Regression â€” the exact 36-option pool that produced the Robert's verdict
 // in prod room d11b3983-a8f6-4741-81a5-309ba038a2f6 on 2026-05-19T20:41:15Z.
 // Reconstructed minimally as a fixture (fsq_place_id, name, lat, lng,
-// categories) — those are the only fields the bug-15 gate reads.
+// categories) â€” those are the only fields the bug-15 gate reads.
 const PROD_ROOM_D11B3983_POOL: ReadonlyArray<FoursquareSearchResult> = Object
   .freeze([
     { fsq_place_id: "fsq-1", name: "Chick-fil-A", latitude: 36.156, longitude: -86.795, categories: [{ name: "Fried Chicken Joint" }] },
@@ -592,13 +593,13 @@ const PROD_ROOM_D11B3983_POOL: ReadonlyArray<FoursquareSearchResult> = Object
     { fsq_place_id: "fsq-3", name: "Chick-fil-A", latitude: 36.193, longitude: -86.800, categories: [{ name: "Fast Food Restaurant" }] },
     { fsq_place_id: "fsq-4", name: "Jack Brown's Beer & Burger Joint", latitude: 36.176, longitude: -86.786, categories: [{ name: "Burger Joint" }] },
     { fsq_place_id: "fsq-5", name: "Hattie B's Hot Chicken", latitude: 36.160, longitude: -86.779, categories: [{ name: "Fried Chicken Joint" }] },
-    // The leak — categories[0] = 'Bar' (nightlife).
+    // The leak â€” categories[0] = 'Bar' (nightlife).
     { fsq_place_id: "fsq-6", name: "Robert's Western World", latitude: 36.161, longitude: -86.778, categories: [{ name: "Bar" }, { name: "Burger Joint" }, { name: "Rock Club" }] },
     { fsq_place_id: "fsq-7", name: "Morton's The Steakhouse", latitude: 36.16, longitude: -86.78, categories: [{ name: "Steakhouse" }] },
     { fsq_place_id: "fsq-8", name: "Tin Roof Broadway", latitude: 36.16, longitude: -86.78, categories: [{ name: "Diner" }] },
-    // Sports Bar carve-out — kept.
+    // Sports Bar carve-out â€” kept.
     { fsq_place_id: "fsq-9", name: "Neighbors", latitude: 36.16, longitude: -86.78, categories: [{ name: "Sports Bar" }] },
-    // Primary 'Brewery' is in the nightlife set — cut. Accepted false-cut.
+    // Primary 'Brewery' is in the nightlife set â€” cut. Accepted false-cut.
     { fsq_place_id: "fsq-10", name: "Tennessee Brew Works", latitude: 36.16, longitude: -86.78, categories: [{ name: "Brewery" }, { name: "American Restaurant" }] },
     { fsq_place_id: "fsq-11", name: "Cook Out", latitude: 36.16, longitude: -86.78, categories: [{ name: "Burger Joint" }, { name: "Fast Food Restaurant" }] },
     { fsq_place_id: "fsq-12", name: "Folk", latitude: 36.16, longitude: -86.78, categories: [{ name: "Pizzeria" }] },
@@ -606,7 +607,7 @@ const PROD_ROOM_D11B3983_POOL: ReadonlyArray<FoursquareSearchResult> = Object
     { fsq_place_id: "fsq-14", name: "Velvet Taco", latitude: 36.16, longitude: -86.78, categories: [{ name: "Taco Restaurant" }] },
     { fsq_place_id: "fsq-15", name: "Slim & Husky's Pizza Beeria", latitude: 36.16, longitude: -86.78, categories: [{ name: "Pizzeria" }, { name: "Food and Beverage Service" }] },
     { fsq_place_id: "fsq-16", name: "San Antonio Taco Co.", latitude: 36.16, longitude: -86.78, categories: [{ name: "Taco Restaurant" }, { name: "Mexican Restaurant" }, { name: "Tex-Mex Restaurant" }] },
-    // Meal-primary + nightlife (no entertainment-venue) — kept.
+    // Meal-primary + nightlife (no entertainment-venue) â€” kept.
     { fsq_place_id: "fsq-17", name: "The Slider House", latitude: 36.16, longitude: -86.78, categories: [{ name: "Burger Joint" }, { name: "Bar" }] },
     { fsq_place_id: "fsq-18", name: "Waldo's Chicken & Beer", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fried Chicken Joint" }] },
     { fsq_place_id: "fsq-19", name: "Torchy's Tacos", latitude: 36.16, longitude: -86.78, categories: [{ name: "Taco Restaurant" }] },
@@ -615,9 +616,9 @@ const PROD_ROOM_D11B3983_POOL: ReadonlyArray<FoursquareSearchResult> = Object
     { fsq_place_id: "fsq-22", name: "Chipotle Mexican Grill", latitude: 36.16, longitude: -86.78, categories: [{ name: "Mexican Restaurant" }] },
     { fsq_place_id: "fsq-23", name: "Joyland", latitude: 36.16, longitude: -86.78, categories: [{ name: "Burger Joint" }, { name: "Fried Chicken Joint" }] },
     { fsq_place_id: "fsq-24", name: "The Diner", latitude: 36.16, longitude: -86.78, categories: [{ name: "Diner" }] },
-    // Meal-primary + nightlife — kept.
+    // Meal-primary + nightlife â€” kept.
     { fsq_place_id: "fsq-25", name: "Batters Box Bar & Grill", latitude: 36.16, longitude: -86.78, categories: [{ name: "Restaurant" }, { name: "Bar" }] },
-    // Sports Bar primary — kept.
+    // Sports Bar primary â€” kept.
     { fsq_place_id: "fsq-26", name: "Losers Bar", latitude: 36.16, longitude: -86.78, categories: [{ name: "Sports Bar" }, { name: "Dive Bar" }] },
     { fsq_place_id: "fsq-27", name: "Sonic Drive-In", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fast Food Restaurant" }, { name: "Burger Joint" }] },
     { fsq_place_id: "fsq-28", name: "Wingstop", latitude: 36.16, longitude: -86.78, categories: [{ name: "Wings Joint" }] },
@@ -631,7 +632,7 @@ const PROD_ROOM_D11B3983_POOL: ReadonlyArray<FoursquareSearchResult> = Object
     { fsq_place_id: "fsq-36", name: "Burger King", latitude: 36.16, longitude: -86.78, categories: [{ name: "Fast Food Restaurant" }] },
   ]);
 
-Deno.test("shapeFoursquareResult — bug-15 — regression: prod room d11b3983 pool drops Robert's, keeps both Sports Bars", () => {
+Deno.test("shapeFoursquareResult â€” bug-15 â€” regression: prod room d11b3983 pool drops Robert's, keeps both Sports Bars", () => {
   // The exact 36-option pool that produced the Robert's Western World
   // verdict in prod room d11b3983-a8f6-4741-81a5-309ba038a2f6 on
   // 2026-05-19. Source row: supabase `options` table (queried 2026-05-19).
@@ -659,7 +660,7 @@ Deno.test("shapeFoursquareResult — bug-15 — regression: prod room d11b3983 p
 // Post-filter (taste tokens).
 // ---------------------------------------------------------------------------
 
-Deno.test("applyPostFilters — keeps results that include at least one synonym per group", () => {
+Deno.test("applyPostFilters â€” keeps results that include at least one synonym per group", () => {
   const has: FoursquareSearchResult = {
     ...SAMPLE_RESULT,
     tastes: ["gluten-free", "vegan menu"],
@@ -668,7 +669,7 @@ Deno.test("applyPostFilters — keeps results that include at least one synonym 
     ...SAMPLE_RESULT,
     tastes: ["vegan menu"],
   };
-  // One requirement group: ["gluten-free", "gluten free"] — synonyms OR'd.
+  // One requirement group: ["gluten-free", "gluten free"] â€” synonyms OR'd.
   const filtered = applyPostFilters(
     [has, missing],
     [["gluten-free", "gluten free"]],
@@ -677,12 +678,12 @@ Deno.test("applyPostFilters — keeps results that include at least one synonym 
   assertEquals(filtered[0].tastes, ["gluten-free", "vegan menu"]);
 });
 
-Deno.test("applyPostFilters — empty group list is a no-op", () => {
+Deno.test("applyPostFilters â€” empty group list is a no-op", () => {
   const filtered = applyPostFilters([SAMPLE_RESULT], []);
   assertEquals(filtered.length, 1);
 });
 
-Deno.test("applyPostFilters — multiple groups all need at least one match", () => {
+Deno.test("applyPostFilters â€” multiple groups all need at least one match", () => {
   const onlyOneGroup: FoursquareSearchResult = {
     ...SAMPLE_RESULT,
     tastes: ["gluten-free"],
@@ -703,15 +704,15 @@ Deno.test("applyPostFilters — multiple groups all need at least one match", ()
 // Dietary chip map sanity.
 // ---------------------------------------------------------------------------
 
-Deno.test("DIETARY_CHIP_MAP — every Q1 chip from the PRD is mapped", () => {
-  // PRD §"Quiz copy": Gluten · Dairy · Shellfish · Needs vegan options · Halal-only · Nothing tonight
+Deno.test("DIETARY_CHIP_MAP â€” every Q1 chip from the PRD is mapped", () => {
+  // PRD Â§"Quiz copy": Gluten Â· Dairy Â· Shellfish Â· Needs vegan options Â· Halal-only Â· Nothing tonight
   // The map normalizes to lowercased single-word chips.
   for (const chip of ["gluten", "dairy", "shellfish", "vegan", "halal"]) {
     assertExists(findDietaryMapping(chip), `${chip} chip is unmapped`);
   }
 });
 
-Deno.test("DIETARY_CHIP_MAP — disclaimers map covers allergen chips", () => {
+Deno.test("DIETARY_CHIP_MAP â€” disclaimers map covers allergen chips", () => {
   // Per research-report Option C: dairy + shellfish + nuts have no
   // Foursquare signal, so they MUST land in the disclaimer bucket.
   for (const chip of ["dairy", "shellfish", "nuts"]) {
@@ -728,7 +729,7 @@ Deno.test("THIN_RESULTS_THRESHOLD is a small positive integer", () => {
   assertEquals(THIN_RESULTS_THRESHOLD < 10, true);
 });
 
-Deno.test("extractDietaryTags — independent of caller's emitted_tags", () => {
+Deno.test("extractDietaryTags â€” independent of caller's emitted_tags", () => {
   const tagsFromCategory = extractDietaryTags(
     { ...SAMPLE_RESULT, tastes: [] },
     [],
@@ -738,7 +739,7 @@ Deno.test("extractDietaryTags — independent of caller's emitted_tags", () => {
   assertEquals(tagsFromCategory.includes("vegan_friendly"), true);
 });
 
-Deno.test("photoToUrl — composes prefix + size + suffix", () => {
+Deno.test("photoToUrl â€” composes prefix + size + suffix", () => {
   assertEquals(
     photoToUrl({ prefix: "https://img.x/", suffix: "/y.jpg" }),
     "https://img.x/400x400/y.jpg",
@@ -746,7 +747,7 @@ Deno.test("photoToUrl — composes prefix + size + suffix", () => {
 });
 
 // Ensure the chip map has no duplicate entries.
-Deno.test("DIETARY_CHIP_MAP — no duplicate chip names", () => {
+Deno.test("DIETARY_CHIP_MAP â€” no duplicate chip names", () => {
   const chips = DIETARY_CHIP_MAP.map((m) => m.chip);
   assertEquals(chips.length, new Set(chips).size);
 });
@@ -756,7 +757,7 @@ Deno.test("DIETARY_CHIP_MAP — no duplicate chip names", () => {
 // Foursquare surface; every taxonomy id must be a 24-char hex string.
 const HEX24_CATEGORY_ID = /^[0-9a-f]{24}$/;
 
-Deno.test("CUISINE_CATEGORY_MAP — every id is a live hex taxonomy id", () => {
+Deno.test("CUISINE_CATEGORY_MAP â€” every id is a live hex taxonomy id", () => {
   for (const m of CUISINE_CATEGORY_MAP) {
     assertEquals(
       HEX24_CATEGORY_ID.test(m.fsq_category_id),
@@ -766,7 +767,7 @@ Deno.test("CUISINE_CATEGORY_MAP — every id is a live hex taxonomy id", () => {
   }
 });
 
-Deno.test("DIETARY_CHIP_MAP — every category-strategy id is a live hex taxonomy id", () => {
+Deno.test("DIETARY_CHIP_MAP â€” every category-strategy id is a live hex taxonomy id", () => {
   for (const m of DIETARY_CHIP_MAP) {
     if (m.strategy !== "category" || !m.fsq_category_ids) continue;
     for (const id of m.fsq_category_ids.split(",")) {
@@ -779,7 +780,7 @@ Deno.test("DIETARY_CHIP_MAP — every category-strategy id is a live hex taxonom
   }
 });
 
-Deno.test("extractDietaryTags — reads the post-2025 fsq_category_id field", () => {
+Deno.test("extractDietaryTags â€” reads the post-2025 fsq_category_id field", () => {
   // The category-id key migrated from `id` to `fsq_category_id` on the
   // 2025 Foursquare surface; a halal-category venue must still tag.
   const tags = extractDietaryTags(
@@ -796,11 +797,11 @@ Deno.test("extractDietaryTags — reads the post-2025 fsq_category_id field", ()
 });
 
 // ---------------------------------------------------------------------------
-// Cuisine advisory tag (tb-17) — per-call category scoping.
+// Cuisine advisory tag (tb-17) â€” per-call category scoping.
 // ---------------------------------------------------------------------------
 
 /** The eight QuizCuisine ids the iOS Q1 surface emits. Kept in sync with
- *  `ios/Sources/App/QuizCoordinator.swift` enum `QuizCuisine`. */
+ *  `legacy Swift ios/Sources/App/QuizCoordinator.swift` enum `QuizCuisine`. */
 const QUIZ_CUISINE_IDS = [
   "mexican",
   "italian",
@@ -812,7 +813,7 @@ const QUIZ_CUISINE_IDS = [
   "mediterranean",
 ];
 
-Deno.test("CUISINE_CATEGORY_MAP — every QuizCuisine id maps to a category", () => {
+Deno.test("CUISINE_CATEGORY_MAP â€” every QuizCuisine id maps to a category", () => {
   for (const id of QUIZ_CUISINE_IDS) {
     const mapping = findCuisineCategory(id);
     assertExists(mapping, `${id} cuisine is unmapped`);
@@ -821,12 +822,12 @@ Deno.test("CUISINE_CATEGORY_MAP — every QuizCuisine id maps to a category", ()
   }
 });
 
-Deno.test("CUISINE_CATEGORY_MAP — no duplicate cuisine ids", () => {
+Deno.test("CUISINE_CATEGORY_MAP â€” no duplicate cuisine ids", () => {
   const ids = CUISINE_CATEGORY_MAP.map((m) => m.cuisine);
   assertEquals(ids.length, new Set(ids).size);
 });
 
-Deno.test("findCuisineCategory — is case- and whitespace-tolerant", () => {
+Deno.test("findCuisineCategory â€” is case- and whitespace-tolerant", () => {
   const a = findCuisineCategory("Mexican");
   const b = findCuisineCategory("  mexican  ");
   assertExists(a);
@@ -834,12 +835,12 @@ Deno.test("findCuisineCategory — is case- and whitespace-tolerant", () => {
   assertEquals(a.fsq_category_id, b.fsq_category_id);
 });
 
-Deno.test("findCuisineCategory — unknown cuisine returns undefined", () => {
+Deno.test("findCuisineCategory â€” unknown cuisine returns undefined", () => {
   assertEquals(findCuisineCategory("klingon"), undefined);
   assertEquals(findCuisineCategory(""), undefined);
 });
 
-Deno.test("buildFoursquareQuery — cuisine tag applies the mapped category to the wire query", () => {
+Deno.test("buildFoursquareQuery â€” cuisine tag applies the mapped category to the wire query", () => {
   const mexican = findCuisineCategory("mexican");
   assertExists(mexican);
   const plan = buildFoursquareQuery({
@@ -851,10 +852,10 @@ Deno.test("buildFoursquareQuery — cuisine tag applies the mapped category to t
   assertEquals(plan.query.get("fsq_category_ids"), mexican.fsq_category_id);
 });
 
-Deno.test("buildFoursquareQuery — general call (no cuisine tag) stays un-cuisine-scoped but carries the floor", () => {
-  // research-01 §3.2: the mandatory general call supplies non-craved
+Deno.test("buildFoursquareQuery â€” general call (no cuisine tag) stays un-cuisine-scoped but carries the floor", () => {
+  // research-01 Â§3.2: the mandatory general call supplies non-craved
   // breadth and must NOT be cuisine-filtered. tb-25 / ADR 0012: it IS
-  // venue-class floored — the floor is orthogonal to cuisine (every
+  // venue-class floored â€” the floor is orthogonal to cuisine (every
   // cuisine is a Restaurant child, so the Q5 cuisine-drop card survives).
   const plan = buildFoursquareQuery({
     lat: 40.7128,
@@ -867,7 +868,7 @@ Deno.test("buildFoursquareQuery — general call (no cuisine tag) stays un-cuisi
   );
 });
 
-Deno.test("buildFoursquareQuery — unknown cuisine degrades to the general query (no error)", () => {
+Deno.test("buildFoursquareQuery â€” unknown cuisine degrades to the general query (no error)", () => {
   // An unknown cuisine id must not throw and must not leak onto the wire.
   // tb-25 / ADR 0012: with no resolvable cuisine category, the set is
   // empty and degrades to the floored general query.
@@ -883,7 +884,7 @@ Deno.test("buildFoursquareQuery — unknown cuisine degrades to the general quer
   );
 });
 
-Deno.test("buildFoursquareQuery — cuisine + dietary categories both reach the wire", () => {
+Deno.test("buildFoursquareQuery â€” cuisine + dietary categories both reach the wire", () => {
   // A per-cuisine call can still carry the profile dietary category
   // (e.g. a halal member craving Mexican). Both ids land in the
   // sorted, comma-joined fsq_category_ids list.
@@ -902,7 +903,7 @@ Deno.test("buildFoursquareQuery — cuisine + dietary categories both reach the 
   assertEquals(idSet.has("52e81612bcbc57f1066b79ff"), true); // halal category
 });
 
-Deno.test("buildQuerySignature — cuisine tag changes the cache signature", () => {
+Deno.test("buildQuerySignature â€” cuisine tag changes the cache signature", () => {
   // Two per-cuisine calls at the same geo must not collide in the
   // cache, and a per-cuisine call must not collide with the general call.
   const general = buildQuerySignature({
@@ -920,7 +921,7 @@ Deno.test("buildQuerySignature — cuisine tag changes the cache signature", () 
   assertEquals(mexican === italian, false);
 });
 
-Deno.test("buildQuerySignature — unknown cuisine signs identically to the general call", () => {
+Deno.test("buildQuerySignature â€” unknown cuisine signs identically to the general call", () => {
   // An unknown cuisine degrades to the general query, so it must also
   // share the general call's cache row rather than minting a dead one.
   const general = buildQuerySignature({
@@ -934,7 +935,7 @@ Deno.test("buildQuerySignature — unknown cuisine signs identically to the gene
 });
 
 // ---------------------------------------------------------------------------
-// Candidate-pool floor (tb-25 / ADR 0012) — the venue-type allowlist seeded
+// Candidate-pool floor (tb-25 / ADR 0012) â€” the venue-type allowlist seeded
 // onto any Foursquare call whose category-id set is otherwise empty.
 // ---------------------------------------------------------------------------
 
@@ -943,7 +944,7 @@ Deno.test("buildQuerySignature — unknown cuisine signs identically to the gene
  *  Breakfast Spot, Bagel Shop. Kept here so the test asserts the exact
  *  membership the ADR specifies, independently of the module constant. */
 const FLOOR_IDS_EXPECTED = [
-  "4d4b7105d754a06374d81259", // Restaurant (parent — descendant-inclusive)
+  "4d4b7105d754a06374d81259", // Restaurant (parent â€” descendant-inclusive)
   "4bf58dd8d48988d11d941735", // Sports Bar
   "4bf58dd8d48988d120951735", // Food Court
   "4bf58dd8d48988d1cb941735", // Food Truck
@@ -953,8 +954,8 @@ const FLOOR_IDS_EXPECTED = [
   "4bf58dd8d48988d179941735", // Bagel Shop
 ];
 
-Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS — is a single exported eight-id constant", () => {
-  // ADR 0012: the floor lives in one named, exported constant — the
+Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS â€” is a single exported eight-id constant", () => {
+  // ADR 0012: the floor lives in one named, exported constant â€” the
   // canonical source of truth alongside CUISINE_CATEGORY_MAP.
   assertEquals(CANDIDATE_POOL_FLOOR_CATEGORY_IDS.length, 8);
   assertEquals(
@@ -963,7 +964,7 @@ Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS — is a single exported eight-id c
   );
 });
 
-Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS — every member is a live hex taxonomy id", () => {
+Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS â€” every member is a live hex taxonomy id", () => {
   for (const id of CANDIDATE_POOL_FLOOR_CATEGORY_IDS) {
     assertEquals(
       HEX24_CATEGORY_ID.test(id),
@@ -973,7 +974,7 @@ Deno.test("CANDIDATE_POOL_FLOOR_CATEGORY_IDS — every member is a live hex taxo
   }
 });
 
-Deno.test("buildFoursquareQuery — general call seeds the eight-category floor", () => {
+Deno.test("buildFoursquareQuery â€” general call seeds the eight-category floor", () => {
   // ADR 0012: a general call carries no cuisine and no dietary category,
   // so its category-id set is empty and the floor is seeded.
   const plan = buildFoursquareQuery({
@@ -989,8 +990,8 @@ Deno.test("buildFoursquareQuery — general call seeds the eight-category floor"
   );
 });
 
-Deno.test("buildFoursquareQuery — per-cuisine call carries only the cuisine id, floor NOT OR-appended", () => {
-  // ADR 0012: fsq_category_ids is OR semantics — appending the floor to
+Deno.test("buildFoursquareQuery â€” per-cuisine call carries only the cuisine id, floor NOT OR-appended", () => {
+  // ADR 0012: fsq_category_ids is OR semantics â€” appending the floor to
   // a per-cuisine call would OR-broaden it straight back to all
   // restaurants. The floor is a fallback, never an addition.
   const mexican = findCuisineCategory("mexican");
@@ -1004,7 +1005,7 @@ Deno.test("buildFoursquareQuery — per-cuisine call carries only the cuisine id
   assertEquals(plan.query.get("fsq_category_ids"), mexican.fsq_category_id);
 });
 
-Deno.test("buildFoursquareQuery — dietary category present means the floor is NOT added", () => {
+Deno.test("buildFoursquareQuery â€” dietary category present means the floor is NOT added", () => {
   // ADR 0012: a dietary category is a hard veto, correctly narrower than
   // the floor. A non-empty category set suppresses the floor.
   const plan = buildFoursquareQuery({
@@ -1013,17 +1014,17 @@ Deno.test("buildFoursquareQuery — dietary category present means the floor is 
     radius_meters: 1600,
     filters: { dietary: ["halal"] },
   });
-  // Only the halal category id — no floor members.
+  // Only the halal category id â€” no floor members.
   assertEquals(plan.query.get("fsq_category_ids"), "52e81612bcbc57f1066b79ff");
 });
 
-Deno.test("buildFoursquareQuery — fsq_category_ids is never emitted empty", () => {
+Deno.test("buildFoursquareQuery â€” fsq_category_ids is never emitted empty", () => {
   // The core invariant: every call shape emits a non-empty category id
   // list. General, disclaimer-only, no-op, and unknown-cuisine calls all
   // fall back to the floor.
   const shapes = [
     {},
-    { dietary: ["shellfish"] }, // disclaimer-only — no category id
+    { dietary: ["shellfish"] }, // disclaimer-only â€” no category id
     { dietary: ["Nothing tonight"] }, // no-op chip
     { cuisine: "klingon" }, // unknown cuisine
   ];
@@ -1037,9 +1038,9 @@ Deno.test("buildFoursquareQuery — fsq_category_ids is never emitted empty", ()
   }
 });
 
-Deno.test("buildQuerySignature — floor seeding is signature-stable across the change", () => {
+Deno.test("buildQuerySignature â€” floor seeding is signature-stable across the change", () => {
   // The floor is deterministic, so two general calls at the same geo
-  // still produce the identical signature — the floor must not introduce
+  // still produce the identical signature â€” the floor must not introduce
   // any cache-key churn.
   const a = buildQuerySignature({ lat: 0, lng: 0, radius_meters: 100 });
   const b = buildQuerySignature({ lat: 0, lng: 0, radius_meters: 100 });

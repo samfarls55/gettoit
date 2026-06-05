@@ -9,11 +9,14 @@ closed: 2026-05-26
 github_issue: 272
 ---
 
-# wfr-31 — web/app/places-fallback "open the app on iOS" copy without App Store link
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-31 â€” web/app/places-fallback "open the app on iOS" copy without App Store link
 
 ## What to build
 
-`places-fallback` page (~line 35) mentions "open the GetToIt app on iOS" but does not link to the App Store. Add the App Store URL inline. AFK agent has full autonomy to pick the cleanest CTA shape — inline link on the word "iOS" or a dedicated secondary button — and to fetch the correct App Store URL.
+`places-fallback` page (~line 35) mentions "open the GetToIt app on iOS" but does not link to the App Store. Add the App Store URL inline. AFK agent has full autonomy to pick the cleanest CTA shape â€” inline link on the word "iOS" or a dedicated secondary button â€” and to fetch the correct App Store URL.
 
 ## Acceptance criteria
 
@@ -22,7 +25,7 @@ github_issue: 272
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Hub anchors
 
@@ -35,4 +38,4 @@ None — can start immediately.
 
 ## Comments
 
-- 2026-05-26 — Closed via afk/wfr-31. Wrapped the word "iOS" in the `PlacesEmptyState` body copy as an inline `<a>` to the existing `APP_STORE_URL` constant in `web/lib/app-store.ts` (the same placeholder S04 / SessionRoom already uses; the real Apple ID swaps centrally there once allocated). Inline-link CTA shape chosen over a dedicated button so the existing "Try again" / "Start over" remains the dominant action on the terminal fallback. `target="_blank"` + `rel="noopener noreferrer"` matches the SessionRoom S04 affordance (download CTA opens in a new tab so the verdict context isn't lost). New `PlacesEmptyState.test.tsx` covers the link `href`/`target`/`rel`.
+- 2026-05-26 â€” Closed via afk/wfr-31. Wrapped the word "iOS" in the `PlacesEmptyState` body copy as an inline `<a>` to the existing `APP_STORE_URL` constant in `web/lib/app-store.ts` (the same placeholder S04 / SessionRoom already uses; the real Apple ID swaps centrally there once allocated). Inline-link CTA shape chosen over a dedicated button so the existing "Try again" / "Start over" remains the dominant action on the terminal fallback. `target="_blank"` + `rel="noopener noreferrer"` matches the SessionRoom S04 affordance (download CTA opens in a new tab so the verdict context isn't lost). New `PlacesEmptyState.test.tsx` covers the link `href`/`target`/`rel`.

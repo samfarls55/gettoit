@@ -8,34 +8,37 @@ created: 2026-05-21
 prd: 0.1.0-prd
 ---
 
-# bug-16 — Check-in "Ask me later" writes a terminal row
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# bug-16 â€” Check-in "Ask me later" writes a terminal row
 
 ## Symptom
 
-The S08 next-day check-in offers three options: `We went` / `We skipped` / `Ask me later`. "Ask me later" is meant as a snooze — `design-system/surfaces/08-checkin.md` says it "exists because users at 6:43 PM the next day might not be ready to answer truthfully. Forcing a binary at that moment corrupts the metric." The copy implies the user gets re-asked.
+The S08 next-day check-in offers three options: `We went` / `We skipped` / `Ask me later`. "Ask me later" is meant as a snooze â€” `design-system/surfaces/08-checkin.md` says it "exists because users at 6:43 PM the next day might not be ready to answer truthfully. Forcing a binary at that moment corrupts the metric." The copy implies the user gets re-asked.
 
 They never do. Worse: once a user taps "Ask me later", they can **never** report a real outcome for that verdict.
 
 ## Root cause
 
 - `CheckinScreen.handleTap` routes every outcome except `.skipped` straight to `commit(...)`. `.snoozed` is not `.skipped`, so a snooze tap immediately writes a `check_ins` row with `outcome = 'snoozed'` via `SupabaseCheckinWriter.record`.
-- `check_ins` has a primary key on `(room_id, user_id)` — exactly one row per user per room. `SupabaseCheckinWriter` swallows the `23505` unique-violation on any later write. So once the `snoozed` row exists, a subsequent `We went` / `We skipped` tap is a silent no-op.
+- `check_ins` has a primary key on `(room_id, user_id)` â€” exactly one row per user per room. `SupabaseCheckinWriter` swallows the `23505` unique-violation on any later write. So once the `snoozed` row exists, a subsequent `We went` / `We skipped` tap is a silent no-op.
 - The check-in push is dispatched exactly once per verdict (`checkin_dispatches` PK blocks re-dispatch). Nothing re-prompts a snoozer.
-- The no-signal sweeper (`cron_mark_no_signal_checkins`) writes `no_signal` only where **no** `check_ins` row exists. A snoozer already has a row, so they never roll to `no_signal` either — they are frozen as `snoozed`.
+- The no-signal sweeper (`cron_mark_no_signal_checkins`) writes `no_signal` only where **no** `check_ins` row exists. A snoozer already has a row, so they never roll to `no_signal` either â€” they are frozen as `snoozed`.
 
 Net: "Ask me later" is a one-way terminal state. The copy promises a deferral the system never honors.
 
 ## Impact
 
-- North-star metric (% of verdicts followed through on): a user who genuinely went or skipped but tapped snooze first is permanently excluded from both the numerator and the denominator. `snoozed` and `no_signal` are metric-excluded by design — but `snoozed` is supposed to be a *temporary* state, not a sink.
-- Pre-existing since TB-14 (0.1.0). Surfaced during the sg-WF-6 `/grill-with-docs` session on 2026-05-21 — the tb-WF-8 `check_ins` AFTER INSERT trigger that closes the reroll window also fires on a `snoozed` row (harmless for the reroll window, since the meal is over by check-in time, but it exposed the snooze write path).
+- North-star metric (% of verdicts followed through on): a user who genuinely went or skipped but tapped snooze first is permanently excluded from both the numerator and the denominator. `snoozed` and `no_signal` are metric-excluded by design â€” but `snoozed` is supposed to be a *temporary* state, not a sink.
+- Pre-existing since TB-14 (0.1.0). Surfaced during the sg-WF-6 `/grill-with-docs` session on 2026-05-21 â€” the tb-WF-8 `check_ins` AFTER INSERT trigger that closes the reroll window also fires on a `snoozed` row (harmless for the reroll window, since the meal is over by check-in time, but it exposed the snooze write path).
 
 ## Fix fork (needs triage)
 
 Two coherent directions:
 
-- **A — Make snooze genuinely deferrable.** "Ask me later" does not write a `check_ins` row; it re-arms a check-in dispatch (or dismisses and a re-prompt mechanism is added). The user can still report `went` / `skipped` later. Requires a re-prompt path — the current scheduler fires once per verdict.
-- **B — Accept the terminal state, fix the copy.** Keep the immediate `snoozed` write but rename the option so it stops promising a re-ask (a "Skip" / "Not this time" register). Cheapest and honest; loses the "snooze is cheaper than a wrong answer" property the S08 spec values.
+- **A â€” Make snooze genuinely deferrable.** "Ask me later" does not write a `check_ins` row; it re-arms a check-in dispatch (or dismisses and a re-prompt mechanism is added). The user can still report `went` / `skipped` later. Requires a re-prompt path â€” the current scheduler fires once per verdict.
+- **B â€” Accept the terminal state, fix the copy.** Keep the immediate `snoozed` write but rename the option so it stops promising a re-ask (a "Skip" / "Not this time" register). Cheapest and honest; loses the "snooze is cheaper than a wrong answer" property the S08 spec values.
 
 A honors the locked S08 intent; B is a one-surface copy change. Recommendation deferred to triage.
 
@@ -48,63 +51,63 @@ A honors the locked S08 intent; B is a one-surface copy change. Recommendation d
 
 ## References
 
-- `design-system/surfaces/08-checkin.md` — S08 spec ("Three options (not yes/no)").
-- `ios/Sources/App/CheckinScreen.swift` — `handleTap` / `SupabaseCheckinWriter.record`.
-- `supabase/migrations/20260514000400000_checkins_and_events.sql` — `check_ins` schema (`(room_id, user_id)` PK).
-- `supabase/migrations/20260514000430000_checkin_no_signal_sweeper.sql` — the no-signal sweeper.
-- Surfaced during the sg-WF-6 grill (2026-05-21) — flagged as an adjacency in [[sg-wf-6-reroll-window-deadline|sg-WF-6]].
+- `design-system/surfaces/08-checkin.md` â€” S08 spec ("Three options (not yes/no)").
+- `ios/Sources/App/CheckinScreen.swift` â€” `handleTap` / `SupabaseCheckinWriter.record`.
+- `supabase/migrations/20260514000400000_checkins_and_events.sql` â€” `check_ins` schema (`(room_id, user_id)` PK).
+- `supabase/migrations/20260514000430000_checkin_no_signal_sweeper.sql` â€” the no-signal sweeper.
+- Surfaced during the sg-WF-6 grill (2026-05-21) â€” flagged as an adjacency in [[sg-wf-6-reroll-window-deadline|sg-WF-6]].
 
 ## Comments
 
-### Triage 2026-05-22 — fork resolved to B; ready-for-agent (AFK)
+### Triage 2026-05-22 â€” fork resolved to B; ready-for-agent (AFK)
 
 > *This was generated by AI during triage.*
 
-Reproduced: `CheckinScreen` routes a snooze tap straight to `commit`, the `(room_id, user_id)` PK plus the swallowed `23505` makes the `snoozed` row terminal, and the no-signal sweeper skips rows that already exist — confirmed against the migrations and the screen logic.
+Reproduced: `CheckinScreen` routes a snooze tap straight to `commit`, the `(room_id, user_id)` PK plus the swallowed `23505` makes the `snoozed` row terminal, and the no-signal sweeper skips rows that already exist â€” confirmed against the migrations and the screen logic.
 
-**Fix fork resolved to B** — accept the terminal `snoozed` write, fix the copy so it stops promising a re-ask. Fork A (a real re-prompt scheduler) is explicitly not pursued. With the fork closed this becomes a one-surface copy reconciliation: type flipped HITL -> AFK.
+**Fix fork resolved to B** â€” accept the terminal `snoozed` write, fix the copy so it stops promising a re-ask. Fork A (a real re-prompt scheduler) is explicitly not pursued. With the fork closed this becomes a one-surface copy reconciliation: type flipped HITL -> AFK.
 
 #### Agent Brief
 
 **Category:** bug
-**Summary:** The S08 check-in "Ask me later" option promises a deferral the system never honors — re-label it so the copy is honest (fork B).
+**Summary:** The S08 check-in "Ask me later" option promises a deferral the system never honors â€” re-label it so the copy is honest (fork B).
 
 **Current behavior:**
-S08 offers three outcomes: went / skipped / "Ask me later". "Ask me later" immediately writes a terminal `check_ins` row with the `snoozed` outcome. The `(room_id, user_id)` primary key plus a swallowed unique-violation means the user can never report a real outcome afterward, and the no-signal sweeper skips them. The option copy — and the S08 spec rationale — frame it as a snooze the user will be re-asked about. They never are.
+S08 offers three outcomes: went / skipped / "Ask me later". "Ask me later" immediately writes a terminal `check_ins` row with the `snoozed` outcome. The `(room_id, user_id)` primary key plus a swallowed unique-violation means the user can never report a real outcome afterward, and the no-signal sweeper skips them. The option copy â€” and the S08 spec rationale â€” frame it as a snooze the user will be re-asked about. They never are.
 
 **Desired behavior:**
-Keep the immediate `snoozed` write unchanged (it stays metric-excluded by design). Re-label the third option and its supporting copy so it no longer implies a re-prompt — a "didn't decide / not this time" register rather than a "snooze". Reconcile the S08 surface spec so its rationale matches the terminal-write reality.
+Keep the immediate `snoozed` write unchanged (it stays metric-excluded by design). Re-label the third option and its supporting copy so it no longer implies a re-prompt â€” a "didn't decide / not this time" register rather than a "snooze". Reconcile the S08 surface spec so its rationale matches the terminal-write reality.
 
 **Key interfaces:**
-- The S08 surface spec (`design-system/surfaces/08-checkin.md`) — the "three options (not yes/no)" section, including the rationale paragraph that frames the third option as a deferral. Copy and rationale both updated to the chosen register.
-- The iOS check-in screen — the third option's label string. The committed outcome value (`snoozed`) and the write path do not change.
+- The S08 surface spec (`design-system/surfaces/08-checkin.md`) â€” the "three options (not yes/no)" section, including the rationale paragraph that frames the third option as a deferral. Copy and rationale both updated to the chosen register.
+- The iOS check-in screen â€” the third option's label string. The committed outcome value (`snoozed`) and the write path do not change.
 
 **Acceptance criteria:**
 - [ ] The S08 third-option copy no longer implies the user will be re-asked.
 - [ ] The S08 surface spec's rationale is reconciled with the terminal-write behavior.
-- [ ] The option still commits the `snoozed` outcome — no behavior change to the write path.
+- [ ] The option still commits the `snoozed` outcome â€” no behavior change to the write path.
 - [ ] `node design-system/scripts/verify.mjs` passes.
 
 **Out of scope:**
-- Fork A — no re-prompt scheduler, no re-arming of the check-in dispatch.
+- Fork A â€” no re-prompt scheduler, no re-arming of the check-in dispatch.
 - The `check_ins` schema, its primary key, and the no-signal sweeper.
 - The metric-exclusion treatment of the `snoozed` outcome.
 
-The agent has full autonomy on the exact replacement copy — maintainer reviews wording drift on the PR.
+The agent has full autonomy on the exact replacement copy â€” maintainer reviews wording drift on the PR.
 
-### Closed 2026-05-22 — done (PR #210)
+### Closed 2026-05-22 â€” done (PR #210)
 
 Fork B shipped. The third option's machine outcome (`snoozed`) and the
-`SupabaseCheckinWriter` write path are unchanged — the `snoozed` row
+`SupabaseCheckinWriter` write path are unchanged â€” the `snoozed` row
 stays terminal and metric-excluded by design. Only user-facing copy
 moved:
 
 - Option label `Ask me later` -> `I'd rather not say`; sub `Not sure
   yet` -> `We'll leave it blank`.
 - Snoozed confirmation split into its own `switch` arm (it had shared
-  the `skipped` "Ok — tomorrow." / "We'll pop back tonight…" copy, which
-  itself implied a re-ask): headline `Ok — no worries.`, body `We've
-  left this one blank — no follow-up. See you next session.`
+  the `skipped` "Ok â€” tomorrow." / "We'll pop back tonightâ€¦" copy, which
+  itself implied a re-ask): headline `Ok â€” no worries.`, body `We've
+  left this one blank â€” no follow-up. See you next session.`
 
 Reconciled `design-system/surfaces/08-checkin.md` (three-options
 section, copy register, coercion-defense line, edge cases), the C-18
@@ -115,6 +118,6 @@ historical record.
 
 Added two regression-guard tests (`testThirdOptionCopyDoesNotPromiseAReAsk`,
 `testSnoozedConfirmationBodyDoesNotPromiseAReAsk`) that fail if any
-deferral-implying word ("later", "snooze", "tomorrow", "pop back", …)
+deferral-implying word ("later", "snooze", "tomorrow", "pop back", â€¦)
 re-enters the third-option or snoozed-confirmation copy. CI `ios` lane
 green. `node design-system/scripts/verify.mjs` all six gates green.

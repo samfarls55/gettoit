@@ -1,9 +1,0 @@
-# XcodeGen output — regenerate via `xcodegen generate` on the macOS runner.
-GetToIt.xcodeproj/
-DerivedData/
-.swiftpm/
-xcuserdata/
-*.xcuserstate
-
-# Resolved SPM versions are recreated by `xcodebuild` on each CI run.
-*.xcworkspace/

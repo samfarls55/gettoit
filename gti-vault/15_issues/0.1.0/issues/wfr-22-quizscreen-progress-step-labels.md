@@ -8,7 +8,10 @@ created: 2026-05-26
 github_issue: 263
 ---
 
-# wfr-22 — QuizScreen Progress Indicator capsules lack step labels
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-22 â€” QuizScreen Progress Indicator capsules lack step labels
 
 ## What to build
 
@@ -22,7 +25,7 @@ The progress strip (`QuizScreen.swift:184-201`) animates fill state but the caps
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Hub anchors
 
@@ -35,4 +38,4 @@ None — can start immediately.
 
 ## Comments
 
-- 2026-05-26 — AFK shipped on `afk/wfr-22`. Added compact `Q{n} of 5` text under the 5-segment progress capsules in `QuizScreen.topBar`, and bound the locked `"Question {n} of 5"` accessibility label from `design-system/accessibility.md` §4 to the combined strip+label element. Two static helpers (`QuizScreen.progressAccessibilityLabel(forStep:)` and `QuizScreen.progressVisibleLabel(forStep:)`) own the copy so tests can pin it without touching the view. Snapshot smoke covers Q1..Q5 render; source-level tests pin the topBar's a11y wiring (same pattern as bug-25 centering test). Decision: chose VStack(capsules, Text) inside the centred slot rather than placing the label adjacent — keeps the bug-25 horizontal symmetry intact and the label tracks the same step transitions VoiceOver already announces via the parent label.
+- 2026-05-26 â€” AFK shipped on `afk/wfr-22`. Added compact `Q{n} of 5` text under the 5-segment progress capsules in `QuizScreen.topBar`, and bound the locked `"Question {n} of 5"` accessibility label from `design-system/accessibility.md` Â§4 to the combined strip+label element. Two static helpers (`QuizScreen.progressAccessibilityLabel(forStep:)` and `QuizScreen.progressVisibleLabel(forStep:)`) own the copy so tests can pin it without touching the view. Snapshot smoke covers Q1..Q5 render; source-level tests pin the topBar's a11y wiring (same pattern as bug-25 centering test). Decision: chose VStack(capsules, Text) inside the centred slot rather than placing the label adjacent â€” keeps the bug-25 horizontal symmetry intact and the label tracks the same step transitions VoiceOver already announces via the parent label.

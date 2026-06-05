@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useReducer, useState } from "react";
+import { type Dispatch, useEffect, useReducer, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -14,10 +14,16 @@ import {
   resolveInviteLink,
   type InviteRouteResolution,
 } from "./src/invites/inviteLinks";
+import type { MobileAuthState } from "./src/auth/authRepository";
 import type {
   AppRouteName,
   AppStateRouterState,
 } from "./src/navigation/appStateRouter";
+import {
+  nativeAuthBoundary,
+  nativeInviteBoundary,
+  nativeLinkBoundary as runtimeNativeLinkBoundary,
+} from "./src/native/nativeRuntime";
 import {
   initialAppStateRouterState,
   appStateRouterReducer,
@@ -55,6 +61,7 @@ import type { WaitingRepository } from "./src/waiting/waitingRepository";
 import { fakeWaitingRepository } from "./src/waiting/waitingRepository";
 
 type AuthBoundary = {
+  restoreSession?: () => Promise<MobileAuthState>;
   deleteCurrentAccount: () => Promise<unknown>;
   signInWithApple: () => Promise<unknown>;
   redeemClaimCode: (code: string) => Promise<unknown>;
@@ -214,6 +221,7 @@ const contentByRouteName: Record<AppRouteName, RouteContent> = {
 };
 
 const defaultAuthBoundary: AuthBoundary = {
+  restoreSession: async () => ({ kind: "idle" }),
   deleteCurrentAccount: async () => undefined,
   signInWithApple: async () => undefined,
   redeemClaimCode: async () => undefined,
@@ -254,6 +262,37 @@ const defaultNativeLinkBoundary: NativeLinkBoundary = {
   subscribe: () => () => undefined,
 };
 
+const runtimeAuthBoundary: AuthBoundary = {
+  restoreSession: async () => {
+    try {
+      return await nativeAuthBoundary.restoreSession();
+    } catch {
+      return { kind: "idle" };
+    }
+  },
+  deleteCurrentAccount: nativeAuthBoundary.deleteCurrentAccount,
+  signInWithApple: nativeAuthBoundary.signInWithApple,
+  redeemClaimCode: nativeAuthBoundary.redeemClaimCode,
+  signOut: nativeAuthBoundary.signOut,
+};
+
+function dispatchAuthState(
+  dispatch: Dispatch<Parameters<typeof appStateRouterReducer>[1]>,
+  authState: MobileAuthState,
+) {
+  switch (authState.kind) {
+    case "linkedApple":
+      dispatch({ type: "appleSignInSucceeded" });
+      return;
+    case "anonymous":
+      dispatch({ type: "claimCodeRedeemed" });
+      return;
+    case "idle":
+      dispatch({ type: "authSignedOut" });
+      return;
+  }
+}
+
 function defaultSetupPlan(participantScope: PlanParticipantScope): PlanSetup {
   return {
     name: "",
@@ -293,10 +332,14 @@ function filterDeletedCreatedPlans(
 }
 
 export default function App({
-  authBoundary = defaultAuthBoundary,
+  authBoundary = runtimeAuthBoundary,
   initialRouterState,
-  inviteBoundary = defaultInviteBoundary,
-  nativeLinkBoundary = defaultNativeLinkBoundary,
+  inviteBoundary = {
+    ...defaultInviteBoundary,
+    createGroupInviteLink: nativeInviteBoundary.createGroupInviteLink,
+    shareInviteLink: nativeInviteBoundary.shareInviteLink,
+  },
+  nativeLinkBoundary = runtimeNativeLinkBoundary,
   planRepository = fakePlanRepository,
   q5CandidateRepository = fakeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
@@ -317,6 +360,24 @@ export default function App({
     role: "initiator",
   });
   const [planListNotice, setPlanListNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialRouterState) {
+      return;
+    }
+
+    let isCurrent = true;
+
+    authBoundary.restoreSession?.().then((authState) => {
+      if (isCurrent) {
+        dispatchAuthState(dispatch, authState);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [authBoundary, initialRouterState]);
 
   useEffect(() => {
     let isCurrent = true;

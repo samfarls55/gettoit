@@ -1,20 +1,21 @@
-// PreferenceFunction pure unit tests (TB-22 quiz redesign — Swift→TS port).
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// PreferenceFunction pure unit tests (TB-22 quiz redesign â€” Swiftâ†’TS port).
 //
 // The preference engine (PRD modules A `buildPreferenceFunction` + E
-// axis scorers) is pure: it takes a member's stated Q1–Q4 profile and
+// axis scorers) is pure: it takes a member's stated Q1â€“Q4 profile and
 // their three Q5 factorial ratings, and returns a `prefFn` that scores
-// any axis-profiled venue 1…5. No I/O, no clock, no group state.
+// any axis-profiled venue 1â€¦5. No I/O, no clock, no group state.
 //
 // This file is a faithful port of the Swift test suite
-// (`ios/Tests/PreferenceFunctionTests.swift`, TB-09). Every Swift test
-// case is reproduced here, AND — beyond the behavioral assertions the
-// Swift suite makes — an explicit exact-score vector table asserts the
+// (`legacy Swift ios/Tests/PreferenceFunctionTests.swift`, TB-09). Every Swift test
+// case is reproduced here, AND â€” beyond the behavioral assertions the
+// Swift suite makes â€” an explicit exact-score vector table asserts the
 // TS module reproduces the Swift scores byte-identically (the TB-22
 // acceptance criterion: "the TS module reproduces the Swift scores
 // exactly on every vector"). The exact expected numbers were computed
 // from the Swift module's arithmetic by hand and pinned here.
 //
-// Design source: gti-vault/50_product/0.1.0-quiz-amendments §3.
+// Design source: gti-vault/50_product/0.1.0-quiz-amendments Â§3.
 
 import {
   assert,
@@ -35,12 +36,12 @@ import {
   THRESHOLD_T,
 } from "./preference-function.ts";
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Fixture helpers (mirror the Swift suite's fixtures)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// Quiz id constants — mirror `QuizCuisine` / `QuizReputation` (Swift
-// `ios/Sources/App/QuizCoordinator.swift`).
+// Quiz id constants â€” mirror `QuizCuisine` / `QuizReputation` (Swift
+// `legacy Swift ios/Sources/App/QuizCoordinator.swift`).
 const CUISINE_MEXICAN = "mexican";
 const CUISINE_ITALIAN = "italian";
 const CUISINE_THAI = "thai";
@@ -68,7 +69,7 @@ const mexicanSocialPopular: Q5MemberProfile = {
   vibe: 2,
 };
 
-/** Three Q5 ratings where every card scores the same — no axis reveals
+/** Three Q5 ratings where every card scores the same â€” no axis reveals
  *  any weight signal (marginal value 0 everywhere). */
 function flatRatings(score: number): Q5Rating[] {
   return [
@@ -78,11 +79,11 @@ function flatRatings(score: number): Q5Rating[] {
   ];
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// buildPreferenceFunction — basic contract
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// buildPreferenceFunction â€” basic contract
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("prefFn scores within 1…5", () => {
+Deno.test("prefFn scores within 1â€¦5", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, flatRatings(3));
   const perfect = venue(CUISINE_MEXICAN, REP_POPULAR, 2);
   const miss = venue(CUISINE_THAI, REP_HIDDEN_GEM, 4);
@@ -99,9 +100,9 @@ Deno.test("perfect match scores five", () => {
   assertAlmostEquals(prefFn(perfect), 5.0, 0.001);
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Soft non-match has teeth (scores below T)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("soft non-match scores below threshold T", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, flatRatings(3));
@@ -116,9 +117,9 @@ Deno.test("non-match on low-weight axis barely dents score", () => {
   assert(prefFn(twoOfThree) > prefFn(allMiss));
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // "No preference" zeroes an axis
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("reputation no-preference zeroes that axis", () => {
   const member: Q5MemberProfile = {
@@ -155,9 +156,9 @@ Deno.test("no-preference axis weight redistributes to survivors", () => {
   assertAlmostEquals(prefFn(v), 5.0, 0.001);
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Soft re-weight blends toward the Q5-revealed weights
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("soft re-weight lifts a high-marginal axis", () => {
   const highCuisineWeight = buildPreferenceFunction(mexicanSocialPopular, [
@@ -190,9 +191,9 @@ Deno.test("flat ratings leave weights at prior", () => {
   assertAlmostEquals(prefFn(cuisineOnly), prefFn(reputationOnly), 0.001);
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Hard-contradiction override
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("hard-contradiction override fires on strict trigger", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, [
@@ -254,9 +255,9 @@ Deno.test("override on multi-pick cuisine demotes the whole set", () => {
   assertAlmostEquals(prefFn(v), 5.0, 0.001);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// Axis scorers — fixed venue -> 1…5 interface
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Axis scorers â€” fixed venue -> 1â€¦5 interface
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("cuisine scorer is set membership", () => {
   const craved = ["mexican", "italian"];
@@ -284,7 +285,7 @@ Deno.test("vibe scorer is graded by distance", () => {
   assert(far >= 1.0);
 });
 
-Deno.test("all axis scorers return 1…5 across their domain", () => {
+Deno.test("all axis scorers return 1â€¦5 across their domain", () => {
   for (const craved of [[], ["mexican"], ["mexican", "thai"]]) {
     for (const vc of ["mexican", "thai", null]) {
       const s = scoreCuisineAxis(vc, craved);
@@ -306,9 +307,9 @@ Deno.test("all axis scorers return 1…5 across their domain", () => {
   }
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Determinism
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("prefFn is deterministic", () => {
   const v = venue(CUISINE_MEXICAN, REP_CLASSIC, 1);
@@ -317,9 +318,9 @@ Deno.test("prefFn is deterministic", () => {
   assertEquals(a, b);
 });
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Cohort-zero constants match the Swift module exactly
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("cohort-zero constants match the Swift module exactly", () => {
   assertEquals(MATCH_SCORE, 5.0);
@@ -328,15 +329,15 @@ Deno.test("cohort-zero constants match the Swift module exactly", () => {
   assertEquals(ALPHA, 0.5);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// Exact-score vector table — the TB-22 port-fidelity proof.
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Exact-score vector table â€” the TB-22 port-fidelity proof.
 //
 // Each row is a fully-specified (member, q5Ratings, venue) input with
 // the score the Swift module's arithmetic produces, computed by hand
 // from the Swift source. The TS module must reproduce every number
 // exactly. This is the criterion: "the TS module reproduces the Swift
 // scores exactly on every vector."
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ScoreVector {
   name: string;
@@ -462,7 +463,7 @@ const SCORE_VECTORS: ScoreVector[] = [
     expected: 5.0,
   },
   // Member no-prefs every axis cuisine + reputation, but vibe is
-  // always active — so this is not the all-zero case. To exercise the
+  // always active â€” so this is not the all-zero case. To exercise the
   // all-zeroed -> MATCH_SCORE ceiling we need all three axes demoted.
   // Vibe can only leave via override: vibe-drop 5, both vibe-keeps 1.
   // Combine with cuisine empty + reputation no-pref so only vibe is

@@ -8,7 +8,10 @@ created: 2026-05-26
 github_issue: 255
 ---
 
-# wfr-14 — JoinScreen joining spinner has no Cancel; error state has no Back
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-14 â€” JoinScreen joining spinner has no Cancel; error state has no Back
 
 ## What to build
 
@@ -22,7 +25,7 @@ github_issue: 255
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Hub anchors
 
@@ -35,4 +38,4 @@ None — can start immediately.
 
 ## Comments
 
-- 2026-05-26 — Closed by [#287](https://github.com/samfarls55/gettoit/pull/287). Added a shared `onCancel` closure wired to RootView's `deepLink = nil`. Cancel tertiary on `.joining` (11pt eyebrow, 55% opacity — matches RerollScreen cancel), "Try another link" tertiary on `.error` (regular eyebrow, 78% opacity — matches LockedScreen home chrome). `.joined` deliberately has no escape (host hops straight into the quiz). In-flight join `Task` auto-cancelled by SwiftUI's `.task` modifier on unmount. All CI checks green (ios xcodebuild test 3m50s pass, design-system verify pass).
+- 2026-05-26 â€” Closed by [#287](https://github.com/samfarls55/gettoit/pull/287). Added a shared `onCancel` closure wired to RootView's `deepLink = nil`. Cancel tertiary on `.joining` (11pt eyebrow, 55% opacity â€” matches RerollScreen cancel), "Try another link" tertiary on `.error` (regular eyebrow, 78% opacity â€” matches LockedScreen home chrome). `.joined` deliberately has no escape (host hops straight into the quiz). In-flight join `Task` auto-cancelled by SwiftUI's `.task` modifier on unmount. All CI checks green (ios xcodebuild test 3m50s pass, design-system verify pass).

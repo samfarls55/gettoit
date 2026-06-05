@@ -1,4 +1,5 @@
-// tb-WF-11 — tests for the member display-name resolver.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// tb-WF-11 â€” tests for the member display-name resolver.
 //
 // `compute-verdict.fetchVotes` joins `members.display_name` and uses it
 // for the member name shown on the verdict surface, keeping the existing
@@ -40,7 +41,7 @@ Deno.test("tb-WF-11: resolver falls back when the joined name is undefined", () 
 });
 
 Deno.test("tb-WF-11: resolver falls back for an empty / whitespace-only name", () => {
-  // An empty or whitespace-only `display_name` is treated as no name —
+  // An empty or whitespace-only `display_name` is treated as no name â€”
   // the name-entry surface trims and rejects whitespace-only input, so
   // a blank value in the column is a data anomaly, not a real name.
   assertEquals(

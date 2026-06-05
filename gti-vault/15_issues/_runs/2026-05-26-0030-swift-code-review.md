@@ -5,7 +5,10 @@ scope: ios/Sources/App/*.swift + ios/Sources/GTITokens.swift (Tests excluded)
 standards: CODING_STANDARDS.md (repo root)
 ---
 
-# 2026-05-26 00:30 UTC — swift-code-review
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# 2026-05-26 00:30 UTC â€” swift-code-review
 
 ## Totals
 
@@ -20,7 +23,7 @@ standards: CODING_STANDARDS.md (repo root)
 
 | Rule | Severity | Hits | Notes |
 | ---- | -------- | ---- | ----- |
-| NAME-003 | S3 | 15 | missing `///` doc comments on public inits — bucketed; not actioned individually |
+| NAME-003 | S3 | 15 | missing `///` doc comments on public inits â€” bucketed; not actioned individually |
 | CONC-010 | S2 | 3 | `DispatchQueue.main.async` in `LocationCoordinator` |
 | FUN-002 | S3 | 4 | `@escaping` on closures called synchronously (judgment call) |
 | ENUM-002 | S2 | 2 | `default:` on in-module enum (RerollScreen, VerdictScreen) |
@@ -43,7 +46,7 @@ Repo-wide grep confirmed **clean** on: `try!`, `as!`, `unowned self`, `lazy var`
 
 ## Picks applied
 
-User picked: `all S1 + S2` → issues created, not direct edits. Per `/to-issues`:
+User picked: `all S1 + S2` â†’ issues created, not direct edits. Per `/to-issues`:
 
 | Pick | Vault issue | GH issue | Status |
 | ---- | ----------- | -------- | ------ |
@@ -52,23 +55,23 @@ User picked: `all S1 + S2` → issues created, not direct edits. Per `/to-issues
 | 3 (ENUM-002 S2) | bug-32 | #241 | ready-for-agent / AFK |
 | 6 (CONC-010 S2) | bug-33 | #242 | ready-for-agent / AFK |
 
-S3 candidates (4, 5, 7) not actioned this run — surface again on next sweep if not addressed organically.
+S3 candidates (4, 5, 7) not actioned this run â€” surface again on next sweep if not addressed organically.
 
 ## Deferred (architectural)
 
-- **NAME-003 doc-comment debt** (~100+ sites repo-wide) — better as one dedicated bulk pass than scattered through code-review tickets.
-- **LocationCoordinator `@MainActor` migration** — wholesale move would ripple through CoreLocation delegate signatures. Out of scope for bug-33's local-replacement fix.
+- **NAME-003 doc-comment debt** (~100+ sites repo-wide) â€” better as one dedicated bulk pass than scattered through code-review tickets.
+- **LocationCoordinator `@MainActor` migration** â€” wholesale move would ripple through CoreLocation delegate signatures. Out of scope for bug-33's local-replacement fix.
 
 ## False positives (logged)
 
-- `case error(String)` in State enums (AuthCoordinator:40, FireVerdictCoordinator:44) flagged as ERR-005 — these are state payloads, not error types.
-- `preconditionFailure(...)` in InviteLink.swift:62 flagged as OPT-001 — explicit trap, not a force unwrap.
-- `[weak self] response, _ in guard let self else` in LocationCoordinator (lines 294, 384) flagged as REF-001 — correct pattern.
-- `now: @escaping () -> Date` stored as `self.now` flagged as FUN-002 — the closure IS escaping (stored as property).
+- `case error(String)` in State enums (AuthCoordinator:40, FireVerdictCoordinator:44) flagged as ERR-005 â€” these are state payloads, not error types.
+- `preconditionFailure(...)` in InviteLink.swift:62 flagged as OPT-001 â€” explicit trap, not a force unwrap.
+- `[weak self] response, _ in guard let self else` in LocationCoordinator (lines 294, 384) flagged as REF-001 â€” correct pattern.
+- `now: @escaping () -> Date` stored as `self.now` flagged as FUN-002 â€” the closure IS escaping (stored as property).
 
 ## Coverage caveats
 
-- A–F scan agent fixated on NAME-003 / ERR-005; cross-greppable correctness rules confirmed via direct grep, not via that agent.
+- Aâ€“F scan agent fixated on NAME-003 / ERR-005; cross-greppable correctness rules confirmed via direct grep, not via that agent.
 - `ios/Tests/` not scanned this run.
 
 ## Next sweep

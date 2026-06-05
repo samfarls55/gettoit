@@ -3,6 +3,9 @@ folder: 20_plan
 purpose: Decisions consciously deferred past v1.1 / first non-self user
 ---
 
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
 # Post-public-launch considerations
 
 Items deliberately scoped out of v1.1 with a documented reason. Revisit when the listed gate fires.
@@ -14,7 +17,7 @@ Items deliberately scoped out of v1.1 with a documented reason. Revisit when the
 **Why.**
 - iPhone-only target. App is shipped as iPhone-only via App Store; no iPad, no Catalyst.
 - Hardware keyboard on iPhone is a rounding-error cohort for a social-decision app.
-- No realistic QA path — see [[../../../home/node/.claude/projects/-workspace/memory/project_no_mac_ci_only_ios|project_no_mac_ci_only_ios]] memory: no Mac, no iPad, no Magic Keyboard.
+- No realistic QA path â€” see [[../../../home/node/.claude/projects/-workspace/memory/project_no_mac_ci_only_ios|project_no_mac_ci_only_ios]] memory: no Mac, no iPad, no Magic Keyboard.
 - The workflow-design hub's [[../30_design/interaction-patterns/principles#P-12. Keyboard Only]] gate is written against desktop-web forms; over-fitting to iPhone-only social app.
 
 **Revisit gate.** Any of:

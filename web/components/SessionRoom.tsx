@@ -9,7 +9,7 @@
 //   3. Drive the quiz-redesign 5-question quiz; on Q4 -> Q5 fire the per-member
 //      Foursquare candidate fetch; submit the `votes` row.
 //   4. Subscribe to Realtime so the Waiting + Verdict surfaces stay in
-//      lockstep with iOS.
+//      lockstep with the mobile app.
 //   5. Once `rooms.status === 'verdict_ready'` (or the broadcast
 //      arrives), fetch the verdict + cuts + receipts and render the
 //      read-only S05 surface.
@@ -101,7 +101,7 @@ type RoomsRow = {
 
 const POSTGRES_CHANGE_INSERT = "INSERT" as const;
 /** The candidate-pool radius default — matches `rooms.radius_meters`'s
- *  column default (≈ 2.0 mi) so a room with a NULL radius still fetches. */
+ *  column default (˜ 2.0 mi) so a room with a NULL radius still fetches. */
 const DEFAULT_RADIUS_METERS = 3219;
 
 const VALID_MEAL_TIMES: ReadonlySet<string> = new Set([
@@ -112,7 +112,7 @@ const VALID_MEAL_TIMES: ReadonlySet<string> = new Set([
 ]);
 
 /** Read the session meal time off `rooms.session_params`, falling back
- *  to `dinner` (the iOS `SessionParameters.default`) when the column is
+ *  to `dinner` (the mobile app default) when the column is
  *  NULL or carries an unknown value. */
 function readMealTime(params: RoomsRow["session_params"]): MealTime {
   const raw = params?.meal_time;
@@ -200,9 +200,9 @@ export function SessionRoom({
     ReturnType<typeof getSupabaseClient>["channel"]
   > | null>(null);
 
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
   // Boot — anon auth + member insert + initial fetches + Realtime.
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
     async function boot() {
@@ -346,7 +346,7 @@ export function SessionRoom({
 
         // Did the caller already vote on a prior visit? Skip ahead to
         // Waiting/Verdict (idempotent — votes has a unique PK). This is
-        // the web-01 §B "already voted → Waiting" resume case.
+        // the web-01 §B "already voted ? Waiting" resume case.
         if (
           ((voteRows as VotesPresenceRow[] | null) ?? []).some(
             (v) => v.user_id === uid,
@@ -358,7 +358,7 @@ export function SessionRoom({
           room?.status === "locked"
         ) {
           // Verdict already shipped; treat the user as a late-joiner.
-          // web-01 §B "verdict → Verdict" resume case.
+          // web-01 §B "verdict ? Verdict" resume case.
           setPhase({ kind: "waiting" });
         } else {
           // web-01 §B mid-quiz resume — start on the last-answered
@@ -510,9 +510,9 @@ export function SessionRoom({
     };
   }, [roomId, roomStatus, userId, verdictRefetchSignal]);
 
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
   // Q5 per-member candidate fetch.
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
 
   /** Fire the per-member Foursquare fetch and fold its result into the
    *  Q5 state. Idempotent within a session — a fetch already in flight
@@ -561,9 +561,9 @@ export function SessionRoom({
     }
   }, [phase, startCandidateFetch]);
 
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
   // Quiz handlers.
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
 
   // Snapshot the current quiz answers into a `quiz_progress` payload.
   // Used on every advance so a re-clicking invitee resumes with their
@@ -605,7 +605,7 @@ export function SessionRoom({
 
       // Gate the verdict-firing `votes` write on the candidate fetch —
       // the raw fetched union must land in `member_fetches` before the
-      // verdict can union it into `options` (mirrors iOS `submit()`).
+      // verdict can union it into `options` (mirrors mobile app submit).
       const fetchResult = await (fetchPromiseRef.current ??
         Promise.resolve<CandidateFetchResult>({
           candidates: [],
@@ -662,9 +662,9 @@ export function SessionRoom({
     }
   }, [budget, candidates, cuisine, q5Ratings, reputation, roomId, userId, vibe]);
 
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
   // §E — Leave (web-01 §E, decision doc §Q7).
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
 
   /** Confirm the leave: drop the `members` row via the shell's
    *  `onLeave` handler. On a rejected delete the sheet stays open with
@@ -692,9 +692,9 @@ export function SessionRoom({
     ? () => setLeaveConfirmOpen(true)
     : undefined;
 
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
   // Render
-  // ────────────────────────────────────────────────────────────────
+  // ----------------------------------------------------------------
 
   const memberViews = useMemo<WaitingMemberView[]>(() => {
     return members.map((m, i) => ({
@@ -960,7 +960,7 @@ function clampStep(value: number | undefined): 1 | 2 | 3 | 4 | 5 {
 }
 
 // Lightweight duplicate-key detection for the votes insert. Mirrors
-// iOS `QuizCoordinator.isUniqueViolation`.
+// Legacy Swift `QuizCoordinator.isUniqueViolation`; active app lives in `mobile/`.
 function isUniqueViolation(error: unknown): boolean {
   if (!error) return false;
   const description = JSON.stringify(error);

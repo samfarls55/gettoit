@@ -2,6 +2,8 @@
 
 Append-only log of every change to the design system spec. Newest at top. One line per change unless a `BREAKING:` entry needs context.
 
+> **Legacy mobile note:** SwiftUI / `ios/` references in older changelog entries are historical notes from the retired Swift app. Active mobile implementation is React Native / Expo in `mobile/`.
+
 Format: `YYYY-MM-DD — short description. (PR / commit / reason)`
 
 Prefix `BREAKING:` for any change that requires code or downstream consumers to update.

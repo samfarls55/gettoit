@@ -1,4 +1,5 @@
--- TB-03 — add `timer_minutes` + `radius_meters` to `rooms`.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-03 â€” add `timer_minutes` + `radius_meters` to `rooms`.
 --
 -- Both controls live on S01 Initiator Landing (see
 -- `design-system/surfaces/01-initiator.md`). Values are written when
@@ -8,15 +9,15 @@
 -- client passes the user-selected values, but if a future client (web
 -- fallback, debug RPC) inserts a `rooms` row without them, the row
 -- should still be valid. The defaults match the canonical "10 min /
--- 2.0 mi" specified in `design-system/surfaces/01-initiator.md` §
+-- 2.0 mi" specified in `design-system/surfaces/01-initiator.md` Â§
 -- "Timer + radius controls".
 --
 -- Storage shape:
---   * `timer_minutes` — integer minutes. The four legal values are the
---     four S01 chips (`5 · 10 · 15 · 30`). Constrained to the set so a
+--   * `timer_minutes` â€” integer minutes. The four legal values are the
+--     four S01 chips (`5 Â· 10 Â· 15 Â· 30`). Constrained to the set so a
 --     bad client can't write 999 and have the verdict-fire trigger
 --     (TB-07) try to wait an hour and a half.
---   * `radius_meters` — integer meters. The S01 slider ranges from
+--   * `radius_meters` â€” integer meters. The S01 slider ranges from
 --     0.5 mi (805 m) to 5.0 mi (8047 m) in 0.5 mi steps. We store
 --     meters (not miles) because the candidate-pool fetch (TB-05's
 --     PlacesProxy) speaks meters to Foursquare. The check window is
@@ -36,4 +37,4 @@ comment on column public.rooms.timer_minutes is
     'Initiator-set verdict-fire timer (S01). Minutes. Legal set 5/10/15/30. Default 10.';
 
 comment on column public.rooms.radius_meters is
-    'Initiator-set candidate-pool radius (S01). Meters. S01 slider exposes 805..8047 m (0.5..5.0 mi); the column allows up to 16093 m (10 mi) to accommodate the S05 no-survivor widen path (TB-09). Default 3219 m (≈ 2.0 mi).';
+    'Initiator-set candidate-pool radius (S01). Meters. S01 slider exposes 805..8047 m (0.5..5.0 mi); the column allows up to 16093 m (10 mi) to accommodate the S05 no-survivor widen path (TB-09). Default 3219 m (â‰ˆ 2.0 mi).';

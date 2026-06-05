@@ -1,4 +1,6 @@
 // GetToIt — Sunset Pop · shared components (canonical)
+// Active mobile app is React Native / Expo in mobile/. Any SwiftUI mentions
+// below are historical notes from the retired Swift app.
 // No tweak deps — single palette (sunset), single vibe vocab (mood), grain 0.35.
 
 // ── The 4-stop gradient map. The narrative arc of the product ──

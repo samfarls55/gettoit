@@ -66,15 +66,6 @@ if (proc.status !== 0) {
   notes.push(`drift-check: code/tokens.css matches tokens.json`);
 }
 
-// ── 2b. Swift drift gate ───────────────────────────────────
-const genSwiftPath = path.join(__dirname, 'gen-swift.mjs');
-const swiftProc = spawnSync(process.execPath, [genSwiftPath, '--check'], { encoding: 'utf8' });
-if (swiftProc.status !== 0) {
-  failures.push(`ios/Sources/GTITokens.swift drift: regenerate via "node design-system/scripts/gen-swift.mjs"`);
-  if (swiftProc.stderr) notes.push(swiftProc.stderr.trim());
-} else {
-  notes.push(`drift-check: ios/Sources/GTITokens.swift matches tokens.json`);
-}
 
 // ── 3. Orphan-hex sweep ────────────────────────────────────
 const registered = collectRegisteredHex(tokens);
@@ -204,7 +195,7 @@ if (pairingErrors.length) {
 // The web invitee shell is a web-only surface tree (the iMessage/SMS
 // `/join/<roomId>` flow). It lives under a `web-NN-*` namespace rather
 // than the `NN-*` ritual-arc namespace because (a) it never reaches an
-// iOS surface and (b) its JSX is built by the paired shell-wiring
+// mobile-app surface and (b) its JSX is built by the paired shell-wiring
 // tracer-bullets (tb-WF-11 / tb-WF-12) in `web/`, not as design-system
 // `code/screens/` JSX — so the §4 surface↔jsx pairing check (which only
 // matches `NN[a-z]?-*.md`) intentionally skips it. This check is the

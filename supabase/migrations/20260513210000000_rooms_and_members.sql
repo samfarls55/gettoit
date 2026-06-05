@@ -52,7 +52,7 @@ alter table public.members enable row level security;
 
 -- A user can see a room iff they're a member of it. The creator's
 -- INSERT bootstraps their own membership inside the same transaction
--- (the iOS client wraps both in a single call), so the policy is
+-- (the mobile client wraps both in a single call), so the policy is
 -- consistent on both sides.
 drop policy if exists "rooms_select_members" on public.rooms;
 create policy "rooms_select_members" on public.rooms

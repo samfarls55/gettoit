@@ -78,17 +78,16 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ## Codebase map
 
 - `web/` — Next.js app (App Router, Vercel-deployed).
-- `ios/` — Swift iOS app (XcodeGen `project.yml`, CI-built via TestFlight).
+- `mobile/` — active React Native / Expo iOS app (TypeScript, EAS-built).
 - `supabase/` — `migrations/`, edge `functions/`, local `config.toml`, `scripts/`.
 - `design-system/` — UI source of truth: `tokens.json`, `components.md`, `surfaces/`, `motion.md`, `accessibility.md`.
 - `gti-vault/` — knowledge vault (see below).
 - `docs/agents/` — agent contracts (`issue-tracker.md`, `triage-labels.md`, `domain.md`).
 - `CONTEXT.md` — single-context domain doc at repo root.
-- `CODING_STANDARDS.md` — Swift coding standards (stable rule IDs). **Read before writing or editing any Swift code under `ios/`.**
 
 ## Vault
 
-`gti-vault/` is the documentation home: PRDs, plans, design notes, marketing/branding, engineering ADRs, raw inbox, and issues (`15_issues/`). Any new long-lived note, decision, spec, or research artifact goes here — not into ad-hoc files at the repo root or inside `web/`/`ios/`.
+`gti-vault/` is the documentation home: PRDs, plans, design notes, marketing/branding, engineering ADRs, raw inbox, and issues (`15_issues/`). Any new long-lived note, decision, spec, or research artifact goes here — not into ad-hoc files at the repo root or inside `web/`/`mobile/`.
 
 **Document everything of substance here.** If a decision, finding, plan, or piece of context would be useful to your future self or another agent, write it into the vault as you go — don't leave it stranded in chat. Skip anything derivable from code, git, or current docs.
 

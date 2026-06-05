@@ -1,7 +1,10 @@
 ---
-title: Surfaces — per-surface design and audit playbooks
+title: Surfaces â€” per-surface design and audit playbooks
 purpose: Surface-by-surface recipes for designing or auditing by intent; the bridge between principles and the named pattern catalog
 ---
+
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
 
 # Surfaces
 
@@ -11,28 +14,28 @@ Playbooks for designing or auditing by surface intent. Each section gives: when 
 
 Source: Tidwell/Brewer/Valencia Ch.2 intro. Name the screen type before reaching for a pattern.
 
-- **Overview** — show a list or set of things. Home pages, search results, feeds, grids, tables, dashboards, trees.
-- **Focus** — show one single thing. Articles, item detail, single record, map, video, game.
-- **Make** — provide tools to create or update a digital object. Editors, builders, canvases, IDEs.
-- **Do** — facilitate a single task. Sign in, register, purchase, change a setting, run a wizard.
+- **Overview** â€” show a list or set of things. Home pages, search results, feeds, grids, tables, dashboards, trees.
+- **Focus** â€” show one single thing. Articles, item detail, single record, map, video, game.
+- **Make** â€” provide tools to create or update a digital object. Editors, builders, canvases, IDEs.
+- **Do** â€” facilitate a single task. Sign in, register, purchase, change a setting, run a wizard.
 
 Most screens collapse to one of these. The common failure mode is a screen that tries to be two at once (Make + Overview crammed together); split or pick. Settings, Entry, Form, Data, and Mobile are framed as sub-shapes of the above and get their own playbooks below.
 
 ## Navigation models
 
-Source: Tidwell/Brewer/Valencia Ch.3 intro. Pick one — or knowingly mix — before applying any specific nav pattern.
+Source: Tidwell/Brewer/Valencia Ch.3 intro. Pick one â€” or knowingly mix â€” before applying any specific nav pattern.
 
-- **Hub and Spoke** — a hub lists destinations; user goes to a spoke, does the job, returns. Pick for small-screen mobile or suites with a small fixed set of major sections.
-- **Fully Connected** — every screen carries global nav reaching every other screen in one hop. Pick for sites with under ~7 top-level sections where any-to-any jumps are normal.
-- **Multilevel / Tree** — top sections fully connected, subpages reach siblings only. Pick for large content sites where cross-section jumps are rare.
-- **Step by Step** — prescribed linear sequence with Back/Next. Pick for tasks with required order, branching, or guided learning (wizard, checkout, onboarding).
-- **Pyramid** — step-by-step plus a hub/menu page listing the whole sequence. Pick for galleries, photo albums, article series, product variants.
-- **Pan and Zoom** — one large virtual space; navigation is pan/zoom/reset. Pick for maps, image viewers, info graphics.
-- **Flat** — almost no inter-screen navigation; tools live inside one workspace. Pick for tool-dominant apps where users live in one canvas (Photoshop, Excel).
+- **Hub and Spoke** â€” a hub lists destinations; user goes to a spoke, does the job, returns. Pick for small-screen mobile or suites with a small fixed set of major sections.
+- **Fully Connected** â€” every screen carries global nav reaching every other screen in one hop. Pick for sites with under ~7 top-level sections where any-to-any jumps are normal.
+- **Multilevel / Tree** â€” top sections fully connected, subpages reach siblings only. Pick for large content sites where cross-section jumps are rare.
+- **Step by Step** â€” prescribed linear sequence with Back/Next. Pick for tasks with required order, branching, or guided learning (wizard, checkout, onboarding).
+- **Pyramid** â€” step-by-step plus a hub/menu page listing the whole sequence. Pick for galleries, photo albums, article series, product variants.
+- **Pan and Zoom** â€” one large virtual space; navigation is pan/zoom/reset. Pick for maps, image viewers, info graphics.
+- **Flat** â€” almost no inter-screen navigation; tools live inside one workspace. Pick for tool-dominant apps where users live in one canvas (Photoshop, Excel).
 
 Mix-and-match is normal. Cost of fully-connected nav everywhere is screen clutter and signalling that leaving the page is fine. Hide global nav inside focused flows.
 
-### GetToIt app shell — Hub-and-Spoke
+### GetToIt app shell â€” Hub-and-Spoke
 
 `PlanListScreen` is the hub. Spokes (Settings now; Profile + Help later) are reached via a top-trailing chrome glyph using the [[patterns#Sign-In Tools]] convention. Rationale: single dominant surface (PlanList), small fixed spoke set, iOS-standard placement (P-07 Habituation), consistent coordinate across empty + populated render paths (P-09 Spatial Memory). Bottom Navigation rejected as premature for one spoke; hamburger rejected as identity-hiding; Multilevel deferred until History cardinality forces a separate destination. Resolved 2026-05-26 via workflow-review grill #3.
 
@@ -55,30 +58,30 @@ Lists, search results, feeds, grids, tables, dashboards.
 
 **Required patterns**
 
-- [[patterns#Feature, Search, and Browse]] — give searchers, browsers, and passive arrivals an anchor on one page.
-- [[patterns#Center Stage]] — the dominant content (featured item, primary list) outweighs chrome.
-- [[patterns#Titled Sections]] — group widgets / categories with named headers.
-- [[patterns#Clear Entry Points]] — 1-3 plain-language CTAs for the top tasks.
+- [[patterns#Feature, Search, and Browse]] â€” give searchers, browsers, and passive arrivals an anchor on one page.
+- [[patterns#Center Stage]] â€” the dominant content (featured item, primary list) outweighs chrome.
+- [[patterns#Titled Sections]] â€” group widgets / categories with named headers.
+- [[patterns#Clear Entry Points]] â€” 1-3 plain-language CTAs for the top tasks.
 - A list pattern matched to content shape: [[patterns#Cards]], [[patterns#Thumbnail Grid]], [[patterns#Two-Panel Selector or Split View]], [[patterns#List Inlay]], [[patterns#Pagination]], or [[patterns#Infinite List]].
 
 **Optional patterns**
 
-- [[patterns#Dashboard]] — when the surface aggregates status across domains.
-- [[patterns#Streams and Feeds]] — when content updates frequently and recency matters.
-- [[patterns#Media Browser]] — when items are pictorial/playable.
-- [[patterns#Dynamic Queries]] — live filter/sort controls.
-- [[patterns#Jump to Item]] / [[patterns#Alpha/Numeric Scroller]] — quick jump for long lists.
-- [[patterns#New-Item Row]] — clear add-an-item affordance from the list.
-- [[patterns#Carousel]] — featured-then-tail content (use with care; avoid auto-rotating 5+ slides).
-- [[patterns#Movable Panels]] — when user roles vary enough to justify customisation.
+- [[patterns#Dashboard]] â€” when the surface aggregates status across domains.
+- [[patterns#Streams and Feeds]] â€” when content updates frequently and recency matters.
+- [[patterns#Media Browser]] â€” when items are pictorial/playable.
+- [[patterns#Dynamic Queries]] â€” live filter/sort controls.
+- [[patterns#Jump to Item]] / [[patterns#Alpha/Numeric Scroller]] â€” quick jump for long lists.
+- [[patterns#New-Item Row]] â€” clear add-an-item affordance from the list.
+- [[patterns#Carousel]] â€” featured-then-tail content (use with care; avoid auto-rotating 5+ slides).
+- [[patterns#Movable Panels]] â€” when user roles vary enough to justify customisation.
 
 **Foundation gates**
 
-- [[principles#P-02. Instant Gratification]] — first useful item visible without sign-in, tour, or empty state.
-- [[principles#P-03. Satisficing]] — labels scan-readable; primary CTA reads as a verb.
-- [[principles#P-08. Microbreaks]] — returning user sees fresh content in one tap.
-- [[principles#P-09. Spatial Memory]] — list order, nav placement, and chrome stable across visits.
-- [[principles#V-01. Visual hierarchy]] — most actionable info is visually dominant; charts honest.
+- [[principles#P-02. Instant Gratification]] â€” first useful item visible without sign-in, tour, or empty state.
+- [[principles#P-03. Satisficing]] â€” labels scan-readable; primary CTA reads as a verb.
+- [[principles#P-08. Microbreaks]] â€” returning user sees fresh content in one tap.
+- [[principles#P-09. Spatial Memory]] â€” list order, nav placement, and chrome stable across visits.
+- [[principles#V-01. Visual hierarchy]] â€” most actionable info is visually dominant; charts honest.
 
 **Anti-pattern sweep**
 
@@ -109,27 +112,27 @@ Item detail, single record, article, map, video, document.
 
 **Required patterns**
 
-- [[patterns#Center Stage]] — the primary content visually dominates; chrome demoted.
-- [[patterns#Breadcrumbs]] — "you are here" plus one-click ascent (when hierarchy is 2+ levels).
-- [[patterns#Deep Links]] — stable shareable URL captures content + relevant state.
-- [[patterns#Escape Hatch]] — every limited-nav variant carries a one-tap return to a known place.
-- [[patterns#Action Panel]] or [[patterns#Button Groups]] — actions on the item are collected and discoverable.
+- [[patterns#Center Stage]] â€” the primary content visually dominates; chrome demoted.
+- [[patterns#Breadcrumbs]] â€” "you are here" plus one-click ascent (when hierarchy is 2+ levels).
+- [[patterns#Deep Links]] â€” stable shareable URL captures content + relevant state.
+- [[patterns#Escape Hatch]] â€” every limited-nav variant carries a one-tap return to a known place.
+- [[patterns#Action Panel]] or [[patterns#Button Groups]] â€” actions on the item are collected and discoverable.
 
 **Optional patterns**
 
-- [[patterns#Pyramid]] — sibling prev/next plus an Up link to the index, when the item is one of a sequence.
-- [[patterns#Alternative Views]] — when one design cannot serve all scenarios for the same content (map vs list, edit vs preview).
-- [[patterns#Annotated Scroll Bar]] — long documents where the user scrolls for specific items.
-- [[patterns#Hover or Pop-Up Tools]] — secondary actions surfaced on hover when chrome would clutter.
-- [[patterns#Animated Transition]] — shared-element transitions when arriving from a list.
+- [[patterns#Pyramid]] â€” sibling prev/next plus an Up link to the index, when the item is one of a sequence.
+- [[patterns#Alternative Views]] â€” when one design cannot serve all scenarios for the same content (map vs list, edit vs preview).
+- [[patterns#Annotated Scroll Bar]] â€” long documents where the user scrolls for specific items.
+- [[patterns#Hover or Pop-Up Tools]] â€” secondary actions surfaced on hover when chrome would clutter.
+- [[patterns#Animated Transition]] â€” shared-element transitions when arriving from a list.
 
 **Foundation gates**
 
-- [[principles#P-01. Safe Exploration]] — every action reversible or confirmable; Back works.
-- [[principles#P-04. Changes in Midstream]] — leaving and returning restores scroll, selection, draft state.
-- [[principles#P-09. Spatial Memory]] — header, breadcrumbs, action panel in stable positions.
-- [[principles#P-13. Social Proof + Collaboration]] — reviews, ratings, or "N others" signal where decisions are made.
-- [[principles#V-04. Readability]] — line length 45-75ch on long-form content.
+- [[principles#P-01. Safe Exploration]] â€” every action reversible or confirmable; Back works.
+- [[principles#P-04. Changes in Midstream]] â€” leaving and returning restores scroll, selection, draft state.
+- [[principles#P-09. Spatial Memory]] â€” header, breadcrumbs, action panel in stable positions.
+- [[principles#P-13. Social Proof + Collaboration]] â€” reviews, ratings, or "N others" signal where decisions are made.
+- [[principles#V-04. Readability]] â€” line length 45-75ch on long-form content.
 
 **Anti-pattern sweep**
 
@@ -154,29 +157,29 @@ Editors, builders, canvases, IDEs, layout tools.
 
 **Required patterns**
 
-- [[patterns#Canvas Plus Palette]] — central work area framed by tool, property, and layer palettes.
-- [[patterns#Preview]] — live or near-live result of edits.
-- [[patterns#Multilevel Undo]] — full undo history, not just last action.
-- [[patterns#Command History]] — companion to undo; lets users review and redo.
-- [[patterns#Many Workspaces]] — tabs, panels, or windows for parallel work.
+- [[patterns#Canvas Plus Palette]] â€” central work area framed by tool, property, and layer palettes.
+- [[patterns#Preview]] â€” live or near-live result of edits.
+- [[patterns#Multilevel Undo]] â€” full undo history, not just last action.
+- [[patterns#Command History]] â€” companion to undo; lets users review and redo.
+- [[patterns#Many Workspaces]] â€” tabs, panels, or windows for parallel work.
 
 **Optional patterns**
 
-- [[patterns#Module Tabs]] / [[patterns#Collapsible Panels]] — group palette subgroups.
-- [[patterns#Movable Panels]] — user-controlled palette layout (system-controlled reflow defeats spatial memory).
-- [[patterns#Macros]] — record-and-replay for repeated action sequences.
-- [[patterns#Smart Menu Items]] — context-aware menu state (greyed when not applicable, with last-used filename, etc).
-- [[patterns#Hover or Pop-Up Tools]] — surface secondary actions without occupying the palette.
-- [[patterns#Visual Framework]] — common shell across multiple editor views.
+- [[patterns#Module Tabs]] / [[patterns#Collapsible Panels]] â€” group palette subgroups.
+- [[patterns#Movable Panels]] â€” user-controlled palette layout (system-controlled reflow defeats spatial memory).
+- [[patterns#Macros]] â€” record-and-replay for repeated action sequences.
+- [[patterns#Smart Menu Items]] â€” context-aware menu state (greyed when not applicable, with last-used filename, etc).
+- [[patterns#Hover or Pop-Up Tools]] â€” surface secondary actions without occupying the palette.
+- [[patterns#Visual Framework]] â€” common shell across multiple editor views.
 
 **Foundation gates**
 
-- [[principles#P-01. Safe Exploration]] — undo reaches arbitrarily back; no irreversible destructive defaults.
-- [[principles#P-04. Changes in Midstream]] — switch tabs, switch tools, return without losing state.
-- [[principles#P-06. Incremental Construction]] — feedback under 500ms; non-blocking saves.
-- [[principles#P-07. Habituation]] — Ctrl-S saves; standard shortcuts wired; gesture per tool consistent.
-- [[principles#P-11. Streamlined Repetition]] — bulk operations, find/replace, recorded actions on high-traffic actions.
-- [[principles#P-12. Keyboard Only]] — every primary tool reachable from the keyboard with predictable Tab order.
+- [[principles#P-01. Safe Exploration]] â€” undo reaches arbitrarily back; no irreversible destructive defaults.
+- [[principles#P-04. Changes in Midstream]] â€” switch tabs, switch tools, return without losing state.
+- [[principles#P-06. Incremental Construction]] â€” feedback under 500ms; non-blocking saves.
+- [[principles#P-07. Habituation]] â€” Ctrl-S saves; standard shortcuts wired; gesture per tool consistent.
+- [[principles#P-11. Streamlined Repetition]] â€” bulk operations, find/replace, recorded actions on high-traffic actions.
+- [[principles#P-12. Keyboard Only]] â€” every primary tool reachable from the keyboard with predictable Tab order.
 
 **Anti-pattern sweep**
 
@@ -202,27 +205,27 @@ Single-task flows: checkout, sign-up, run-a-workflow, multi-step setup.
 
 **Required patterns**
 
-- [[patterns#Wizard]] — for branched or novel multi-step tasks (3-10 steps).
-- [[patterns#Progress Indicator]] — current step plus total visible near Back/Next.
-- [[patterns#Prominent "Done" Button or Assumed Next Step]] — the finish action is visually dominant on each step.
-- [[patterns#Escape Hatch]] — Cancel works on every step and returns to a safe place.
-- [[patterns#Good Defaults and Smart Prefills]] — every step preloads sensible values.
+- [[patterns#Wizard]] â€” for branched or novel multi-step tasks (3-10 steps).
+- [[patterns#Progress Indicator]] â€” current step plus total visible near Back/Next.
+- [[patterns#Prominent "Done" Button or Assumed Next Step]] â€” the finish action is visually dominant on each step.
+- [[patterns#Escape Hatch]] â€” Cancel works on every step and returns to a safe place.
+- [[patterns#Good Defaults and Smart Prefills]] â€” every step preloads sensible values.
 
 **Optional patterns**
 
-- [[patterns#Forgiving Format]] — accept multiple formats on strict fields (dates, phone numbers).
-- [[patterns#Input Hints]] / [[patterns#Input Prompt]] — visible without focus required.
-- [[patterns#Error Messages]] — localised to the field, plain language, concrete fix.
-- [[patterns#Autocompletion]] — for domain-known values (city, country, product names).
-- [[patterns#Animated Transition]] — step-to-step transitions that preserve spatial continuity.
+- [[patterns#Forgiving Format]] â€” accept multiple formats on strict fields (dates, phone numbers).
+- [[patterns#Input Hints]] / [[patterns#Input Prompt]] â€” visible without focus required.
+- [[patterns#Error Messages]] â€” localised to the field, plain language, concrete fix.
+- [[patterns#Autocompletion]] â€” for domain-known values (city, country, product names).
+- [[patterns#Animated Transition]] â€” step-to-step transitions that preserve spatial continuity.
 
 **Foundation gates**
 
-- [[principles#P-04. Changes in Midstream]] — back to any prior step without losing data; drafts persist.
-- [[principles#P-05. Deferred Choices]] — non-required fields skippable; "change later" affordances.
-- [[principles#P-07. Habituation]] — Enter submits; Esc cancels; Tab order matches visual order.
-- [[principles#P-12. Keyboard Only]] — every step completable without the mouse.
-- [[principles#V-01. Visual hierarchy]] — one primary CTA per step; no competing primaries.
+- [[principles#P-04. Changes in Midstream]] â€” back to any prior step without losing data; drafts persist.
+- [[principles#P-05. Deferred Choices]] â€” non-required fields skippable; "change later" affordances.
+- [[principles#P-07. Habituation]] â€” Enter submits; Esc cancels; Tab order matches visual order.
+- [[principles#P-12. Keyboard Only]] â€” every step completable without the mouse.
+- [[principles#V-01. Visual hierarchy]] â€” one primary CTA per step; no competing primaries.
 
 **Anti-pattern sweep**
 
@@ -247,24 +250,24 @@ Preferences, account, profile, configuration, document properties.
 
 **Required patterns**
 
-- [[patterns#Settings Editor]] — findable, self-contained, named groups, conventional placement.
-- [[patterns#Menu Page]] or [[patterns#Two-Panel Selector or Split View]] — categorise so users can guess where a setting lives.
-- [[patterns#Sign-In Tools]] — entry from the upper-right user menu by convention.
-- [[patterns#Escape Hatch]] — return-to-app affordance from any sub-page.
+- [[patterns#Settings Editor]] â€” findable, self-contained, named groups, conventional placement.
+- [[patterns#Menu Page]] or [[patterns#Two-Panel Selector or Split View]] â€” categorise so users can guess where a setting lives.
+- [[patterns#Sign-In Tools]] â€” entry from the upper-right user menu by convention.
+- [[patterns#Escape Hatch]] â€” return-to-app affordance from any sub-page.
 
 **Optional patterns**
 
-- [[patterns#Module Tabs]] — alternative to a left rail when categories are few.
-- [[patterns#Collapsible Panels]] — for long settings pages that group naturally.
-- [[patterns#Smart Menu Items]] — show current value at a glance in the entry control.
-- [[patterns#Good Defaults and Smart Prefills]] — sane out-of-box values; per-setting and global revert.
+- [[patterns#Module Tabs]] â€” alternative to a left rail when categories are few.
+- [[patterns#Collapsible Panels]] â€” for long settings pages that group naturally.
+- [[patterns#Smart Menu Items]] â€” show current value at a glance in the entry control.
+- [[patterns#Good Defaults and Smart Prefills]] â€” sane out-of-box values; per-setting and global revert.
 
 **Foundation gates**
 
-- [[principles#P-07. Habituation]] — gear/avatar in the conventional spot; settings reachable from there.
-- [[principles#P-09. Spatial Memory]] — categories do not reorder between visits.
-- [[principles#P-10. Prospective Memory]] — drafts/changes persist if the user navigates away mid-edit.
-- [[principles#V-01. Visual hierarchy]] — destructive actions (delete account) visually separated from cosmetic ones.
+- [[principles#P-07. Habituation]] â€” gear/avatar in the conventional spot; settings reachable from there.
+- [[principles#P-09. Spatial Memory]] â€” categories do not reorder between visits.
+- [[principles#P-10. Prospective Memory]] â€” drafts/changes persist if the user navigates away mid-edit.
+- [[principles#V-01. Visual hierarchy]] â€” destructive actions (delete account) visually separated from cosmetic ones.
 
 **Anti-pattern sweep**
 
@@ -290,24 +293,24 @@ First-run, empty-state, landing, cold-start.
 
 **Required patterns**
 
-- [[patterns#Clear Entry Points]] — 1-3 large plain-language CTAs covering the top tasks.
-- [[patterns#Mobile Direct Access]] (on mobile) — first screen primes the most likely action using device signals.
-- [[patterns#Escape Hatch]] — skip / dismiss / explore-without-completing always available.
-- [[patterns#Help Systems]] — inline labels, hints, and at least a "Help" link to fuller docs.
+- [[patterns#Clear Entry Points]] â€” 1-3 large plain-language CTAs covering the top tasks.
+- [[patterns#Mobile Direct Access]] (on mobile) â€” first screen primes the most likely action using device signals.
+- [[patterns#Escape Hatch]] â€” skip / dismiss / explore-without-completing always available.
+- [[patterns#Help Systems]] â€” inline labels, hints, and at least a "Help" link to fuller docs.
 
 **Optional patterns**
 
-- [[patterns#Good Defaults and Smart Prefills]] — empty state seeded with a working example or template.
-- [[patterns#Animated Transition]] — short, purposeful entrance motion.
-- [[patterns#New-Item Row]] — clear first action when the empty state is a list.
-- [[patterns#Wizard]] — only for genuinely branched first-time setup; otherwise a single page wins.
+- [[patterns#Good Defaults and Smart Prefills]] â€” empty state seeded with a working example or template.
+- [[patterns#Animated Transition]] â€” short, purposeful entrance motion.
+- [[patterns#New-Item Row]] â€” clear first action when the empty state is a list.
+- [[patterns#Wizard]] â€” only for genuinely branched first-time setup; otherwise a single page wins.
 
 **Foundation gates**
 
-- [[principles#P-01. Safe Exploration]] — onboarding skippable; nothing destructive on first run.
-- [[principles#P-02. Instant Gratification]] — first useful action under 5 seconds, before sign-up wall.
-- [[principles#P-05. Deferred Choices]] — registration deferred until the user has experienced value.
-- [[principles#V-05. Evoking a feeling]] — visual register matches the user's emotional state on arrival.
+- [[principles#P-01. Safe Exploration]] â€” onboarding skippable; nothing destructive on first run.
+- [[principles#P-02. Instant Gratification]] â€” first useful action under 5 seconds, before sign-up wall.
+- [[principles#P-05. Deferred Choices]] â€” registration deferred until the user has experienced value.
+- [[principles#V-05. Evoking a feeling]] â€” visual register matches the user's emotional state on arrival.
 
 **Anti-pattern sweep**
 
@@ -332,29 +335,29 @@ Anywhere data is entered: contact, profile edit, search refinement, content edit
 
 **Required patterns**
 
-- [[patterns#Input Hints]] — format hints visible without focus required.
-- [[patterns#Input Prompt]] — short prompt inside empty fields when helpful.
-- [[patterns#Good Defaults and Smart Prefills]] — reasonable defaults; never an empty form when context exists.
-- [[patterns#Error Messages]] — field-local, plain language, concrete fix.
-- [[patterns#Forgiving Format]] — accept multiple formats on date, phone, currency, address fields.
-- [[patterns#Prominent "Done" Button or Assumed Next Step]] — one dominant submit, in a predictable location.
+- [[patterns#Input Hints]] â€” format hints visible without focus required.
+- [[patterns#Input Prompt]] â€” short prompt inside empty fields when helpful.
+- [[patterns#Good Defaults and Smart Prefills]] â€” reasonable defaults; never an empty form when context exists.
+- [[patterns#Error Messages]] â€” field-local, plain language, concrete fix.
+- [[patterns#Forgiving Format]] â€” accept multiple formats on date, phone, currency, address fields.
+- [[patterns#Prominent "Done" Button or Assumed Next Step]] â€” one dominant submit, in a predictable location.
 
 **Optional patterns**
 
-- [[patterns#Autocompletion]] — for known value sets.
-- [[patterns#Drop-down Chooser]] — when the choice is small, mutually exclusive, and known in advance.
-- [[patterns#Fill-in-the-Blanks]] — inline form-as-sentence for short focused inputs.
-- [[patterns#Structured Format]] — segmented inputs (credit card, phone) where structure aids correctness.
-- [[patterns#Password Strength Meter]] — on password creation fields.
-- [[patterns#List Builder]] — when the input is "pick N from this set".
+- [[patterns#Autocompletion]] â€” for known value sets.
+- [[patterns#Drop-down Chooser]] â€” when the choice is small, mutually exclusive, and known in advance.
+- [[patterns#Fill-in-the-Blanks]] â€” inline form-as-sentence for short focused inputs.
+- [[patterns#Structured Format]] â€” segmented inputs (credit card, phone) where structure aids correctness.
+- [[patterns#Password Strength Meter]] â€” on password creation fields.
+- [[patterns#List Builder]] â€” when the input is "pick N from this set".
 
 **Foundation gates**
 
-- [[principles#P-03. Satisficing]] — short plain labels; CTAs name the verb.
-- [[principles#P-05. Deferred Choices]] — required field set as small as possible; optional fields marked.
-- [[principles#P-07. Habituation]] — Enter submits; Esc cancels; Tab order matches visual order.
-- [[principles#P-12. Keyboard Only]] — every field reachable and operable without the mouse; visible focus rings.
-- [[principles#V-03. Typography]] — body 12pt-ish; generous leading on multi-field forms.
+- [[principles#P-03. Satisficing]] â€” short plain labels; CTAs name the verb.
+- [[principles#P-05. Deferred Choices]] â€” required field set as small as possible; optional fields marked.
+- [[principles#P-07. Habituation]] â€” Enter submits; Esc cancels; Tab order matches visual order.
+- [[principles#P-12. Keyboard Only]] â€” every field reachable and operable without the mouse; visible focus rings.
+- [[principles#V-03. Typography]] â€” body 12pt-ish; generous leading on multi-field forms.
 
 **Anti-pattern sweep**
 
@@ -380,27 +383,27 @@ Tables, charts, graphs, complex visualisations.
 
 **Required patterns**
 
-- [[patterns#Datatips]] — hover reveals the underlying number on points/cells.
-- [[patterns#Dynamic Queries]] — filters apply live, not on a submit click.
-- [[patterns#Small Multiples]] — many-series comparison; one chart per series instead of overplotting.
+- [[patterns#Datatips]] â€” hover reveals the underlying number on points/cells.
+- [[patterns#Dynamic Queries]] â€” filters apply live, not on a submit click.
+- [[patterns#Small Multiples]] â€” many-series comparison; one chart per series instead of overplotting.
 - Sortable-table-style affordances via [[patterns#Two-Panel Selector or Split View]] or [[patterns#List Inlay]] when each row has detail.
 
 **Optional patterns**
 
-- [[patterns#Data Brushing]] — selecting in one chart highlights the same rows in others.
-- [[patterns#Data Spotlight]] — highlight a subset without losing surrounding context.
-- [[patterns#Multi-Y Graph]] — compare series with different units on one frame.
-- [[patterns#Annotated Scroll Bar]] — surface position markers on long tables (errors, search hits).
-- [[patterns#Pagination]] / [[patterns#Infinite List]] — for long rowsets where the right choice depends on whether the user scans or jumps.
-- [[patterns#Jump to Item]] — quick row access on long tables.
+- [[patterns#Data Brushing]] â€” selecting in one chart highlights the same rows in others.
+- [[patterns#Data Spotlight]] â€” highlight a subset without losing surrounding context.
+- [[patterns#Multi-Y Graph]] â€” compare series with different units on one frame.
+- [[patterns#Annotated Scroll Bar]] â€” surface position markers on long tables (errors, search hits).
+- [[patterns#Pagination]] / [[patterns#Infinite List]] â€” for long rowsets where the right choice depends on whether the user scans or jumps.
+- [[patterns#Jump to Item]] â€” quick row access on long tables.
 
 **Foundation gates**
 
-- [[principles#P-03. Satisficing]] — labels and units immediately legible; no decoder ring required.
-- [[principles#P-09. Spatial Memory]] — column order, axis scale, palette stable across visits.
-- [[principles#V-01. Visual hierarchy]] — dominant metric reads first; minor ones recede.
-- [[principles#V-02. Color]] — survives desaturation; categorical encodings reinforced with shape/text.
-- [[principles#V-06. Images]] — chart imagery carries meaning; no decorative chartjunk.
+- [[principles#P-03. Satisficing]] â€” labels and units immediately legible; no decoder ring required.
+- [[principles#P-09. Spatial Memory]] â€” column order, axis scale, palette stable across visits.
+- [[principles#V-01. Visual hierarchy]] â€” dominant metric reads first; minor ones recede.
+- [[principles#V-02. Color]] â€” survives desaturation; categorical encodings reinforced with shape/text.
+- [[principles#V-06. Images]] â€” chart imagery carries meaning; no decorative chartjunk.
 
 **Anti-pattern sweep**
 
@@ -426,28 +429,28 @@ Run this overlay on any surface above when the target is mobile (phone or small 
 
 **Required patterns**
 
-- [[patterns#Vertical Stack]] — primary content in a single column.
-- [[patterns#Bottom Navigation]] — top-level sections within thumb reach.
-- [[patterns#Touch Tools]] — taps, swipes, long-presses where the gesture matches the verb.
-- [[patterns#Generous Borders]] — 44pt+ tap targets per platform HIG.
-- [[patterns#Loading or Progress Indicators]] — progress, not just spinners, for waits over 1s.
+- [[patterns#Vertical Stack]] â€” primary content in a single column.
+- [[patterns#Bottom Navigation]] â€” top-level sections within thumb reach.
+- [[patterns#Touch Tools]] â€” taps, swipes, long-presses where the gesture matches the verb.
+- [[patterns#Generous Borders]] â€” 44pt+ tap targets per platform HIG.
+- [[patterns#Loading or Progress Indicators]] â€” progress, not just spinners, for waits over 1s.
 
 **Optional patterns**
 
-- [[patterns#Mobile Direct Access]] — first screen primes the most likely action using device signals.
-- [[patterns#Collections and Cards]] — multi-field items rendered as cards.
-- [[patterns#Filmstrip]] — swipe-paging when the user compares items.
-- [[patterns#Infinite List]] — long single-column lists.
-- [[patterns#Richly Connected Apps]] — universal links / app links so external URLs route to the right destination.
-- [[patterns#Make It Mobile]] — derive the mobile experience from mobile-first thinking, not shrunk-down desktop.
+- [[patterns#Mobile Direct Access]] â€” first screen primes the most likely action using device signals.
+- [[patterns#Collections and Cards]] â€” multi-field items rendered as cards.
+- [[patterns#Filmstrip]] â€” swipe-paging when the user compares items.
+- [[patterns#Infinite List]] â€” long single-column lists.
+- [[patterns#Richly Connected Apps]] â€” universal links / app links so external URLs route to the right destination.
+- [[patterns#Make It Mobile]] â€” derive the mobile experience from mobile-first thinking, not shrunk-down desktop.
 
 **Foundation gates**
 
-- [[principles#P-02. Instant Gratification]] — value within one or two taps of launch.
-- [[principles#P-07. Habituation]] — platform-standard gestures (back swipe, pull-to-refresh) work as expected.
-- [[principles#P-08. Microbreaks]] — persistent auth; restore-to-where; quick triage on cards.
-- [[principles#V-04. Readability]] — body legible in sun, under bifocals; line length 45-75ch.
-- [[principles#B-04. Natural user interfaces]] — touch/gesture affordances discoverable; fallback for users who can't or won't gesture.
+- [[principles#P-02. Instant Gratification]] â€” value within one or two taps of launch.
+- [[principles#P-07. Habituation]] â€” platform-standard gestures (back swipe, pull-to-refresh) work as expected.
+- [[principles#P-08. Microbreaks]] â€” persistent auth; restore-to-where; quick triage on cards.
+- [[principles#V-04. Readability]] â€” body legible in sun, under bifocals; line length 45-75ch.
+- [[principles#B-04. Natural user interfaces]] â€” touch/gesture affordances discoverable; fallback for users who can't or won't gesture.
 
 **Anti-pattern sweep**
 

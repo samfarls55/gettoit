@@ -1,10 +1,11 @@
-// compute-verdict Edge Function — runtime entry point.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// compute-verdict Edge Function â€” runtime entry point.
 //
 // Composes the pure HTTP handler from `./handler.ts` with the
 // supabase-js data adapter and the Deno.serve listener.
 //
 // References:
-//   * Original PRD §"VerdictEngine" (gti-vault/10_prds/0.1.0-prd.md)
+//   * Original PRD Â§"VerdictEngine" (gti-vault/10_prds/0.1.0-prd.md)
 //   * TB-06 ticket (gti-vault/15_issues/0.1.0/issues/tb-06-verdict-engine-clean-run.md)
 //   * Engine spec: supabase/functions/_shared/verdict-engine.ts
 
@@ -27,7 +28,7 @@ import {
   type QuestionSlot,
   type VotesRow,
 } from "../_shared/votes-schema.ts";
-// tb-WF-11 — resolves each member's name from the joined
+// tb-WF-11 â€” resolves each member's name from the joined
 // `members.display_name`, falling back to the `m<uuid>` placeholder.
 import { resolveMemberDisplayName } from "./member-display-name.ts";
 // `HardVeto` is referenced by the `fetchProfileVetoes` adapter method
@@ -43,7 +44,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
 
   return {
     async fetchRoom(room_id) {
-      // tb-WF-1 — select `plan_id` too so the handler can transition
+      // tb-WF-1 â€” select `plan_id` too so the handler can transition
       // the parent Plan to `decided-active` on a successful verdict.
       // The column exists on every row post-migration (NULL on legacy
       // S01-created rooms); the handler treats a NULL as "no Plan."
@@ -70,7 +71,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       return (data ?? []) as RoomOptionRow[];
     },
     async fetchMemberFetches(room_id): Promise<MemberFetchRow[]> {
-      // TB-21 — read every member's persisted raw Foursquare fetch for
+      // TB-21 â€” read every member's persisted raw Foursquare fetch for
       // the room. `member_fetches.payload` is the jsonb array of every
       // venue the member's fetch returned (the full raw union, not the
       // three Q5 factorial cards). The service-role key bypasses RLS so
@@ -95,7 +96,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       });
     },
     async insertOptions(rows: OptionInsertRow[]): Promise<void> {
-      // TB-21 — write the unioned candidate pool into `options`. The
+      // TB-21 â€” write the unioned candidate pool into `options`. The
       // handler calls this only when `options` is empty for the room,
       // so a plain insert is correct; the `options` (room_id,
       // fsq_place_id) UNIQUE constraint is a backstop against a racing
@@ -118,11 +119,11 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
     },
     async fetchVotes(room_id): Promise<MemberVoteRow[]> {
-      // TB-04 — `votes` now stores answers in five generic jsonb slots
+      // TB-04 â€” `votes` now stores answers in five generic jsonb slots
       // (`q1`..`q5`). The engine's answer fields are derived by the
       // schema-driven mapping layer `_shared/votes-schema.ts`, which
       // dispatches each slot on `meta.question_kind` rather than on a
-      // hardcoded column name — so quiz content can change without a
+      // hardcoded column name â€” so quiz content can change without a
       // migration or an engine change.
       const { data, error } = await client
         .from("votes")
@@ -132,14 +133,14 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         console.warn("compute-verdict fetchVotes failed:", error.message);
         return [];
       }
-      // tb-WF-11 — join `members.display_name` for the room. The web
-      // invitee shell (sg-WF-5 surface §A) writes a real name onto the
+      // tb-WF-11 â€” join `members.display_name` for the room. The web
+      // invitee shell (sg-WF-5 surface Â§A) writes a real name onto the
       // `members` row when a Web invitee enters one on the name-entry
       // surface; iOS members have no name-entry surface so their
       // `display_name` stays NULL. `votes` and `members` share the
       // (room_id, user_id) key but carry no FK between them, so this is
       // a separate read folded into a map rather than a PostgREST
-      // embed. A failed members read degrades to "no names" — every
+      // embed. A failed members read degrades to "no names" â€” every
       // member then resolves to the `m<uuid>` placeholder, the same
       // behavior as before this column existed.
       const memberNames = new Map<string, string | null>();
@@ -164,7 +165,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         }
       }
       // The receipts surface wants a lowercase first name per
-      // verdict-screen-spec §"Copy register". `resolveMemberDisplayName`
+      // verdict-screen-spec Â§"Copy register". `resolveMemberDisplayName`
       // returns the joined `members.display_name` when set, and falls
       // back to the legacy `"m" + userId.slice(0, 4)` placeholder when
       // it is NULL (iOS members, which have no name-entry surface).
@@ -186,7 +187,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         // `vetoes_extra` into `q1_vetoes`, so the handler's
         // `q1_vetoes_extra` merge is a harmless no-op here.
         const vote = mapVotesRowToMemberVote(votesRow);
-        // TB-23 — the preference inputs (stated Q1/Q3/Q4 profile + the
+        // TB-23 â€” the preference inputs (stated Q1/Q3/Q4 profile + the
         // three Q5 factorial ratings). The handler builds the member's
         // `prefFn` from these and scores the full candidate pool with
         // it. The same schema-driven mapper dispatches on
@@ -237,7 +238,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       };
     },
     async fetchProfileVetoes(user_ids) {
-      // TB-12 — read each voting member's sticky per-account profile
+      // TB-12 â€” read each voting member's sticky per-account profile
       // vetoes from `user_preferences.profile_vetoes` (a jsonb array of
       // `{ kind, token }` HardVeto entries). The service-role key
       // bypasses RLS so the verdict can read every member's profile,
@@ -251,7 +252,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .in("user_id", user_ids);
       if (error) {
         // Best-effort: a failed profile read must not block the
-        // verdict. Logged + treated as "no profile vetoes" — the only
+        // verdict. Logged + treated as "no profile vetoes" â€” the only
         // risk is surfacing a venue a member would have vetoed, which
         // the no-profile path already accepts pre-TB-12.
         console.warn("compute-verdict fetchProfileVetoes failed:", error.message);
@@ -283,7 +284,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       // Race-tolerant: the prior verdict may have been deleted by
       // apply_reroll already. We surface null in that case so the
       // engine's reroll prefix falls back to "the prior pick" copy.
-      // The verdict has option_id null only for `no_survivor` — we
+      // The verdict has option_id null only for `no_survivor` â€” we
       // skip those too.
       const { data: verdictRow } = await client
         .from("verdicts")
@@ -356,7 +357,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       return (data ?? null) as VerdictRow | null;
     },
     async markRoomVerdictReady(room_id): Promise<void> {
-      // Flip rooms.status from firing → verdict_ready. The migration
+      // Flip rooms.status from firing â†’ verdict_ready. The migration
       // schema admits the transition from `open` directly too (the
       // single-tap manual fire can land while the dispatcher is in
       // flight and the trigger may have not yet seen `firing`).
@@ -364,7 +365,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .from("rooms")
         .update({ status: "verdict_ready" })
         .eq("id", room_id)
-        // Only flip from these two states — never overwrite `locked`
+        // Only flip from these two states â€” never overwrite `locked`
         // or `expired`.
         .in("status", ["open", "firing"]);
       if (error) {
@@ -373,7 +374,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
     },
     async setPlanDecidedActive(plan_id: string): Promise<void> {
-      // tb-WF-1 — invoke the `set_plan_decided_active(p_plan_id uuid)`
+      // tb-WF-1 â€” invoke the `set_plan_decided_active(p_plan_id uuid)`
       // SECURITY DEFINER function. The function flips the Plan's
       // status to `decided-active` and stamps `reroll_window_closes_at`.
       // Idempotent: a non-pending Plan is a no-op inside the function
@@ -392,9 +393,9 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
     },
     async emitVerdictReadyBroadcast(room_id, verdict_id): Promise<void> {
-      // Realtime Broadcast — `room:{roomId}` channel, `verdict_ready`
-      // event. iOS subscribers receive in ~50–200ms per
-      // stack-patterns.md §Realtime.
+      // Realtime Broadcast â€” `room:{roomId}` channel, `verdict_ready`
+      // event. iOS subscribers receive in ~50â€“200ms per
+      // stack-patterns.md Â§Realtime.
       //
       // We use the HTTP-based Realtime API rather than the WS channel
       // because the Edge Function lives in a short-lived Deno worker;

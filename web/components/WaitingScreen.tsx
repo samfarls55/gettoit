@@ -1,14 +1,14 @@
 // GetToIt web — Surface 04 (Waiting), web fallback variant.
 //
 // Web equivalent of `design-system/code/screens/ScreenWaiting.jsx`.
-// Differences from the iOS version, enforced by TB-15 scope:
+// Differences from the mobile app version, enforced by TB-15 scope:
 //   * No Auth Upgrade Chip (ADR 0007 forbids Apple Sign-in on web).
 //   * No "Decide now" CTA — the web fallback never has the initiator
-//     role (initiators created the room on iOS) and the migration's
+//     role (initiators created the room in the mobile app) and the migration's
 //     fire_verdict() RPC checks `creator_user_id = auth.uid()`.
 //   * No "Nudge" CTA — no nudge plumbing is in scope pre-launch.
 // What stays: avatar row, "N of M are in" headline, low-emphasis
-// countdown, the same animated copy register as iOS.
+// countdown, the same animated copy register as the mobile app.
 //
 // TB-02 (quiz redesign) addition — sg-03 "Download the app" CTA. Renders in
 // the dock when the caller is on the web fallback AND anonymous (the
@@ -54,7 +54,7 @@ export type WaitingScreenProps = {
   outstandingName?: string;
   /** sg-03 / TB-02 (quiz redesign) — when both are true, render the
    *  "Download the app" CTA in the dock. Web-fallback anonymous
-   *  invitees are the canonical caller; iOS users and Apple-linked
+   *  invitees are the canonical caller; mobile app users and Apple-linked
    *  web users (currently impossible per ADR 0007, but the prop is
    *  here so the suppression is explicit) suppress the CTA. */
   isAnonymous?: boolean;
@@ -239,7 +239,7 @@ export function WaitingScreen({
             the `platform === 'web' && isAnonymous` branch in
             `design-system/code/screens/ScreenWaiting.jsx`. We don't
             check `platform` explicitly because this component IS the
-            web-fallback render path; the iOS app never instantiates
+            web-fallback render path; the mobile app never instantiates
             it (per the TB-15 comment at the top of the file). Apple-
             linked web users (impossible today per ADR 0007 but
             modeled for forward compatibility) hide the CTA via

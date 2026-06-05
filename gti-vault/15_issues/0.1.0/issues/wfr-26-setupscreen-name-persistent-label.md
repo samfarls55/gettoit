@@ -9,7 +9,10 @@ closed: 2026-05-26
 github_issue: 267
 ---
 
-# wfr-26 — SetupScreen name field uses placeholder-as-label (anti-pattern)
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-26 â€” SetupScreen name field uses placeholder-as-label (anti-pattern)
 
 ## What to build
 
@@ -23,7 +26,7 @@ github_issue: 267
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Hub anchors
 
@@ -36,4 +39,4 @@ None — can start immediately.
 
 ## Comments
 
-- 2026-05-26 — Closed via PR #307 (`afk/wfr-26`). Replaced the eyebrow above the name input (`NAME THIS PLAN`, eyebrow-token UPPERCASE) with a persistent field label rendered through a new `fieldLabel(_:id:)` helper — sentence case `Name this plan`, `GTIFont.Size.sm` (14pt) / weight 600 / `TextOnGradient.secondary` (white 0.78). The new treatment reads as a field label, not a section heading, so the label can't be mistaken for one of the other five eyebrow rows on the surface. Persistence: the label sits above the row and stays put during and after typing; the in-field placeholder `Name this plan` keeps its Input Prompt role and still disappears on type. VoiceOver: the visible label is `accessibilityHidden(true)` and the TextField's existing `accessibilityLabel("Name this plan")` is the single VO announcement — no double-read. Identifier renamed `setup.name.eyebrow` → `setup.name.label` (no existing tests referenced the old identifier). New static `SetupScreen.nameLabelCopy()` pins the label copy for unit tests. Render coverage added in `SetupScreenRenderTests`: empty + typed (typed seeded via `editingPlan` prefill) per AC #3. Surface doc (`design-system/surfaces/01-setup.md`) gained a wfr-26 override note next to the wfr-24 override; the JSX (`design-system/code/screens/ScreenSetup.jsx`) mirrors the iOS treatment with `aria-hidden="true"` on the visible label. The other five rows continue to use the eyebrow treatment — the override is scoped to the one text-input row.
+- 2026-05-26 â€” Closed via PR #307 (`afk/wfr-26`). Replaced the eyebrow above the name input (`NAME THIS PLAN`, eyebrow-token UPPERCASE) with a persistent field label rendered through a new `fieldLabel(_:id:)` helper â€” sentence case `Name this plan`, `GTIFont.Size.sm` (14pt) / weight 600 / `TextOnGradient.secondary` (white 0.78). The new treatment reads as a field label, not a section heading, so the label can't be mistaken for one of the other five eyebrow rows on the surface. Persistence: the label sits above the row and stays put during and after typing; the in-field placeholder `Name this plan` keeps its Input Prompt role and still disappears on type. VoiceOver: the visible label is `accessibilityHidden(true)` and the TextField's existing `accessibilityLabel("Name this plan")` is the single VO announcement â€” no double-read. Identifier renamed `setup.name.eyebrow` â†’ `setup.name.label` (no existing tests referenced the old identifier). New static `SetupScreen.nameLabelCopy()` pins the label copy for unit tests. Render coverage added in `SetupScreenRenderTests`: empty + typed (typed seeded via `editingPlan` prefill) per AC #3. Surface doc (`design-system/surfaces/01-setup.md`) gained a wfr-26 override note next to the wfr-24 override; the JSX (`design-system/code/screens/ScreenSetup.jsx`) mirrors the iOS treatment with `aria-hidden="true"` on the visible label. The other five rows continue to use the eyebrow treatment â€” the override is scoped to the one text-input row.

@@ -1,10 +1,11 @@
-// bug-13 — an empty candidate pool is a terminal no-survivor verdict,
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// bug-13 â€” an empty candidate pool is a terminal no-survivor verdict,
 // not a 404.
 //
 // Before bug-13, `compute-verdict` returned `{"error":"no_candidates"}`
 // as HTTP 404 when a room had no `options` rows. No `verdicts` row was
 // written, so the room stayed in `status='firing'` forever and iOS
-// polled a verdict that never landed — wedging ~29% of sessions on
+// polled a verdict that never landed â€” wedging ~29% of sessions on
 // 2026-05-19.
 //
 // The fix: an empty pool now flows through the engine (which already
@@ -12,7 +13,7 @@
 // the handler persists the terminal verdict row + advances the room out
 // of `firing`, exactly as a normal verdict does.
 //
-// These tests drive the pure handler with an in-memory adapter — no
+// These tests drive the pure handler with an in-memory adapter â€” no
 // supabase-js client, no network.
 
 import {
@@ -123,13 +124,13 @@ const votesFor = (...userIds: string[]): MemberVoteRow[] =>
     scores: {},
   }));
 
-// ───────────────────────────────────────────────────────────────────────
-// AC1 — empty pool writes a terminal no-survivor verdict, not a 404
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// AC1 â€” empty pool writes a terminal no-survivor verdict, not a 404
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — empty candidate pool writes a no_survivor verdict (not no_candidates 404)", async () => {
+Deno.test("compute-verdict â€” empty candidate pool writes a no_survivor verdict (not no_candidates 404)", async () => {
   const { adapter, inserts, cuts } = emptyPoolAdapter({
-    options: [], // no candidates at all — the wedge condition
+    options: [], // no candidates at all â€” the wedge condition
     votes: votesFor("u1"),
   });
 
@@ -141,7 +142,7 @@ Deno.test("compute-verdict — empty candidate pool writes a no_survivor verdict
   assertEquals(
     res.status,
     200,
-    "an empty pool must NOT 404 — it is a terminal outcome the surface renders",
+    "an empty pool must NOT 404 â€” it is a terminal outcome the surface renders",
   );
   const body = await res.json();
   assertEquals(body.error, undefined, "no error payload on an empty pool");
@@ -164,11 +165,11 @@ Deno.test("compute-verdict — empty candidate pool writes a no_survivor verdict
   assertExists(body.surviving_hard_needs);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// AC2 — the room advances out of status='firing' on an empty pool
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// AC2 â€” the room advances out of status='firing' on an empty pool
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — empty pool advances the room out of firing", async () => {
+Deno.test("compute-verdict â€” empty pool advances the room out of firing", async () => {
   const { adapter, verdictReadyRoomIds } = emptyPoolAdapter({
     options: [],
     votes: votesFor("u1"),
@@ -187,11 +188,11 @@ Deno.test("compute-verdict — empty pool advances the room out of firing", asyn
   );
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// AC3 — a non-empty pool still resolves to a ranked verdict (no regression)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// AC3 â€” a non-empty pool still resolves to a ranked verdict (no regression)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — non-empty pool still resolves to a ranked verdict", async () => {
+Deno.test("compute-verdict â€” non-empty pool still resolves to a ranked verdict", async () => {
   const { adapter, inserts } = emptyPoolAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
@@ -220,12 +221,12 @@ Deno.test("compute-verdict — non-empty pool still resolves to a ranked verdict
   assertEquals(inserts.length, 1);
 });
 
-// ───────────────────────────────────────────────────────────────────────
-// Degenerate — a room with no votes at all still 404s (no members to
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Degenerate â€” a room with no votes at all still 404s (no members to
 // render a verdict for; that is a distinct failure from an empty pool).
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-Deno.test("compute-verdict — empty pool AND no votes still returns no_votes 404", async () => {
+Deno.test("compute-verdict â€” empty pool AND no votes still returns no_votes 404", async () => {
   const { adapter, inserts } = emptyPoolAdapter({
     options: [],
     votes: [],
@@ -241,7 +242,7 @@ Deno.test("compute-verdict — empty pool AND no votes still returns no_votes 40
   assertEquals(
     body.error,
     "no_votes",
-    "no members means no verdict — distinct from an empty candidate pool",
+    "no members means no verdict â€” distinct from an empty candidate pool",
   );
   assertEquals(inserts.length, 0);
 });

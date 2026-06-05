@@ -1,4 +1,5 @@
--- TB-04 (quiz redesign) — generic Q1..Q5 jsonb votes schema.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-04 (quiz redesign) â€” generic Q1..Q5 jsonb votes schema.
 --
 -- Replaces the pre-redesign `votes` table's typed-per-question columns
 -- (`q1_vetoes text[]`, `q2_budget int`, `q3_walk_minutes int`,
@@ -9,17 +10,17 @@
 -- the schema to one fixed quiz; the generic slots decouple it.
 --
 -- Each slot stores a `{ meta, answer }` envelope:
---   * `meta`   — per-session question metadata. The load-bearing field
+--   * `meta`   â€” per-session question metadata. The load-bearing field
 --                is `question_kind` (a discriminator: `dietary_veto`,
 --                `budget_cap`, `walk_minutes`, `vibe`, `regret`). `meta`
 --                may also carry the prompt + option copy the session
---                showed — descriptive, for audit / replay.
---   * `answer` — the member's response payload, shaped per kind.
+--                showed â€” descriptive, for audit / replay.
+--   * `answer` â€” the member's response payload, shaped per kind.
 -- The verdict engine reads these slots through the schema-driven
 -- mapping layer in `supabase/functions/_shared/votes-schema.ts`, which
 -- dispatches on `meta.question_kind` rather than on the column name.
 -- Per-session question variability lives in the jsonb, never in the
--- schema — that is the whole point of the slot shape.
+-- schema â€” that is the whole point of the slot shape.
 --
 -- Pre-launch with no real user data, so recreating the table is
 -- acceptable (the pre-redesign TestFlight dogfood produced no rows worth
@@ -28,7 +29,7 @@
 --
 -- RLS, the (room_id, user_id) primary key, the write-once contract,
 -- and the cascading FKs are carried over verbatim from the pre-redesign votes
--- migration (`20260513215000000_votes.sql`) — only the answer columns
+-- migration (`20260513215000000_votes.sql`) â€” only the answer columns
 -- change shape. See that file's header for the rationale behind each
 -- policy; it is unchanged here.
 --
@@ -38,7 +39,7 @@
 -- It is re-created defensively at the end if the recreate dropped it
 -- via CASCADE.
 
--- ── Recreate the table ───────────────────────────────────────────────
+-- â”€â”€ Recreate the table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- CASCADE drops any objects that depended on the old column shape
 -- (e.g. the verdict-fire trigger). They are restored below.
 drop table if exists public.votes cascade;
@@ -49,7 +50,7 @@ create table public.votes (
     -- Generic question slots. Each is a `{ meta, answer }` jsonb
     -- envelope; `meta.question_kind` is the discriminator the engine's
     -- mapping layer dispatches on. A slot is NULL when the session did
-    -- not ask that question — the mapping layer defaults an absent
+    -- not ask that question â€” the mapping layer defaults an absent
     -- slot to the most-permissive answer so an unasked question never
     -- prunes a candidate.
     q1         jsonb,
@@ -105,24 +106,24 @@ comment on table public.votes is
     'Per-user quiz answers for a room, stored as five generic jsonb question slots (q1..q5). Each slot is a { meta, answer } envelope; meta.question_kind tells the verdict-engine mapping layer how to interpret answer. Written once on quiz-submit; the (room_id, user_id) primary key prevents pollution from a re-submit. Read by the VerdictEngine via _shared/votes-schema.ts.';
 
 comment on column public.votes.q1 is
-    'Generic question slot 1 — { meta, answer } jsonb envelope. meta.question_kind discriminates the answer shape. NULL when the session did not ask a question here.';
+    'Generic question slot 1 â€” { meta, answer } jsonb envelope. meta.question_kind discriminates the answer shape. NULL when the session did not ask a question here.';
 comment on column public.votes.q2 is
-    'Generic question slot 2 — see q1.';
+    'Generic question slot 2 â€” see q1.';
 comment on column public.votes.q3 is
-    'Generic question slot 3 — see q1.';
+    'Generic question slot 3 â€” see q1.';
 comment on column public.votes.q4 is
-    'Generic question slot 4 — see q1.';
+    'Generic question slot 4 â€” see q1.';
 comment on column public.votes.q5 is
-    'Generic question slot 5 — see q1.';
+    'Generic question slot 5 â€” see q1.';
 
 create index if not exists votes_room_id_idx on public.votes (room_id);
 
--- ── RLS — carried over verbatim from 20260513215000000_votes.sql ─────
+-- â”€â”€ RLS â€” carried over verbatim from 20260513215000000_votes.sql â”€â”€â”€â”€â”€
 alter table public.votes enable row level security;
 
 -- A user can see their own vote and any other member's votes for the
 -- same room (the verdict screen surfaces room-mate picks as
--- voice-receipts — PRD user story 34).
+-- voice-receipts â€” PRD user story 34).
 drop policy if exists "votes_select_room_members" on public.votes;
 create policy "votes_select_room_members" on public.votes
     for select
@@ -143,19 +144,19 @@ create policy "votes_insert_self_in_room" on public.votes
         and room_id in (select room_id from public.members where user_id = (select auth.uid()))
     );
 
--- No UPDATE / DELETE policies — RLS denies by default. The quiz is
+-- No UPDATE / DELETE policies â€” RLS denies by default. The quiz is
 -- write-once per (room, user); correcting an answer means exiting and
 -- starting fresh, which lands the user back on the same unique-
 -- constraint reject (PRD user story 26).
 
--- ── Restore the verdict-fire trigger ─────────────────────────────────
+-- â”€â”€ Restore the verdict-fire trigger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- The DROP TABLE ... CASCADE above removed the `AFTER INSERT ON votes`
 -- trigger (`votes_maybe_fire_verdict`) that fires the VerdictEngine on
 -- full quorum. Re-create it so the auto-fire path survives the table
 -- recreate. The trigger function `public.votes_maybe_fire_verdict()`
 -- is defined in `20260513224000000_verdict_fire_trigger_and_cron.sql`
--- and reads only `new.room_id` + room state + a `count(*)` of votes —
--- never the old typed answer columns — so the recreated trigger
+-- and reads only `new.room_id` + room state + a `count(*)` of votes â€”
+-- never the old typed answer columns â€” so the recreated trigger
 -- behaves identically against the new jsonb shape.
 --
 -- The function survives the table DROP (it is schema-level, not
@@ -164,7 +165,7 @@ create policy "votes_insert_self_in_room" on public.votes
 -- is safe to run on a fresh database where the verdict-fire migration
 -- has not yet applied (migrations run in filename order, and this one
 -- is dated after the verdict-fire migration, so in practice the
--- function is always present — the guard is defensive).
+-- function is always present â€” the guard is defensive).
 do $$
 begin
     if exists (
@@ -181,11 +182,11 @@ begin
 end
 $$;
 
--- ── SQL-side mapping helpers ──────────────────────────────────────────
+-- â”€â”€ SQL-side mapping helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 --
 -- The verdict engine reads votes through the TypeScript mapping layer
--- (`_shared/votes-schema.ts`). Two SQL RPCs — `apply_reroll` and
--- `fetch_read_only_verdict` — also read / write quiz answers and were
+-- (`_shared/votes-schema.ts`). Two SQL RPCs â€” `apply_reroll` and
+-- `fetch_read_only_verdict` â€” also read / write quiz answers and were
 -- written against the old typed columns. Rather than re-couple them to
 -- a fixed quiz, they go through these SQL-side mapping helpers, which
 -- mirror the TypeScript layer: dispatch on `meta.question_kind`, never
@@ -221,9 +222,9 @@ as $$
 $$;
 
 comment on function public.votes_slot_of_kind(uuid, uuid, text) is
-    'TB-04 — return the { meta, answer } jsonb slot of a given question_kind for one member''s votes row. NULL when absent. Mirrors the dispatch-on-question_kind contract of _shared/votes-schema.ts.';
+    'TB-04 â€” return the { meta, answer } jsonb slot of a given question_kind for one member''s votes row. NULL when absent. Mirrors the dispatch-on-question_kind contract of _shared/votes-schema.ts.';
 
--- Aggregate helper — the MIN integer answer for a kind across every
+-- Aggregate helper â€” the MIN integer answer for a kind across every
 -- member of a room. Used by apply_reroll's cost / dist tightening.
 -- `answer #>> {answer_key}` is the per-kind scalar; rows whose slot is
 -- absent or non-numeric are skipped. `p_default` is returned when no
@@ -255,7 +256,7 @@ as $$
 $$;
 
 comment on function public.votes_min_int_answer(uuid, text, text, int) is
-    'TB-04 — MIN integer answer for a question_kind across a room''s votes. Skips members whose slot is absent / non-numeric; returns p_default when none supplied. Mirrors the room-aggregate MIN the verdict engine computes.';
+    'TB-04 â€” MIN integer answer for a question_kind across a room''s votes. Skips members whose slot is absent / non-numeric; returns p_default when none supplied. Mirrors the room-aggregate MIN the verdict engine computes.';
 
 -- Patch the `answer` of whichever slot in a member's votes row carries
 -- a given question_kind, merging `p_answer_patch` into the existing
@@ -302,20 +303,20 @@ end;
 $$;
 
 comment on function public.votes_patch_answer(uuid, uuid, text, jsonb) is
-    'TB-04 — merge an answer patch into whichever generic slot carries a given question_kind for one member. SECURITY DEFINER (votes has no client UPDATE policy). No-op when the kind is absent. Used by apply_reroll mood / diet paths.';
+    'TB-04 â€” merge an answer patch into whichever generic slot carries a given question_kind for one member. SECURITY DEFINER (votes has no client UPDATE policy). No-op when the kind is absent. Used by apply_reroll mood / diet paths.';
 
--- ── apply_reroll — re-created against the generic jsonb shape ─────────
+-- â”€â”€ apply_reroll â€” re-created against the generic jsonb shape â”€â”€â”€â”€â”€â”€â”€â”€â”€
 --
 -- TB-04: the pre-redesign `apply_reroll` (20260514000300000_rerolls.sql) read
 -- `min(q2_budget)` / `min(q3_walk_minutes)` and wrote `q4_vibe` /
 -- `q1_vetoes_extra` directly. Those typed columns are gone. The body
--- below is identical in BEHAVIOR — same validation, same 3-cap, same
--- per-reason mutations, same return shape — but the four quiz-answer
+-- below is identical in BEHAVIOR â€” same validation, same 3-cap, same
+-- per-reason mutations, same return shape â€” but the four quiz-answer
 -- touch points now go through the mapping helpers above:
---   * cost  — votes_min_int_answer(..., 'budget_cap', 'tier', 4)
---   * dist  — votes_min_int_answer(..., 'walk_minutes', 'minutes', 30)
---   * mood  — votes_patch_answer(..., 'vibe', { "level": <new> })
---   * diet  — appends to the dietary slot's `answer.vetoes_extra` array
+--   * cost  â€” votes_min_int_answer(..., 'budget_cap', 'tier', 4)
+--   * dist  â€” votes_min_int_answer(..., 'walk_minutes', 'minutes', 30)
+--   * mood  â€” votes_patch_answer(..., 'vibe', { "level": <new> })
+--   * diet  â€” appends to the dietary slot's `answer.vetoes_extra` array
 -- The dietary reroll-extra chips land in `answer.vetoes_extra`; the
 -- TypeScript mapping layer unions them into `q1_vetoes` for the engine.
 create or replace function public.apply_reroll(
@@ -390,7 +391,7 @@ begin
     values (p_room_id, v_caller, p_reason, p_detail)
     returning id into v_reroll_id;
 
-    -- Per-reason mutations — same semantics as pre-redesign, jsonb-backed.
+    -- Per-reason mutations â€” same semantics as pre-redesign, jsonb-backed.
     if p_reason = 'cost' then
         v_existing_budget := least(
             public.votes_min_int_answer(p_room_id, 'budget_cap', 'tier', 4),
@@ -418,7 +419,7 @@ begin
 
     elsif p_reason = 'diet' then
         -- Append the chip to the dietary slot's `answer.vetoes_extra`
-        -- array — the immutable `answer.vetoes` original is untouched.
+        -- array â€” the immutable `answer.vetoes` original is untouched.
         -- The mapping layer unions vetoes + vetoes_extra for the engine.
         v_diet_slot := public.votes_slot_of_kind(p_room_id, v_caller, 'dietary_veto');
         if v_diet_slot is not null then
@@ -464,11 +465,11 @@ end;
 $$;
 
 comment on function public.apply_reroll(uuid, text, text, text, int) is
-    'TB-10 reroll RPC (TB-04 re-cut for the generic jsonb votes shape). Same behavior — member check, 3/room cap, per-reason mutation, verdict drop, last_reroll_reason stamp — but the quiz-answer reads / writes go through the votes_* mapping helpers instead of typed columns.';
+    'TB-10 reroll RPC (TB-04 re-cut for the generic jsonb votes shape). Same behavior â€” member check, 3/room cap, per-reason mutation, verdict drop, last_reroll_reason stamp â€” but the quiz-answer reads / writes go through the votes_* mapping helpers instead of typed columns.';
 
 revoke all on function public.apply_reroll(uuid, text, text, text, int) from public;
 
--- ── fetch_read_only_verdict — receipts re-cut for the jsonb shape ────
+-- â”€â”€ fetch_read_only_verdict â€” receipts re-cut for the jsonb shape â”€â”€â”€â”€
 --
 -- TB-04: the pre-redesign `fetch_read_only_verdict`
 -- (20260514000500000_join_room_smart.sql) built each receipt from the
@@ -535,7 +536,7 @@ begin
     left join public.options o on o.id = oc.option_id
     where oc.verdict_id = v_verdict.id;
 
-    -- Receipts — every vote row for the room, projected back to the
+    -- Receipts â€” every vote row for the room, projected back to the
     -- legacy receipt shape from the generic slots via the mapping
     -- helpers. q1_vetoes is the union of the dietary slot's `vetoes`
     -- and `vetoes_extra` (diet-reroll additions) so it matches what

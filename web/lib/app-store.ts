@@ -14,7 +14,7 @@
 // placeholder" callout for the swap checklist.
 
 /**
- * iOS App Store URL for GetToIt. Placeholder until the Apple ID is
+ * App Store URL for the active React Native mobile app. Placeholder until the Apple ID is
  * allocated (see TODO above).
  *
  * Web-friendly `https://` form is used unconditionally — the iOS-

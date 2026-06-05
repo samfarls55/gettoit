@@ -1,7 +1,10 @@
 ---
-title: Patterns — flat alphabetical catalog of 81 UI patterns
+title: Patterns â€” flat alphabetical catalog of 81 UI patterns
 purpose: Single canonical reference for every named interaction pattern, with tags, signals, and anti-patterns
 ---
+
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
 
 # Interaction Patterns
 

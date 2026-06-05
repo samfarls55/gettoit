@@ -10,6 +10,9 @@ related:
   - "[[ios-ci-setup]]"
 ---
 
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
 # GitHub Actions Secrets
 
 GitHub Issues and CI are remote; Codex runs in its own sandbox and does not need a repo devcontainer. This runbook is the durable secret roster that replaced the old devcontainer setup note.

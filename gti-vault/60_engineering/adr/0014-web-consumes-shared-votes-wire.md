@@ -7,19 +7,22 @@ supersedes: null
 superseded_by: null
 ---
 
-# 0014 — Web consumes a shared votes-wire module
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# 0014 â€” Web consumes a shared votes-wire module
 
 ## Status
 
-Accepted — 2026-05-21. Decided in the `/grill-with-docs` session
+Accepted â€” 2026-05-21. Decided in the `/grill-with-docs` session
 on the web invitee single-link flow
 ([[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]]
-§Q2). Implemented by tb-WF-10.
+Â§Q2). Implemented by tb-WF-10.
 
 ## Context
 
-The vote **wire shape** — the `{ meta, answer }` envelope per quiz
-slot, plus the helpers that build it from a set of quiz answers — is
+The vote **wire shape** â€” the `{ meta, answer }` envelope per quiz
+slot, plus the helpers that build it from a set of quiz answers â€” is
 currently defined **three separate times**:
 
 1. iOS, in Swift.
@@ -38,23 +41,23 @@ silently fell a whole quiz generation behind because nothing forces
 it to track the other two.
 
 The web invitee flow has to produce 0.1.0-shaped votes. The naive fix
-is to hand-update `web/lib/quiz.ts` to match — i.e. keep the mirror
+is to hand-update `web/lib/quiz.ts` to match â€” i.e. keep the mirror
 and re-sync it. But three hand-copies already produced one silent
 divergence; a fourth re-sync just resets the clock on the next one.
 
 Two existing ADRs frame how this monorepo shares code:
 
-- [[0004-monorepo-layout|ADR 0004]] chose **no shared package** — no
+- [[0004-monorepo-layout|ADR 0004]] chose **no shared package** â€” no
   pnpm workspaces, no git submodules, "no package-publish overhead"
   for a solo dev with one consumer pair. It also accepted "no
   enforced package boundaries," assuming cross-imports would be
   *accidental* and caught in review.
 - [[0003-web-fallback-nextjs-vercel|ADR 0003]] ruled that **`web/`
-  must not import from `design-system/code/`** — the design-system
+  must not import from `design-system/code/`** â€” the design-system
   JSX is *spec*, web re-implements it, and the `verify.mjs` drift
   gate is the contract.
 
-A web→`supabase/functions/_shared` import is neither of those
+A webâ†’`supabase/functions/_shared` import is neither of those
 situations, but it is close enough to both that proceeding silently
 would leave a future reader unsure whether it was a mistake.
 
@@ -65,8 +68,8 @@ into a new leaf module, `supabase/functions/_shared/votes-wire.ts`.
 The web app imports it directly. The `web/lib/quiz.ts` hand-mirror is
 deleted.**
 
-`votes-wire.ts` is a **leaf module**: it imports no engine code —
-only the tiny `Q5Rating` / `Axis` types — and it has no relative
+`votes-wire.ts` is a **leaf module**: it imports no engine code â€”
+only the tiny `Q5Rating` / `Axis` types â€” and it has no relative
 imports of its own. That property is load-bearing (see Consequences):
 it is what keeps the module consumable by both the Deno edge runtime
 and the Next.js / Node web build without a resolution mismatch.
@@ -78,11 +81,11 @@ monorepo.
 
 1. **One un-forkable contract.** Three hand-copies produced exactly
    one silent rot; a fourth copy guarantees the next. A single
-   imported module cannot drift from itself — the web app and the
+   imported module cannot drift from itself â€” the web app and the
    edge functions compile against the same source.
 2. **ADR 0004's "no shared package" reasoning does not bite here.**
    That decision rejected the *publish overhead* of npm workspaces /
-   submodules — versioning, pinning, a publish step. A direct
+   submodules â€” versioning, pinning, a publish step. A direct
    relative import of one leaf `.ts` file has none of that overhead.
    "No package" and "no shared file" are different claims; ADR 0004
    only made the first.
@@ -93,10 +96,10 @@ monorepo.
    dangerous** (a malformed vote, a verdict computed on the wrong
    shape), and no drift gate can catch it the way `verify.mjs` catches
    an orphan hex. For a data contract, importing the one true source
-   is *safer* than re-implementing it — the opposite of the
+   is *safer* than re-implementing it â€” the opposite of the
    design-system case.
-4. **The seam is already narrow.** The web invitee grill (§Q1/§Q2)
-   pinned the shell↔quiz boundary to exactly a vote envelope and a
+4. **The seam is already narrow.** The web invitee grill (Â§Q1/Â§Q2)
+   pinned the shellâ†”quiz boundary to exactly a vote envelope and a
    progress envelope. `votes-wire.ts` *is* that boundary made into a
    file.
 
@@ -104,7 +107,7 @@ monorepo.
 
 - **From [[0004-monorepo-layout|ADR 0004]].** ADR 0004 assumed
   cross-sibling imports would be accidental. This establishes a
-  *deliberate, sanctioned* one. It is **not** a reversal — no package,
+  *deliberate, sanctioned* one. It is **not** a reversal â€” no package,
   no workspace, no publish step is introduced; ADR 0004's actual
   decision stands. What changes is that the monorepo now has one
   intentional cross-import, and future readers must treat
@@ -113,28 +116,28 @@ monorepo.
   directory is web-importable.
 - **From [[0003-web-fallback-nextjs-vercel|ADR 0003]].** ADR 0003's
   literal rule ("`web/` must not import from `design-system/code/`")
-  is **not violated** — `votes-wire.ts` lives under
+  is **not violated** â€” `votes-wire.ts` lives under
   `supabase/functions/_shared`, not `design-system/`. But ADR 0003's
-  *spirit* — "web re-implements rather than imports" — is being
+  *spirit* â€” "web re-implements rather than imports" â€” is being
   deliberately set aside for this one data-contract module, because
   the reasoning behind that spirit (visual spec, drift gate) does not
-  apply to a data contract (see Why §3).
+  apply to a data contract (see Why Â§3).
 
 ## Considered options
 
 - **Re-sync the `web/lib/quiz.ts` hand-mirror and keep it.** Rejected
-  — the rot is the proof that hand-mirrors do not survive. Re-syncing
+  â€” the rot is the proof that hand-mirrors do not survive. Re-syncing
   resets the clock; it does not stop the next divergence.
-- **Publish a real shared npm package (pnpm workspaces).** Rejected —
+- **Publish a real shared npm package (pnpm workspaces).** Rejected â€”
   reintroduces exactly the publish / version / pin overhead ADR 0004
   declined, to share one leaf file. ADR 0004's re-evaluation trigger
   for workspaces ("external consumer of the design-system appears")
   has not fired.
-- **Put the shared types in `design-system/`.** Rejected — ADR 0003
+- **Put the shared types in `design-system/`.** Rejected â€” ADR 0003
   explicitly forbids `web/` importing `design-system/code/`, and a
   vote wire shape is not a design-system artifact in the first place.
 - **Generate the web copy from `votes-schema.ts` via a codegen
-  step.** Rejected — a codegen script is more machinery than a direct
+  step.** Rejected â€” a codegen script is more machinery than a direct
   import, and it still leaves two files that can diverge between
   regenerations.
 
@@ -146,8 +149,8 @@ monorepo.
   web app and the edge functions. `web/lib/quiz.ts`'s hand-mirror is
   deleted.
 - The next quiz-shape change physically cannot leave the web app a
-  generation behind — there is no separate web copy to forget.
-- The shell↔quiz seam from the web invitee grill (§Q2) now has a
+  generation behind â€” there is no separate web copy to forget.
+- The shellâ†”quiz seam from the web invitee grill (Â§Q2) now has a
   concrete, reviewable artifact.
 
 ### Negative / costs
@@ -170,21 +173,21 @@ monorepo.
 
 ## Re-evaluation triggers
 
-- A **second** cross-sibling import request appears — at two, the
+- A **second** cross-sibling import request appears â€” at two, the
   question becomes whether a real shared package (ADR 0004's
   workspace trigger) is finally warranted.
-- `votes-wire.ts` needs a non-type relative import — revisit the
+- `votes-wire.ts` needs a non-type relative import â€” revisit the
   Deno/Node portability constraint before adding it.
 
 ## References
 
 - [[../../50_product/0.1.0-workflow-overhaul-web-invitee-flow|0.1.0-workflow-overhaul-web-invitee-flow]]
-  §Q2 — the grill decision this ADR records.
-- [[0003-web-fallback-nextjs-vercel|ADR 0003]] — the
+  Â§Q2 â€” the grill decision this ADR records.
+- [[0003-web-fallback-nextjs-vercel|ADR 0003]] â€” the
   web-re-implements-the-spec rule whose spirit this sets aside for
   one data-contract module.
-- [[0004-monorepo-layout|ADR 0004]] — the no-shared-package decision
+- [[0004-monorepo-layout|ADR 0004]] â€” the no-shared-package decision
   this does not reverse but does add a deliberate cross-import to.
-- [[0010-generic-jsonb-votes-schema|ADR 0010]] — the generic jsonb
+- [[0010-generic-jsonb-votes-schema|ADR 0010]] â€” the generic jsonb
   votes schema the wire shape belongs to; `votes-schema.ts` is the
   sibling module `votes-wire.ts` is carved out alongside.

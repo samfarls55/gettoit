@@ -8,27 +8,30 @@ created: 2026-05-19
 prd: 0.1.0-quiz-redesign-prd
 ---
 
-# bug-14 — iOS fires the verdict before the member's candidate fetch is persisted
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# bug-14 â€” iOS fires the verdict before the member's candidate fetch is persisted
 
 ## Parent
 
-[[../_index|0.1.0 backlog]] — found during the 2026-05-19 verdict-spinner diagnosis. The iOS-side cause of the empty candidate pools that [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] resolves on the server side.
+[[../_index|0.1.0 backlog]] â€” found during the 2026-05-19 verdict-spinner diagnosis. The iOS-side cause of the empty candidate pools that [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] resolves on the server side.
 
 ## What's broken
 
-A member completes Q5 and fires the verdict while that member's raw Foursquare fetch has not yet been persisted to `member_fetches`. The server-side `options` union then assembles an empty (or partial) candidate pool — not because the member genuinely had no candidates, but because the write had not landed yet. The verdict fires against a pool that does not reflect the member.
+A member completes Q5 and fires the verdict while that member's raw Foursquare fetch has not yet been persisted to `member_fetches`. The server-side `options` union then assembles an empty (or partial) candidate pool â€” not because the member genuinely had no candidates, but because the write had not landed yet. The verdict fires against a pool that does not reflect the member.
 
 ## Root cause
 
 Three compounding defects in the iOS quiz submit path (`QuizCoordinator`):
 
-1. **The fire-before-persist race.** The per-member Foursquare fetch runs as a background task. `submit()` builds and writes the `votes` row — which triggers the verdict fire — **without awaiting that fetch/persist task**. If the fetch has not finished, the verdict fires before this member's `member_fetches` row exists.
-2. **`persistRawFetch` skips the write on an empty `rawFetch`.** An empty raw fetch is guarded out entirely, so no `member_fetches` row is written at all — indistinguishable downstream from "the write never ran."
-3. **Errors are silently swallowed.** A failed `member_fetches` write is caught and dropped, so a failed or slow persist is invisible — no telemetry, no retry, no signal.
+1. **The fire-before-persist race.** The per-member Foursquare fetch runs as a background task. `submit()` builds and writes the `votes` row â€” which triggers the verdict fire â€” **without awaiting that fetch/persist task**. If the fetch has not finished, the verdict fires before this member's `member_fetches` row exists.
+2. **`persistRawFetch` skips the write on an empty `rawFetch`.** An empty raw fetch is guarded out entirely, so no `member_fetches` row is written at all â€” indistinguishable downstream from "the write never ran."
+3. **Errors are silently swallowed.** A failed `member_fetches` write is caught and dropped, so a failed or slow persist is invisible â€” no telemetry, no retry, no signal.
 
 ## Desired behavior
 
-A member's verdict never fires against an unpersisted fetch. `submit()` awaits the member's candidate fetch and its `member_fetches` persist before firing the verdict. `persistRawFetch` surfaces write failures (telemetry / propagation) instead of swallowing them. A genuinely empty fetch is recorded as such, not silently dropped — so the server can tell "no candidates" apart from "write never ran."
+A member's verdict never fires against an unpersisted fetch. `submit()` awaits the member's candidate fetch and its `member_fetches` persist before firing the verdict. `persistRawFetch` surfaces write failures (telemetry / propagation) instead of swallowing them. A genuinely empty fetch is recorded as such, not silently dropped â€” so the server can tell "no candidates" apart from "write never ran."
 
 ## Agent Brief
 
@@ -40,41 +43,41 @@ A member's verdict never fires against an unpersisted fetch. `submit()` awaits t
 **Desired behavior:** `submit()` awaits completion of the member's candidate fetch and its `member_fetches` persist before the verdict-firing write. `persistRawFetch` surfaces failures instead of swallowing them. The verdict never fires against a `member_fetches` table that is missing this member's row due to a race or a dropped error.
 
 **Key interfaces:**
-- `QuizCoordinator.submit()` — must await the in-flight member candidate-fetch / persist task before performing the verdict-firing `votes` write. Preserve the existing rapid-tap fold (`inflight`) and the `.submitting` / `.submitted` / `.failed` step transitions.
-- `QuizCoordinator.persistRawFetch` — stop silently skipping the write and stop swallowing errors; surface failures via the existing telemetry path or propagate them so submit can react.
-- The background fetch task handle — `submit()` needs a handle to await; today the task is fired and forgotten.
+- `QuizCoordinator.submit()` â€” must await the in-flight member candidate-fetch / persist task before performing the verdict-firing `votes` write. Preserve the existing rapid-tap fold (`inflight`) and the `.submitting` / `.submitted` / `.failed` step transitions.
+- `QuizCoordinator.persistRawFetch` â€” stop silently skipping the write and stop swallowing errors; surface failures via the existing telemetry path or propagate them so submit can react.
+- The background fetch task handle â€” `submit()` needs a handle to await; today the task is fired and forgotten.
 
 **Acceptance criteria:**
 - [ ] `submit()` does not perform the verdict-firing write until the member's candidate fetch and `member_fetches` persist have completed.
-- [ ] A failed `member_fetches` write is surfaced (telemetry and/or propagated) — never silently swallowed.
+- [ ] A failed `member_fetches` write is surfaced (telemetry and/or propagated) â€” never silently swallowed.
 - [ ] An empty raw fetch is recorded distinguishably (not silently skipped) so the server can tell "no candidates" from "write never ran".
-- [ ] Quiz submit still completes for a member whose fetch genuinely returns no candidates — it routes to the verdict, where [[bug-13-engine-no-survivor-on-empty-pool|bug-13]]'s no-survivor outcome handles the empty pool.
+- [ ] Quiz submit still completes for a member whose fetch genuinely returns no candidates â€” it routes to the verdict, where [[bug-13-engine-no-survivor-on-empty-pool|bug-13]]'s no-survivor outcome handles the empty pool.
 - [ ] The rapid-tap submit fold and the existing step machine (`submitting` / `submitted` / `failed`) are unregressed.
 - [ ] iOS build succeeds and the `ios` test lane is green; new unit tests cover submit-awaits-persist and persist-error-surfacing.
 
 **Out of scope:**
-- The server-side handling of an empty pool — that is [[bug-13-engine-no-survivor-on-empty-pool|bug-13]].
-- The post-Q5 router orphaned-host bug — that is [[bug-12-verdict-spinner-orphaned-host|bug-12]].
+- The server-side handling of an empty pool â€” that is [[bug-13-engine-no-survivor-on-empty-pool|bug-13]].
+- The post-Q5 router orphaned-host bug â€” that is [[bug-12-verdict-spinner-orphaned-host|bug-12]].
 - Any change to the Foursquare fetch planner / category allowlist.
 
 ## Blocked by
 
-None — self-contained iOS change. Independent of bug-13; either slice ships alone and helps.
+None â€” self-contained iOS change. Independent of bug-13; either slice ships alone and helps.
 
 ## Related
 
-- [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] — the server-side empty-pool fix; parallel slice
-- [[bug-12-verdict-spinner-orphaned-host|bug-12]] — the other defect from the same diagnosis
-- [[tb-21-raw-fetch-to-options|tb-21]] — the `member_fetches` → `options` persistence path this protects
+- [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] â€” the server-side empty-pool fix; parallel slice
+- [[bug-12-verdict-spinner-orphaned-host|bug-12]] â€” the other defect from the same diagnosis
+- [[tb-21-raw-fetch-to-options|tb-21]] â€” the `member_fetches` â†’ `options` persistence path this protects
 
 ## Comments
 
-**2026-05-19 — filed.** Found during the 2026-05-19 verdict-spinner diagnosis. Triaged `ready-for-agent` / AFK — self-contained iOS change, testable through the coordinator's existing seams, no design fork (an empty pool is handled by bug-13's no-survivor outcome).
+**2026-05-19 â€” filed.** Found during the 2026-05-19 verdict-spinner diagnosis. Triaged `ready-for-agent` / AFK â€” self-contained iOS change, testable through the coordinator's existing seams, no design fork (an empty pool is handled by bug-13's no-survivor outcome).
 
-**2026-05-19 — done (PR #150).** All three compounding defects fixed in `QuizCoordinator`:
+**2026-05-19 â€” done (PR #150).** All three compounding defects fixed in `QuizCoordinator`:
 
-1. **Fire-before-persist race.** `submit()` now `await`s the in-flight per-member candidate fetch and its `member_fetches` persist before the verdict-firing `votes` write. The fetch task `await`s `persistRawFetch` as its last step and clears its own `fetchTask` handle only afterwards — so a single `awaitCandidateFetch()` covers both phases. Previously the handle was cleared mid-task (in `applyFetchResult`), which would have let `submit()` race past an in-flight persist; that ordering bug was fixed too.
-2. **Empty raw fetch silently skipped.** `persistRawFetch` no longer guards out an empty `rawFetch` — a genuinely empty fetch is persisted as a real `member_fetches` row with an empty `payload` (the `payload jsonb not null` column accepts `[]`), so the server can tell "this member has no candidates" apart from "the write never ran".
-3. **Swallowed persist errors.** A failed `member_fetches` write is recorded on the new `QuizCoordinator.lastMemberFetchPersist` (`notAttempted` / `written` / `failed`) and forwarded to an injected `MemberFetchPersistFailureSink`. `RootView` binds the sink to a `member_fetch_persist_failed` telemetry emission via `SupabaseTelemetrySink` — the persist stays best-effort but the failure is no longer invisible.
+1. **Fire-before-persist race.** `submit()` now `await`s the in-flight per-member candidate fetch and its `member_fetches` persist before the verdict-firing `votes` write. The fetch task `await`s `persistRawFetch` as its last step and clears its own `fetchTask` handle only afterwards â€” so a single `awaitCandidateFetch()` covers both phases. Previously the handle was cleared mid-task (in `applyFetchResult`), which would have let `submit()` race past an in-flight persist; that ordering bug was fixed too.
+2. **Empty raw fetch silently skipped.** `persistRawFetch` no longer guards out an empty `rawFetch` â€” a genuinely empty fetch is persisted as a real `member_fetches` row with an empty `payload` (the `payload jsonb not null` column accepts `[]`), so the server can tell "this member has no candidates" apart from "the write never ran".
+3. **Swallowed persist errors.** A failed `member_fetches` write is recorded on the new `QuizCoordinator.lastMemberFetchPersist` (`notAttempted` / `written` / `failed`) and forwarded to an injected `MemberFetchPersistFailureSink`. `RootView` binds the sink to a `member_fetch_persist_failed` telemetry emission via `SupabaseTelemetrySink` â€” the persist stays best-effort but the failure is no longer invisible.
 
-**Decisions:** the failure-surfacing seam is a closure (`MemberFetchPersistFailureSink`), mirroring the existing `QuizVoteWriter` / `MemberFetchWriter` pattern, rather than plumbing a full `TelemetryWriter` into `RootView` (none exists there today). The new `member_fetch_persist_failed` event is emitted via the raw `SupabaseTelemetrySink` (the documented `events`-table seam, ADR 0005) rather than a typed `TelemetryWriter` helper — confined to this one failure path until it earns a first-class helper. The rapid-tap submit fold and the `submitting`/`submitted`/`failed` step machine are unchanged. iOS test lane green in CI.
+**Decisions:** the failure-surfacing seam is a closure (`MemberFetchPersistFailureSink`), mirroring the existing `QuizVoteWriter` / `MemberFetchWriter` pattern, rather than plumbing a full `TelemetryWriter` into `RootView` (none exists there today). The new `member_fetch_persist_failed` event is emitted via the raw `SupabaseTelemetrySink` (the documented `events`-table seam, ADR 0005) rather than a typed `TelemetryWriter` helper â€” confined to this one failure path until it earns a first-class helper. The rapid-tap submit fold and the `submitting`/`submitted`/`failed` step machine are unchanged. iOS test lane green in CI.

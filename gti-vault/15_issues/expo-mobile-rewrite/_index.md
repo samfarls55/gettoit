@@ -1,7 +1,10 @@
-﻿---
+---
 folder: 15_issues/expo-mobile-rewrite
 purpose: Expo managed mobile rewrite PRD and implementation issues
 ---
+
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
 
 # expo-mobile-rewrite - Index
 

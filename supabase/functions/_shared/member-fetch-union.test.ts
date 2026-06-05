@@ -15,7 +15,7 @@ import {
   unionMemberFetches,
 } from "./member-fetch-union.ts";
 
-/** A minimal fetched-venue payload entry. The iOS writer persists the
+/** A minimal fetched-venue payload entry. the mobile writer persists the
  *  full `ShapedPlace` shape; the union only needs `fsq_place_id` for
  *  dedup and passes the rest of the payload through. */
 function venue(

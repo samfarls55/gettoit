@@ -3,7 +3,10 @@ run: 2026-05-25-1742
 status: done
 ---
 
-# AFK Execution Run — 2026-05-25 17:42
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# AFK Execution Run â€” 2026-05-25 17:42
 
 Goal: execute all open AFK issues not blocked by a HITL issue.
 
@@ -29,14 +32,14 @@ All four bugs come from the 2026-05-26 swift-code-review pass against `ios/`. Ea
 | bug-33 | #242 | deferred | - | - | re-queue in next run |
 
 ## Event log
-- 17:42 — preflight pass; vault docs commit 21115a0 pushed to main before start
-- 17:42 — work set built: 4 ready AFK issues, 0 waiting, 0 excluded
-- 17:42 — wave 1 batch A spawned: bug-30, bug-31 (concurrency cap 2)
-- 17:43 — user scope cut: stop after bug-30 + bug-31; bug-32 + bug-33 deferred to a later run
-- 17:51 — bug-30 MERGED — PR #244 (b58c739); vault closure followed on docs/close-bug-30 (ba1a300, pushed to main after subagent finished)
-- 17:51 — bug-31 MERGED — PR #243 (59c7530); vault closure direct-to-main (ddaada0)
-- 17:52 — cleanup: removed afk/bug-30, afk/bug-31, two worktree-agent-* branches and both worktrees; orchestrator main fast-forwarded to ba1a300
+- 17:42 â€” preflight pass; vault docs commit 21115a0 pushed to main before start
+- 17:42 â€” work set built: 4 ready AFK issues, 0 waiting, 0 excluded
+- 17:42 â€” wave 1 batch A spawned: bug-30, bug-31 (concurrency cap 2)
+- 17:43 â€” user scope cut: stop after bug-30 + bug-31; bug-32 + bug-33 deferred to a later run
+- 17:51 â€” bug-30 MERGED â€” PR #244 (b58c739); vault closure followed on docs/close-bug-30 (ba1a300, pushed to main after subagent finished)
+- 17:51 â€” bug-31 MERGED â€” PR #243 (59c7530); vault closure direct-to-main (ddaada0)
+- 17:52 â€” cleanup: removed afk/bug-30, afk/bug-31, two worktree-agent-* branches and both worktrees; orchestrator main fast-forwarded to ba1a300
 
 ## Outcome
 - 2/2 dispatched issues merged, 0 escalated, 0 failed
-- bug-32, bug-33 still `ready-for-agent` on GitHub + vault — pick up in the next `/execute-issues` run
+- bug-32, bug-33 still `ready-for-agent` on GitHub + vault â€” pick up in the next `/execute-issues` run

@@ -1,6 +1,6 @@
 // GetToIt web — Q1–Q5 quiz screens, quiz redesign (tb-WF-10).
 //
-// Web equivalents of the iOS redesigned quiz surfaces (`QuizQ1Cuisine`,
+// Web equivalents of the mobile redesigned quiz surfaces (`QuizQ1Cuisine`,
 // `QuizQ2Budget`, `QuizQ3Reputation`, `QuizQ4Vibe`, `QuizQ5Regret`,
 // `QuizQ5NoResults`). The authoritative spec is
 // `design-system/surfaces/03-quiz.md` — these are 1:1 ports threaded
@@ -408,7 +408,7 @@ export function QuizQ4Vibe({
 // ───────────────────────────────────────────────────────────────────────
 
 /** The Q5 candidate state — drives which mode Q5 renders. Mirrors the
- *  iOS `QuizCoordinator.Q5CandidatesState`. */
+ *  mobile `QuizCoordinator.Q5CandidatesState`. */
 export type Q5State = "loading" | "default" | "no-results";
 
 export function QuizQ5({

@@ -1,8 +1,8 @@
 # Sunset Pop — Design System
 
-Production design system for **GetToIt**, the iOS app that kills group decision paralysis in 60 seconds.
+Production design system for **GetToIt**, the mobile app that kills group decision paralysis in 60 seconds.
 
-This is the handoff package for agent-assisted SwiftUI implementation. Tokens, components, motion, surfaces, and accessibility are speccated against the locked Sunset Pop direction. Every screen ships with **real JSX source** alongside the markdown spec — drop the JSX into your iframe/preview environment to see the canonical state, lift the values into SwiftUI.
+This is the source-of-truth package for React/JSX reference screens and the active React Native / Expo app in `mobile/`. Tokens, components, motion, surfaces, and accessibility are specced against the locked Sunset Pop direction.
 
 ---
 
@@ -10,14 +10,14 @@ This is the handoff package for agent-assisted SwiftUI implementation. Tokens, c
 
 | Path | What's in it |
 |---|---|
-| [`tokens.json`](./tokens.json) | **Canonical source of truth** for all tokens. `code/tokens.css` is generated from this. Future `GTITokens.swift` will be too. |
-| [`tokens.md`](./tokens.md) | Human-readable tokens reference: color, gradient, type, spacing, radii, shadow, motion. SwiftUI primitive map. |
-| [`components.md`](./components.md) | Every component (C-01…C-28) — states, sizes, tap targets, SwiftUI primitives. |
+| [`tokens.json`](./tokens.json) | **Canonical source of truth** for all tokens. `code/tokens.css` is generated from this. |
+| [`tokens.md`](./tokens.md) | Human-readable tokens reference: color, gradient, type, spacing, radii, shadow, motion. |
+| [`components.md`](./components.md) | Every component (C-01…C-28) — states, sizes, tap targets, implementation notes. |
 | [`motion.md`](./motion.md) | Per-component motion timings, verdict-reveal choreography, reduced-motion. |
 | [`accessibility.md`](./accessibility.md) | Contrast tables on every gradient, tap-target audit, focus order, VO, Dynamic Type. |
 | [`surfaces/`](./surfaces/) | 8 surface docs — purpose, defenses, copy register, edge cases. Each links to its JSX. |
 | [`code/`](./code/) | **Clean React/JSX source for every screen.** No tweak machinery. This is what to port. |
-| [`scripts/`](./scripts/) | `gen-css.mjs` (tokens.json → tokens.css), `gen-swift.mjs` (tokens.json → `ios/Sources/GTITokens.swift`), `verify.mjs` (drift gate + orphan-hex sweep — covers both generated outputs). |
+| [`scripts/`](./scripts/) | `gen-css.mjs` (tokens.json → tokens.css), `verify.mjs` (drift gate + orphan-hex sweep). |
 | [`AGENTS.md`](./AGENTS.md) | Editing rules for agents working in this directory. Read before changing anything here. |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Append-only log of spec changes. Every user-visible change adds a line. |
 
@@ -30,12 +30,12 @@ Every surface has a corresponding JSX file. The markdown is the **why**, the JSX
 | # | Surface | Doc | JSX |
 |---|---|---|---|
 | 00 | **Plan list** — canonical post-sign-in entry surface | [`surfaces/00-plan-list.md`](./surfaces/00-plan-list.md) | [`code/screens/ScreenPlanList.jsx`](./code/screens/ScreenPlanList.jsx) |
-| 00 | ~~Landing~~ — superseded 2026-05-20 by `00-plan-list`; remains in tree until tb-WF-5 retires the iOS code | [`surfaces/00-landing.md`](./surfaces/00-landing.md) | [`code/screens/ScreenLanding.jsx`](./code/screens/ScreenLanding.jsx) |
-| 00a | Forced sign-in gate (iOS, first launch) | [`surfaces/00a-signin.md`](./surfaces/00a-signin.md) | [`code/screens/ScreenSignIn.jsx`](./code/screens/ScreenSignIn.jsx) |
+| 00 | ~~Landing~~ — superseded 2026-05-20 by `00-plan-list`; kept as spec history | [`surfaces/00-landing.md`](./surfaces/00-landing.md) | [`code/screens/ScreenLanding.jsx`](./code/screens/ScreenLanding.jsx) |
+| 00a | Forced sign-in gate (mobile, first launch) | [`surfaces/00a-signin.md`](./surfaces/00a-signin.md) | [`code/screens/ScreenSignIn.jsx`](./code/screens/ScreenSignIn.jsx) |
 | 00b | Location permission pre-prime | [`surfaces/00b-location-permission.md`](./surfaces/00b-location-permission.md) | [`code/screens/ScreenLocationPermission.jsx`](./code/screens/ScreenLocationPermission.jsx) |
 | 01 | **Plan setup (Create + Edit)** — canonical replacement for S01 + S01b | [`surfaces/01-setup.md`](./surfaces/01-setup.md) | [`code/screens/ScreenSetup.jsx`](./code/screens/ScreenSetup.jsx) |
-| 01 | ~~Initiator landing~~ — superseded 2026-05-19 by `01-setup`; iOS code retired by tb-WF-4 (2026-05-20). JSX kept in tree as spec history. | [`surfaces/01-initiator.md`](./surfaces/01-initiator.md) | [`code/screens/ScreenInitiator.jsx`](./code/screens/ScreenInitiator.jsx) |
-| 01b | ~~Pre-quiz parameters setup (initiator)~~ — superseded 2026-05-19 by `01-setup`; iOS code retired by tb-WF-4 (2026-05-20). JSX kept in tree as spec history. | [`surfaces/01b-parameters.md`](./surfaces/01b-parameters.md) | [`code/screens/ScreenParameters.jsx`](./code/screens/ScreenParameters.jsx) |
+| 01 | ~~Initiator landing~~ — superseded 2026-05-19 by `01-setup`; kept in tree as spec history. | [`surfaces/01-initiator.md`](./surfaces/01-initiator.md) | [`code/screens/ScreenInitiator.jsx`](./code/screens/ScreenInitiator.jsx) |
+| 01b | ~~Pre-quiz parameters setup (initiator)~~ — superseded 2026-05-19 by `01-setup`; kept in tree as spec history. | [`surfaces/01b-parameters.md`](./surfaces/01b-parameters.md) | [`code/screens/ScreenParameters.jsx`](./code/screens/ScreenParameters.jsx) |
 | 02a | Invite (iMessage unfurl) | [`surfaces/02-invite.md`](./surfaces/02-invite.md) | [`code/screens/ScreenInviteUnfurl.jsx`](./code/screens/ScreenInviteUnfurl.jsx) |
 | 02b | Invite (web fallback) | ↑ | [`code/screens/ScreenInviteWeb.jsx`](./code/screens/ScreenInviteWeb.jsx) |
 | 03 | Quiz Q1 · Vetoes | [`surfaces/03-quiz.md`](./surfaces/03-quiz.md) | [`code/screens/ScreenQ1Vetoes.jsx`](./code/screens/ScreenQ1Vetoes.jsx) |
@@ -84,17 +84,19 @@ If a treatment hides or downgrades any of these in the first 5s read, it fails. 
 
 ---
 
-## SwiftUI translation cheat sheet
+## React Native Translation Notes
 
-| Web | SwiftUI |
+The active mobile app is Expo / React Native in `mobile/`. Use the JSX as reference for hierarchy, copy, tokens, and motion intent; implement with React Native primitives and `mobile/src/design/` tokens.
+
+| Web reference | React Native direction |
 |---|---|
-| `linear-gradient` background | `LinearGradient(...)` |
-| `@property --color` interpolation | `withAnimation(.easeInOut(duration: 1.1)) { stops = ... }` over `@State` color array |
-| `backdrop-filter: blur()` | `.background(.ultraThinMaterial)` |
-| `feTurbulence` grain overlay | Pre-baked `Image("grain").blendMode(.overlay).opacity(0.35)` |
-| `cubic-bezier(.16, 1, .3, 1)` | `Animation.timingCurve(0.16, 1, 0.3, 1)` |
+| `linear-gradient` background | Expo/React Native gradient layer using `tokens.json` stops |
+| `@property --color` interpolation | Animated color stops using the mobile animation layer |
+| `backdrop-filter: blur()` | Native blur/material equivalent where available, otherwise token-matched fallback |
+| `feTurbulence` grain overlay | Pre-baked tiled image overlay |
+| `cubic-bezier(.16, 1, .3, 1)` | Matching easing curve in the mobile animation library |
 | `text-wrap: balance` | Manual line breaks in source strings |
-| `transform: scale()` | `.scaleEffect(...)` |
+| `transform: scale()` | React Native transform scale |
 
 See [`code/README.md`](./code/README.md) for a more thorough table and a per-file porting strategy.
 
@@ -102,7 +104,6 @@ See [`code/README.md`](./code/README.md) for a more thorough table and a per-fil
 
 ## What's intentionally not in this package
 
-- **Hand-edited Swift output.** `ios/Sources/GTITokens.swift` is generated by `scripts/gen-swift.mjs`; never hand-edit. CI's `verify.mjs` enforces a byte-identical drift gate.
 - **Logo / wordmark.** The `GTIMark` tile + "GetToIt" wordmark in code is a placeholder pending real branding.
 - **Brand voice copy strings.** Owned by `40_marketing_branding/`.
 - **Warm-friend vs. court-formal copy register A/B.** Visual is locked to warm-friend; copy A/B is post-launch.

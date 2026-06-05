@@ -2,7 +2,7 @@
 
 The single source of truth for color, type, spacing, radii, shadow, motion.
 
-**Source of truth:** [`tokens.json`](./tokens.json). [`code/tokens.css`](./code/tokens.css) is generated from it via `scripts/gen-css.mjs`. When porting to SwiftUI, generate `GTITokens.swift` from the same `tokens.json` — never duplicate values by hand. The tables below are the human-readable reference; `tokens.json` is what consumers read.
+**Source of truth:** [`tokens.json`](./tokens.json). [`code/tokens.css`](./code/tokens.css) is generated from it via `scripts/gen-css.mjs`. The active React Native / Expo app lives in `mobile/` and ports these values into `mobile/src/design/`. The tables below are the human-readable reference; `tokens.json` is what consumers read.
 
 ---
 
@@ -60,11 +60,13 @@ The narrative arc — coral → magenta → indigo → midnight — IS the exper
 
 **Glass fill (soft pressed)** — `--glass-fill-soft-press` — momentary press feedback for soft-glass list rows (C-23 LocationPicker suggestion row). Sits between `fill-soft` (0.10, default rest) and `fill` (0.18, hover-ish). Distinct from "selected" which always uses sun. Added 2026-05-14 for sg-04.
 
-**On bright gradient (secondary)** — `color.text.on-bright-gradient.secondary` — tinted-ink secondary text role for surfaces whose gradient reaches into the yellow/peach lightness range (initiator, Q1, Q2 yellow-bottom; verdict and checkin yellow-top). White-on-yellow secondary fails WCAG AA against the brightest stop (`#FFD23F`, ~1.3:1); ink-at-0.78 measures **7.74:1** there and **5.62:1** worst-case across the coral top of the initiator — both clear AA body-text. Primary text stays `#FFFFFF` for headline punch; only the secondary role flips. Indigo/midnight surfaces (Q3–Q5, waiting, midnight) keep `on-gradient.secondary` — flipping their secondary to ink would tank readability. SwiftUI surface: `GTIColor.TextOnBrightGradient.secondary`. Added 2026-05-14 for sg-01 (issue #45).
+**On bright gradient (secondary)** — `color.text.on-bright-gradient.secondary` — tinted-ink secondary text role for surfaces whose gradient reaches into the yellow/peach lightness range (initiator, Q1, Q2 yellow-bottom; verdict and checkin yellow-top). White-on-yellow secondary fails WCAG AA against the brightest stop (`#FFD23F`, ~1.3:1); ink-at-0.78 measures **7.74:1** there and **5.62:1** worst-case across the coral top of the initiator — both clear AA body-text. Primary text stays `#FFFFFF` for headline punch; only the secondary role flips. Indigo/midnight surfaces (Q3–Q5, waiting, midnight) keep `on-gradient.secondary` — flipping their secondary to ink would tank readability. Legacy SwiftUI token name was `GTIColor.TextOnBrightGradient.secondary`; active mobile mapping belongs in `mobile/src/design/`. Added 2026-05-14 for sg-01 (issue #45).
 
 No red. No green. Sun-yellow is the only state signal. If you reach for red, you're designing the wrong screen.
 
-### 1.4 SwiftUI
+### 1.4 Legacy SwiftUI Notes
+
+Historical only: the SwiftUI app is retired. Active mobile implementation is React Native / Expo in `mobile/`.
 
 ```swift
 enum GTIColor {
@@ -83,7 +85,7 @@ enum GTIGradient {
 }
 ```
 
-For the tween: hold `@State var g1, g2, g3, g4: Color` and animate them on surface transition. SwiftUI interpolates `Color` natively inside `withAnimation`.
+For the retired SwiftUI tween: hold `@State var g1, g2, g3, g4: Color` and animate them on surface transition. SwiftUI interpolates `Color` natively inside `withAnimation`.
 
 ---
 
@@ -109,7 +111,9 @@ Single typeface: **Inter**. Weights used: 500, 600, 700, 800, 900.
 
 **Stacked uppercase rule.** Display strings ≥7 chars per line (e.g. "PICO'S", "TAQUERIA") wrap **one word per line** — never let the renderer break a word.
 
-### SwiftUI
+### Legacy SwiftUI Notes
+
+Historical only: active mobile implementation is React Native / Expo in `mobile/`.
 
 ```swift
 extension Font {
@@ -131,7 +135,7 @@ Text("Q1 OF 5").font(.gtiEyebrow).tracking(2.0).textCase(.uppercase)
 4   8   12   16   20   24   32   40   48   64
 ```
 
-Named tokens: `sp-1` through `sp-16` in `tokens.css`. SwiftUI: just literals (`EdgeInsets(top: 16, …)`).
+Named tokens: `sp-1` through `sp-16` in `tokens.css`. Legacy SwiftUI used literals (`EdgeInsets(top: 16, …)`); active mobile maps spacing in `mobile/src/design/`.
 
 **Common spacing patterns:**
 - Top bar to question header: 40
@@ -153,7 +157,7 @@ Named tokens: `sp-1` through `sp-16` in `tokens.css`. SwiftUI: just literals (`E
 | `r-row` | 12 | List-row radius (C-23 LocationPicker suggestion rows + typeahead input). Sits between `tag` (8, hard) and `card` (18, soft). Matches the in-sheet density of the Lumy reference (Refero `a18a8df8`). |
 | `r-card` | 18 | Glass regret card, vertical picker row, check-in tap |
 | `r-card-lg` | 22 | Reroll reason tile, cut row |
-| `r-hero` | 28 | (Reserved for future hero surfaces — currently unused; iOS frame's own corner radius is 48.) |
+| `r-hero` | 28 | Reserved for future hero surfaces — currently unused. |
 | `r-pill` | 999 | Primary CTA — always full radius |
 | `r-sheet` | 26 | Reroll bottom sheet, LocationPicker sheet |
 
@@ -173,7 +177,7 @@ Gradients resist drop shadows. Use elevation **only on white or sun-yellow surfa
 | `shadow-sheet` | `0 -20px 60px rgba(0,0,0,0.5)` |
 | `shadow-fab` | `0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08)` |
 
-**Glass uses inset highlights, not drop shadows.** That's how iOS does material and it reads correctly on gradients.
+**Glass uses inset highlights, not drop shadows.** That's how native material reads correctly on gradients.
 
 ---
 
@@ -205,7 +209,9 @@ Sunset Pop has one signature texture: **film grain on every gradient surface.**
 
 This is the texture defense against "algorithm-flat." Don't ship without it.
 
-### SwiftUI
+### Legacy SwiftUI Notes
+
+Historical only: active mobile implementation is React Native / Expo in `mobile/`.
 
 ```swift
 ZStack {
@@ -222,7 +228,7 @@ ZStack {
 
 ## 8 · Tweakable knobs (kept around for design iteration)
 
-Listed for completeness — these are the live tweaks in the prototype. SwiftUI port doesn't need to expose them; they're for design exploration.
+Listed for completeness — these are the live tweaks in the prototype. Active mobile doesn't need to expose them; they're for design exploration.
 
 - `palette`: `sunset` (canon) | `citrus` | `noir`
 - `grain`: 0 – 0.7 (default 0.35)

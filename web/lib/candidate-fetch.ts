@@ -3,23 +3,24 @@
 // Brings the web fallback's Q5 to quiz-redesign parity. The pre-redesign web quiz
 // rendered a fixed `DUMMY_CANDIDATES` fixture; this module replaces it
 // with the real per-member Foursquare fetch + the strict-factorial Q5
-// probe, mirroring the iOS path:
+// probe, mirroring the mobile app path. Legacy Swift source references
+// below are historical; active mobile implementation lives in `mobile/`:
 //
-//   QuizCandidateFetch        (ios/Sources/App/QuizCandidateFetch.swift)
-//   FoursquareFetchPlanner    (ios/Sources/App/FoursquareFetchPlanner.swift)
-//   Q5VenueClassifier         (ios/Sources/App/Q5VenueClassifier.swift)
-//   Q5FactorialCardGenerator  (ios/Sources/App/Q5FactorialCardGenerator.swift)
+//   QuizCandidateFetch        (legacy Swift ios/Sources/App/QuizCandidateFetch.swift)
+//   FoursquareFetchPlanner    (legacy Swift ios/Sources/App/FoursquareFetchPlanner.swift)
+//   Q5VenueClassifier         (legacy Swift ios/Sources/App/Q5VenueClassifier.swift)
+//   Q5FactorialCardGenerator  (legacy Swift ios/Sources/App/Q5FactorialCardGenerator.swift)
 //
-// Web differs from iOS in one place (ADR 0002): the web client has no
+// Web differs from the mobile app in one place (ADR 0002): the web client has no
 // MapKit escape hatch, so a thin / failed Foursquare response degrades
 // straight to the no-results path — there is no second data source.
 //
-// Per ADR 0003 the web fallback re-implements design-system / iOS logic
+// Per ADR 0003 the web fallback re-implements design-system / mobile-app logic
 // rather than importing it; only the vote WIRE shape is a sanctioned
 // cross-sibling import (ADR 0014, `votes-wire.ts`). The factorial /
 // classifier are not on the design-system spec path — they are pure
 // product logic ported here so the web quiz produces the same Q5 probe
-// shape iOS does.
+// shape the mobile app does.
 //
 // HONEST DEGRADATION (ADR 0013): when the fetch produces no
 // factorial-usable pool the result is an EMPTY candidate list with the
@@ -27,11 +28,11 @@
 
 import type { Q5Rating } from "../../supabase/functions/_shared/votes-wire";
 
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 // Wire types — the slice of `places-proxy`'s `ShapedPlace` this path
 // reads. Kept minimal and defensively typed so a malformed venue is
 // skipped rather than crashing the fetch.
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 
 /** A venue as returned by the `places-proxy` Edge Function — the
  *  fields the classifier + Q5 surface read. */
@@ -55,7 +56,7 @@ export interface PlacesProxyResponse {
 }
 
 /** The session parameters slice the fetch planner reads — mirrors the
- *  iOS `SessionParameters` meal-time field (the only one that drives a
+ *  legacy Swift `SessionParameters` meal-time field (the only one that drives a
  *  fetch filter). Defaults to `dinner` when `rooms.session_params` is
  *  absent (a room created before the parameters surface). */
 export type MealTime = "breakfast" | "lunch" | "dinner" | "late_night";
@@ -73,9 +74,9 @@ export interface PlacesProxyRequest {
   };
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Q5 factorial axis types — mirror iOS `Q5FactorialCard.Axis` etc.
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
+// Q5 factorial axis types — mirror legacy Swift `Q5FactorialCard.Axis` etc.
+// -----------------------------------------------------------------------
 
 export type Axis = "cuisine" | "reputation" | "vibe";
 const ALL_AXES: readonly Axis[] = ["cuisine", "reputation", "vibe"];
@@ -129,11 +130,11 @@ export interface CandidateFetchResult {
   rawFetch: FetchedVenue[];
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Fetch planner — N+1 `places-proxy` call specs (mirrors iOS
+// -----------------------------------------------------------------------
+// Fetch planner — N+1 `places-proxy` call specs (mirrors the mobile app
 // FoursquareFetchPlanner). One per craved cuisine + one mandatory
 // general call.
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 
 /** The planner cap on craved-cuisine calls — re-asserts Q1's 3-cap. */
 export const MAX_CUISINE_CALLS = 3;
@@ -154,7 +155,7 @@ const REPRESENTATIVE_HOUR: Record<MealTime, { hour: number; minute: number }> = 
  *  `FoursquareFetchPlanner.openAtToken`.
  *
  *  Foursquare's weekday is `1=Mon … 7=Sun`; JS `getDay()` is
- *  `0=Sun … 6=Sat`. The conversion maps Sun(0) → 7, Mon(1) → 1, …. */
+ *  `0=Sun … 6=Sat`. The conversion maps Sun(0) ? 7, Mon(1) ? 1, …. */
 export function openAtToken(
   mealTime: MealTime,
   now: Date,
@@ -215,11 +216,11 @@ export function planCalls(args: {
   return specs;
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Venue classifier — `FetchedVenue -> VenueProfile` (mirrors iOS
-// Q5VenueClassifier; thresholds kept byte-identical with the Swift /
+// -----------------------------------------------------------------------
+// Venue classifier — `FetchedVenue -> VenueProfile` (mirrors legacy Swift
+// Q5VenueClassifier; thresholds kept byte-identical with the legacy Swift /
 // server-side `venue-classifier.ts`).
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 
 const POPULAR_RATING_FLOOR = 7.0;
 const HIDDEN_GEM_RATING_FLOOR = 8.0;
@@ -375,11 +376,11 @@ export function classifyPool(
   }));
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Factorial card generator — mirrors iOS Q5FactorialCardGenerator.
+// -----------------------------------------------------------------------
+// Factorial card generator — mirrors legacy Swift Q5FactorialCardGenerator.
 // Three cards, one per axis; each drops exactly one axis and matches the
 // other two. `null` when the pool can't furnish a valid triple.
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 
 /** The dot-delimited Q5 card meta line — mirrors
  *  `Q5CandidatesLoader.metaString`. */
@@ -529,9 +530,9 @@ function toCandidate(venue: PoolVenue, droppedAxis: Axis): QuizCandidate {
   };
 }
 
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 // Union + selection — classify the union, run the factorial.
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 
 /** Union the N+1 call results, deduped first-seen by `fsq_place_id`,
  *  then classify + run the factorial. Mirrors
@@ -567,9 +568,9 @@ export function unionResponses(responses: PlacesProxyResponse[]): FetchedVenue[]
   return union;
 }
 
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 // The per-member fetch — fires the N+1 `places-proxy` calls.
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
 
 /** A function that POSTs one `places-proxy` request and resolves the
  *  response. Injected so tests can drive the fetch without the network. */
@@ -628,9 +629,9 @@ export async function fetchMemberCandidates(args: {
   return selectCandidates(union, args.member, args.now ?? new Date());
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Q5 ratings assembly — venue-keyed ratings → factorial probe.
-// ───────────────────────────────────────────────────────────────────────
+// -----------------------------------------------------------------------
+// Q5 ratings assembly — venue-keyed ratings ? factorial probe.
+// -----------------------------------------------------------------------
 
 /** Seed Q5 ratings at the spec'd midpoint (3) so each card renders with
  *  a chosen state. Mirrors `QuizCoordinator.seededRatings`. */

@@ -10,7 +10,7 @@ jsx:
 
 # S00 · Landing
 
-> **SUPERSEDED (2026-05-20) — replaced by [[00-plan-list|S00 Plan list]].** The workflow-overhaul phase retired the post-sign-in "What's next?" router; the Plan list is the new app entry surface ([[../../gti-vault/15_issues/0.1.0/issues/sg-wf-4-plan-list-surface|sg-WF-4]] / #157). This file and `code/screens/ScreenLanding.jsx` remain in the tree until the paired iOS tracer-bullet **tb-WF-5** retires the consuming Swift code; do **not** build new features against this surface. See [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]] for the locked decisions.
+> **SUPERSEDED (2026-05-20) — replaced by [[00-plan-list|S00 Plan list]].** The workflow-overhaul phase retired the post-sign-in "What's next?" router; the Plan list is the new app entry surface ([[../../gti-vault/15_issues/0.1.0/issues/sg-wf-4-plan-list-surface|sg-WF-4]] / #157). This file and `code/screens/ScreenLanding.jsx` remain in the tree as spec history only; active mobile app work belongs in React Native / Expo under `mobile/`. Do **not** build new features against this surface. See [[../../gti-vault/50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]] for the locked decisions.
 
 > **Code:** [`../code/screens/ScreenLanding.jsx`](../code/screens/ScreenLanding.jsx)
 

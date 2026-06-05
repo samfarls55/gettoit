@@ -3,6 +3,9 @@ run: 2026-06-03-1258
 status: running
 ---
 
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
 # AFK Execution Run - 2026-06-03 12:58 -05:00
 
 Goal: execute all open AFK issues not blocked by a HITL issue.

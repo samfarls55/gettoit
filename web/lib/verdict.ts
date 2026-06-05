@@ -5,13 +5,13 @@
 // verdict card": plan name + verdict venue only. §C spells out,
 // verbatim, "No receipts, no per-axis cuts, no rule chip" and "No
 // primary CTA" — the web invitee card is a far smaller read than the
-// iOS S05 Verdict surface.
+// mobile S05 Verdict surface.
 //
 // These helpers shape the rows the engine wrote (`verdicts`,
 // `options`) into that §C surface. They carry NO receipt / cut
 // machinery: `votes` is ephemeral and gone by the time a Plan is
 // decided (decision doc §Q6), so a receipt surface has no live data
-// source on web. iOS keeps its full receipt surface — web/iOS verdict
+// source on web. the mobile app keeps its full receipt surface — web/mobile verdict
 // parity is not a goal (bug-17).
 
 export type OptionPayload = {

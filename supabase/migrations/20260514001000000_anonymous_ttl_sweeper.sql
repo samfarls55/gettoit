@@ -1,4 +1,5 @@
--- TB-16 — anonymous account 30-day TTL sweeper.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-16 â€” anonymous account 30-day TTL sweeper.
 --
 -- Per [[ADR 0006]] (60_engineering/adr/0006-privacy-posture-0.1.0.md):
 -- anonymous accounts are purged 30 days after their last activity.
@@ -45,7 +46,7 @@ comment on function public.cron_purge_expired_anonymous_users() is
 
 revoke all on function public.cron_purge_expired_anonymous_users() from public;
 
--- Idempotent re-schedule — drop any prior slot under this name before
+-- Idempotent re-schedule â€” drop any prior slot under this name before
 -- registering. Same pattern used by the verdict cron and the no-signal
 -- sweeper.
 do $$
@@ -57,7 +58,7 @@ begin
     end if;
 end $$;
 
--- Hourly at minute 30 — offset from the no-signal sweeper at minute 0
+-- Hourly at minute 30 â€” offset from the no-signal sweeper at minute 0
 -- so the two TTL-shaped jobs don't bunch into the same minute.
 select cron.schedule(
     'gettoit_purge_expired_anonymous_users',

@@ -1,0 +1,69 @@
+---
+status: approved
+github_issue: 336
+---
+
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# Expo release cutover
+
+TB-18 swaps active iOS release ownership from the retired SwiftUI app in `ios/` to the Expo managed app in `mobile/`.
+
+## Active release path
+
+- Active iOS client: `mobile/`
+- Release tool: Expo EAS
+- TestFlight/App Store continuity bundle id: `app.gettoit.GetToIt`
+- Marketing version: `0.1.0`
+- Apple team: `WXTMNYM34A`
+- App Store Connect app id: `6769440299`
+- Universal Links entitlement: `applinks:gettoit.app`
+
+## Release commands
+
+Run from `mobile/`:
+
+```sh
+npx eas-cli login
+npx eas-cli build --platform ios --profile production
+npx eas-cli submit --platform ios --profile production --latest
+```
+
+If EAS asks to manage Apple credentials, choose automatic credential management for `app.gettoit.GetToIt` on team `WXTMNYM34A`.
+
+## Agent-verifiable configuration
+
+- `mobile/app.json` carries bundle id `app.gettoit.GetToIt`, build number `1003`, Apple Sign-In, associated domain `applinks:gettoit.app`, location usage copy, and EAS project id.
+- `mobile/eas.json` uses a production store build profile, local app version source, auto-incremented build numbers, and App Store Connect app id `6769440299`.
+- `.github/workflows/ci.yml` verifies the active Expo mobile app with `npm run verify` in `mobile/`.
+- `.github/workflows/ci.yml` disables the legacy Swift `ios` and Swift TestFlight jobs; old Swift release upload is no longer an active CI path.
+
+## Legacy Swift status
+
+`ios/` is retired as active product scope and kept as legacy reference only. Do not add new product work or ship Swift TestFlight builds unless a human explicitly reopens the Swift path for an emergency.
+
+## TB-17 handoff
+
+TB-17 closed native runtime parity on June 5, 2026:
+
+- EAS production iOS build `1003` succeeded.
+- Build `1003` was submitted to App Store Connect/TestFlight.
+- Founder confirmed build `1003` opens on device and Apple account creation works.
+- Remaining native runtime gaps were accepted as residual risk for later Expo rewrite work, not blockers for TB-17.
+
+Accepted residual risks from TB-17:
+
+- APNs/push has no Expo runtime implementation wired yet.
+- Search area still uses the deterministic preview surface in code.
+- Account claim, Universal Links, location prompt, share sheet, lifecycle, and Settings/account flows need deeper device sweeps in later Expo rewrite work.
+
+## Founder approval
+
+Founder approved all TB-18 HITL gates on June 5, 2026:
+
+- Cutover timing is approved as June 5, 2026.
+- `ios/` SwiftUI is retired as active product scope and kept only as legacy reference.
+- Expo TestFlight build `1003` is accepted as the installable build for TB-18 closure.
+
+Founder noted there are multiple issues with TB-18, to be addressed after closure as follow-up work.

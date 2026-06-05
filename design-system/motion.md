@@ -8,6 +8,8 @@ Motion is part of the system, not garnish. Three motion behaviors carry product 
 
 Everything else is utility motion (button press, chip select, sheet open).
 
+> **Legacy mobile note:** SwiftUI / `ios/` references in this file are historical notes from the retired Swift app. Active mobile implementation is React Native / Expo in `mobile/`.
+
 ---
 
 ## Easing curves
@@ -52,7 +54,7 @@ property: opacity (0 ↔ 1) on the routed question content
 
 **Why pair, not stagger:** the gradient is the load-bearing "time-of-day" signal. Anchoring the card to it preserves the read of "the surface changed because the sun moved" rather than "two unrelated transitions fired one-after-the-other."
 
-**SwiftUI:** the routed view is re-keyed by step and decorated with `.transition(.opacity).animation(.timingCurve(0.65, 0, 0.35, 1, duration: 1.1), value: step)` — see `ios/Sources/App/QuizScreen.swift`.
+**Legacy SwiftUI:** the retired Swift app re-keyed the routed view by step and decorated it with `.transition(.opacity).animation(.timingCurve(0.65, 0, 0.35, 1, duration: 1.1), value: step)`. Active mobile implementation lives in React Native / Expo under `mobile/`.
 
 **Reduced motion:** drop to 300ms linear, same fallback as the gradient — keeps the two layers paired even when shortened.
 

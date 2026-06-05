@@ -9,19 +9,19 @@ This file is grown lazily by `/grill-with-docs` as terms get resolved during rea
 ### Auth identity
 
 **Anonymous session**:
-A Supabase auth session minted via `signInAnonymously()`, carrying a real `user_id` but no Apple identity. Default for both iOS and web prior to the S00a sign-in gate. Post-S00a iOS, anonymous sessions only exist as transient legacy state on pre-S00a TestFlight installs and on the web fallback.
+A Supabase auth session minted via `signInAnonymously()`, carrying a real `user_id` but no Apple identity. Default for both the legacy Swift app and web prior to the S00a sign-in gate. In the active React Native app under `mobile/`, anonymous sessions only exist as transient legacy state from pre-S00a installs and on the web fallback.
 _Avoid_: guest user, anon account, unauthenticated session (a session is still present), no-account user.
 
 **Linked-Apple session**:
-A Supabase auth session whose `user_id` has an Apple identity attached, either via fresh `signInWithApple` (no prior session) or `linkApple` (existing anonymous session upgraded, same `user_id` preserved). Canonical iOS post-S00a state.
+A Supabase auth session whose `user_id` has an Apple identity attached, either via fresh `signInWithApple` (no prior session) or `linkApple` (existing anonymous session upgraded, same `user_id` preserved). Canonical mobile post-S00a state.
 _Avoid_: signed-in user, authenticated user, Apple account (the account is on Apple's side, the session is ours).
 
 **S00a Sign-in Gate**:
-The surface (`design-system/surfaces/00a-signin.md`) rendered on iOS launch when the current auth state is anything other than Linked-Apple. One Sign-in-with-Apple pill, no skip. 0.1.0 closure of the iOS half of [[gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s anonymous-default.
+The surface (`design-system/surfaces/00a-signin.md`) rendered on mobile launch when the current auth state is anything other than Linked-Apple. One Sign-in-with-Apple pill, no skip. 0.1.0 closure of the mobile-app half of [[gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]'s anonymous-default. Active implementation belongs in the React Native app under `mobile/`.
 _Avoid_: sign-up page, sign-up screen, onboarding screen, welcome screen, account creation page (see Flagged ambiguities).
 
 **Account claim**:
-The process by which a Web invitee who installs the iOS app carries their browser-held Anonymous session into the app *before* completing Apple sign-in, so that S00a upgrades that existing identity via `linkApple` (preserving `user_id`, zero row migration) instead of `signInWithApple` minting a fresh, disjoint account. **Same-device only** — browser and app on one phone. **Before-sign-in only** — the claim must complete on S00a *before* the Sign-in-with-Apple tap; once a Linked-Apple session exists there is no in-app recovery (that would require an account merge — deferred to a future feature). If the claim is skipped, Apple sign-in mints a new `user_id` and the web vote strands; the only recovery is delete-and-reinstall (which returns the user to a fresh S00a), within the 30-day anonymous-identity TTL. The carrier is a **Claim code**. See [[gti-vault/15_issues/0.1.0/issues/sg-wf-7-web-invitee-account-claim|sg-WF-7]].
+The process by which a Web invitee who installs the mobile app carries their browser-held Anonymous session into the app *before* completing Apple sign-in, so that S00a upgrades that existing identity via `linkApple` (preserving `user_id`, zero row migration) instead of `signInWithApple` minting a fresh, disjoint account. **Same-device only** — browser and app on one phone. **Before-sign-in only** — the claim must complete on S00a *before* the Sign-in-with-Apple tap; once a Linked-Apple session exists there is no in-app recovery (that would require an account merge — deferred to a future feature). If the claim is skipped, Apple sign-in mints a new `user_id` and the web vote strands; the only recovery is delete-and-reinstall (which returns the user to a fresh S00a), within the 30-day anonymous-identity TTL. The carrier is a **Claim code**. Active app work lives in `mobile/`. See [[gti-vault/15_issues/0.1.0/issues/sg-wf-7-web-invitee-account-claim|sg-WF-7]].
 _Avoid_: account merge (no merge — the Apple identity attaches to the *existing* anonymous user; nothing is merged), account linking (collides with `linkApple`, which is only the final upgrade step, not the cross-context transport).
 
 **Claim code**:
@@ -114,10 +114,10 @@ _Avoid_: previous (form-field register), undo (suggests destructive reversal; ba
 
 **Plan member** (any-platform):
 A user participating in a Plan's quiz round. Two disjoint subtypes, distinguished by auth identity, not by role within the quiz:
-- **Account member** — a user with a Linked-Apple session (iOS app holder, post-S00a). Has a personal **Plan list** surface as the app's landing. Plans they `Created` or `Joined` both appear on this list with distinct badges. May Exit any Plan, may Delete only their own Created Plans.
+- **Account member** — a user with a Linked-Apple session (mobile app holder, post-S00a). Has a personal **Plan list** surface as the app's landing. Plans they `Created` or `Joined` both appear on this list with distinct badges. May Exit any Plan, may Delete only their own Created Plans.
 - **Web invitee** — a user without an account, accessing a single Plan via the iMessage/SMS deep-link rendered by the web fallback. Has **no Plan list** and no homepage; the SMS link is their only persistent handle on the Plan. Identified by a name they enter on first landing. Re-opening the same link returns them to the Plan's current state (quiz / waiting / verdict / read-only history). May Exit; cannot Delete (only creators can, and creators are always Account members).
 
-The Plan creator is always an Account member — Plan creation is iOS-only post-workflow-overhaul. A Plan's joiners may be any mix of Account members (joined via iOS deep-link, with the Plan appearing on their list) and Web invitees (joined via the iMessage link in a browser, no list).
+The Plan creator is always an Account member — Plan creation is mobile-app-only post-workflow-overhaul. A Plan's joiners may be any mix of Account members (joined via mobile deep link, with the Plan appearing on their list) and Web invitees (joined via the iMessage link in a browser, no list).
 _Avoid_: guest (collides with "Anonymous session"), user / participant (acceptable colloquially but underspecified about which subtype — say "Account member" or "Web invitee" when the distinction matters).
 
 ### Sheet primitives (UI dogfood, 2026-05-24)
@@ -127,22 +127,22 @@ A sheet hosting a rich editor surface — multi-row content, persistent open sta
 _Avoid_: bottom sheet (ambiguous — collides with `Action sheet`), reroll sheet (one specific consumer, not the primitive), dark-glass sheet (visual-property name; the *role* is what's load-bearing).
 
 **Action sheet**:
-A sheet hosting a short choice — typically 1-3 affordances and a cancel, content-height, no scrolling inside. Carries the **native iOS shape** via SwiftUI `.sheet` + `.presentationDetents([.height(contentHeight)])` + `.presentationDragIndicator(.visible)` — rounded-top, full-width, system safe-area, native grabber. Inside the container, the Sunset Pop dark-glass register is preserved for visual continuity. Used for the S00 Plan list disambig (Solo / Group) sheet and the per-card delete-confirm sheet. Primitive: `C-2N` (assigned at the bug-24 spec edit; see [[gti-vault/15_issues/0.1.0/issues/bug-24-bottom-sheet-ios-shape|bug-24]]).
+A sheet hosting a short choice — typically 1-3 affordances and a cancel, content-height, no scrolling inside. Carries the **native mobile action-sheet shape** — rounded-top, full-width, system safe-area, native grabber on iOS. Inside the container, the Sunset Pop dark-glass register is preserved for visual continuity. Used for the S00 Plan list disambig (Solo / Group) sheet and the per-card delete-confirm sheet. Primitive: `C-2N` (assigned at the bug-24 spec edit; see [[gti-vault/15_issues/0.1.0/issues/bug-24-bottom-sheet-ios-shape|bug-24]]). Active implementation belongs in the React Native app under `mobile/`.
 _Avoid_: confirm sheet (only one of two consumers is a confirm; the disambig sheet is a 2-row picker), bottom action sheet (redundant — the action-sheet idiom is bottom-anchored on iOS by construction), alert sheet (collides with iOS HIG alert, a distinct primitive).
 
 The distinction matters because the bespoke modal-sheet container intentionally feels non-native — that is correct for the rich-editor role but **wrong** for the short-choice role, where users expect the iOS-HIG native shape. Grilling bug-24 resolved the two roles into two separate primitives instead of collapsing them.
 
 ### Verdict surfaces (pre-public-launch, 2026-05-26)
 
-**Live verdict surface** (`VerdictScreen.swift`):
+**Live verdict surface**:
 The Focus surface rendered when a Plan is in `decided-active` state for an Account member who participated in the room — eyebrow + hero + time-badge + receipts + reroll + Home chrome. Carries a three-case `Flavor` enum: `default` (pre-ratify group view), `committed` (post-`I'm in` group view with dock countdown), `solo` (single-member view — suppresses receipts and time-badge audience subtitle, swaps group-save for the C-22 save-taste-profile chip). One intent: *act on this verdict before the window closes*. Reroll burns and ratify live here. See [[gti-vault/60_engineering/adr/0018-verdict-surface-three-way-split|ADR 0018]].
 _Avoid_: verdict screen (overloaded — prior name for the 5-mode unified struct, deprecated 2026-05-26), Live VerdictScreen (engineering register; "live verdict surface" is the canonical noun in design-doc voice).
 
-**Read-only verdict surface** (`VerdictReadOnlyScreen.swift`, post-ADR-0018):
+**Read-only verdict surface** (post-ADR-0018):
 The Focus surface rendered when a viewer arrives at a `decided-expired` Plan, OR when a Web invitee deep-links into someone else's `decided-active` Plan they did not vote in. Suppresses ratify, reroll, dock countdown, save-chip; Home chrome rendering depends on arrival vector (Account member from PlanList History → yes; Web invitee from SMS → no). One intent: *show a closed verdict as a record*. Primary CTA is `Start a new decision`. Replaces the prior `.readOnly` mode case on the unified VerdictScreen.
 _Avoid_: history verdict (the surface is reachable from history but also from non-history deep links — the read-only-ness is the load-bearing property, not the history-ness), past verdict screen (uses deprecated "screen" register).
 
-**No-survivor surface** (`NoSurvivorScreen.swift`, post-ADR-0018):
+**No-survivor surface** (post-ADR-0018):
 The Focus surface rendered when a Plan's quiz round produces a candidate pool that the verdict engine cannot reduce to a winner — every option vetoed, no satisficing floor survivors. NOT a verdict surface (no hero, no time-badge, no receipts). One intent: *widen the search and re-run*. Carries the inline range slider and a `Re-run · N.N mi` primary CTA. Home chrome preserved (initiator-owned, PlanList reachable). Reroll burns are not consumed by the widen action (the widen is free; only post-verdict reroll consumes a burn). Replaces the prior `.noSurvivor` mode case on the unified VerdictScreen.
 _Avoid_: no-results screen (collides with the Q5 no-results screen — that one fires on per-member empty fetch, not on post-verdict no-survivor; see [[gti-vault/60_engineering/adr/0013-no-fictitious-fallback-venues|ADR 0013]]), verdict-failure screen (overloaded — "failure" implies an error path; no-survivor is a successful quiz with a recoverable outcome).
 
@@ -159,7 +159,7 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 ## Relationships
 
 - An **Anonymous session** can upgrade to a **Linked-Apple session** via `AuthCoordinator.linkApple`, preserving the `user_id` and all owned rows (rooms, votes, members, events).
-- The **S00a Sign-in Gate** is the iOS entry point that converts any non-Linked-Apple state into a **Linked-Apple session**. It is the ONLY surface that mints a Linked-Apple session on iOS.
+- The **S00a Sign-in Gate** is the mobile-app entry point that converts any non-Linked-Apple state into a **Linked-Apple session**. It is the ONLY surface that mints a Linked-Apple session in the app.
 - A **Linked-Apple session** is durable across reinstalls keyed by the device's Apple identity. An **Anonymous session** is durable only until the keychain is cleared or the app is deleted.
 - An **Account claim** reuses the existing S00a `linkApple` path unchanged — its only new work is transporting the Anonymous session from browser to app keychain via a **Claim code**. Once the session is in the keychain, S00a treats the user identically to a pre-S00a legacy-carryover anonymous install.
 - A **Parameter** is set on session setup and constrains the entire quiz that follows. A **Scenario question** is asked of every member during the quiz, and its answer is per-member. A **Profile** value is read silently per member without re-asking.
@@ -171,7 +171,7 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 - **Density preview pins** can appear inside the **Search area editor**, but they do not define or promise membership in the **Candidate pool**.
 - The **Candidate-pool floor** is a fetch-time (Stage 1) venue-*class* hard filter, applied alongside geo / radius / price / meal-time. It is orthogonal to cuisine, which is a Stage-2 soft scoring axis in the verdict engine and never strict-filters the fetch.
 - A **Plan** is the durable owner; a **Room** is the ephemeral container for one quiz round. A Plan owns at most one active Room (the in-flight round). Launching a `pending` Plan mints a new Room. On verdict, the Room closes and the Plan transitions to `decided-active`. A reroll re-runs the verdict on that **same** Room in place — it does not mint a new Room (the 3-burn cap is per-Room). Once the Plan transitions to `decided-expired`, no new Rooms may be minted against it. Plan name, status, params, and the stamped verdict survive Room lifecycle; the Room's `votes` / `options` rows do not.
-- A **Modal sheet** and an **Action sheet** are distinct primitives, not visual variants. They differ in *role* (rich editor vs short choice), in container shape (bespoke dark-glass vs native-iOS), and in HIG semantics. C-16 (reroll) and C-23 LocationPicker are Modal sheets. The S00 disambig (Solo / Group) and delete-confirm sheets are Action sheets. A future surface that needs to host a richer single-choice picker (e.g. a long list) belongs in the Modal sheet family, not the Action sheet family — the choice is editor-vs-choice, not list-length.
+- A **Modal sheet** and an **Action sheet** are distinct primitives, not visual variants. They differ in *role* (rich editor vs short choice), in container shape (bespoke dark-glass vs native platform action-sheet), and in platform semantics. C-16 (reroll) and C-23 LocationPicker are Modal sheets. The S00 disambig (Solo / Group) and delete-confirm sheets are Action sheets. A future surface that needs to host a richer single-choice picker (e.g. a long list) belongs in the Modal sheet family, not the Action sheet family — the choice is editor-vs-choice, not list-length.
 
 ## Example dialogue
 
@@ -184,9 +184,9 @@ _Avoid_: category filter (collides with the per-cuisine `fsq_category_ids` scopi
 
 - "S01 + S04 surface specs are stale on timer/countdown": `design-system/surfaces/01-initiator.md` (locked 2026-05-12) and `design-system/surfaces/04-waiting.md` describe a timer chip group + `"Auto-fires in 7:42"` countdown that the 0.1.0 PRD (2026-05-15) explicitly retired (US34, US35, §115). Surfaces need a sweep to remove the timer chip, the countdown mono-tag, the `"Auto-fires"` copy, and any related state in `code/screens/Screen*.jsx` + `tb-03` / `tb-07` carryover. Workflow-overhaul setup screen (post-grill) does not include a Timer control.
 - "sign-up" vs "sign-in": product / founder voice uses "sign-up page" loosely for any account-creation moment. Engineering uses "sign-in gate" because the surface only ever signs in with an existing Apple identity (Apple owns account creation; the app never sees a "new vs returning" distinction). When the founder says "sign-up page," they almost always mean the **S00a Sign-in Gate**.
-- "anonymous user" vs "no user": pre-S00a these were the same in practice (every iOS install minted an anonymous user on launch). Post-S00a they diverge - no user = pre-S00a state; anonymous user = legacy carryover that must pass through S00a via `linkApple`.
+- "anonymous user" vs "no user": pre-S00a these were the same in practice (every legacy mobile install minted an anonymous user on launch). Post-S00a they diverge - no user = pre-S00a state; anonymous user = legacy carryover that must pass through S00a via `linkApple`.
 - "Search-area timezone" conflict: the existing **Plan reroll window** definition says the close boundary uses `plans.location.timeZoneIdentifier`, but the Search area grill on 2026-06-03 clarified that **Search area** has no timing or timezone semantics. The timing model needs a separate correction; do not use the map selector work to reinforce the old search-area-timezone language.
-- "C-23 LocationPicker" vs "C-28 SearchAreaPicker": the 2026-06-03 Search area grill clarified that the active Setup component should be a new **C-28 SearchAreaPicker**, not a relabeled C-23 LocationPicker. C-23 remains historical until the design-system and iOS cleanup retires its active references.
+- "C-23 LocationPicker" vs "C-28 SearchAreaPicker": the 2026-06-03 Search area grill clarified that the active Setup component should be a new **C-28 SearchAreaPicker**, not a relabeled C-23 LocationPicker. C-23 remains historical until the design-system and mobile cleanup retires its active references.
 
 ## See also
 

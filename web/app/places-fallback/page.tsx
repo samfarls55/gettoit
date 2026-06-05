@@ -3,7 +3,7 @@
 // response or errors on the web client.
 //
 // Why a standalone route: per ADR 0002, the web fallback does NOT
-// have a MapKit escape hatch (MapKit is iOS-native only). When the
+// have a MapKit escape hatch (MapKit is native mobile only). When the
 // proxy fails on web, the entire candidate-pool path is dead, so
 // the experience degrades to a clear copy state rather than an
 // indefinite spinner.

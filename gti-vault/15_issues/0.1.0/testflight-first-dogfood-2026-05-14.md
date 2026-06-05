@@ -1,11 +1,14 @@
 ---
 title: TestFlight first-dogfood notes
 date: 2026-05-14
-context: First install of GetToIt on real iPhone via TestFlight (build 0.1.0). Raw observations dumped after a Go-Solo flow run-through. Awaits triage → issues.
+context: First install of GetToIt on real iPhone via TestFlight (build 0.1.0). Raw observations dumped after a Go-Solo flow run-through. Awaits triage â†’ issues.
 status: raw
 ---
 
-# TestFlight first-dogfood — 2026-05-14
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# TestFlight first-dogfood â€” 2026-05-14
 
 First time the app ran on a real device. Below is unfiltered first-impression
 feedback. Each bullet is a candidate issue for `15_issues/`; the wording is
@@ -15,14 +18,14 @@ close-to-verbatim so we don't lose the original intent during triage.
 
 - **Home-page contrast is low.** Yellow and white don't go well together on
   the surface. Need to revisit the on-gradient text colors against the
-  initiator gradient, or rethink the yellow→white pairing on the home
+  initiator gradient, or rethink the yellowâ†’white pairing on the home
   surface specifically.
   - Cross-ref: [[design-system/accessibility.md]] contrast tables;
     [[design-system/tokens.json]] `color.text.on-gradient.*`.
 
 ## Missing surfaces / flows
 
-- **Landing page.** The app needs a proper landing surface — what users see
+- **Landing page.** The app needs a proper landing surface â€” what users see
   before they enter a session. Today it drops straight into the initiator.
 - **Account creation flow.** No surface for sign-up today. Sign in with
   Apple exists ([[design-system/components.md]] AuthUpgradeChip) but the
@@ -31,7 +34,7 @@ close-to-verbatim so we don't lose the original intent during triage.
 ## Geography / location
 
 - **Geography awareness.** App needs to understand where the user is. Most
-  food / place decisions are location-bounded — without this, recommendations
+  food / place decisions are location-bounded â€” without this, recommendations
   can't be real. Likely overlaps with the existing `PlacesService` /
   `MapKitPlacesFallback` work in `ios/Sources/App/`, but the surface that
   *asks for* location permission and explains why doesn't exist yet.
@@ -39,7 +42,7 @@ close-to-verbatim so we don't lose the original intent during triage.
 ## Motion
 
 - **Question transitions feel slow.** Concrete repro: tap **Go Solo**,
-  select an answer — the UI advances to the next question instantly, but
+  select an answer â€” the UI advances to the next question instantly, but
   the background gradient lags ~1s behind. Should be a seamless single
   transition where UI + background animate together.
   - Cross-ref: [[design-system/motion.md]]; per-screen `CHOREO` constants
@@ -54,7 +57,7 @@ close-to-verbatim so we don't lose the original intent during triage.
   `PlacesService` results filtered by the answers so far.
 
 - **Questions need rework.** Allergies (and similar fixed personal-trait
-  data) should be **user-profile settings** stored at account level — not
+  data) should be **user-profile settings** stored at account level â€” not
   re-asked every session. The in-session questions should narrow toward
   *mood / situational context* (what are you in the mood for right now?)
   rather than re-collect static data.
@@ -75,7 +78,7 @@ close-to-verbatim so we don't lose the original intent during triage.
 ## Sharing / invite link
 
 - **Invite link is plain text in iMessage.** When sent via SMS / iMessage,
-  the link comes through as raw text — no icon, no preview. Apple's
+  the link comes through as raw text â€” no icon, no preview. Apple's
   AASA + universal-links mechanism is supposed to surface a rich preview
   card with an icon. Either the AASA file isn't being read or the
   universal-link metadata isn't set up.
@@ -85,21 +88,21 @@ close-to-verbatim so we don't lose the original intent during triage.
     Should verify both ends are correct and that Open Graph / iMessage
     rich-preview metadata is set on the destination page.
 
-- **Invite link → 404.** Tapping the invite link 404s. Doesn't open the
+- **Invite link â†’ 404.** Tapping the invite link 404s. Doesn't open the
   app, doesn't open the web fallback. Almost certainly related to the
-  point above — the destination URL either doesn't exist or the AASA →
+  point above â€” the destination URL either doesn't exist or the AASA â†’
   app handoff is broken. **Likely the highest-priority bug here** because
   it breaks the entire invite flow end-to-end.
 
 ## Triage notes (for whoever processes this)
 
 - Several of these (landing page, account flow, geography permission)
-  are missing-surface gaps — they're spec-level decisions that have to
+  are missing-surface gaps â€” they're spec-level decisions that have to
   start in `design-system/` and/or `10_prds/` before any code goes in.
 - The 404 + plain-text link are real bugs against shipped functionality
   and should jump the queue.
 - The motion lag is a localized fix in the relevant `CHOREO` constants.
-- The questions rework is a product decision — talk to product / read
+- The questions rework is a product decision â€” talk to product / read
   `50_product/` before deciding on the split between
   in-session vs profile-level data.
 - This file is raw; let `to-issues` or a `compile` pass split these into

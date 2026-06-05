@@ -1,7 +1,10 @@
 ---
-status: ready-for-agent
+status: done
 github_issue: 325
 ---
+
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
 
 # Expo Mobile Rewrite PRD
 
@@ -161,3 +164,7 @@ Prior art:
 ADR 0021 records the architecture decision behind this PRD. The migration should be split into tracer-bullet issues after the foundation shape is scaffolded or immediately if execution needs parallelization.
 
 The biggest known risk is Search area parity: map camera behavior, current location, typed search, radius display, and density preview pins need an early spike. Apple auth, Universal Links, EAS handoff, and push also need real iOS checks because local Windows tests can only cover faked outcomes.
+
+## Closure note
+
+Closed 2026-06-05. All child tracer-bullet issues TB-01 through TB-18 are closed in GitHub, and TB-18 recorded the release swap, Swift retirement, TB-17 residual risks, and founder approval.

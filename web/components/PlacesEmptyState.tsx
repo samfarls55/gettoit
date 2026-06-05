@@ -1,8 +1,8 @@
 // PlacesEmptyState — web-fallback empty state for the PlacesProxy.
 //
 // Shown when the PlacesProxy Edge Function returns a thin response or
-// errors on the web side. ADR 0002 documents the divergence from iOS:
-// the web client has no MapKit escape hatch, so this is the terminal
+// errors on the web side. ADR 0002 documents the divergence from the
+// mobile app: the web client has no native maps escape hatch, so this is the terminal
 // surface when Foursquare can't supply candidates.
 //
 // Tokens via CSS custom properties from `design-system/code/tokens.css`
@@ -58,14 +58,14 @@ const bodyStyle: CSSProperties = {
   margin: 0,
 };
 
-// wfr-31 — the fallback mentions the iOS app as the way out, so the
-// word itself is the App Store link. Inline (rather than a dedicated
+// wfr-31 — the fallback mentions the mobile app as the way out, so the
+// app phrase itself is the App Store link. Inline (rather than a dedicated
 // CTA) keeps "Try again" / "Start over" as the dominant action while
-// still making the iOS path reachable. The link inherits the body
+// still making the mobile path reachable. The link inherits the body
 // color and underlines so it reads as a link without inventing new
 // chrome — consistent with the SessionRoom S04 web-fallback affordance
 // in `app-store.ts`.
-const iosLinkStyle: CSSProperties = {
+const appLinkStyle: CSSProperties = {
   color: "inherit",
   textDecoration: "underline",
 };
@@ -99,15 +99,15 @@ export function PlacesEmptyState({ onRetry }: PlacesEmptyStateProps) {
       <h1 style={headlineStyle}>Couldn&apos;t load options nearby.</h1>
       <p style={bodyStyle}>
         We hit a snag pulling places from Foursquare. Try again in a moment —
-        or open the GetToIt app on{" "}
+        or open the{" "}
         <a
           href={APP_STORE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          style={iosLinkStyle}
-          data-testid="places-empty-ios-link"
+          style={appLinkStyle}
+          data-testid="places-empty-app-link"
         >
-          iOS
+          GetToIt mobile app
         </a>
         , which can fall back to Apple Maps.
       </p>

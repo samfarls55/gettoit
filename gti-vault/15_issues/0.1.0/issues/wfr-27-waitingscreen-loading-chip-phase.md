@@ -10,7 +10,10 @@ pr: 304
 merged: 2026-05-26
 ---
 
-# wfr-27 — WaitingScreen has no Loading/Progress signal during initial chip-phase load
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-27 â€” WaitingScreen has no Loading/Progress signal during initial chip-phase load
 
 ## What to build
 
@@ -23,7 +26,7 @@ The `.loading` chip phase (`WaitingScreen.swift:100-151`) currently renders noth
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Hub anchors
 
@@ -35,13 +38,13 @@ None — can start immediately.
 
 ## Comments
 
-### 2026-05-26 — Done (PR #304)
+### 2026-05-26 â€” Done (PR #304)
 
-Shipped a `ProgressView` in the WaitingScreen CTA dock, gated on `phase == .loading`. The indicator sits in situ where the AuthUpgradeChip will land (per the *Loading or Progress Indicators* pattern: "Place the indicator in situ — where the missing content will appear — not in a generic top bar"). Hides the moment the chip-phase resolves to any other state so the spinner doesn't leak.
+Shipped a `ProgressView` in the WaitingScreen CTA dock, gated on `phase == .loading`. The indicator sits in situ where the AuthUpgradeChip will land (per the *Loading or Progress Indicators* pattern: "Place the indicator in situ â€” where the missing content will appear â€” not in a generic top bar"). Hides the moment the chip-phase resolves to any other state so the spinner doesn't leak.
 
 **Autonomy calls:**
 
-- Chose `ProgressView` over skeleton — the chip slot is one capsule, not a content-shaped block, so a skeleton would mislead about the resolved chip's shape. Spinner sits cleanly in the same vertical real estate.
+- Chose `ProgressView` over skeleton â€” the chip slot is one capsule, not a content-shaped block, so a skeleton would mislead about the resolved chip's shape. Spinner sits cleanly in the same vertical real estate.
 - Tinted `GTIColor.TextOnGradient.primary` to match the existing `quiz.q5.loading` / `submitting` ProgressView idiom in QuizScreen.
 - Reserved `minHeight: 44` so the slot doesn't visibly jump when the indicator gives way to the resolved chip.
 - Extracted the visibility rule as a public static predicate (`shouldRenderChipLoadingIndicator(for:)`) so the test covers every `ChipPhase` without spinning up a SwiftUI body. Mirrors the locked-constant / pure-helper idiom from `leaveChromeLabel` (wfr-17) and `sessionEndedToastLabel` (bug-37).

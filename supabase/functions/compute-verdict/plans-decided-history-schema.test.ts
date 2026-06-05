@@ -20,7 +20,7 @@
 //   * Triggers on `public.rerolls` (3rd burn) and `public.check_ins`
 //     (any outcome) expire the linked plan via the same
 //     `set_plan_decided_expired` function.
-//   * Two new RPCs back the Decided + History sections of the iOS S00
+//   * Two new RPCs back the Decided + History sections of the mobile S00
 //     Plan list:
 //       - `plans_decided_for_user(uuid)` — Created + Joined Plans in
 //         status='decided-active', joined inline with the verdict's
@@ -258,7 +258,7 @@ Deno.test("tb-WF-8: plans_history_for_user filters status='decided-expired'", ()
 
 Deno.test("tb-WF-8: decided + history RPCs project a `role` column ('owner' | 'joined')", () => {
   const sql = decidedHistoryMigration();
-  // Both RPCs return a `role` text column so the iOS surface can
+  // Both RPCs return a `role` text column so the mobile surface can
   // render the JOINED chip on Joined cards without an extra lookup.
   assert(
     /plans_decided_for_user[\s\S]+role\s+text/i.test(sql),

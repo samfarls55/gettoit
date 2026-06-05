@@ -8,10 +8,13 @@ relates:
   - 60_engineering/foursquare-venue-closure-signal
 ---
 
-# Places Provider Options — Full Survey (2026-05)
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# Places Provider Options â€” Full Survey (2026-05)
 
 Decision-support survey. Triggered by a product call to **drop Foursquare as the primary
-data provider** — confidence in data freshness is gone (the founder used the Foursquare
+data provider** â€” confidence in data freshness is gone (the founder used the Foursquare
 consumer app and saw restaurants closed for years still mapped). This widens the earlier
 two-way comparison ([[places-api-foursquare-vs-google]]) into a full market scan:
 every realistic provider, with capability and pricing.
@@ -23,16 +26,16 @@ every realistic provider, with capability and pricing.
 ## TL;DR
 
 1. **The staleness complaint is real and already documented.** See
-   [[foursquare-venue-closure-signal]] — Foursquare's post-2025 API has no closure
+   [[foursquare-venue-closure-signal]] â€” Foursquare's post-2025 API has no closure
    bucket, `date_closed` was null on 0/300 sampled restaurants, and a venue dead since
    ~2018 (Pastime) still returns as live with a full hours schedule.
 
-2. **Three "alternatives" are not alternatives — they are Foursquare in a trenchcoat.**
+2. **Three "alternatives" are not alternatives â€” they are Foursquare in a trenchcoat.**
    - **Mapbox** Search Box POI data: Foursquare is the *primary* POI provider for the
      entire Mapbox suite (partnership re-announced Sept 2024).
    - **Overture Maps** Places: Foursquare is one of its 8 source feeds.
    - **FSQ OS Places** (the open dataset): literally Foursquare's own place graph.
-   Switching to any of these does not escape the freshness problem — it re-buys it,
+   Switching to any of these does not escape the freshness problem â€” it re-buys it,
    usually with *fewer* fields exposed.
 
 3. **Ratings/reputation is a walled asset.** Of every provider surveyed, only **Google**
@@ -40,7 +43,7 @@ every realistic provider, with capability and pricing.
    Foursquare's *paid premium* tier also has them. Every open/aggregator/map-data
    source (OSM, Geoapify, Radar, Overture, FSQ OS, HERE, TomTom Search, Mapbox,
    Apple's developer APIs) has **no ratings at all**. The quiz's Q3 (reputation) and
-   Q5 (candidate rater) depend on this — see "Impact on the quiz" below.
+   Q5 (candidate rater) depend on this â€” see "Impact on the quiz" below.
 
 4. **Only Google has a reliable, owner-incentivised freshness signal.** Google
    `businessStatus` returns `OPERATIONAL / CLOSED_TEMPORARILY / CLOSED_PERMANENTLY`,
@@ -62,9 +65,9 @@ every realistic provider, with capability and pricing.
 The founder reviewed this survey and chose to keep Foursquare as the primary provider
 for now, accepting its known weaknesses:
 
-- The staleness is real and acknowledged — the Foursquare consumer app has been
+- The staleness is real and acknowledged â€” the Foursquare consumer app has been
   largely unmaintained since ~2019; reviews and closure data are stale.
-- But Foursquare still provides a **decent baseline** — usable category, taste,
+- But Foursquare still provides a **decent baseline** â€” usable category, taste,
   price, and hours data for the 0.1.0 quiz recipes.
 - It is the **cheapest of the providers that actually feed this quiz**: Google is
   pricier per call and forces the `places-proxy` caching rework; Yelp is a $299+/mo
@@ -72,17 +75,17 @@ for now, accepting its known weaknesses:
 - The stale-venue problem is already partially mitigated by the on-device
   `VenueClosureVerifier` MapKit cross-check ([[foursquare-venue-closure-signal]]).
 
-This is an explicit "for now". The analysis below — which recommends Google — is
+This is an explicit "for now". The analysis below â€” which recommends Google â€” is
 retained as the record of what a migration would buy and cost, for whenever the
 decision is revisited. Likely revisit triggers: post-launch call volume crossing the
-Yelp break-even (~8,000–16,000 calls/month), or stale data becoming a repeated real
+Yelp break-even (~8,000â€“16,000 calls/month), or stale data becoming a repeated real
 user complaint rather than a founder-noticed one.
 
 ---
 
 ## Why "just use a different map provider" does not work
 
-The founder's instinct — Foursquare data is stale — is correct. But the POI-data
+The founder's instinct â€” Foursquare data is stale â€” is correct. But the POI-data
 market is more consolidated than it looks. A handful of companies actually *collect*
 venue data; most "providers" license and re-package it.
 
@@ -106,12 +109,12 @@ dropped from the product.
 
 ---
 
-## Tier 1 — Providers with real restaurant ratings (self-serve)
+## Tier 1 â€” Providers with real restaurant ratings (self-serve)
 
 ### Google Places API (New)
 
 - **Search:** Text Search, Nearby Search, Place Details, Autocomplete.
-- **Filters (server-side):** `includedType` (cuisine-level types — `italian_restaurant`,
+- **Filters (server-side):** `includedType` (cuisine-level types â€” `italian_restaurant`,
   `sushi_restaurant`, etc.), `priceLevels`, `minRating`, `openNow`, `rankPreference`,
   geo bias/restriction.
 - **Fields:** ratings, `userRatingCount`, full review text, price level, hours,
@@ -122,14 +125,14 @@ dropped from the product.
   Profile (owners self-update hours/closure) + crowdsourced edits + imagery. Explicit
   `businessStatus` closure field. This directly fixes the Pastime-class miss.
 - **Pricing (since 2025-03-01, the $200 flat credit was removed):** per-SKU monthly
-  free caps — Essentials 10k, Pro 5k, Enterprise 1k. Per 1,000 calls at low volume:
+  free caps â€” Essentials 10k, Pro 5k, Enterprise 1k. Per 1,000 calls at low volume:
   Text Search Pro $32, Enterprise $35, **Enterprise+Atmosphere $40**; Place Details
   Pro $17 / Enterprise $20 / **+Atmosphere $25**. **Billed at the highest SKU any
-  requested field touches** — one amenity field pushes the whole call to +Atmosphere.
-- **ToS — the dealbreaker:** Only `place_id` may be stored indefinitely. Names,
+  requested field touches** â€” one amenity field pushes the whole call to +Atmosphere.
+- **ToS â€” the dealbreaker:** Only `place_id` may be stored indefinitely. Names,
   ratings, reviews, hours, amenities **may not be cached or warehoused**. The current
   `places-proxy` venue cache (24h/7d TTL, ADR 0002) is **non-compliant with Google**
-  and would have to be torn out — re-fetch live per request, higher latency and cost,
+  and would have to be torn out â€” re-fetch live per request, higher latency and cost,
   hard runtime dependency on Google. Plus "Powered by Google" attribution + review
   author attribution obligations.
 - **iOS:** Mature Places SDK for iOS + a newer Swift-first Places Swift SDK
@@ -148,31 +151,31 @@ What Google gives you to characterise a restaurant *beyond category*:
   - Crowd/suitability: `goodForChildren`, `goodForGroups`, `goodForWatchingSports`,
     `allowsDogs`.
   - Structured objects: `accessibilityOptions`, `parkingOptions`, `paymentOptions`.
-  - Fields are omitted when Google lacks the data — coverage is sparse for low-traffic
+  - Fields are omitted when Google lacks the data â€” coverage is sparse for low-traffic
     venues. Not region-gated.
 - **Rating + price (Enterprise tier):** `rating`, `userRatingCount`, `priceLevel`,
   `priceRange`.
 
-**Review keyword extraction — NO structured field.** The Maps consumer app's
+**Review keyword extraction â€” NO structured field.** The Maps consumer app's
 "People often mention [cozy] [great pasta]" keyword chips are **not exposed** as
 structured/queryable data. There is no `reviewHighlights` / `reviewTags` / `topics`
 field. What exists instead:
 
-- **`contextualContents.justifications`** (Text Search only, **experimental**) — for a
+- **`contextualContents.justifications`** (Text Search only, **experimental**) â€” for a
   query like "firewood pizza" it returns the matching review *snippet* with the
   matching span index-marked (`reviewJustification.highlightedText`), plus a
   `businessAvailabilityAttributes` justification (takeout/delivery/dineIn booleans).
   This is the closest thing to keyword chips, but it is snippet+span, query-scoped,
-  Text-Search-only, and experimental — not safe as a core dependency.
-- **`reviewSummary`** — AI/Gemini prose synthesising reviews. **Region-gated** (~18
+  Text-Search-only, and experimental â€” not safe as a core dependency.
+- **`reviewSummary`** â€” AI/Gemini prose synthesising reviews. **Region-gated** (~18
   English-language countries incl. US/UK/India/Mexico; EEA excluded; "not guaranteed
   for all places"). Prose, not tags.
-- **`generativeSummary`** — AI ~100-char place overview. **More restricted: English,
+- **`generativeSummary`** â€” AI ~100-char place overview. **More restricted: English,
   India + US only.**
-- **`editorialSummary`** — short Google-written (non-AI) blurb; sometimes carries a
+- **`editorialSummary`** â€” short Google-written (non-AI) blurb; sometimes carries a
   vibe word ("cozy", "upscale"); inconsistently present.
 
-**Vibe / ambience — NO structured descriptor.** Google does not expose a
+**Vibe / ambience â€” NO structured descriptor.** Google does not expose a
 casual/upscale/romantic enum, a noise-level field, a decor field, or a crowd-type
 field. To get a structured "feel" you either (a) infer it from the boolean set, or
 (b) run your own keyword/sentiment extraction over `reviews` text or `reviewSummary`
@@ -181,9 +184,9 @@ region-gated, and carry a "Summarized with Gemini" disclosure + report-link disp
 obligation.
 
 **Cost note:** every atmosphere boolean, `reviews`, and the AI summaries all sit in
-the **Enterprise + Atmosphere** SKU — ~$25/1k on Place Details, ~$40/1k on Text/Nearby
+the **Enterprise + Atmosphere** SKU â€” ~$25/1k on Place Details, ~$40/1k on Text/Nearby
 Search. AI summaries are GA (no allowlist), gated only by geography. AI summary fields
-have no caching exception — re-fetch, don't warehouse.
+have no caching exception â€” re-fetch, don't warehouse.
 
 ### Yelp Fusion API (rebranded "Yelp Places API")
 
@@ -191,22 +194,22 @@ have no caching exception — re-fetch, don't warehouse.
   Business Details, plus a plan-gated Review Highlights endpoint.
 - **Filters (server-side):** `categories` (cuisine taxonomy), `price` (1-4),
   `open_now` / `open_at`, `attributes` (reservations, outdoor seating, delivery,
-  ambience, noise — count of available attributes is plan-tiered: 15/23/66),
+  ambience, noise â€” count of available attributes is plan-tiered: 15/23/66),
   `sort_by` (rating, review_count, distance).
 - **Fields:** `rating`, `review_count`, `price`, `categories`, `is_closed`,
   `transactions` (delivery/pickup/reservation), `hours` + `is_open_now`, photos,
   review excerpts (plan-gated: 0/3/7).
-- **Freshness:** Strong for US dining — Yelp's core business is its own review
+- **Freshness:** Strong for US dining â€” Yelp's core business is its own review
   platform; `is_closed` kept current by community + moderation. No published refresh
   SLA. Materially better closure exposure than Foursquare.
 - **Pricing:** No permanent free tier (5,000 calls in a 30-day trial only).
   Monthly base + overage: **Base $229/mo** + $5.91/1k, **Enhanced $299/mo** + $6.57/1k,
   **Premium $643/mo** + $14.13/1k. Enterprise (>150k/mo) is sales-quoted.
-- **ToS — two flags:**
+- **ToS â€” two flags:**
   1. **Caching limited to 24 hours** (Yelp Business IDs storable indefinitely).
      The `places-proxy` 7-day cold TTL would have to drop to <=24h.
   2. **Commercial use requires Yelp's express written consent.** GetToIt is a
-     commercial app — this needs legal sign-off / written confirmation that buying a
+     commercial app â€” this needs legal sign-off / written confirmation that buying a
      paid plan grants that consent. **Launch blocker if unaddressed.**
   Also: branded Yelp stars only, mandatory link-back, and Yelp ratings **may not be
   displayed alongside any other UGC rating** (no blending with another provider).
@@ -216,7 +219,7 @@ have no caching exception — re-fetch, don't warehouse.
 
 - **Search:** Location Search, Nearby Location Search, Location Details, Photos,
   Reviews. **Returns only up to 10 locations per query; up to 5 reviews/photos each.**
-- **Filters:** Weak — only a coarse `category` ("restaurants"). **No price, cuisine,
+- **Filters:** Weak â€” only a coarse `category` ("restaurants"). **No price, cuisine,
   open-now, or amenity filters server-side.** You would over-fetch and filter
   client-side, which does not fit the "recipe of filters" model.
 - **Fields:** `rating`, `num_reviews`, `price_level` (sparse), `cuisine`, `hours`
@@ -224,17 +227,17 @@ have no caching exception — re-fetch, don't warehouse.
 - **Freshness:** Travel/tourism-weighted; weaker for everyday neighbourhood dining.
   No published closure-accuracy guarantee.
 - **Pricing:** 5,000 free calls/month ongoing (credit card required). Pay-as-you-go
-  beyond that — **no public per-call rates**; sales-quoted; >500k/mo needs sales.
-- **ToS:** Caching forbidden for everything except Location IDs — all content
+  beyond that â€” **no public per-call rates**; sales-quoted; >500k/mo needs sales.
+- **ToS:** Caching forbidden for everything except Location IDs â€” all content
   fetched live every call. B2C consumer apps allowed (GetToIt qualifies). Mandatory
   Tripadvisor logo + "Ollie" owl, bubble images served from Tripadvisor URLs.
-- **Access:** Gated — application + approval, requires a live B2C travel URL,
+- **Access:** Gated â€” application + approval, requires a live B2C travel URL,
   provisional key expires in 6 months.
 - **Verdict:** Weakest filtering of the three. Not a fit for the quiz recipe model.
 
 ---
 
-## Tier 2 — Map-data providers (no ratings, navigation-first)
+## Tier 2 â€” Map-data providers (no ratings, navigation-first)
 
 These return strong category/geo search but **no ratings, no reviews, no reputation**.
 Usable only as a *base catalog* if reputation is dropped from the product, or paired
@@ -244,34 +247,34 @@ with a separate ratings source.
 
 - **Capability:** Coarse category + geo search only. `MKMapItem` / Maps Server API
   `/search` return name, address, coordinate, POI category, phone, website. Category
-  filter exists but is coarse — `.restaurant`, `.cafe`, `.bakery`, `.brewery`,
-  `.nightlife` — one bucket for all restaurants, no cuisine granularity. **No ratings,
+  filter exists but is coarse â€” `.restaurant`, `.cafe`, `.bakery`, `.brewery`,
+  `.nightlife` â€” one bucket for all restaurants, no cuisine granularity. **No ratings,
   reviews, price, amenities, readable hours, open-now filter, or closure field** via
   any developer API. Apple Maps the *app* shows Yelp-sourced ratings and (iOS 26
-  place cards) hours — but rendered by Apple's UI, not exposed as developer-readable
+  place cards) hours â€” but rendered by Apple's UI, not exposed as developer-readable
   structured fields. Apple Maps is a review *aggregator*: it surfaces Yelp (main),
   TripAdvisor, MICHELIN/expert guides (added May 2025), plus Apple's own
   thumbs-up/down score. That content is licensed *to Apple for display in Apple Maps
-  only* — Apple has no right to sublicense it, so it reaches developers through no
+  only* â€” Apple has no right to sublicense it, so it reaches developers through no
   Apple channel at all. Wanting "the data in Apple Maps" therefore means licensing
-  the source (Yelp) directly — there is no cheaper Apple back door to it.
+  the source (Yelp) directly â€” there is no cheaper Apple back door to it.
 - **Freshness:** Actually a strength. Apple's underlying POI/closure data is good
   enough that `VenueClosureVerifier` already trusts MapKit as the closure *oracle* to
   catch Foursquare's stale venues. The catch: there is no developer-readable closure
-  *field* — the verifier infers closure from venue *absence* in a MapKit sweep.
-- **Pricing:** Effectively free — 25,000 calls/day on the Maps Server API, and
+  *field* â€” the verifier infers closure from venue *absence* in a MapKit sweep.
+- **Pricing:** Effectively free â€” 25,000 calls/day on the Maps Server API, and
   on-device `MKLocalSearch` is keyless and unmetered. Needs an Apple Developer
   membership ($99/yr).
 - **ToS:** Map data may not be cached beyond "temporary and limited" performance use.
-- **iOS:** Best-in-class — first-party framework, no key for on-device `MKLocalSearch`.
-- **Role / why not primary:** MapKit is **not ruled out** — it is already in
+- **iOS:** Best-in-class â€” first-party framework, no key for on-device `MKLocalSearch`.
+- **Role / why not primary:** MapKit is **not ruled out** â€” it is already in
   production in two roles (ADR 0002 fallback provider + the `VenueClosureVerifier`
   closure cross-check) and should keep both. What it cannot be is the *primary*
   provider, and the blocker is the **0.1.0 quiz design, not MapKit quality**: the quiz
   compiles each answer into a recipe of cuisine / price / attribute / reputation
   filters, and MapKit exposes neither those filters nor the data to filter
   client-side. A simpler "good restaurants near me, sorted, closed ones removed"
-  product could run on MapKit alone, for free — so MapKit-vs-paid-provider is partly
+  product could run on MapKit alone, for free â€” so MapKit-vs-paid-provider is partly
   a **quiz-scope decision** (see open question 6).
 
 ### HERE (Geocoding & Search)
@@ -291,7 +294,7 @@ with a separate ratings source.
 
 - **Capability:** POI/Category/Nearby search. Category + brand filters, hours on
   request. **No price filter, no amenities, no ratings** in the Search API.
-- **TomTom POI Details API** *does* return ratings/reviews/price — but it is
+- **TomTom POI Details API** *does* return ratings/reviews/price â€” but it is
   **Tripadvisor-sourced, automotive-use-only, private-preview/contract-only**, and
   contractually barred from "Enterprise Customers." Not a realistic self-serve path.
 - **Pricing:** Free 2,500 non-tile requests/day; overage ~$0.54-0.75/1k. POI Details
@@ -301,7 +304,7 @@ with a separate ratings source.
 
 ### Mapbox (Search Box API)
 
-- **CRITICAL:** Mapbox POI data **is Foursquare data** — Foursquare is the primary POI
+- **CRITICAL:** Mapbox POI data **is Foursquare data** â€” Foursquare is the primary POI
   provider for the whole Mapbox suite (re-announced Sept 2024). Adopting Mapbox does
   **not** escape the staleness problem; it inherits it, and exposes *fewer* fields
   than Foursquare's own API (no ratings/photos/price passthrough; phone/website/hours
@@ -311,14 +314,14 @@ with a separate ratings source.
 - **Pricing (introductory, through Q4 2025):** session-based free 500/mo then $3/1k;
   request-based free 50k/mo then $1/1k. Permanent storage requires the pricier
   Permanent Geocoding tier.
-- **ToS:** Default results ephemeral — must not persist; persistence needs Permanent
+- **ToS:** Default results ephemeral â€” must not persist; persistence needs Permanent
   tier.
-- **iOS:** `mapbox-search-ios` — strong native Swift SDK with prebuilt search UI.
-- **Verdict:** No reason to switch here — same data, worse fields.
+- **iOS:** `mapbox-search-ios` â€” strong native Swift SDK with prebuilt search UI.
+- **Verdict:** No reason to switch here â€” same data, worse fields.
 
 ---
 
-## Tier 3 — Open / aggregator datasets (free, no ratings, self-host)
+## Tier 3 â€” Open / aggregator datasets (free, no ratings, self-host)
 
 No ratings anywhere in this tier. These are *base catalogs* you host and query
 yourself. Relevant only if reputation is dropped, or as the cheap bulk-filtering layer
@@ -327,22 +330,22 @@ under a thin paid ratings call.
 ### OpenStreetMap (Overpass / Nominatim)
 
 - **Capability:** Strong category + `cuisine` tag filtering; `opening_hours`, diet
-  tags (`diet:vegan` etc.), `wheelchair`, `outdoor_seating`, `takeaway`, `delivery` —
+  tags (`diet:vegan` etc.), `wheelchair`, `outdoor_seating`, `takeaway`, `delivery` â€”
   but populated unevenly. **No price level, no ratings.**
-- **Freshness:** Live crowdsourced DB. Closure accuracy weak — closed venues removed
+- **Freshness:** Live crowdsourced DB. Closure accuracy weak â€” closed venues removed
   only when a mapper notices; restaurant turnover lags. Coverage varies wildly by city.
 - **Pricing:** Free. Public endpoints are rate-limited (Nominatim 1 req/s, no bulk);
   production = self-host.
-- **Licensing:** ODbL 1.0 share-alike. Using results in-app is a "Produced Work" —
+- **Licensing:** ODbL 1.0 share-alike. Using results in-app is a "Produced Work" â€”
   attribution only, no copyleft on the app. Redistributing an enhanced *database*
   triggers share-alike.
-- **Effort:** High — self-host Overpass + regional extract.
+- **Effort:** High â€” self-host Overpass + regional extract.
 
 ### Geoapify Places API
 
 - **Capability:** 800+ categories incl. cuisine subtypes; "conditions" filters
   (vegan, vegetarian, wheelchair, internet_access, hours). Place Details API for
-  structured hours. **No price level, no ratings.** OSM-derived — inherits OSM
+  structured hours. **No price level, no ratings.** OSM-derived â€” inherits OSM
   freshness/closure weaknesses.
 - **Pricing:** Free 3,000 credits/day. Paid: $59/mo (10k/day) ... $299/mo (100k/day) ...
   $609/mo (250k/day).
@@ -359,16 +362,16 @@ under a thin paid ratings call.
 - **Verdict:** Easiest iOS integration, weakest *content* fit for restaurant
   discovery. It is a geofencing platform, not a dining catalog.
 
-### Overture Maps Foundation — Places dataset
+### Overture Maps Foundation â€” Places dataset
 
 - **Capability:** ~64M places; good category taxonomy (Dec 2025 added a proper
   cuisine hierarchy). Fields: names, addresses, websites, socials, brand, `confidence`,
   `operating_status`. **No hours, no price, no amenities, no ratings.**
 - **Freshness:** Monthly static dump. `operating_status` exists but currently a
-  placeholder (all "open") — does **not** yet solve closure detection.
+  placeholder (all "open") â€” does **not** yet solve closure detection.
 - **Pricing:** Free/open. Permissive licensing (CDLA-Permissive 2.0 / Apache 2.0 /
   CC0 by source). No share-alike.
-- **Effort:** High — host GeoParquet, query via PostGIS/DuckDB, expose your own API.
+- **Effort:** High â€” host GeoParquet, query via PostGIS/DuckDB, expose your own API.
 
 ### FSQ OS Places (Foursquare Open Source Places)
 
@@ -377,15 +380,15 @@ under a thin paid ratings call.
 - **Capability:** 1,000+ category taxonomy. ~22 fields incl. `date_closed` and
   `date_refreshed`. **No hours, no price, no ratings, no amenities** (Foursquare kept
   those for the paid API).
-- **Freshness note:** Same underlying graph as the stale live API — but the open
+- **Freshness note:** Same underlying graph as the stale live API â€” but the open
   dataset *does* expose `date_closed` + `date_refreshed`, so you could filter closed
   venues yourself, arguably better than the live API behaviour. Still the same source.
 - **Pricing:** Free/open (Hugging Face, Snowflake Marketplace, FSQ Places Portal).
-- **Effort:** High — host and query the monthly dump yourself.
+- **Effort:** High â€” host and query the monthly dump yourself.
 
 ---
 
-## Reference baseline — Foursquare Places API (current provider)
+## Reference baseline â€” Foursquare Places API (current provider)
 
 For completeness, what is being replaced. Pro tier ~31 fields; Premium tier adds
 hours, `rating`, `price`, `popularity`, `tastes`, photos, tips, amenity booleans.
@@ -393,11 +396,11 @@ Fine-grained 1,000+ filterable taxonomy. **30-day caching allowed** (the
 `places-proxy` cache is compliant). Pricing: list price Pro $15/1k, Premium $18.75/1k.
 The rich fields the 0.1.0 quiz needs (hours, rating, price, tastes, photos) are all
 **Premium** tier, which has no free allowance. **The widely-cited $200/mo developer
-credit does not apply to GetToIt's account** — the project runs straight
+credit does not apply to GetToIt's account** â€” the project runs straight
 pay-as-you-go off a prepaid balance (founder confirmed 2026-05-19, started with a $20
 top-up). So the current real cost is per-call from day one, not free. **Flagged
 risk:** an "Upcoming Changes" notice says the Pro free tier may drop 10,000 -> 500
-calls/mo on 2026-06-01. Closure signal effectively absent — the reason for this survey.
+calls/mo on 2026-06-01. Closure signal effectively absent â€” the reason for this survey.
 
 ---
 
@@ -405,7 +408,7 @@ calls/mo on 2026-06-01. Closure signal effectively absent — the reason for thi
 
 | Provider | Ratings | Cuisine filter | Price filter | Open-now | Closure signal | Cache allowed | Low-volume cost | iOS SDK |
 |---|---|---|---|---|---|---|---|---|
-| **Google Places (New)** | Yes (+reviews) | Yes (fine) | Yes | Yes | **Yes — businessStatus** | place_id only | $32-40/1k search | Yes (Swift) |
+| **Google Places (New)** | Yes (+reviews) | Yes (fine) | Yes | Yes | **Yes â€” businessStatus** | place_id only | $32-40/1k search | Yes (Swift) |
 | **Yelp Fusion** | Yes (+excerpts) | Yes | Yes | Yes | Yes (`is_closed`) | 24h only | $229+/mo +$5.91/1k | No (REST) |
 | **Tripadvisor** | Yes | No | No | No | Weak | IDs only | 5k free, then quoted | No (REST) |
 | Foursquare (current) | Premium tier | Yes (finest) | Yes | Yes | **No (broken)** | 30 days | $18.75/1k premium | No (REST) |
@@ -424,7 +427,7 @@ calls/mo on 2026-06-01. Closure signal effectively absent — the reason for thi
 ## Impact on the quiz design
 
 The 0.1.0 quiz compiles each answer into a recipe of filters
-([[../50_product/0.1.0-quiz-amendments]], [[places-api-foursquare-vs-google]] §4).
+([[../50_product/0.1.0-quiz-amendments]], [[places-api-foursquare-vs-google]] Â§4).
 A provider switch is not field-neutral:
 
 - **Foursquare's 1,000+ fully-filterable taxonomy is the finest of any provider.**
@@ -441,52 +444,52 @@ A provider switch is not field-neutral:
 ## Deriving vibe attributes (Q4 nudge)
 
 The 0.1.0 Q4 vibe axis runs a category-archetype baseline plus a bounded +/-1 nudge.
-That nudge is fed **entirely** by Foursquare's `tastes` field — the 30-token allowlist
+That nudge is fed **entirely** by Foursquare's `tastes` field â€” the 30-token allowlist
 from [[research/foursquare-tastes-vibe-2026-05/report|foursquare-tastes-vibe-2026-05]],
 consumed by tb-18's `Q5VenueClassifier`. **Leaving Foursquare removes that input.**
 No other provider has a `tastes`-equivalent free folksonomy field.
 
 The downstream half of the pipeline (baseline + sign-of-sum nudge) is
-provider-agnostic — only the *token producer* needs replacing. Options:
+provider-agnostic â€” only the *token producer* needs replacing. Options:
 
-- **Path A — Google atmosphere booleans -> nudge.** Map `liveMusic`, `goodForGroups`,
+- **Path A â€” Google atmosphere booleans -> nudge.** Map `liveMusic`, `goodForGroups`,
   `goodForWatchingSports`, `servesCocktails` (loud-leaning) and `reservable`
   (quiet-leaning) onto the energy axis. Deterministic, CI-testable, no extra API
   cost (already on the Atmosphere tier). Weak: only `liveMusic` is a true
   crowd-perception vibe word; the rest are amenity facts. Coarser than `tastes`.
-- **Path B — NLP over Google `reviews` text -> existing allowlist.** Google returns
+- **Path B â€” NLP over Google `reviews` text -> existing allowlist.** Google returns
   up to 5 full reviews. Run keyword extraction over that text, match the existing
   30-token allowlist, feed the same nudge. Reuses the whole tb-18 consumption
   contract; only the producer changes. Caveats: (1) Google ToS forbids warehousing
-  review text — storing the *derived* +/-1 label is a legal grey area, needs review;
+  review text â€” storing the *derived* +/-1 label is a legal grey area, needs review;
   (2) 5 reviews, Google-selected by relevance, is a thinner/more biased sample than
   Foursquare's ~26-token crowd cloud; (3) per-venue extraction adds cost + latency,
   multiplied by the N+1 per-member fan-out.
-- **Path C — LLM infers energy directly** from review text. Handles cafes better
+- **Path C â€” LLM infers energy directly** from review text. Handles cafes better
   (the current nudge is near-dead for cafes, 22.7% fire-rate). But non-deterministic
-  — breaks the exact-replay tests the vibe research built.
+  â€” breaks the exact-replay tests the vibe research built.
 
 **Yelp is the outlier: you read vibe, you do not derive it.** Yelp exposes a
 structured `Ambience` object (divey, hipster, casual, touristy, trendy, intimate,
 romantic, classy, upscale) and `NoiseLevel` (quiet / average / loud / very_loud).
 `NoiseLevel` maps directly onto the Q4 Quiet->Rowdy axis with zero NLP. No other
 surveyed provider has a first-class ambience field. Availability is plan-tiered
-(attribute count 15/23/66) and coverage is not universal — verify the tier. This is
+(attribute count 15/23/66) and coverage is not universal â€” verify the tier. This is
 a material argument in Yelp's favour specifically for the Q4 feature.
 
 **Net:** vibe is effectively *free* on Foursquare (`tastes`) and on Yelp
 (`NoiseLevel`/`Ambience`). On Google it becomes a build (Path B), a per-venue cost,
-and a ToS question. Factor this into the provider decision — it is not a footnote.
+and a ToS question. Factor this into the provider decision â€” it is not a footnote.
 
 ## Recommendation
 
 > **Not adopted (2026-05-19).** The founder reviewed this and chose to stay on
-> Foursquare for now — see "Decision" above. The recommendation below is retained as
+> Foursquare for now â€” see "Decision" above. The recommendation below is retained as
 > analysis of what a future migration would buy and cost, not as the adopted path.
 
 **Primary recommendation: migrate to Google Places API (New).**
 
-It is the only provider that *directly answers the founder's complaint* — a reliable,
+It is the only provider that *directly answers the founder's complaint* â€” a reliable,
 owner-incentivised `businessStatus` closure enum plus the freshest large POI dataset
 for US restaurants. It keeps ratings, reviews, price, hours, and a rich amenity set,
 so the quiz's reputation and price questions survive.
@@ -500,20 +503,20 @@ The migration is not free. Two real costs, both must be planned, not discovered 
 2. **Quiz recipe re-authoring.** Google's coarser Table A/B taxonomy means some
    scenario-composite filter recipes need revisiting.
 
-**If the caching rework is judged too expensive,** the fallback is **Yelp Fusion** —
+**If the caching rework is judged too expensive,** the fallback is **Yelp Fusion** â€”
 strong dining reputation data and real filters, at $229-643/mo. But Yelp also caps
 caching at 24h and carries a commercial-use-consent clause that needs legal sign-off
 *before* any build. Net architecture impact is similar to Google's; reputation depth
 is comparable; global coverage and closure-signal quality are weaker than Google's.
 
-**Do not switch to Mapbox, Overture, or FSQ OS Places expecting fresher data** — all
+**Do not switch to Mapbox, Overture, or FSQ OS Places expecting fresher data** â€” all
 three are Foursquare-derived. They are only worth considering as a free base catalog
 *if* the product drops ratings entirely, which contradicts the 0.1.0 quiz design.
 
 **Hybrid worth weighing** (the [[places-api-foursquare-vs-google]] note already
 raised this): keep Foursquare for discovery/taxonomy and add Google purely for the
 `businessStatus` field on the final shortlist. Lower migration cost, but it keeps the
-founder's distrust of Foursquare's underlying data unaddressed — and the founder's
+founder's distrust of Foursquare's underlying data unaddressed â€” and the founder's
 stated position is to drop Foursquare as *primary*, not patch it.
 
 ---
@@ -526,9 +529,9 @@ stated position is to drop Foursquare as *primary*, not patch it.
 2. **Is the `places-proxy` caching rework an acceptable cost** to gain Google's
    freshness? This is the single biggest architectural consequence.
 3. **Budget ceiling and cost shape.** Foursquare today is *already* a paid
-   pay-as-you-go cost — ~$18.75/1k for the Premium fields the quiz needs, no credit
+   pay-as-you-go cost â€” ~$18.75/1k for the Premium fields the quiz needs, no credit
    applied. Google keeps that pay-per-call shape, pricier: ~$25-40/1k at the
-   +Atmosphere tier with small free caps. Yelp is a different shape — $299-643/mo
+   +Atmosphere tier with small free caps. Yelp is a different shape â€” $299-643/mo
    flat regardless of volume. Yelp only beats pay-as-you-go above a crossover of
    roughly 8,000-16,000 calls/month. What is the projected monthly call volume?
 4. **Can reputation be dropped from the quiz?** If yes, the cheap Tier 3 options open
@@ -544,7 +547,7 @@ stated position is to drop Foursquare as *primary*, not patch it.
 
 ## See also
 
-- [[places-api-foursquare-vs-google]] — the earlier two-way comparison this supersedes
-- [[foursquare-venue-closure-signal]] — the closure investigation + MapKit workaround
-- [[adr/0002-places-data-foursquare-mapkit|ADR 0002]] — current Foursquare-primary decision (now under review)
-- [[../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]] — quiz recipe model affected by a provider switch
+- [[places-api-foursquare-vs-google]] â€” the earlier two-way comparison this supersedes
+- [[foursquare-venue-closure-signal]] â€” the closure investigation + MapKit workaround
+- [[adr/0002-places-data-foursquare-mapkit|ADR 0002]] â€” current Foursquare-primary decision (now under review)
+- [[../50_product/0.1.0-quiz-amendments|0.1.0-quiz-amendments]] â€” quiz recipe model affected by a provider switch

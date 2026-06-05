@@ -2,7 +2,7 @@
 //
 // tb-WF-13 — the web side of the web-invitee account-claim bridge
 // (ADR 0015). A Web invitee who votes in the browser and then installs
-// the iOS app gets a fresh, disjoint Apple `user_id` — their browser
+// the mobile app gets a fresh, disjoint Apple `user_id` — their browser
 // vote strands. This affordance is where the web side MINTS the
 // single-use claim code that carries the browser's anonymous identity
 // across; the app side that RECEIVES it is the S00a "Voted on the web?"

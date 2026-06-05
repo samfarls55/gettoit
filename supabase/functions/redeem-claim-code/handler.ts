@@ -1,6 +1,7 @@
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // HTTP handler for the redeem-claim-code Edge Function.
 //
-// tb-WF-14 / ADR 0015 — the redeem half of the web-invitee account-
+// tb-WF-14 / ADR 0015 â€” the redeem half of the web-invitee account-
 // claim bridge. A Web invitee who voted in the browser installs the
 // iOS app, taps the S00a "Voted on the web?" affordance, and types in
 // the claim code minted by the web "Getting the app?" affordance
@@ -9,24 +10,24 @@
 // single-use, and returns the carried anonymous session's refresh
 // token so the app can install that exact identity into its keychain.
 // The subsequent Sign-in-with-Apple tap then runs `linkApple`,
-// preserving the `user_id` (ADR 0015 §Decision).
+// preserving the `user_id` (ADR 0015 Â§Decision).
 //
-// ── Why no caller-auth gate (unlike mint) ────────────────────────────
+// â”€â”€ Why no caller-auth gate (unlike mint) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // `mint-claim-code` authenticates the caller against a live web-session
-// JWT — the web invitee can only mint a code for their own session. The
+// JWT â€” the web invitee can only mint a code for their own session. The
 // redeem side is the opposite: a freshly-installed app has NO session
 // at all (it is sitting on S00a, the forced sign-in gate). It cannot
-// present a bearer JWT because it does not have one yet — claiming is
+// present a bearer JWT because it does not have one yet â€” claiming is
 // what gives it a session. So the *code itself* is the credential. The
 // code is unguessable (31^8 keyspace), single-use, short-TTL, and the
-// endpoint is rate-limited against brute force — those four together
-// stand in for an auth gate (ADR 0015 §Decision "protected by the
+// endpoint is rate-limited against brute force â€” those four together
+// stand in for an auth gate (ADR 0015 Â§Decision "protected by the
 // unguessable code + rate limiting").
 //
-// ── Single-use burn — the conditional UPDATE ─────────────────────────
+// â”€â”€ Single-use burn â€” the conditional UPDATE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The burn is a conditional UPDATE (`set redeemed_at = now() where code
 // = $1 and redeemed_at is null`). The handler treats a zero-row result
-// as `{ burned: false }` and rejects with 409 — that closes the race
+// as `{ burned: false }` and rejects with 409 â€” that closes the race
 // where two concurrent redeems both read the row as unredeemed: only
 // the UPDATE that flips `redeemed_at` first wins, and the loser never
 // receives a session.
@@ -38,9 +39,9 @@
 import { decryptToken, isWellFormedClaimCode } from "../_shared/claim-code.ts";
 
 export interface RedeemClaimCodeEnv {
-  /** Supabase project URL — present on every Edge invocation. */
+  /** Supabase project URL â€” present on every Edge invocation. */
   SUPABASE_URL?: string;
-  /** Supabase service-role key — required to read + update the
+  /** Supabase service-role key â€” required to read + update the
    *  RLS-locked `claim_codes` table. */
   SUPABASE_SERVICE_ROLE_KEY?: string;
   /** Base64-encoded 32-byte AES-GCM key the stored refresh token was
@@ -48,14 +49,14 @@ export interface RedeemClaimCodeEnv {
   CLAIM_CODE_ENC_KEY?: string;
 }
 
-/** A `claim_codes` row as the handler consumes it — camelCase, with
+/** A `claim_codes` row as the handler consumes it â€” camelCase, with
  *  the timestamps as ISO strings the handler parses against its clock. */
 export interface ClaimCodeRow {
   code: string;
   /** The AES-GCM ciphertext of the web anonymous session refresh
    *  token (`<iv-b64>:<ciphertext-b64>`). */
   encryptedToken: string;
-  /** The carried anonymous `user_id` — echoed to the client so it can
+  /** The carried anonymous `user_id` â€” echoed to the client so it can
    *  sanity-check what it is about to install. */
   userId: string;
   /** ISO-8601 expiry. */
@@ -69,7 +70,7 @@ export interface ClaimCodeRow {
  *  means it matched zero rows (the code was redeemed concurrently). */
 export type BurnResult = { burned: boolean };
 
-/** A rate-limit verdict — `allowed` false carries an optional
+/** A rate-limit verdict â€” `allowed` false carries an optional
  *  `retryAfterSeconds` for the `Retry-After` header. */
 export interface RateLimitVerdict {
   allowed: boolean;
@@ -98,7 +99,7 @@ export interface RedeemClaimCodeDeps {
     env: RedeemClaimCodeEnv,
     code: string,
   ) => Promise<BurnResult>;
-  /** Clock — injectable so tests can pin expiry comparisons. */
+  /** Clock â€” injectable so tests can pin expiry comparisons. */
   now?: () => number;
 }
 
@@ -125,7 +126,7 @@ function jsonResponse(body: unknown, init?: ResponseInit): Response {
  *  request headers. Edge invocations sit behind a proxy that sets
  *  `x-forwarded-for`; `cf-connecting-ip` is the Cloudflare-edge
  *  fallback. An empty string collapses every un-attributable caller
- *  into one shared (still capped) bucket — never unlimited. */
+ *  into one shared (still capped) bucket â€” never unlimited. */
 function sourceKeyFor(req: Request): string {
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) {
@@ -150,7 +151,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Config gate ───────────────────────────────────────────────────
+  // â”€â”€ Config gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const supabaseUrl = deps.env.SUPABASE_URL ?? "";
   const serviceRoleKey = deps.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const encKey = deps.env.CLAIM_CODE_ENC_KEY ?? "";
@@ -162,7 +163,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Rate-limit gate — before any DB work ──────────────────────────
+  // â”€â”€ Rate-limit gate â€” before any DB work â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // A guessing burst must be refused as cheaply as possible: the limit
   // is checked before the body is even parsed so a denied caller never
   // costs a lookup.
@@ -178,7 +179,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Read the code from the body ───────────────────────────────────
+  // â”€â”€ Read the code from the body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let rawCode: unknown;
   try {
     const body = await req.json();
@@ -198,10 +199,10 @@ export async function handleRequest(
 
   // Normalize: trim surrounding whitespace, uppercase. The mint side
   // stores uppercase; a lowercase paste or stray space must still
-  // match (claim-code.ts §alphabet comment).
+  // match (claim-code.ts Â§alphabet comment).
   const code = rawCode.trim().toUpperCase();
 
-  // Cheap structural pre-check — reject a malformed code before a DB
+  // Cheap structural pre-check â€” reject a malformed code before a DB
   // round-trip. A code that fails this can never exist in the table.
   if (!isWellFormedClaimCode(code)) {
     return jsonResponse({ error: "invalid_code" }, {
@@ -210,7 +211,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Look the code up ──────────────────────────────────────────────
+  // â”€â”€ Look the code up â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let row: ClaimCodeRow | null;
   try {
     row = await deps.lookupCode(deps.env, code);
@@ -228,7 +229,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Reject an already-redeemed code (fast path) ───────────────────
+  // â”€â”€ Reject an already-redeemed code (fast path) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // The conditional burn below is the authoritative single-use guard;
   // this check just turns the common already-spent case into a clear
   // 409 without an UPDATE round-trip.
@@ -239,8 +240,8 @@ export async function handleRequest(
     });
   }
 
-  // ── Reject an expired code ────────────────────────────────────────
-  // A code expiring exactly at now() is treated as expired — the TTL
+  // â”€â”€ Reject an expired code â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // A code expiring exactly at now() is treated as expired â€” the TTL
   // is inclusive of its lower bound only.
   const now = deps.now ?? Date.now;
   const expiresAtMs = Date.parse(row.expiresAt);
@@ -251,7 +252,7 @@ export async function handleRequest(
     });
   }
 
-  // ── Burn the code single-use (conditional UPDATE) ─────────────────
+  // â”€â”€ Burn the code single-use (conditional UPDATE) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // The UPDATE only matches a still-unredeemed row; a zero-row result
   // means a concurrent redeem won the race. Either way, a caller that
   // does not win the burn never gets a session.
@@ -272,9 +273,9 @@ export async function handleRequest(
     });
   }
 
-  // ── Decrypt the carried refresh token ─────────────────────────────
+  // â”€â”€ Decrypt the carried refresh token â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // The code is now burned. A decryption failure here is a server-side
-  // fault (wrong key, corrupt ciphertext) — surface 500. The code is
+  // fault (wrong key, corrupt ciphertext) â€” surface 500. The code is
   // already spent; that is acceptable, the user re-mints a fresh one
   // from the web link (re-mintable by design).
   let refreshToken: string;
@@ -288,9 +289,9 @@ export async function handleRequest(
     });
   }
 
-  // The carried anonymous session — the app installs this refresh
+  // The carried anonymous session â€” the app installs this refresh
   // token into its keychain, reaches `.anonymous`, and the Apple tap
-  // then runs `linkApple` preserving `user_id` (ADR 0015 §Decision).
+  // then runs `linkApple` preserving `user_id` (ADR 0015 Â§Decision).
   return jsonResponse(
     { status: "ok", refresh_token: refreshToken, user_id: row.userId },
     { headers: corsHeaders() },

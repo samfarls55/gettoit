@@ -7,7 +7,7 @@
 // and must stay in lock-step with the Privacy Nutrition Labels filed
 // in App Store Connect.
 //
-// Not an iOS design-system surface (no entry in
+// Not a mobile design-system surface (no entry in
 // `design-system/surfaces/`) — web-only legal page consuming the
 // canonical tokens for typography and color so it stays on-brand
 // without forcing a long-form-text surface into the locked spec.
@@ -129,8 +129,8 @@ export default function PrivacyPage() {
         <h2 style={h2Style}>1. Who we are</h2>
         <p style={pStyle}>
           GetToIt is a personal project operated by an independent developer
-          based in Tennessee, United States. The service consists of an iOS
-          app distributed via the Apple App Store (and TestFlight during the
+          based in Tennessee, United States. The service consists of a mobile
+          app distributed via the Apple App Store (and EAS/TestFlight during the
           beta period) and a companion web fallback hosted at gettoit.app.
         </p>
 

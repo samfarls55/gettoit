@@ -1,9 +1,12 @@
 ---
 folder: 60_engineering
-purpose: TB-07 — S04 Waiting surface, Realtime wiring, verdict-fire trigger + cron
+purpose: TB-07 â€” S04 Waiting surface, Realtime wiring, verdict-fire trigger + cron
 ---
 
-# Waiting + Realtime + verdict-fire trigger — TB-07
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# Waiting + Realtime + verdict-fire trigger â€” TB-07
 
 Server-authoritative auto-fire path that turns the room's state forward through the S04 Waiting surface and into S05 Verdict. Documents the moving parts so future agents can extend the path without re-deriving the choices.
 
@@ -15,27 +18,27 @@ Server-authoritative auto-fire path that turns the room's state forward through 
     - Widens `rooms.status` check constraint to admit `'firing'`.
     - Introduces `public.is_room_member(uuid, uuid)` SECURITY DEFINER helper + a wider `members_select_via_helper` SELECT policy so the S04 avatar row can render every co-member.
   - `supabase/migrations/20260513223500000_fire_verdict_rpc.sql`
-    - Initial cut of `public.fire_verdict(uuid)` RPC — initiator-only, min-quorum-2 enforced, flips `status='firing'`. Pure status-flip path.
+    - Initial cut of `public.fire_verdict(uuid)` RPC â€” initiator-only, min-quorum-2 enforced, flips `status='firing'`. Pure status-flip path.
   - `supabase/migrations/20260513224000000_verdict_fire_trigger_and_cron.sql`
-    - Replaces `fire_verdict` with the dispatch-aware version — adds inline `dispatch_compute_verdict(p_room_id)` call after the status flip.
-    - Adds `public.dispatch_compute_verdict(uuid)` — fire-and-forget HTTP POST via `pg_net` to the `compute-verdict` Edge Function.
+    - Replaces `fire_verdict` with the dispatch-aware version â€” adds inline `dispatch_compute_verdict(p_room_id)` call after the status flip.
+    - Adds `public.dispatch_compute_verdict(uuid)` â€” fire-and-forget HTTP POST via `pg_net` to the `compute-verdict` Edge Function.
     - Adds `AFTER INSERT ON votes` trigger that dispatches when `status='firing'` OR `deadline_at <= now()` AND `vote_count >= 2`.
     - Adds `public.cron_auto_fire_or_expire()` worker + `pg_cron` schedule `'gettoit_verdict_auto_fire'` running every minute.
-- **Edge Function** — `supabase/functions/compute-verdict/handler.ts`
+- **Edge Function** â€” `supabase/functions/compute-verdict/handler.ts`
   - Now accepts a `method` field on the request body (`manual` default; `quorum` / `deadline` from the trigger / cron paths).
   - Calls `markRoomVerdictReady(room_id)` (flip `rooms.status` to `verdict_ready` for clients subscribing to row updates) and `emitVerdictReadyBroadcast(room_id, verdict_id)` (Realtime Broadcast on the `room:{roomId}` channel) post-write.
-- **iOS surface** — `ios/Sources/App/WaitingScreen.swift`
+- **iOS surface** â€” `ios/Sources/App/WaitingScreen.swift`
   - Full S04 port: top eyebrow, "N of M / ARE IN" headline, avatar row with answered/answering state, body copy, mono-tag countdown, Decide-now CTA (initiator-only, quorum-gated), Nudge CTA, Auth Upgrade Chip (preserved from TB-12), expired-no-quorum terminal mode.
-- **iOS state** — `ios/Sources/App/WaitingStore.swift` + `ios/Sources/App/TimerCoordinator.swift`
-  - `WaitingStore` — observable `members`, `answered`, `status`, `verdictReady`; reacts to `WaitingStoreEvent` cases (`memberJoined` / `voteCast` / `roomStatusChanged` / `verdictReady`). Local nudge rate-limit (1 per 2 min) per surface spec.
-  - `TimerCoordinator` — observable `secondsRemaining` from injected clock + invoker seam for the `fire_verdict` RPC. `formatCountdown` + `formatCountdownReducedMotion` pure-function helpers per `surfaces/04-waiting.md`.
+- **iOS state** â€” `ios/Sources/App/WaitingStore.swift` + `ios/Sources/App/TimerCoordinator.swift`
+  - `WaitingStore` â€” observable `members`, `answered`, `status`, `verdictReady`; reacts to `WaitingStoreEvent` cases (`memberJoined` / `voteCast` / `roomStatusChanged` / `verdictReady`). Local nudge rate-limit (1 per 2 min) per surface spec.
+  - `TimerCoordinator` â€” observable `secondsRemaining` from injected clock + invoker seam for the `fire_verdict` RPC. `formatCountdown` + `formatCountdownReducedMotion` pure-function helpers per `surfaces/04-waiting.md`.
 
 ## Two fire paths, one engine
 
 Both paths share the same `dispatch_compute_verdict(p_room_id)` function. The function reads the cluster GUC settings `app.supabase_url` + `app.service_role_key` and POSTs to the Edge Function endpoint via `pg_net`. Failure modes:
 
-- **GUC unset (local dev / CI)** — the dispatcher silently no-ops. The RPC + trigger + cron still update `rooms.status`; the iOS layer's direct invoke is the live engine call.
-- **Edge Function returns 422 (TB-09 no-survivor)** — the dispatcher fired-and-forgot; no error path is captured. The verdict surface still routes to S05 — TB-09 lands the no-survivor terminal mode there.
+- **GUC unset (local dev / CI)** â€” the dispatcher silently no-ops. The RPC + trigger + cron still update `rooms.status`; the iOS layer's direct invoke is the live engine call.
+- **Edge Function returns 422 (TB-09 no-survivor)** â€” the dispatcher fired-and-forgot; no error path is captured. The verdict surface still routes to S05 â€” TB-09 lands the no-survivor terminal mode there.
 
 The Edge Function's idempotency contract (`verdicts.room_id` unique constraint + `existingVerdict` short-circuit) means double-dispatches are safe.
 
@@ -66,57 +69,57 @@ The function runs as the postgres role internally, bypassing the `members` SELEC
 
 ## Realtime delivery contract
 
-Per `stack-patterns.md §Realtime`:
+Per `stack-patterns.md Â§Realtime`:
 
 - **Broadcast** is the canonical channel for live fanout. The Edge Function emits `verdict_ready` on `room:{roomId}` after writing the verdict.
-- **Postgres Changes** is the cold-start hydration path only — iOS subscribes to it to pick up the initial `members` + `votes` snapshot, but live updates flow through Broadcast.
+- **Postgres Changes** is the cold-start hydration path only â€” iOS subscribes to it to pick up the initial `members` + `votes` snapshot, but live updates flow through Broadcast.
 - **Presence** is a future polish layer; the avatar row uses the `votes` row's existence as the "answered" signal, not Presence's online lights.
 
 The iOS subscriber pattern (left to a follow-up because supabase-swift Realtime is hard to mock in CI):
 1. Bootstrap fetch of `members` + `votes` from PostgREST.
 2. Subscribe to the `room:{roomId}` broadcast channel.
-3. On `vote_cast` broadcast → `WaitingStore.apply(event: .voteCast(userID:))`.
-4. On `verdict_ready` broadcast → `WaitingStore.apply(event: .verdictReady)`.
+3. On `vote_cast` broadcast â†’ `WaitingStore.apply(event: .voteCast(userID:))`.
+4. On `verdict_ready` broadcast â†’ `WaitingStore.apply(event: .verdictReady)`.
 5. View routes into S05 via `onChange(of: store.verdictReady)`.
 
-The vote-cast broadcast is emitted client-side from the voter's device — the votes INSERT writes the durable record; the broadcast is the live wake-up. (A future iteration can move the broadcast to a Postgres trigger so the source-of-truth is server-side.)
+The vote-cast broadcast is emitted client-side from the voter's device â€” the votes INSERT writes the durable record; the broadcast is the live wake-up. (A future iteration can move the broadcast to a Postgres trigger so the source-of-truth is server-side.)
 
 ## Manual fire RPC outcomes
 
 The `fire_verdict(p_room_id)` RPC returns one of:
 
-- `{"status":"firing","vote_count":N}` — happy path.
-- `{"status":"already_firing","room_status":"<state>"}` — concurrent press or cron already flipped the row.
-- `{"error":"below_quorum","vote_count":N}` — fewer than 2 votes.
-- `{"error":"not_initiator"}` — caller isn't `creator_user_id`.
-- `{"error":"room_not_found"}` — no such row or RLS hides it.
-- `{"error":"unauthenticated"}` — no JWT context.
+- `{"status":"firing","vote_count":N}` â€” happy path.
+- `{"status":"already_firing","room_status":"<state>"}` â€” concurrent press or cron already flipped the row.
+- `{"error":"below_quorum","vote_count":N}` â€” fewer than 2 votes.
+- `{"error":"not_initiator"}` â€” caller isn't `creator_user_id`.
+- `{"error":"room_not_found"}` â€” no such row or RLS hides it.
+- `{"error":"unauthenticated"}` â€” no JWT context.
 
 The iOS `TimerCoordinator.tapDecideNow()` maps these to a `FireVerdictOutcome` enum the view surfaces.
 
 ## Expired-no-quorum terminal
 
-When `deadline_at` elapses with `vote_count < 2`, the cron job flips `rooms.status` to `'expired'` (not `firing`). The iOS view observes this via the Realtime channel and renders the terminal mode — `"COULDN'T REACH / QUORUM TONIGHT"` plus a `"Start over"` white pill that returns the initiator to S01 with their prior radius + timer pre-populated. Surface copy lives in `surfaces/04-waiting.md §"Edge cases"`.
+When `deadline_at` elapses with `vote_count < 2`, the cron job flips `rooms.status` to `'expired'` (not `firing`). The iOS view observes this via the Realtime channel and renders the terminal mode â€” `"COULDN'T REACH / QUORUM TONIGHT"` plus a `"Start over"` white pill that returns the initiator to S01 with their prior radius + timer pre-populated. Surface copy lives in `surfaces/04-waiting.md Â§"Edge cases"`.
 
 ## What's intentionally out of scope for TB-07
 
 Tracked in subsequent tickets:
 
-- **TB-08** — `"I'm in"` ratification + push permission prompt + hard-close motion.
-- **TB-09** — soft-pref relax + no-survivor terminal (S05 `no-survivor` mode). The dispatcher path lights up automatically when the engine starts emitting `method='no_survivor'`.
-- **TB-11** — late-joiner read-only verdict surface.
-- **Supabase-swift Realtime wiring** — the WaitingStore is decoupled from the supabase-swift Realtime API on purpose so unit tests can drive `apply(event:)` without a network round-trip. The live channel wiring (`client.channel("room:\(roomID)").send(...)` on the voter device + the corresponding `.onBroadcast` subscriber) lands as a small follow-up that's safer to debug after the schema + RPC contract is observable end-to-end.
+- **TB-08** â€” `"I'm in"` ratification + push permission prompt + hard-close motion.
+- **TB-09** â€” soft-pref relax + no-survivor terminal (S05 `no-survivor` mode). The dispatcher path lights up automatically when the engine starts emitting `method='no_survivor'`.
+- **TB-11** â€” late-joiner read-only verdict surface.
+- **Supabase-swift Realtime wiring** â€” the WaitingStore is decoupled from the supabase-swift Realtime API on purpose so unit tests can drive `apply(event:)` without a network round-trip. The live channel wiring (`client.channel("room:\(roomID)").send(...)` on the voter device + the corresponding `.onBroadcast` subscriber) lands as a small follow-up that's safer to debug after the schema + RPC contract is observable end-to-end.
 
 ## Adjacencies flagged (not fixed)
 
-- **Vote broadcast vs. Postgres Changes** — TB-07's iOS path leans on the vote sender's device to emit the broadcast. A future iteration can move the source-of-truth to a Postgres trigger that fires the broadcast via `pg_net` on every votes INSERT, mirroring the verdict-ready broadcast pattern. The schema is broadcast-agnostic; the iOS subscriber doesn't care which producer fires the event.
-- **fire_verdict UPDATE policy on rooms** — the RPC writes to `rooms.status` from SECURITY DEFINER context so no client-side UPDATE policy is needed. If a future surface ever exposes a direct status-flip UPDATE to clients, the policy gap surfaces there — out of scope for TB-07.
-- **`emitVerdictReadyBroadcast` failure semantics** — the live adapter logs and swallows. iOS clients that miss the broadcast can still poll the `verdicts` row when the room status flips to `verdict_ready` (a separate Postgres Changes subscription on `rooms` would catch this).
+- **Vote broadcast vs. Postgres Changes** â€” TB-07's iOS path leans on the vote sender's device to emit the broadcast. A future iteration can move the source-of-truth to a Postgres trigger that fires the broadcast via `pg_net` on every votes INSERT, mirroring the verdict-ready broadcast pattern. The schema is broadcast-agnostic; the iOS subscriber doesn't care which producer fires the event.
+- **fire_verdict UPDATE policy on rooms** â€” the RPC writes to `rooms.status` from SECURITY DEFINER context so no client-side UPDATE policy is needed. If a future surface ever exposes a direct status-flip UPDATE to clients, the policy gap surfaces there â€” out of scope for TB-07.
+- **`emitVerdictReadyBroadcast` failure semantics** â€” the live adapter logs and swallows. iOS clients that miss the broadcast can still poll the `verdicts` row when the room status flips to `verdict_ready` (a separate Postgres Changes subscription on `rooms` would catch this).
 
 ## Related
 
-- [[../10_prds/0.1.0-prd|0.1.0 PRD]] §"Group size, fire trigger, timer"
-- [[verdict-engine|verdict-engine.md]] — engine architecture + idempotency contract
-- [[stack-patterns|stack-patterns.md]] §"Realtime" + §"Deadline / quorum / verdict computation"
-- [[../15_issues/0.1.0/issues/02-s04-decide-now-countdown|spec-gap 02]] — surface-level scope
+- [[../10_prds/0.1.0-prd|0.1.0 PRD]] Â§"Group size, fire trigger, timer"
+- [[verdict-engine|verdict-engine.md]] â€” engine architecture + idempotency contract
+- [[stack-patterns|stack-patterns.md]] Â§"Realtime" + Â§"Deadline / quorum / verdict computation"
+- [[../15_issues/0.1.0/issues/02-s04-decide-now-countdown|spec-gap 02]] â€” surface-level scope
 - [[../15_issues/0.1.0/issues/tb-07-waiting-realtime-fire-trigger|TB-07 ticket]]

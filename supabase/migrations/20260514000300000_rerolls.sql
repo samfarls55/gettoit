@@ -1,4 +1,5 @@
--- TB-10 — rerolls schema + reason-to-constraint plumbing + apply_reroll RPC.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-10 â€” rerolls schema + reason-to-constraint plumbing + apply_reroll RPC.
 --
 -- The reroll surface is the friction-bearing correctability path on
 -- S05. A reroll must (a) cost a slot (capped at 3/room), (b) state a
@@ -7,37 +8,37 @@
 -- durable plumbing for all three.
 --
 -- Tables:
---   * `rerolls` — one row per reroll attempt. Enforces the 3/room cap
+--   * `rerolls` â€” one row per reroll attempt. Enforces the 3/room cap
 --     via an AFTER INSERT trigger (counts existing rows, raises an
---     exception if > 3). The cap is server-authoritative — clients
+--     exception if > 3). The cap is server-authoritative â€” clients
 --     can't bypass it by tampering with the count.
 --
 -- New columns:
---   * `votes.q1_vetoes_extra text[]` — additional Q1 dietary chips
+--   * `votes.q1_vetoes_extra text[]` â€” additional Q1 dietary chips
 --     appended after the initial vote, sourced from `diet`-reason
 --     rerolls. Lets the apply_reroll RPC add an EBA veto for the
 --     initiating user without breaking the "votes are write-once"
 --     invariant (the original q1_vetoes column stays immutable).
 --     The engine reads BOTH columns and merges.
---   * `rooms.budget_tier_override int` — engine-applied cap below the
+--   * `rooms.budget_tier_override int` â€” engine-applied cap below the
 --     member-derived MIN(q2_budget). Set by `cost` rerolls. Each
 --     `cost` reroll decrements the override by 1 (floored at 1).
---   * `rooms.walk_minutes_override int` — engine-applied cap below the
+--   * `rooms.walk_minutes_override int` â€” engine-applied cap below the
 --     member-derived MIN(q3_walk_minutes). Set by `dist` rerolls.
 --     Each `dist` reroll subtracts 5 from the current effective MIN
 --     (floored at 5).
---   * `rooms.excluded_option_ids uuid[]` — option ids the engine must
+--   * `rooms.excluded_option_ids uuid[]` â€” option ids the engine must
 --     filter out of the candidate pool BEFORE pruning. Populated by
 --     `avail` rerolls (current verdict's option is added) so the
 --     re-run picks a different candidate.
---   * `verdicts.reroll_reason text` — set on the new verdict row written
+--   * `verdicts.reroll_reason text` â€” set on the new verdict row written
 --     after a reroll. The engine's rule_text generator reads this to
 --     prefix the rule chip with the aggregate-reroll attribution
 --     ("Cost reroll cut Pico's. Sushi Ren had the next-lowest regret.").
 --
 -- RPC:
 --   * `apply_reroll(p_room_id uuid, p_reason text, p_detail text,
---                   p_diet_chip text, p_new_vibe int)` — SECURITY DEFINER.
+--                   p_diet_chip text, p_new_vibe int)` â€” SECURITY DEFINER.
 --     Validates caller is a room member; enforces 3-cap; mutates state
 --     per reason (q1_vetoes_extra append, budget_tier_override --,
 --     walk_minutes_override -=5, q4_vibe update for caller, or the
@@ -52,20 +53,20 @@
 --
 -- Why the cap is enforced inside the RPC AND a trigger:
 --   * The RPC's authentication-aware check returns a clean JSONB error
---     for the iOS surface (3-cap exceeded → `{"error":"cap_exhausted"}`).
+--     for the mobile surface (3-cap exceeded â†’ `{"error":"cap_exhausted"}`).
 --   * The trigger is the belt-and-suspenders defense: a bypass attempt
 --     via direct INSERT (e.g. a hypothetical service-role-key leak)
 --     still trips at the DB layer.
 --
 -- Why all dietary chips are private:
---   * Per verdict-screen-spec §"Copy register" and verdict-engine.md
---     §"Anonymization rules", the diet reroll never names the chip in
+--   * Per verdict-screen-spec Â§"Copy register" and verdict-engine.md
+--     Â§"Anonymization rules", the diet reroll never names the chip in
 --     the rule chip. The handler prefix surfaces "Diet reroll cut
 --     Pico's" without naming the chip. The chip is stored in
 --     `q1_vetoes_extra` for the engine, but is anonymized in any
 --     surface copy.
 
--- ── rerolls ──────────────────────────────────────────────────────────
+-- â”€â”€ rerolls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 create table if not exists public.rerolls (
     id          uuid        primary key default gen_random_uuid(),
     room_id     uuid        not null references public.rooms (id) on delete cascade,
@@ -77,14 +78,14 @@ create table if not exists public.rerolls (
 );
 
 comment on table public.rerolls is
-    'TB-10 — one row per reroll attempt. Capped at 3 per room (enforced by the trg_rerolls_cap trigger AND by the apply_reroll RPC). Reason taxonomy: cost · dist · mood · diet · avail. detail is the optional one-line note shown to the group on the next verdict.';
+    'TB-10 â€” one row per reroll attempt. Capped at 3 per room (enforced by the trg_rerolls_cap trigger AND by the apply_reroll RPC). Reason taxonomy: cost Â· dist Â· mood Â· diet Â· avail. detail is the optional one-line note shown to the group on the next verdict.';
 
 create index if not exists rerolls_room_id_idx on public.rerolls (room_id);
 create index if not exists rerolls_room_id_created_at_idx on public.rerolls (room_id, created_at);
 
--- ── 3-cap trigger (belt-and-suspenders) ──────────────────────────────
+-- â”€â”€ 3-cap trigger (belt-and-suspenders) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 -- The apply_reroll RPC enforces the cap with a clean JSONB error for
--- the iOS surface; this BEFORE INSERT trigger is the DB-layer defense
+-- the mobile surface; this BEFORE INSERT trigger is the DB-layer defense
 -- against a direct write that bypasses the RPC.
 create or replace function public.tg_rerolls_cap()
 returns trigger
@@ -117,10 +118,10 @@ create trigger trg_rerolls_cap
     for each row
     execute function public.tg_rerolls_cap();
 
--- ── RLS on rerolls ───────────────────────────────────────────────────
+-- â”€â”€ RLS on rerolls â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 alter table public.rerolls enable row level security;
 
--- Room members can read every reroll for their room — the next verdict
+-- Room members can read every reroll for their room â€” the next verdict
 -- surfaces the reroll's reason + detail to the group.
 drop policy if exists "rerolls_select_room_members" on public.rerolls;
 create policy "rerolls_select_room_members" on public.rerolls
@@ -133,13 +134,13 @@ create policy "rerolls_select_room_members" on public.rerolls
         )
     );
 
--- No client-side INSERT / UPDATE / DELETE policies — the apply_reroll
+-- No client-side INSERT / UPDATE / DELETE policies â€” the apply_reroll
 -- RPC is the only sanctioned write path. RLS denies direct writes by
 -- default (no INSERT policy = no inserts admitted for `authenticated`).
 -- The RPC runs SECURITY DEFINER so it can bypass RLS for its own
 -- writes; clients invoke it via PostgREST RPC.
 
--- ── New columns on existing tables ───────────────────────────────────
+-- â”€â”€ New columns on existing tables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 -- votes.q1_vetoes_extra: per-user dietary chips appended after the
 -- initial vote, sourced from diet-reason rerolls. The engine reads
@@ -150,7 +151,7 @@ alter table public.votes
     add column if not exists q1_vetoes_extra text[] not null default '{}';
 
 comment on column public.votes.q1_vetoes_extra is
-    'TB-10 — additional Q1 dietary chips appended via the apply_reroll RPC after a diet-reason reroll. Engine merges with q1_vetoes before pruning. Keeps the original quiz answer immutable.';
+    'TB-10 â€” additional Q1 dietary chips appended via the apply_reroll RPC after a diet-reason reroll. Engine merges with q1_vetoes before pruning. Keeps the original quiz answer immutable.';
 
 -- rooms.budget_tier_override: caller-tightened budget cap below the
 -- member-derived MIN(q2_budget). Null means "no override". Each cost
@@ -160,7 +161,7 @@ alter table public.rooms
         check (budget_tier_override is null or budget_tier_override between 1 and 4);
 
 comment on column public.rooms.budget_tier_override is
-    'TB-10 — engine-applied budget cap below the per-member MIN(q2_budget). Set by cost-reason rerolls. Null = no override. The engine uses MIN(member q2_budget, this).';
+    'TB-10 â€” engine-applied budget cap below the per-member MIN(q2_budget). Set by cost-reason rerolls. Null = no override. The engine uses MIN(member q2_budget, this).';
 
 -- rooms.walk_minutes_override: caller-tightened walk-time cap below
 -- the member-derived MIN(q3_walk_minutes). Floor 5. Null means
@@ -170,7 +171,7 @@ alter table public.rooms
         check (walk_minutes_override is null or walk_minutes_override >= 5);
 
 comment on column public.rooms.walk_minutes_override is
-    'TB-10 — engine-applied walk-time cap below the per-member MIN(q3_walk_minutes). Set by dist-reason rerolls. Floor 5. Null = no override.';
+    'TB-10 â€” engine-applied walk-time cap below the per-member MIN(q3_walk_minutes). Set by dist-reason rerolls. Floor 5. Null = no override.';
 
 -- rooms.excluded_option_ids: option ids removed from the candidate pool
 -- BEFORE pruning. Populated by avail-reason rerolls.
@@ -178,7 +179,7 @@ alter table public.rooms
     add column if not exists excluded_option_ids uuid[] not null default '{}';
 
 comment on column public.rooms.excluded_option_ids is
-    'TB-10 — option ids removed from the engine candidate pool before pruning. Set by avail-reason rerolls. Each entry is the option_id of a verdict the user rerolled away from.';
+    'TB-10 â€” option ids removed from the engine candidate pool before pruning. Set by avail-reason rerolls. Each entry is the option_id of a verdict the user rerolled away from.';
 
 -- rooms.last_reroll_reason: persisted so the NEXT verdict run can read
 -- it and stamp verdicts.reroll_reason. The apply_reroll RPC sets this;
@@ -189,7 +190,7 @@ alter table public.rooms
         check (last_reroll_reason is null or last_reroll_reason in ('cost', 'dist', 'mood', 'diet', 'avail'));
 
 comment on column public.rooms.last_reroll_reason is
-    'TB-10 — the reason of the most recent reroll on this room. Read by compute-verdict to stamp verdicts.reroll_reason for the rule chip. Null = clean run (no reroll yet).';
+    'TB-10 â€” the reason of the most recent reroll on this room. Read by compute-verdict to stamp verdicts.reroll_reason for the rule chip. Null = clean run (no reroll yet).';
 
 -- verdicts.reroll_reason: stamped on verdicts produced by a re-run
 -- after a reroll. The engine's rule_text generator reads this to
@@ -199,9 +200,9 @@ alter table public.verdicts
         check (reroll_reason is null or reroll_reason in ('cost', 'dist', 'mood', 'diet', 'avail'));
 
 comment on column public.verdicts.reroll_reason is
-    'TB-10 — set by compute-verdict on verdicts produced after a reroll. Drives the rule_chip prefix ("Cost reroll cut Pico''s..."). Null = clean run / no reroll.';
+    'TB-10 â€” set by compute-verdict on verdicts produced after a reroll. Drives the rule_chip prefix ("Cost reroll cut Pico''s..."). Null = clean run / no reroll.';
 
--- ── apply_reroll RPC ─────────────────────────────────────────────────
+-- â”€â”€ apply_reroll RPC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 create or replace function public.apply_reroll(
     p_room_id     uuid,
@@ -238,10 +239,10 @@ begin
         return jsonb_build_object('error', 'room_not_found');
     end if;
 
-    -- Member-only — anyone in the room can reroll. (v2 may restrict to
+    -- Member-only â€” anyone in the room can reroll. (v2 may restrict to
     -- the initiator; the original admits any member per the spec's "initiator-only
     -- reroll trigger" being a UI-level rule, not a server-side gate.
-    -- TB-10's iOS surface only exposes the affordance on the initiator
+    -- TB-10's mobile surface only exposes the affordance on the initiator
     -- path; the RPC is generous so a future role widening doesn't need
     -- a migration.)
     select exists (
@@ -255,7 +256,7 @@ begin
     end if;
 
     -- 3-cap check. The trigger is the belt; this is the suspender that
-    -- surfaces a clean JSONB error rather than letting the iOS layer
+    -- surfaces a clean JSONB error rather than letting the mobile layer
     -- see a raw SQL exception.
     select count(*)::int into v_count
     from public.rerolls
@@ -280,7 +281,7 @@ begin
     end if;
 
     -- Locate the current verdict for the room (needed for avail's
-    -- excluded-option append). Null is fine for the other reasons —
+    -- excluded-option append). Null is fine for the other reasons â€”
     -- the engine just re-runs against the current state.
     select * into v_current_verdict from public.verdicts where room_id = p_room_id;
 
@@ -331,7 +332,7 @@ begin
 
     elsif p_reason = 'diet' then
         -- Append the new dietary chip to the caller's q1_vetoes_extra.
-        -- Uses array_append to keep idempotency of the RPC simple —
+        -- Uses array_append to keep idempotency of the RPC simple â€”
         -- if the caller already added the same chip we tolerate the
         -- duplicate; the engine's chip lookup is set-based.
         update public.votes
@@ -362,13 +363,13 @@ begin
     -- Drop the current verdict so the next compute-verdict run can
     -- write a fresh row under the verdicts.room_id UNIQUE constraint.
     -- The FK cascade on option_cuts.verdict_id drops the prior cuts.
-    -- We don't gate on existence — DELETE on no rows is a no-op.
+    -- We don't gate on existence â€” DELETE on no rows is a no-op.
     delete from public.verdicts where room_id = p_room_id;
 
     -- Reset the room back to verdict_ready=false so the iOS Realtime
     -- subscriber routes back to S04/S05 cleanly. Status flip: from
     -- 'verdict_ready' (or 'locked' if we ever admit reroll past
-    -- lock — the original does NOT — but be defensive) → 'firing' so the
+    -- lock â€” the original does NOT â€” but be defensive) â†’ 'firing' so the
     -- compute-verdict invocation has a fresh slate.
     update public.rooms
     set status = 'firing'

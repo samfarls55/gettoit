@@ -1,16 +1,19 @@
 ---
-title: Principles — cognition, visual, system audit gates
+title: Principles â€” cognition, visual, system audit gates
 purpose: Cross-cutting audit checks that apply to every surface regardless of which pattern it uses
 ---
 
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
 # Principles
 
-Three layers of audit gates. Run **before** drilling into named patterns. Failure on any of these is grounds for rework regardless of which patterns the surface uses. Source: Tidwell/Brewer/Valencia *Designing Interfaces* 3rd ed., chapters 1, 5, 11–12.
+Three layers of audit gates. Run **before** drilling into named patterns. Failure on any of these is grounds for rework regardless of which patterns the surface uses. Source: Tidwell/Brewer/Valencia *Designing Interfaces* 3rd ed., chapters 1, 5, 11â€“12.
 
-- **P-01..P-13** — Cognition + behavior. How users actually perceive and use software (ch.1). Run on every surface.
-- **V-01..V-06** — Visual style. Whether visual choices reinforce — or fight — the interaction (ch.5). Most token concerns live in repo-root `design-system/`; these are workflow-impacting lenses.
-- **S-01..S-06** — System discipline. Whether the codebase treats UI as a system (ch.11–12). Prerequisite to consistent pattern execution.
-- **B-01..B-04** — Beyond-the-screen. Connected devices, anticipatory systems, assistive inputs, natural UIs. Flag only when relevant.
+- **P-01..P-13** â€” Cognition + behavior. How users actually perceive and use software (ch.1). Run on every surface.
+- **V-01..V-06** â€” Visual style. Whether visual choices reinforce â€” or fight â€” the interaction (ch.5). Most token concerns live in repo-root `design-system/`; these are workflow-impacting lenses.
+- **S-01..S-06** â€” System discipline. Whether the codebase treats UI as a system (ch.11â€“12). Prerequisite to consistent pattern execution.
+- **B-01..B-04** â€” Beyond-the-screen. Connected devices, anticipatory systems, assistive inputs, natural UIs. Flag only when relevant.
 
 Foundation violations tend to be **systemic** (whole app has bug). Pattern misuses tend to be **local** (one screen). Report should separate the two.
 
@@ -77,7 +80,7 @@ Foundation violations tend to be **systemic** (whole app has bug). Pattern misus
 ### P-08. Microbreaks
 
 - **Mindset**: *"Waiting for train. Two minutes useful."*
-- **Check**: Mobile especially — returning user opens app and consumes/contributes value in <5s no setup?
+- **Check**: Mobile especially â€” returning user opens app and consumes/contributes value in <5s no setup?
 - **Signals present**: Persistent auth; restore-to-where; freshest content first; quick triage (star, archive, delete).
 - **Red flags**: Cold-start sign-in every session; slow landing; "today's feed" not first; no quick triage.
 - **Related patterns**: [[patterns#Streams and Feeds]], [[patterns#Infinite List]], [[patterns#Mobile Direct Access]].

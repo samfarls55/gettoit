@@ -1,0 +1,47 @@
+{
+  "color": {
+    "ink": "#0E1011",
+    "paper": "#FFFFFF",
+    "sun": "#FFD23F",
+    "glass": {
+      "stroke": "rgba(255,255,255,0.42)"
+    },
+    "text": {
+      "on-gradient": {
+        "secondary": "rgba(255,255,255,0.78)",
+        "tertiary": "rgba(255,255,255,0.6)"
+      }
+    }
+  },
+  "spacing": {
+    "3": 12,
+    "4": 16,
+    "8": 32
+  },
+  "typography": {
+    "scale": {
+      "body": {
+        "size": 16,
+        "weight": 600,
+        "tracking": "0",
+        "line-height": 1.4,
+        "family": "body"
+      },
+      "display-s": {
+        "size": 32,
+        "weight": 900,
+        "tracking": "-0.02em",
+        "line-height": 0.95,
+        "family": "display"
+      },
+      "eyebrow": {
+        "size": 11,
+        "weight": 700,
+        "tracking": "0.18em",
+        "line-height": 1,
+        "family": "body",
+        "case": "upper"
+      }
+    }
+  }
+}

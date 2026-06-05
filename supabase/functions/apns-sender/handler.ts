@@ -1,4 +1,5 @@
-// HTTP handler for the `apns-sender` Edge Function — TB-08 stub.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// HTTP handler for the `apns-sender` Edge Function â€” TB-08 stub.
 //
 // Wire contract (POST body):
 //   {
@@ -19,23 +20,23 @@
 //   }
 //
 // Error responses:
-//   400 — invalid body
-//   401 — missing JWT (Supabase Edge Runtime forwards the caller's
+//   400 â€” invalid body
+//   401 â€” missing JWT (Supabase Edge Runtime forwards the caller's
 //         token; we still require the header so unauthenticated calls
 //         fail fast)
-//   500 — APNs config missing (`APNS_AUTH_KEY` / `APNS_AUTH_KEY_ID` /
+//   500 â€” APNs config missing (`APNS_AUTH_KEY` / `APNS_AUTH_KEY_ID` /
 //         `APNS_TEAM_ID` / `APNS_TOPIC` not set on the function env)
 //
 // TB-08 ships this as a stub:
 //   * The JWT signer is real (`_shared/apns-jwt.ts`, ES256, validated
 //     against a generated keypair in the test suite).
-//   * The APNs HTTP/2 POST shape — headers, path, payload — is real.
+//   * The APNs HTTP/2 POST shape â€” headers, path, payload â€” is real.
 //   * The fanout reads `push_tokens` rows for the requested users; one
 //     POST per (user, device_token) pair.
 //   * Failed sends are logged with their (status, reason) but don't
-//     abort the batch — every token is attempted.
-//   * Real per-trigger fanout (verdict_ready → APNsSender,
-//     CheckinScheduler → APNsSender) wires up in TB-14 when the
+//     abort the batch â€” every token is attempted.
+//   * Real per-trigger fanout (verdict_ready â†’ APNsSender,
+//     CheckinScheduler â†’ APNsSender) wires up in TB-14 when the
 //     check-in surface lands. TB-08 verifies the delivery primitive
 //     against a stub APNs server in the test suite.
 
@@ -51,7 +52,7 @@ export interface ApnsSenderEnv {
   APNS_AUTH_KEY?: string;
   APNS_AUTH_KEY_ID?: string;
   APNS_TEAM_ID?: string;
-  /** APNs `apns-topic` header — the app's bundle id. */
+  /** APNs `apns-topic` header â€” the app's bundle id. */
   APNS_TOPIC?: string;
 }
 
@@ -59,7 +60,7 @@ export interface ApnsSenderEnv {
 export interface PushTokenRow {
   user_id: string;
   device_token: string;
-  /** Platform tag — only "ios" is honored today; other rows are
+  /** Platform tag â€” only "ios" is honored today; other rows are
    *  skipped in case the schema later admits "android" / "web". */
   platform: string;
 }
@@ -73,7 +74,7 @@ export interface ApnsSenderDataAdapter {
   fetchPushTokens(user_ids: string[]): Promise<PushTokenRow[]>;
 }
 
-/** APNs delivery primitive — one POST per (token, payload) pair. */
+/** APNs delivery primitive â€” one POST per (token, payload) pair. */
 export interface ApnsDeliveryAdapter {
   send(req: ApnsDeliveryRequest): Promise<ApnsDeliveryResult>;
 }
@@ -83,7 +84,7 @@ export interface ApnsDeliveryRequest {
   deviceToken: string;
   /** Pre-signed Bearer token for the `authorization` header. */
   jwt: string;
-  /** APNs topic — usually the bundle id. */
+  /** APNs topic â€” usually the bundle id. */
   topic: string;
   /** APS payload (aps + custom keys). */
   payload: Record<string, unknown>;
@@ -102,7 +103,7 @@ export interface ApnsSenderDeps {
   env: ApnsSenderEnv;
   buildDataAdapter: (env: ApnsSenderEnv) => ApnsSenderDataAdapter;
   buildDeliveryAdapter: (env: ApnsSenderEnv) => ApnsDeliveryAdapter;
-  /** Override for tests — defaults to `Math.floor(Date.now() / 1000)`. */
+  /** Override for tests â€” defaults to `Math.floor(Date.now() / 1000)`. */
   now?: () => number;
 }
 
@@ -117,7 +118,7 @@ interface ApnsSenderRequestBody {
   notification: NotificationInput;
 }
 
-// ── handler entry point ──────────────────────────────────────────────
+// â”€â”€ handler entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function corsHeaders(): Record<string, string> {
   return {
@@ -220,7 +221,7 @@ export async function handleRequest(
   });
 
   // Look up every iOS push token for the requested users. Other
-  // platforms are silently filtered out — currently only delivers to iOS.
+  // platforms are silently filtered out â€” currently only delivers to iOS.
   const tokens = (await data.fetchPushTokens(userIds))
     .filter((row) => row.platform === "ios");
 
@@ -236,7 +237,7 @@ export async function handleRequest(
   };
 
   // Fan out one POST per token. Failures are logged and recorded in
-  // the response but do not abort the batch — APNs returns per-token
+  // the response but do not abort the batch â€” APNs returns per-token
   // errors and we want partial-success semantics.
   const deliveries: Array<{
     user_id: string;

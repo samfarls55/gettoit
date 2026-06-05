@@ -1,5 +1,5 @@
 ---
-title: iOS CI setup — XcodeGen + macOS-14 runner
+title: iOS CI setup â€” XcodeGen + macOS-14 runner
 created: 2026-05-13
 related:
   - "[[adr/0001-ios-tech-stack-supabase]]"
@@ -8,7 +8,10 @@ related:
   - "[[../15_issues/0.1.0/issues/tb-01-walking-skeleton]]"
 ---
 
-# iOS CI setup — XcodeGen + macOS-14 runner
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# iOS CI setup â€” XcodeGen + macOS-14 runner
 
 How the iOS lane of `.github/workflows/ci.yml` builds and tests. Set up in [[../15_issues/0.1.0/issues/tb-01-walking-skeleton|TB-01]]; this note is the durable runbook.
 
@@ -19,14 +22,14 @@ How the iOS lane of `.github/workflows/ci.yml` builds and tests. Set up in [[../
 
 ## Why XcodeGen (not committed pbxproj, not Tuist, not pure SPM)
 
-- **Committed `.xcodeproj` was rejected.** Xcode rewrites `project.pbxproj` non-deterministically on every change — file ordering, UUIDs, build-phase reshuffles. Merge conflicts on every PR.
+- **Committed `.xcodeproj` was rejected.** Xcode rewrites `project.pbxproj` non-deterministically on every change â€” file ordering, UUIDs, build-phase reshuffles. Merge conflicts on every PR.
 - **Tuist was rejected.** Heavier than the project needs at 0.1.0 scale. XcodeGen is one YAML file and a Homebrew install; the dependency surface is smaller and the failure modes are well-understood.
 - **Pure SPM (no .xcodeproj) was rejected.** `xcodebuild test` on a SwiftUI app target still wants an Xcode project + scheme. SPM-only works for libraries but not for a SwiftUI application target with an Info.plist, signing settings, and a simulator destination.
 
 ## Runner image
 
-- `macos-14` is the current default macOS runner. It carries Xcode 15.0–15.4. The workflow pins `DEVELOPER_DIR=/Applications/Xcode_15.4.app/Contents/Developer` so the version doesn't silently rotate when the image refreshes.
-- The iOS 17 simulator runtime version is detected at runtime (`xcrun simctl list runtimes`) — image refreshes sometimes ship 17.2 / 17.4 / 17.5; we pick whichever is highest available rather than pinning a number that may disappear.
+- `macos-14` is the current default macOS runner. It carries Xcode 15.0â€“15.4. The workflow pins `DEVELOPER_DIR=/Applications/Xcode_15.4.app/Contents/Developer` so the version doesn't silently rotate when the image refreshes.
+- The iOS 17 simulator runtime version is detected at runtime (`xcrun simctl list runtimes`) â€” image refreshes sometimes ship 17.2 / 17.4 / 17.5; we pick whichever is highest available rather than pinning a number that may disappear.
 
 ## Build-time configuration injection
 
@@ -50,7 +53,7 @@ Set to **disabled** for CI (`CODE_SIGNING_ALLOWED=NO`, empty `CODE_SIGN_IDENTITY
 
 1. Add it to the `packages:` block in `ios/project.yml`.
 2. Reference it under the target's `dependencies:` list.
-3. Commit `project.yml`. CI's `xcodebuild test` resolves SPM on the runner; no `Package.resolved` is committed (the workflow does not currently cache SPM state — fast at 0.1.0 scale; revisit if test runtime crosses 5 min).
+3. Commit `project.yml`. CI's `xcodebuild test` resolves SPM on the runner; no `Package.resolved` is committed (the workflow does not currently cache SPM state â€” fast at 0.1.0 scale; revisit if test runtime crosses 5 min).
 
 ## Adding a new test file
 

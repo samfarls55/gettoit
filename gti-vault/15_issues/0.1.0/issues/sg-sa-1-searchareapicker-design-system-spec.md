@@ -10,6 +10,9 @@ parent_github_issue: 316
 github_issue: 317
 ---
 
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
 # sg-SA-1 - SearchAreaPicker design-system spec
 
 ## Parent
@@ -46,4 +49,4 @@ None - can start immediately.
 
 ## Comments
 
-- 2026-06-03 — Implemented C-28 SearchAreaPicker design-system contract, updated active Setup geography docs/JSX, marked C-23 historical for active Setup use, and verified `npm run verify:design-system` plus SearchAreaPicker/Setup structural tests.
+- 2026-06-03 â€” Implemented C-28 SearchAreaPicker design-system contract, updated active Setup geography docs/JSX, marked C-23 historical for active Setup use, and verified `npm run verify:design-system` plus SearchAreaPicker/Setup structural tests.

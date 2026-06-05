@@ -1,4 +1,5 @@
--- TB-11 — late-joiner read-only routing RPC.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-11 â€” late-joiner read-only routing RPC.
 --
 -- When a user taps an invite Universal Link AFTER the verdict has
 -- fired, we need to:
@@ -8,15 +9,15 @@
 --      route to the quiz).
 --   2. Otherwise route the late-joiner to the S05 surface in
 --      `read-only` mode (see `design-system/surfaces/05-verdict.md`
---      §`read-only`). They MUST NOT be added to `members` of the
---      closed room — that would imply they contributed.
+--      Â§`read-only`). They MUST NOT be added to `members` of the
+--      closed room â€” that would imply they contributed.
 --
 -- Two problems make this awkward to do client-side:
 --
 --   * The base `rooms_select_members` RLS policy only admits rows
 --     for users who are already in `members`. A late-joiner reading
 --     `rooms.status` before they've inserted membership gets nothing
---     back — the iOS client can't distinguish "wrong room id" from
+--     back â€” the mobile client can't distinguish "wrong room id" from
 --     "closed room I'm not a member of".
 --   * Reading the verdict + cuts + receipts for the read-only render
 --     hits the same RLS shape on `verdicts`, `option_cuts`, `votes`.
@@ -28,8 +29,8 @@
 --   * For the open / firing branch, inserts the `members` row inline
 --     (same shape as `RoomStore.joinRoom`).
 --   * For the closed branch, returns a self-contained read-only
---     payload — room status + the S01 control defaults (timer +
---     radius) the iOS re-invite CTA pre-populates with — without
+--     payload â€” room status + the S01 control defaults (timer +
+--     radius) the iOS re-invite CTA pre-populates with â€” without
 --     ever touching `members`.
 --
 -- The verdict + cuts + receipts payload for the read-only render is
@@ -51,7 +52,7 @@
 --
 --   {"status":"read_only", "room_status":"verdict_ready|locked|expired",
 --    "timer_minutes":N, "radius_meters":N}
---       Late-joiner — the verdict was sealed before they tapped.
+--       Late-joiner â€” the verdict was sealed before they tapped.
 --       Client renders S05 read-only and surfaces the timer + radius
 --       as defaults for the re-invite CTA. No members row is
 --       inserted.
@@ -62,7 +63,7 @@
 -- The RPC runs SECURITY DEFINER so the status check + read-only
 -- payload assemble work even when the caller is not a member of
 -- the room. We never expose member identities or verdict bodies
--- through this RPC — the read-only render fetches those via
+-- through this RPC â€” the read-only render fetches those via
 -- `fetch_read_only_verdict` (also SECURITY DEFINER).
 
 create or replace function public.join_room_smart(p_room_id uuid)
@@ -88,7 +89,7 @@ begin
         return jsonb_build_object('error', 'room_not_found');
     end if;
 
-    -- Already a member? Surface that explicitly so the iOS client
+    -- Already a member? Surface that explicitly so the mobile client
     -- can avoid a redundant insert that would just race against the
     -- (room_id, user_id) primary-key constraint.
     select role into v_existing
@@ -103,9 +104,9 @@ begin
         );
     end if;
 
-    -- open / firing — write the membership row and route to quiz.
+    -- open / firing â€” write the membership row and route to quiz.
     -- We accept `firing` here because the verdict hasn't been
-    -- COMMITTED yet (the engine flips firing → verdict_ready as it
+    -- COMMITTED yet (the engine flips firing â†’ verdict_ready as it
     -- writes the verdict row); the joiner's vote can still land in
     -- the next compute-verdict invocation if they answer in time.
     if v_room.status in ('open', 'firing') then
@@ -118,7 +119,7 @@ begin
         );
     end if;
 
-    -- verdict_ready / locked / expired — read-only late-joiner.
+    -- verdict_ready / locked / expired â€” read-only late-joiner.
     -- DO NOT insert a members row. Return the prior room's S01
     -- defaults so the re-invite CTA can pre-populate them.
     return jsonb_build_object(
@@ -131,13 +132,13 @@ end;
 $$;
 
 comment on function public.join_room_smart(uuid) is
-    'TB-11 — invite-link router. Atomically checks rooms.status and either inserts a members row (open / firing) or returns the read-only routing payload (verdict_ready / locked / expired). Late-joiners are NEVER added to members of a closed room.';
+    'TB-11 â€” invite-link router. Atomically checks rooms.status and either inserts a members row (open / firing) or returns the read-only routing payload (verdict_ready / locked / expired). Late-joiners are NEVER added to members of a closed room.';
 
 revoke all on function public.join_room_smart(uuid) from public;
 grant execute on function public.join_room_smart(uuid) to authenticated;
 
 
--- ── fetch_read_only_verdict ──────────────────────────────────────────
+-- â”€â”€ fetch_read_only_verdict â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 --
 -- Read-only verdict payload for the late-joiner S05 render. Returns
 -- the verdict + cuts + receipts + member_count assembled the same
@@ -145,7 +146,7 @@ grant execute on function public.join_room_smart(uuid) to authenticated;
 -- who is NOT a member of the room.
 --
 -- Receipts include only members who actually voted before the
--- verdict committed. The late-joiner is not in the list — they
+-- verdict committed. The late-joiner is not in the list â€” they
 -- didn't contribute. The function ignores the caller's identity
 -- entirely; it returns the same payload to every late-joiner who
 -- knows the room id.
@@ -170,7 +171,7 @@ grant execute on function public.join_room_smart(uuid) to authenticated;
 --   {"error":"room_not_found"} room id doesn't exist
 --   {"error":"unauthenticated"} caller has no JWT
 --
--- This RPC is intentionally NOT idempotent-write — it's a pure
+-- This RPC is intentionally NOT idempotent-write â€” it's a pure
 -- read. We still gate on `auth.uid()` for parity with the rest of
 -- the API surface, even though every authenticated caller sees the
 -- same payload.
@@ -222,7 +223,7 @@ begin
         v_option := null;
     end if;
 
-    -- Cuts — verdict-scoped. Stitch option name from `options`.
+    -- Cuts â€” verdict-scoped. Stitch option name from `options`.
     select coalesce(jsonb_agg(jsonb_build_object(
         'option_id', oc.option_id,
         'option_name', o.payload->>'name',
@@ -234,7 +235,7 @@ begin
     left join public.options o on o.id = oc.option_id
     where oc.verdict_id = v_verdict.id;
 
-    -- Receipts — every vote row for the room. Late-joiner is not
+    -- Receipts â€” every vote row for the room. Late-joiner is not
     -- here because they never inserted a vote.
     select coalesce(jsonb_agg(jsonb_build_object(
         'user_id', v.user_id,
@@ -275,7 +276,7 @@ end;
 $$;
 
 comment on function public.fetch_read_only_verdict(uuid) is
-    'TB-11 — read-only verdict payload for late-joiner S05 render. SECURITY DEFINER so a non-member can read the verdict the engine already sealed. Receipts list excludes the caller because the caller is by definition NOT in members of a closed room.';
+    'TB-11 â€” read-only verdict payload for late-joiner S05 render. SECURITY DEFINER so a non-member can read the verdict the engine already sealed. Receipts list excludes the caller because the caller is by definition NOT in members of a closed room.';
 
 revoke all on function public.fetch_read_only_verdict(uuid) from public;
 grant execute on function public.fetch_read_only_verdict(uuid) to authenticated;

@@ -1,6 +1,7 @@
-// tb-WF-11 — member display-name resolution.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// tb-WF-11 â€” member display-name resolution.
 //
-// The web invitee shell (sg-WF-5 surface §A) introduces the system's
+// The web invitee shell (sg-WF-5 surface Â§A) introduces the system's
 // first real display-name source: `members.display_name`, written when
 // a Web invitee enters a name on the name-entry surface. iOS members
 // have no name-entry surface, so their `display_name` stays NULL.
@@ -24,7 +25,7 @@ export function memberPlaceholderName(userId: string): string {
  *  `members.display_name` when it is a non-blank string; otherwise
  *  falls back to the `m<uuid>` placeholder.
  *
- *  A blank / whitespace-only joined value is treated as "no name" —
+ *  A blank / whitespace-only joined value is treated as "no name" â€”
  *  the name-entry surface trims input and rejects a whitespace-only
  *  name, so a blank value in the column is a data anomaly, not a real
  *  name. A real name is returned trimmed. */

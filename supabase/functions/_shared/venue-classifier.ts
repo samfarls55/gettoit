@@ -1,10 +1,11 @@
-// VenueClassifier — the `CandidateOption -> Q5VenueProfile` axis
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// VenueClassifier â€” the `CandidateOption -> Q5VenueProfile` axis
 // classification (TB-23 quiz redesign, PRD module E live wiring, server side).
 //
-// A faithful TypeScript port of the Swift `Q5VenueClassifier`
-// (`ios/Sources/App/Q5VenueClassifier.swift`, TB-16). The Swift app
+// A faithful TypeScript port of the legacy Swift `Q5VenueClassifier`
+// (`legacy Swift ios/Sources/App/Q5VenueClassifier.swift`, TB-16). The legacy Swift app
 // classifies a fetched venue pool on device; bug-08 locked the
-// server-side fork (Option 2) — the candidate-pool union and the
+// server-side fork (Option 2) â€” the candidate-pool union and the
 // preference scoring run server-side at verdict fire time. The verdict
 // path is TypeScript, so the venue classification has to live here too,
 // alongside the ported preference function (`preference-function.ts`,
@@ -14,18 +15,18 @@
 // the slice of `options.payload` the engine + classifier read) into its
 // position on the three Q5 preference axes:
 //
-//   * Cuisine    — set membership over `categories[]` matched against
+//   * Cuisine    â€” set membership over `categories[]` matched against
 //                  the QuizCuisine keyword vocabulary; `null` when no
 //                  category matches.
-//   * Vibe       — a category-archetype baseline (0..4 Quiet..Rowdy),
-//                  a curated `tastes`-token nudge (±1), and `price_tier`
+//   * Vibe       â€” a category-archetype baseline (0..4 Quiet..Rowdy),
+//                  a curated `tastes`-token nudge (Â±1), and `price_tier`
 //                  as a last-resort tie-break.
-//   * Reputation — a pool-relative bucketing over `total_ratings`
+//   * Reputation â€” a pool-relative bucketing over `total_ratings`
 //                  (volume), `rating` (quality), and `date_created`
 //                  (age).
 //
-// Reputation is pool-relative — the volume terciles are derived from
-// the fetched pool, not a global constant — so classification is a
+// Reputation is pool-relative â€” the volume terciles are derived from
+// the fetched pool, not a global constant â€” so classification is a
 // pool-level call (`classifyVenuePool`), not a per-venue one.
 //
 // Pure: no I/O, no clock, no randomness. The `date_created` age check
@@ -39,15 +40,15 @@
 import type { CandidateOption } from "./verdict-engine.ts";
 import type { Q5VenueProfile } from "./preference-function.ts";
 
-// ───────────────────────────────────────────────────────────────────────
-// Cohort-zero thresholds (tunable post-cohort — research §4)
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Cohort-zero thresholds (tunable post-cohort â€” research Â§4)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** A venue is "well-rated enough to be Popular" at or above this
  *  `rating` (Foursquare's 0..10 scale). */
 const POPULAR_RATING_FLOOR = 7.0;
 /** A venue is "excellent enough to be a Hidden gem" at or above this
- *  `rating` — a higher bar than Popular. */
+ *  `rating` â€” a higher bar than Popular. */
 const HIDDEN_GEM_RATING_FLOOR = 8.0;
 /** A venue whose Foursquare record is younger than this many days
  *  classifies as `new`. */
@@ -60,13 +61,13 @@ const CLASSIC_RECORD_MIN_AGE_DAYS = 365 * 3;
  *  `GTIVibeLabels.all.count`. */
 const VIBE_SCALE_STOPS = 5;
 
-// QuizReputation ids — mirror the Swift `QuizReputation` constants.
+// QuizReputation ids â€” mirror the legacy Swift `QuizReputation` constants.
 const REP_POPULAR = "popular";
 const REP_HIDDEN_GEM = "hidden_gem";
 const REP_CLASSIC = "classic";
 const REP_NEW = "new";
 
-// QuizCuisine ids — mirror the Swift `QuizCuisine` constants.
+// QuizCuisine ids â€” mirror the legacy Swift `QuizCuisine` constants.
 const CUISINE_MEXICAN = "mexican";
 const CUISINE_ITALIAN = "italian";
 const CUISINE_JAPANESE = "japanese";
@@ -76,9 +77,9 @@ const CUISINE_INDIAN = "indian";
 const CUISINE_AMERICAN = "american";
 const CUISINE_MEDITERRANEAN = "mediterranean";
 
-// ───────────────────────────────────────────────────────────────────────
-// Cuisine axis — keyword set membership over categories
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Cuisine axis â€” keyword set membership over categories
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Keyword fragments that identify each `QuizCuisine` inside a
  *  Foursquare category name. Matching is case-insensitive substring;
@@ -95,7 +96,7 @@ const CUISINE_KEYWORDS: ReadonlyArray<{ cuisine: string; fragments: string[] }> 
   { cuisine: CUISINE_MEDITERRANEAN, fragments: ["mediterranean", "greek", "falafel", "kebab", "shawarma", "lebanese"] },
 ];
 
-/** The venue's cuisine — a `QuizCuisine` id derived from its
+/** The venue's cuisine â€” a `QuizCuisine` id derived from its
  *  `categories[]`, or `null` when no category matches a known cuisine. */
 function cuisineOf(categories: string[]): string | null {
   const haystack = categories.map((c) => c.toLowerCase());
@@ -109,31 +110,31 @@ function cuisineOf(categories: string[]): string | null {
   return null;
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Vibe axis — category archetype baseline + tastes nudge + price
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Vibe axis â€” category archetype baseline + tastes nudge + price
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/** Category-archetype keyword → baseline vibe (0..4 Quiet..Rowdy).
+/** Category-archetype keyword â†’ baseline vibe (0..4 Quiet..Rowdy).
  *  Scanned in order; the first matching archetype wins. Mirrors the
- *  Swift `vibeArchetypes` table verbatim. */
+ *  legacy Swift `vibeArchetypes` table verbatim. */
 const VIBE_ARCHETYPES: ReadonlyArray<{ fragments: string[]; baseline: number }> = [
-  // Rowdy (4) — nightlife-forward.
+  // Rowdy (4) â€” nightlife-forward.
   { fragments: ["nightclub", "night club", "sports bar", "dance"], baseline: 4 },
-  // Lively (3) — bar-forward, social-drinking energy.
+  // Lively (3) â€” bar-forward, social-drinking energy.
   { fragments: ["bar", "pub", "gastropub", "brewery", "taproom", "wine bar", "cocktail"], baseline: 3 },
-  // Quiet (0) — calm, low-energy.
+  // Quiet (0) â€” calm, low-energy.
   { fragments: ["tea", "tea house", "tearoom", "library cafe"], baseline: 0 },
-  // Chill (1) — relaxed daytime.
-  { fragments: ["cafe", "café", "coffee", "bakery", "bistro", "creperie"], baseline: 1 },
-  // Social (2) — the default sit-down restaurant energy.
+  // Chill (1) â€” relaxed daytime.
+  { fragments: ["cafe", "cafÃ©", "coffee", "bakery", "bistro", "creperie"], baseline: 1 },
+  // Social (2) â€” the default sit-down restaurant energy.
   { fragments: ["restaurant", "diner", "eatery", "grill", "kitchen"], baseline: 2 },
 ];
 
-/** The baseline vibe with no category match — the mid-scale Social
+/** The baseline vibe with no category match â€” the mid-scale Social
  *  level. */
 const DEFAULT_VIBE_BASELINE = 2;
 
-/** Curated Foursquare `tastes` vibe-token allowlist — transcribed from
+/** Curated Foursquare `tastes` vibe-token allowlist â€” transcribed from
  *  the research-02 deliverable. Each token is direction-only: `+1`
  *  loud-leaning, `-1` quiet-leaning. Mirrors the Swift
  *  `vibeTokenAllowlist` table verbatim. */
@@ -172,7 +173,7 @@ const VIBE_TOKEN_ALLOWLIST: Readonly<Record<string, number>> = {
   "pleasant atmosphere": -1,
 };
 
-/** The `tastes` nudge for a venue — `-1`, `0`, or `+1`. Sums the
+/** The `tastes` nudge for a venue â€” `-1`, `0`, or `+1`. Sums the
  *  direction tags of the venue's `tastes` tokens that appear in the
  *  allowlist, then returns the sign of that sum. Direction-only. */
 function tastesNudge(tastes: string[]): number {
@@ -193,7 +194,7 @@ function clampVibe(value: number): number {
 /** The venue's vibe level, 0..4. The category archetype is the
  *  baseline; a curated `tastes`-token nudge is the secondary signal;
  *  `price_tier` is the last-resort tie-break (unmatched archetype
- *  only). Mirrors the Swift `vibe(of:)` precedence verbatim. */
+ *  only). Mirrors the legacy Swift `vibe(of:)` precedence verbatim. */
 function vibeOf(categories: string[], tastes: string[], priceTier: number | null): number {
   const haystack = categories.map((c) => c.toLowerCase());
   let baseline = DEFAULT_VIBE_BASELINE;
@@ -210,13 +211,13 @@ function vibeOf(categories: string[], tastes: string[], priceTier: number | null
     }
   }
 
-  // `tastes` nudge — applies whether or not an archetype matched.
+  // `tastes` nudge â€” applies whether or not an archetype matched.
   const nudge = tastesNudge(tastes);
   if (nudge !== 0) {
     return clampVibe(baseline + nudge);
   }
 
-  // Price tie-break — last-resort, unmatched-archetype only.
+  // Price tie-break â€” last-resort, unmatched-archetype only.
   if (!matched && priceTier !== null) {
     if (priceTier <= 1) baseline += 1;
     else if (priceTier >= 4) baseline -= 1;
@@ -225,11 +226,11 @@ function vibeOf(categories: string[], tastes: string[], priceTier: number | null
   return clampVibe(baseline);
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Reputation axis — pool-relative volume × quality × age
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Reputation axis â€” pool-relative volume Ã— quality Ã— age
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-/** The pool-relative volume split — the `total_ratings` cutoffs that
+/** The pool-relative volume split â€” the `total_ratings` cutoffs that
  *  separate the bottom / middle / top tercile of the fetched pool. */
 interface VolumeTerciles {
   lowCeiling: number;
@@ -270,7 +271,7 @@ function recordAgeDays(dateCreated: string | null | undefined, now: Date): numbe
   return seconds / 86_400;
 }
 
-/** The venue's reputation bucket — a `QuizReputation` id, never
+/** The venue's reputation bucket â€” a `QuizReputation` id, never
  *  `no_preference` (that is a member answer). Mirrors the Swift
  *  `reputation(of:volumeSplit:now:)` decision order. */
 function reputationOf(
@@ -282,7 +283,7 @@ function reputationOf(
   const volume = venue.total_ratings ?? 0;
   const rating = venue.rating ?? null;
 
-  // New — age dominates, regardless of volume.
+  // New â€” age dominates, regardless of volume.
   if (ageDays !== null && ageDays <= NEW_RECORD_MAX_AGE_DAYS) {
     return REP_NEW;
   }
@@ -290,25 +291,25 @@ function reputationOf(
   const isHighVolume = volume >= volumeSplit.highFloor && volumeSplit.highFloor > 0;
   const isLowVolume = volume <= volumeSplit.lowCeiling;
 
-  // Classic — high volume + an old record.
+  // Classic â€” high volume + an old record.
   if (isHighVolume && ageDays !== null && ageDays >= CLASSIC_RECORD_MIN_AGE_DAYS) {
     return REP_CLASSIC;
   }
-  // Popular — high volume + well-rated.
+  // Popular â€” high volume + well-rated.
   if (isHighVolume && rating !== null && rating >= POPULAR_RATING_FLOOR) {
     return REP_POPULAR;
   }
-  // Hidden gem — low volume + an excellent rating.
+  // Hidden gem â€” low volume + an excellent rating.
   if (isLowVolume && rating !== null && rating >= HIDDEN_GEM_RATING_FLOOR) {
     return REP_HIDDEN_GEM;
   }
-  // No discriminating signal — the neutral, ordinary bucket.
+  // No discriminating signal â€” the neutral, ordinary bucket.
   return REP_POPULAR;
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Public surface — pool classification
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Public surface â€” pool classification
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Classify a fetched venue pool into `Q5VenueProfile`s, keyed by
  *  `CandidateOption.id`.
@@ -321,7 +322,7 @@ function reputationOf(
  *  @param now  the reference instant the `date_created` age check
  *              reads. Injected so tests are deterministic; defaults to
  *              `new Date()`.
- *  @returns a `Map<option_id, Q5VenueProfile>` — one entry per input
+ *  @returns a `Map<option_id, Q5VenueProfile>` â€” one entry per input
  *           venue. */
 export function classifyVenuePool(
   pool: readonly CandidateOption[],

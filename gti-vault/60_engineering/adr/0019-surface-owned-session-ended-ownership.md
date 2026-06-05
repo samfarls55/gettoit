@@ -7,11 +7,14 @@ supersedes: null
 superseded_by: null
 ---
 
-# 0019 — Surface-owned session-ended ownership for Realtime room-status transitions
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# 0019 â€” Surface-owned session-ended ownership for Realtime room-status transitions
 
 ## Status
 
-Accepted — 2026-05-26. Outcome of the `/workflow-review` grill on `WaitingScreen.swift` finding #5 (audit report `gti-vault/15_issues/_runs/2026-05-26-0958-workflow-review.md`). Establishes the ownership pattern for "the room I'm in just got nuked from outside" transitions across all Realtime-channel-backed surfaces (WaitingScreen now, QuizScreen next, future late-joiner surfaces by extension). Unblocks audit finding #17 (WaitingScreen initiator-Leave affordance).
+Accepted â€” 2026-05-26. Outcome of the `/workflow-review` grill on `WaitingScreen.swift` finding #5 (audit report `gti-vault/15_issues/_runs/2026-05-26-0958-workflow-review.md`). Establishes the ownership pattern for "the room I'm in just got nuked from outside" transitions across all Realtime-channel-backed surfaces (WaitingScreen now, QuizScreen next, future late-joiner surfaces by extension). Unblocks audit finding #17 (WaitingScreen initiator-Leave affordance).
 
 ## Context
 
@@ -24,7 +27,7 @@ The plumbing already exists:
 
 The gap is consumption: `WaitingScreen.swift:110-113` only listens for `verdictReady`, not for `status == .expired`. The wait surface sits forever when the room goes away.
 
-Same gap exists on `QuizScreen` — if the creator deletes mid-quiz, the joiner's quiz screen doesn't react. Same `RoomStatus.expired` projection, same missing `.onChange`.
+Same gap exists on `QuizScreen` â€” if the creator deletes mid-quiz, the joiner's quiz screen doesn't react. Same `RoomStatus.expired` projection, same missing `.onChange`.
 
 The decision is whose responsibility this transition is: the screen, the store, or the RootView precedence chain.
 
@@ -36,7 +39,7 @@ The decision is whose responsibility this transition is: the screen, the store, 
 - On `.expired`, the screen renders the inline "session ended" toast AND fires an `onSessionEnded?` callback up to the host (`PostQuizHostScreen` / `RootView`).
 - The host tears down the precedence-chain state that anchored the screen (`activeQuiz = nil`, `postQuizHost = nil`, etc.) so the user lands on `PlanListScreen`.
 
-Stores stay **passive projections of server state** — they do not own navigation. They expose state changes; the surface that renders the state interprets them.
+Stores stay **passive projections of server state** â€” they do not own navigation. They expose state changes; the surface that renders the state interprets them.
 
 Hosts (`PostQuizHostScreen`, `RootView`) own the precedence-chain teardown, not the toast itself. Toast lives where the user's eyes are.
 
@@ -48,9 +51,9 @@ Hosts (`PostQuizHostScreen`, `RootView`) own the precedence-chain teardown, not 
 
 Rejected because:
 
-- Forces the store from a pure projection into a navigation-owner — couples server-state observation to UI lifecycle.
+- Forces the store from a pure projection into a navigation-owner â€” couples server-state observation to UI lifecycle.
 - The same coordinator-owned logic would have to exist on `QuizStore` / a hypothetical `QuizCoordinator` for the mid-quiz case, doubling the navigation closures the host has to inject and remember to clear.
-- Coordinator-owned doesn't actually centralize the work — each store still needs its own `onSessionEnded`. The "centralization" is illusory.
+- Coordinator-owned doesn't actually centralize the work â€” each store still needs its own `onSessionEnded`. The "centralization" is illusory.
 - Toast UX is a per-surface concern; the coordinator would have to either render the toast itself (UI in a non-UI layer) or signal the surface to do it (back to surface-owned).
 
 ### RootView-owned (global `sessionEnded` precedence step)
@@ -59,14 +62,14 @@ A new `@State sessionEnded: SessionEndedReason?` on RootView, observed by a thin
 
 Rejected because:
 
-- The toast lives one mental level removed from the wait context — visually janky (mid-wait screen vanishes, replaced by a different surface, replaced by PlanList).
+- The toast lives one mental level removed from the wait context â€” visually janky (mid-wait screen vanishes, replaced by a different surface, replaced by PlanList).
 - Novel surface type (`SessionEndedToastScreen`) for one transition; the existing precedence chain has no surface that exists *only to announce a thing happened*.
-- Requires global subscription wiring at RootView that has to know about every Realtime channel the user could be inside — couples RootView to room-state plumbing it currently delegates.
+- Requires global subscription wiring at RootView that has to know about every Realtime channel the user could be inside â€” couples RootView to room-state plumbing it currently delegates.
 - Forces every future Realtime-channel surface to register/de-register with the RootView subscriber.
 
 ### Status quo (do nothing)
 
-Joiner sits on WaitingScreen forever after creator deletes. Background app refresh eventually picks up `rooms.status = 'expired'` via the snapshot poll; but if the user is foregrounded, the screen is stuck. Tested manually 2026-05-26 — silent dead state, no toast, no punt.
+Joiner sits on WaitingScreen forever after creator deletes. Background app refresh eventually picks up `rooms.status = 'expired'` via the snapshot poll; but if the user is foregrounded, the screen is stuck. Tested manually 2026-05-26 â€” silent dead state, no toast, no punt.
 
 Rejected because:
 
@@ -77,14 +80,14 @@ Rejected because:
 
 ### Immediate (v1.1)
 
-- `WaitingScreen` adds `.onChange(of: waitingStore.status)` mirroring the existing `verdictReady` pattern on line 110. On `.expired`: show toast + fire `onSessionEnded?`. Host clears `postQuizHost`. (audit finding #5 → AFK issue.)
+- `WaitingScreen` adds `.onChange(of: waitingStore.status)` mirroring the existing `verdictReady` pattern on line 110. On `.expired`: show toast + fire `onSessionEnded?`. Host clears `postQuizHost`. (audit finding #5 â†’ AFK issue.)
 - `QuizScreen` gets the same treatment for `QuizStore` (or whichever store carries `RoomStatus` for the quiz path). Host clears `activeQuiz`. (new follow-up issue.)
-- Audit finding #17 (WaitingScreen initiator-Leave chrome glyph) unblocks: the Leave-button flow can reuse the same `onSessionEnded` callback shape — the initiator's Leave fires `MemberLeaveStore.ExpireRoom`, the channel echoes `roomStatusChanged(.expired)` back, and the same surface-owned handler punts the initiator too. One path, two callers.
+- Audit finding #17 (WaitingScreen initiator-Leave chrome glyph) unblocks: the Leave-button flow can reuse the same `onSessionEnded` callback shape â€” the initiator's Leave fires `MemberLeaveStore.ExpireRoom`, the channel echoes `roomStatusChanged(.expired)` back, and the same surface-owned handler punts the initiator too. One path, two callers.
 
 ### Architectural
 
 - Pattern extends to any future surface that mounts inside a Realtime channel: `LockedScreen`, late-joiner read-only landings, post-launch group-quiz observers. Each surface watches its own store's `status` and surfaces its own toast + callback.
-- Stores remain pure projections of server state — easier to test (just fire events; assert state); easier to reason about (no hidden navigation closures).
+- Stores remain pure projections of server state â€” easier to test (just fire events; assert state); easier to reason about (no hidden navigation closures).
 - The "session ended" copy + behavior lives in one design doc (`surfaces.md` punted-surface section, to be added when the pattern hits its 2nd consumer) rather than one architectural doc.
 
 ### Cost
@@ -99,6 +102,6 @@ Rejected because:
 
 ## Status of related findings
 
-- **Finding #5** (this grill) — closed via this ADR + WaitingScreen AFK issue.
-- **Finding #17** (WaitingScreen initiator Leave) — unblocked; reuses the same `onSessionEnded` callback shape.
-- **QuizScreen mid-quiz expire** — new follow-up issue spawned (not in the original audit; surfaced by this ADR's scope decision).
+- **Finding #5** (this grill) â€” closed via this ADR + WaitingScreen AFK issue.
+- **Finding #17** (WaitingScreen initiator Leave) â€” unblocked; reuses the same `onSessionEnded` callback shape.
+- **QuizScreen mid-quiz expire** â€” new follow-up issue spawned (not in the original audit; surfaced by this ADR's scope decision).

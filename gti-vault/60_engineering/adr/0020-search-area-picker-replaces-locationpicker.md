@@ -7,11 +7,14 @@ supersedes: 0009-locationpicker-as-reusable-component
 superseded_by: null
 ---
 
-# 0020 — SearchAreaPicker replaces LocationPicker as the active Setup geography control
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# 0020 â€” SearchAreaPicker replaces LocationPicker as the active Setup geography control
 
 ## Status
 
-Accepted — 2026-06-03. Supersedes [[0009-locationpicker-as-reusable-component|ADR 0009]].
+Accepted â€” 2026-06-03. Supersedes [[0009-locationpicker-as-reusable-component|ADR 0009]].
 
 ## Context
 

@@ -1,6 +1,7 @@
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // Integration tests for the PlacesProxy core orchestrator.
 //
-// Exercises the cache miss → Foursquare fetch → cache write → cache hit
+// Exercises the cache miss â†’ Foursquare fetch â†’ cache write â†’ cache hit
 // loop against a recorded Foursquare response payload (no real HTTP).
 
 import {
@@ -28,7 +29,7 @@ import {
   THIN_RESULTS_THRESHOLD,
 } from "./foursquare.ts";
 
-/** The sorted, comma-joined candidate-pool floor (tb-25 / ADR 0012) —
+/** The sorted, comma-joined candidate-pool floor (tb-25 / ADR 0012) â€”
  *  the wire value of `fsq_category_ids` on any call whose category set
  *  is otherwise empty. */
 const FLOOR_WIRE = [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(",");
@@ -37,8 +38,8 @@ const FLOOR_WIRE = [...CANDIDATE_POOL_FLOOR_CATEGORY_IDS].sort().join(",");
 // Test fixtures.
 // ---------------------------------------------------------------------------
 
-/** Recorded Foursquare response — fields verified against the live
- *  surface 2026-05-13 (ADR 0002 §"Live API surface verified"). */
+/** Recorded Foursquare response â€” fields verified against the live
+ *  surface 2026-05-13 (ADR 0002 Â§"Live API surface verified"). */
 const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
   results: [
     {
@@ -51,7 +52,7 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       ],
       location: { formatted_address: "1 Main St, NYC" },
       price: 2,
-      hours: { display: "11am–10pm", open_now: true },
+      hours: { display: "11amâ€“10pm", open_now: true },
       photos: [{ prefix: "https://fsq.example/", suffix: "/p1.jpg" }],
       tastes: ["lamb", "kebab"],
       distance: 160,
@@ -66,7 +67,7 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       ],
       location: { formatted_address: "2 Main St, NYC" },
       price: 3,
-      hours: { display: "noon–9pm", open_now: false },
+      hours: { display: "noonâ€“9pm", open_now: false },
       photos: [],
       tastes: [],
       distance: 320,
@@ -81,7 +82,7 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       ],
       location: { formatted_address: "3 Main St, NYC" },
       price: 2,
-      hours: { display: "5pm–11pm", open_now: true },
+      hours: { display: "5pmâ€“11pm", open_now: true },
       photos: [{ prefix: "https://fsq.example/", suffix: "/p3.jpg" }],
       tastes: ["gluten-free", "farm to table"],
       distance: 800,
@@ -175,13 +176,13 @@ const TYPICAL_INPUT: PlacesProxyInput = {
 // Cache hit / miss / write.
 // ---------------------------------------------------------------------------
 
-Deno.test("cache miss — calls Foursquare, writes cache, returns shaped rows", async () => {
+Deno.test("cache miss â€” calls Foursquare, writes cache, returns shaped rows", async () => {
   const { cache, fetchCalls, deps } = buildDeps();
   const result = await handlePlacesProxy(TYPICAL_INPUT, deps);
 
   // 1. Foursquare was actually called.
   assertEquals(fetchCalls.length, 1);
-  // 2. With the right headers — bearer key + pinned version.
+  // 2. With the right headers â€” bearer key + pinned version.
   const headers = fetchCalls[0].init?.headers as Record<string, string>;
   assertEquals(headers["Authorization"], "Bearer test-api-key");
   assertEquals(headers["X-Places-Api-Version"], FOURSQUARE_API_VERSION);
@@ -195,7 +196,7 @@ Deno.test("cache miss — calls Foursquare, writes cache, returns shaped rows", 
   assertEquals(result.served_from_cache, false);
 });
 
-Deno.test("cache hit — returns cached rows without calling Foursquare", async () => {
+Deno.test("cache hit â€” returns cached rows without calling Foursquare", async () => {
   const { cache, fetchCalls, deps } = buildDeps();
   // First call populates the cache.
   await handlePlacesProxy(TYPICAL_INPUT, deps);
@@ -209,7 +210,7 @@ Deno.test("cache hit — returns cached rows without calling Foursquare", async 
   assertEquals(cache.size(), 1);
 });
 
-Deno.test("cache miss — same geo but different filter set creates a second row", async () => {
+Deno.test("cache miss â€” same geo but different filter set creates a second row", async () => {
   const { cache, fetchCalls, deps } = buildDeps();
   await handlePlacesProxy(TYPICAL_INPUT, deps);
   await handlePlacesProxy({ ...TYPICAL_INPUT, filters: { dietary: ["kosher"] } }, deps);
@@ -217,7 +218,7 @@ Deno.test("cache miss — same geo but different filter set creates a second row
   assertEquals(cache.size(), 2);
 });
 
-Deno.test("cache hit — same geo, identical filter set with reordered chips hits the same row", async () => {
+Deno.test("cache hit â€” same geo, identical filter set with reordered chips hits the same row", async () => {
   const { fetchCalls, deps } = buildDeps();
   await handlePlacesProxy({
     ...TYPICAL_INPUT,
@@ -230,7 +231,7 @@ Deno.test("cache hit — same geo, identical filter set with reordered chips hit
   assertEquals(fetchCalls.length, 1, "filter-order permutation must hit the same cache row");
 });
 
-Deno.test("cache miss — expired cache row triggers re-fetch", async () => {
+Deno.test("cache miss â€” expired cache row triggers re-fetch", async () => {
   const { cache, fetchCalls, deps } = buildDeps({
     now: () => new Date("2026-05-15T13:00:00Z"), // > 24h after the stale row
   });
@@ -241,7 +242,7 @@ Deno.test("cache miss — expired cache row triggers re-fetch", async () => {
     cached_at: "2026-05-13T12:00:00Z",
   });
   await handlePlacesProxy(TYPICAL_INPUT, deps);
-  // Expired hit → went to Foursquare, then wrote a fresh row.
+  // Expired hit â†’ went to Foursquare, then wrote a fresh row.
   assertEquals(fetchCalls.length, 1);
 });
 
@@ -249,7 +250,7 @@ Deno.test("cache miss — expired cache row triggers re-fetch", async () => {
 // Dietary-tag round-trip.
 // ---------------------------------------------------------------------------
 
-Deno.test("dietary filter — halal chip puts category id on the Foursquare wire", async () => {
+Deno.test("dietary filter â€” halal chip puts category id on the Foursquare wire", async () => {
   const { fetchCalls, deps } = buildDeps();
   await handlePlacesProxy(TYPICAL_INPUT, deps);
   const url = new URL(fetchCalls[0].url);
@@ -259,7 +260,7 @@ Deno.test("dietary filter — halal chip puts category id on the Foursquare wire
   );
 });
 
-Deno.test("dietary filter — gluten chip is applied post-fetch, not on the wire", async () => {
+Deno.test("dietary filter â€” gluten chip is applied post-fetch, not on the wire", async () => {
   const { fetchCalls, deps } = buildDeps();
   await handlePlacesProxy({
     ...TYPICAL_INPUT,
@@ -268,12 +269,12 @@ Deno.test("dietary filter — gluten chip is applied post-fetch, not on the wire
   const url = new URL(fetchCalls[0].url);
   // tb-25 / ADR 0012: gluten is a `tastes` post-filter and contributes
   // no category id, so the category set is empty and the candidate-pool
-  // floor is seeded — the wire carries the floor, never empty.
+  // floor is seeded â€” the wire carries the floor, never empty.
   assertEquals(url.searchParams.get("fsq_category_ids"), FLOOR_WIRE);
 });
 
-Deno.test("dietary filter — gluten post-filter rejects results without the taste token", async () => {
-  // Use a fresh deps so the stub fetch returns the recorded payload —
+Deno.test("dietary filter â€” gluten post-filter rejects results without the taste token", async () => {
+  // Use a fresh deps so the stub fetch returns the recorded payload â€”
   // only the "Gluten-Smart Bistro" entry has a matching taste token.
   const { deps } = buildDeps();
   const result = await handlePlacesProxy({
@@ -285,7 +286,7 @@ Deno.test("dietary filter — gluten post-filter rejects results without the tas
   assertEquals(result.places[0].dietary_tags.includes("gluten_free_options"), true);
 });
 
-Deno.test("dietary filter — shellfish chip surfaces as disclaimer in the response", async () => {
+Deno.test("dietary filter â€” shellfish chip surfaces as disclaimer in the response", async () => {
   const { deps } = buildDeps();
   const result = await handlePlacesProxy({
     ...TYPICAL_INPUT,
@@ -298,10 +299,10 @@ Deno.test("dietary filter — shellfish chip surfaces as disclaimer in the respo
 });
 
 // ---------------------------------------------------------------------------
-// Cuisine advisory tag (tb-17) — per-call category scoping.
+// Cuisine advisory tag (tb-17) â€” per-call category scoping.
 // ---------------------------------------------------------------------------
 
-Deno.test("cuisine tag — per-cuisine call puts the mapped category on the Foursquare wire", async () => {
+Deno.test("cuisine tag â€” per-cuisine call puts the mapped category on the Foursquare wire", async () => {
   const { fetchCalls, deps } = buildDeps();
   await handlePlacesProxy({
     ...TYPICAL_INPUT,
@@ -315,7 +316,7 @@ Deno.test("cuisine tag — per-cuisine call puts the mapped category on the Four
   );
 });
 
-Deno.test("cuisine tag — mandatory general call is NOT cuisine-scoped but carries the floor", async () => {
+Deno.test("cuisine tag â€” mandatory general call is NOT cuisine-scoped but carries the floor", async () => {
   const { fetchCalls, deps } = buildDeps();
   await handlePlacesProxy({
     ...TYPICAL_INPUT,
@@ -323,12 +324,12 @@ Deno.test("cuisine tag — mandatory general call is NOT cuisine-scoped but carr
   }, deps);
   const url = new URL(fetchCalls[0].url);
   // tb-25 / ADR 0012: the general call carries no cuisine id, so the
-  // candidate-pool floor is seeded — venue-class floored, not
+  // candidate-pool floor is seeded â€” venue-class floored, not
   // cuisine-scoped. The floor is orthogonal to cuisine.
   assertEquals(url.searchParams.get("fsq_category_ids"), FLOOR_WIRE);
 });
 
-Deno.test("cuisine tag — unknown cuisine degrades to the general query without error", async () => {
+Deno.test("cuisine tag â€” unknown cuisine degrades to the general query without error", async () => {
   const { fetchCalls, deps } = buildDeps();
   const result = await handlePlacesProxy({
     ...TYPICAL_INPUT,
@@ -338,11 +339,11 @@ Deno.test("cuisine tag — unknown cuisine degrades to the general query without
   // tb-25 / ADR 0012: an unresolvable cuisine leaves the category set
   // empty, so it degrades to the floored general query.
   assertEquals(url.searchParams.get("fsq_category_ids"), FLOOR_WIRE);
-  // Degrades gracefully — full result set, no error surfaced.
+  // Degrades gracefully â€” full result set, no error surfaced.
   assertEquals(result.places.length, 3);
 });
 
-Deno.test("cuisine tag — per-cuisine and general calls occupy distinct cache rows", async () => {
+Deno.test("cuisine tag â€” per-cuisine and general calls occupy distinct cache rows", async () => {
   const { cache, fetchCalls, deps } = buildDeps();
   await handlePlacesProxy({ ...TYPICAL_INPUT, filters: {} }, deps);
   await handlePlacesProxy({ ...TYPICAL_INPUT, filters: { cuisine: "thai" } }, deps);
@@ -350,7 +351,7 @@ Deno.test("cuisine tag — per-cuisine and general calls occupy distinct cache r
   assertEquals(cache.size(), 2);
 });
 
-Deno.test("validateInput — keeps a valid cuisine tag on the filters", () => {
+Deno.test("validateInput â€” keeps a valid cuisine tag on the filters", () => {
   const v = validateInput({
     lat: 0, lng: 0, radius_meters: 100,
     filters: { cuisine: "mexican" },
@@ -358,9 +359,9 @@ Deno.test("validateInput — keeps a valid cuisine tag on the filters", () => {
   assertEquals(v.filters?.cuisine, "mexican");
 });
 
-Deno.test("validateInput — tolerates a missing / non-string cuisine key", () => {
+Deno.test("validateInput â€” tolerates a missing / non-string cuisine key", () => {
   // The general call omits `cuisine` entirely; a malformed value must
-  // not throw — it simply drops to undefined.
+  // not throw â€” it simply drops to undefined.
   const noKey = validateInput({ lat: 0, lng: 0, radius_meters: 100, filters: {} });
   assertEquals(noKey.filters?.cuisine, undefined);
   const badType = validateInput({
@@ -370,7 +371,7 @@ Deno.test("validateInput — tolerates a missing / non-string cuisine key", () =
   assertEquals(badType.filters?.cuisine, undefined);
 });
 
-Deno.test("validateInput — keeps a valid open_at DHHMM token", () => {
+Deno.test("validateInput â€” keeps a valid open_at DHHMM token", () => {
   const v = validateInput({
     lat: 0, lng: 0, radius_meters: 100,
     filters: { open_at: "3T1900" },
@@ -378,14 +379,14 @@ Deno.test("validateInput — keeps a valid open_at DHHMM token", () => {
   assertEquals(v.filters?.open_at, "3T1900");
 });
 
-Deno.test("validateInput — tolerates a missing open_at key", () => {
+Deno.test("validateInput â€” tolerates a missing open_at key", () => {
   const v = validateInput({ lat: 0, lng: 0, radius_meters: 100, filters: {} });
   assertEquals(v.filters?.open_at, undefined);
 });
 
-Deno.test("validateInput — rejects a malformed open_at loudly", () => {
+Deno.test("validateInput â€” rejects a malformed open_at loudly", () => {
   // A present-but-malformed open_at is a client bug. Reject with a 400
-  // rather than swallowing it — a swallowed bad open_at (the unix-epoch
+  // rather than swallowing it â€” a swallowed bad open_at (the unix-epoch
   // format) is exactly what silently broke the Q5 fetch pipeline.
   for (const bad of ["2026-05-13T18:00:00Z", "1778695200", "0T1900", "3T2500", "3T1960"]) {
     assertThrows(
@@ -402,10 +403,10 @@ Deno.test("validateInput — rejects a malformed open_at loudly", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Thin-results signal — iOS MapKit fallback trigger.
+// Thin-results signal â€” iOS MapKit fallback trigger.
 // ---------------------------------------------------------------------------
 
-Deno.test("thin-results — empty Foursquare response sets is_thin=true", async () => {
+Deno.test("thin-results â€” empty Foursquare response sets is_thin=true", async () => {
   const cache = new MemoryCache();
   const stub = stubFetch(recordedResponse({ results: [] }));
   const result = await handlePlacesProxy(TYPICAL_INPUT, {
@@ -418,8 +419,8 @@ Deno.test("thin-results — empty Foursquare response sets is_thin=true", async 
   assertEquals(result.places.length, 0);
 });
 
-Deno.test("thin-results — fewer than THIN_RESULTS_THRESHOLD rows sets is_thin=true", async () => {
-  // Provide one result — below the threshold.
+Deno.test("thin-results â€” fewer than THIN_RESULTS_THRESHOLD rows sets is_thin=true", async () => {
+  // Provide one result â€” below the threshold.
   const cache = new MemoryCache();
   const stub = stubFetch(recordedResponse({
     results: [RECORDED_FOURSQUARE_RESPONSE.results[0]],
@@ -434,7 +435,7 @@ Deno.test("thin-results — fewer than THIN_RESULTS_THRESHOLD rows sets is_thin=
   assertEquals(result.places.length < THIN_RESULTS_THRESHOLD, true);
 });
 
-Deno.test("thin-results — Foursquare 5xx returns is_thin=true (graceful fallback)", async () => {
+Deno.test("thin-results â€” Foursquare 5xx returns is_thin=true (graceful fallback)", async () => {
   const cache = new MemoryCache();
   const stub = stubFetch(new Response("upstream down", { status: 503 }));
   const result = await handlePlacesProxy(TYPICAL_INPUT, {
@@ -448,9 +449,9 @@ Deno.test("thin-results — Foursquare 5xx returns is_thin=true (graceful fallba
   assertEquals(result.error, "foursquare_upstream_503");
 });
 
-Deno.test("upstream 4xx — surfaces a soft error, not a silent empty 200", async () => {
+Deno.test("upstream 4xx â€” surfaces a soft error, not a silent empty 200", async () => {
   // A 429 (Foursquare credit exhaustion) or a 401/403 must not be
-  // swallowed into an unmarked empty 200 — the client and the deploy
+  // swallowed into an unmarked empty 200 â€” the client and the deploy
   // diagnostic need a named error to tell "no credits" apart from
   // "genuinely no venues nearby". Regression guard for the 2026-05-16
   // empty-places incident.
@@ -469,7 +470,7 @@ Deno.test("upstream 4xx — surfaces a soft error, not a silent empty 200", asyn
   assertEquals(result.error, "foursquare_upstream_429");
 });
 
-Deno.test("thin-results — Foursquare 410 fails loud (version pin slipped)", async () => {
+Deno.test("thin-results â€” Foursquare 410 fails loud (version pin slipped)", async () => {
   const cache = new MemoryCache();
   const stub = stubFetch(new Response("gone", { status: 410 }));
   await assertRejects(
@@ -488,7 +489,7 @@ Deno.test("thin-results — Foursquare 410 fails loud (version pin slipped)", as
 // Input validation + secret hygiene.
 // ---------------------------------------------------------------------------
 
-Deno.test("validateInput — rejects missing lat", () => {
+Deno.test("validateInput â€” rejects missing lat", () => {
   let err: unknown;
   try {
     validateInput({ lng: 0, radius_meters: 100 });
@@ -499,7 +500,7 @@ Deno.test("validateInput — rejects missing lat", () => {
   assert(err instanceof PlacesProxyInputError);
 });
 
-Deno.test("validateInput — rejects out-of-range lat", () => {
+Deno.test("validateInput â€” rejects out-of-range lat", () => {
   let err: unknown;
   try {
     validateInput({ lat: 999, lng: 0, radius_meters: 100 });
@@ -509,14 +510,14 @@ Deno.test("validateInput — rejects out-of-range lat", () => {
   assert(err instanceof PlacesProxyInputError);
 });
 
-Deno.test("validateInput — accepts a minimal valid input", () => {
+Deno.test("validateInput â€” accepts a minimal valid input", () => {
   const v = validateInput({ lat: 0, lng: 0, radius_meters: 100 });
   assertEquals(v.lat, 0);
   assertEquals(v.lng, 0);
   assertEquals(v.radius_meters, 100);
 });
 
-Deno.test("validateInput — rejects radius > 100km", () => {
+Deno.test("validateInput â€” rejects radius > 100km", () => {
   let err: unknown;
   try {
     validateInput({ lat: 0, lng: 0, radius_meters: 200_000 });
@@ -526,14 +527,14 @@ Deno.test("validateInput — rejects radius > 100km", () => {
   assert(err instanceof PlacesProxyInputError);
 });
 
-Deno.test("secret hygiene — API key never appears in the response body", async () => {
+Deno.test("secret hygiene â€” API key never appears in the response body", async () => {
   const { deps } = buildDeps();
   const result = await handlePlacesProxy(TYPICAL_INPUT, deps);
   const serialized = JSON.stringify(result);
   assertEquals(serialized.includes("test-api-key"), false);
 });
 
-Deno.test("secret hygiene — API key never appears in the cached payload", async () => {
+Deno.test("secret hygiene â€” API key never appears in the cached payload", async () => {
   const { cache, deps } = buildDeps();
   await handlePlacesProxy(TYPICAL_INPUT, deps);
   for (const [, row] of (cache as unknown as { store: Map<string, CacheRow> }).store) {
@@ -545,7 +546,7 @@ Deno.test("secret hygiene — API key never appears in the cached payload", asyn
 // Freshness helper.
 // ---------------------------------------------------------------------------
 
-Deno.test("isCacheRowFresh — returns true for a 1-second-old row", () => {
+Deno.test("isCacheRowFresh â€” returns true for a 1-second-old row", () => {
   const now = new Date("2026-05-13T12:00:00Z");
   const row: CacheRow = {
     geo_h3: "0_0",
@@ -564,7 +565,7 @@ Deno.test("isCacheRowFresh — returns true for a 1-second-old row", () => {
   );
 });
 
-Deno.test("isCacheRowFresh — returns false for a 48-hour-old row", () => {
+Deno.test("isCacheRowFresh â€” returns false for a 48-hour-old row", () => {
   const now = new Date("2026-05-13T12:00:00Z");
   const row: CacheRow = {
     geo_h3: "0_0",

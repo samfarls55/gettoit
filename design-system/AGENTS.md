@@ -19,7 +19,6 @@ Read `README.md` first for the full inventory. This file is the contract for *ed
 
 **Generated files — never edit by hand:**
 - `code/tokens.css` (regen via `node scripts/gen-css.mjs`)
-- Future `*.swift` token outputs (regen via `scripts/gen-swift.mjs`)
 
 If a generated file is wrong, fix `tokens.json` and re-run the generator.
 
@@ -30,7 +29,7 @@ If a generated file is wrong, fix `tokens.json` and re-run the generator.
 ### Tokens
 - Edit `tokens.json`. Run `node scripts/gen-css.mjs`. Commit both.
 - New color → add to `tokens.json`. Register even external/chrome colors (use the `chrome.*` subgroup) so the orphan-hex sweep stays green.
-- New token category → extend `gen-css.mjs` AND `tokens.md` AND (when build lands) the Swift generator.
+- New token category → extend `gen-css.mjs` AND `tokens.md`.
 
 ### Components
 - Editing a component JSX → also edit its `components.md` entry in the same change.
@@ -92,6 +91,6 @@ This directory is **not** in `gti-vault/`. It is authoritative spec; the vault i
 
 ---
 
-## When iOS code lands
+## Mobile App
 
-`scripts/gen-swift.mjs` will emit `GTITokens.swift` from the same `tokens.json`. Same contract — never hand-edit the Swift output, always regenerate. Add a CI step that runs both `--check` modes (CSS + Swift) on every PR.
+The active mobile app is React Native / Expo in `mobile/`. Keep design-system tokens and JSX specs source-of-truth here, then port the needed contracts into `mobile/src/design/` and mobile components intentionally.

@@ -10,7 +10,7 @@ jsx:
 
 > **Code:** [`../code/screens/ScreenLocationPermission.jsx`](../code/screens/ScreenLocationPermission.jsx)
 
-Pre-prime card explaining *why* location is needed before iOS fires the native `CLLocationManager.requestWhenInUseAuthorization` dialog. Surface position: between the landing CTA ("Start a Decision" from sg-02) and S01 Pick-a-Vertical, fired the first time the user enters the decision flow on a fresh install. On subsequent launches with permission already granted (or hard-denied), the surface is skipped.
+Pre-prime card explaining *why* location is needed before the mobile app fires the native location permission dialog. Active implementation lives in the React Native / Expo app under `mobile/`. Surface position: between the landing CTA ("Start a Decision" from sg-02) and S01 Pick-a-Vertical, fired the first time the user enters the decision flow on a fresh install. On subsequent launches with permission already granted (or hard-denied), the surface is skipped.
 
 ## What this surface defends against
 
@@ -28,15 +28,15 @@ No `C-23 LocationPicker` on this surface — the picker doesn't show up until S0
 
 | User action | App behavior |
 |---|---|
-| Tap **primary CTA** (`"Share my location"`) | Fire native `CLLocationManager.requestWhenInUseAuthorization`. iOS dialog appears on top of the surface. On dialog resolve: granted → proceed to S01 with `LocationPicker` mounted in `loading` then `auto` state; denied → proceed to S01 with `LocationPicker` mounted in `empty` state. |
-| Tap **secondary** (`"Pick a place manually"`) | Skip the iOS prompt entirely. Permission state remains `notDetermined`. Proceed to S01 with `LocationPicker` mounted in `empty` state. The picker's sheet will show the typeahead-only flow (no "Use current location" affordance, no deny-state re-enable card — the user explicitly chose this path, no need to flag it). |
+| Tap **primary CTA** (`"Share my location"`) | Fire the native mobile location permission request. Platform dialog appears on top of the surface. On dialog resolve: granted → proceed to S01 with `LocationPicker` mounted in `loading` then `auto` state; denied → proceed to S01 with `LocationPicker` mounted in `empty` state. |
+| Tap **secondary** (`"Pick a place manually"`) | Skip the platform prompt entirely. Permission state remains `notDetermined`. Proceed to S01 with `LocationPicker` mounted in `empty` state. The picker's sheet will show the typeahead-only flow (no "Use current location" affordance, no deny-state re-enable card — the user explicitly chose this path, no need to flag it). |
 
 ## Why offer a "Pick a place manually" escape
 
 The pre-prime is a soft prompt — the user gets a one-tap path to keep moving without ever firing the system prompt. This matters because:
 
-1. The native iOS prompt is **two-state-and-out** — granted/denied are sticky until the user goes into Settings. If a user wants to try the flow first and decide on permission later, the manual-entry path is the only way to reserve that decision.
-2. Permission-fatigued users (post-iOS-17 ATT era) often deny everything on first-pass and re-grant selectively later. The picker's `empty` state on S01 still works.
+1. The native platform prompt is **two-state-and-out** — granted/denied are sticky until the user goes into Settings. If a user wants to try the flow first and decide on permission later, the manual-entry path is the only way to reserve that decision.
+2. Permission-fatigued users often deny everything on first-pass and re-grant selectively later. The picker's `empty` state on S01 still works.
 3. The pre-prime should feel like a courtesy, not a gate. The presence of a manual-entry escape reinforces that framing.
 
 ## Copy register
@@ -44,9 +44,9 @@ The pre-prime is a soft prompt — the user gets a one-tap path to keep moving w
 - **Eyebrow:** `"BEFORE WE START"` — mono-tag eyebrow, sets context that this surface is one step.
 - **Headline:** `"Where are\nyou eating\ntonight?"` — hand-broken, one phrase per line, conversational second-person. Avoids `"Enable location services"` (procedural-system) or `"Allow location access"` (procedural-coercive). The question framing names the use case directly.
 - **Body:** `"We'll line up restaurants close enough to walk to, instead of asking your neighborhood every time. Sharing your location is optional — type it in if you'd rather."` — three short clauses, second-person, voluntary register. The "optional" disclosure is load-bearing — it's the explicit signal that denying is survivable.
-- **Primary CTA:** `"Share my location"` — voluntary verb (`"Share"`), not `"Allow"` (matches iOS system register) or `"Enable"` (procedural). The user is *sharing*, not toggling a setting.
+- **Primary CTA:** `"Share my location"` — voluntary verb (`"Share"`), not `"Allow"` (matches system register) or `"Enable"` (procedural). The user is *sharing*, not toggling a setting.
 - **Secondary:** `"Pick a place manually"` — eyebrow-style text link, second-person, signals that the user is in control of *how* they tell us where they are.
-- **System dialog purpose string (`NSLocationWhenInUseUsageDescription`):** `"So we can line up restaurants close enough to walk to, instead of asking your neighborhood every time."` — appears inside the native iOS "Allow GetToIt to use your location?" alert that fires after the primary CTA. Voice continuity with the pre-prime body copy (same use-case framing, same conversational register) so the system dialog reads as a continuation of this surface, not a regression to system-procedural language. Plist key lives in `ios/project.yml` `info.properties` (XcodeGen generates `Sources/App/Info.plist` from it).
+- **System dialog purpose string (`NSLocationWhenInUseUsageDescription`):** `"So we can line up restaurants close enough to walk to, instead of asking your neighborhood every time."` — appears inside the native iOS "Allow GetToIt to use your location?" alert that fires after the primary CTA. Voice continuity with the pre-prime body copy (same use-case framing, same conversational register) so the system dialog reads as a continuation of this surface, not a regression to system-procedural language. Active app configuration lives in `mobile/app.json`.
 
 ## Visual
 
@@ -64,7 +64,7 @@ The pre-prime is a soft prompt — the user gets a one-tap path to keep moving w
 ## Motion
 
 - Enter: surface fades up over 320ms `var(--ease-out-soft)` from the prior surface (landing). No choreographed reveal — this is a utility surface, not a verdict.
-- Exit on CTA tap: native iOS permission dialog renders on top; surface is unchanged until dialog resolves. After resolve, transition to S01 via the standard gradient tween (1100ms — same surface stop so no visible color change, just the layout swap).
+- Exit on CTA tap: native platform permission dialog renders on top; surface is unchanged until dialog resolves. After resolve, transition to S01 via the standard gradient tween (1100ms — same surface stop so no visible color change, just the layout swap).
 - Reduced motion: instant fade-up.
 
 ## Accessibility

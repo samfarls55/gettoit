@@ -2,16 +2,39 @@
   "expo": {
     "name": "GetToIt Mobile",
     "slug": "gettoit-mobile",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "scheme": "gettoit",
     "userInterfaceStyle": "automatic",
-    "platforms": ["ios", "web"],
+    "platforms": [
+      "ios",
+      "web"
+    ],
+    "plugins": [
+      "expo-apple-authentication"
+    ],
     "ios": {
-      "supportsTablet": false
+      "bundleIdentifier": "app.gettoit.GetToIt",
+      "buildNumber": "1003",
+      "supportsTablet": false,
+      "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:gettoit.app"
+      ],
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true,
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "So we can line up restaurants close enough to walk to, instead of asking your neighborhood every time."
+      }
     },
     "web": {
       "bundler": "metro"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4d9839ff-c43c-4d57-8c4f-0234c1fa0642"
+      }
+    },
+    "owner": "sfarls"
   }
 }

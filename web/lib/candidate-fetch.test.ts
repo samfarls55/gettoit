@@ -2,8 +2,9 @@
 //
 // Pins the redesigned Q5 candidate path: the N+1 fetch planner, the venue
 // classifier, the strict-factorial card generator, and the end-to-end
-// fetch. The factorial / classifier are faithful ports of the iOS
-// modules — these tests mirror `Q5FactorialCardGeneratorTests` /
+// fetch. The factorial / classifier are faithful ports of the legacy
+// Swift modules — active mobile implementation now lives in `mobile/`.
+// These tests mirror `Q5FactorialCardGeneratorTests` /
 // `Q5VenueClassifierTests`.
 
 import { describe, expect, it } from "vitest";
@@ -25,7 +26,7 @@ import {
   type PoolVenue,
 } from "./candidate-fetch";
 
-// ── venue fixtures ──────────────────────────────────────────────────
+// -- venue fixtures --------------------------------------------------
 
 function venue(over: Partial<FetchedVenue> & { fsq_place_id: string }): FetchedVenue {
   return {
@@ -55,7 +56,7 @@ function poolVenue(
   };
 }
 
-// ── planner ─────────────────────────────────────────────────────────
+// -- planner ---------------------------------------------------------
 
 describe("planCalls", () => {
   it("emits N cuisine calls plus one mandatory general call", () => {
@@ -123,7 +124,7 @@ describe("planCalls", () => {
 
 describe("openAtToken", () => {
   it("resolves a meal time to a [1-7]THHMM token", () => {
-    // 2026-05-21 is a Thursday → Foursquare weekday 4. Dinner → 19:00.
+    // 2026-05-21 is a Thursday ? Foursquare weekday 4. Dinner ? 19:00.
     const token = openAtToken("dinner", new Date("2026-05-21T12:00:00Z"), "UTC");
     expect(token).toBe("4T1900");
   });
@@ -136,7 +137,7 @@ describe("openAtToken", () => {
   });
 });
 
-// ── classifier ──────────────────────────────────────────────────────
+// -- classifier ------------------------------------------------------
 
 describe("classifyPool", () => {
   it("classifies cuisine by category keyword", () => {
@@ -155,8 +156,8 @@ describe("classifyPool", () => {
       venue({ fsq_place_id: "bar", categories: ["Cocktail Bar"] }),
       venue({ fsq_place_id: "cafe", categories: ["Coffee Shop"] }),
     ]);
-    expect(pool[0].profile.vibe).toBe(3); // bar → Lively
-    expect(pool[1].profile.vibe).toBe(1); // cafe → Chill
+    expect(pool[0].profile.vibe).toBe(3); // bar ? Lively
+    expect(pool[1].profile.vibe).toBe(1); // cafe ? Chill
   });
 
   it("classifies a young record as new reputation", () => {
@@ -169,7 +170,7 @@ describe("classifyPool", () => {
   });
 });
 
-// ── factorial generator ─────────────────────────────────────────────
+// -- factorial generator ---------------------------------------------
 
 /** A well-stocked pool: enough venues to furnish a valid triple for a
  *  mexican / popular / vibe-2 member. */
@@ -217,7 +218,7 @@ describe("generateFactorialCards", () => {
   });
 });
 
-// ── union + selection ───────────────────────────────────────────────
+// -- union + selection -----------------------------------------------
 
 describe("unionResponses", () => {
   it("dedupes venues first-seen by fsq_place_id", () => {
@@ -247,7 +248,7 @@ describe("selectCandidates", () => {
   });
 });
 
-// ── end-to-end fetch ────────────────────────────────────────────────
+// -- end-to-end fetch ------------------------------------------------
 
 describe("fetchMemberCandidates", () => {
   const member: MemberProfile = {
@@ -307,7 +308,7 @@ describe("fetchMemberCandidates", () => {
         return { places: pool, is_thin: false };
       },
     });
-    // mexican craved → 1 cuisine call + 1 general call.
+    // mexican craved ? 1 cuisine call + 1 general call.
     expect(calls).toHaveLength(2);
     expect(result.source).toBe("fetched");
     expect(result.candidates).toHaveLength(3);
@@ -315,7 +316,7 @@ describe("fetchMemberCandidates", () => {
   });
 });
 
-// ── Q5 ratings assembly ─────────────────────────────────────────────
+// -- Q5 ratings assembly ---------------------------------------------
 
 describe("buildQ5Ratings", () => {
   it("joins venue-keyed ratings to each card's droppedAxis", () => {

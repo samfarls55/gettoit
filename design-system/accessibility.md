@@ -1,6 +1,8 @@
 # Accessibility — Sunset Pop
 
-WCAG 2.2 AA target. iOS HIG conformance for tap targets and Dynamic Type behavior.
+WCAG 2.2 AA target. Native platform conformance for tap targets and Dynamic Type behavior.
+
+> **Legacy mobile note:** SwiftUI references in this file are historical notes from the retired Swift app. Active mobile implementation is React Native / Expo in `mobile/`.
 
 ---
 

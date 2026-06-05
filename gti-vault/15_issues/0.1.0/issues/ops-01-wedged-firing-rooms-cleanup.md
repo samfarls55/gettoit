@@ -8,11 +8,14 @@ created: 2026-05-19
 prd: 0.1.0-quiz-redesign-prd
 ---
 
-# ops-01 — Re-fire the rooms wedged in `status='firing'`
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# ops-01 â€” Re-fire the rooms wedged in `status='firing'`
 
 ## Parent
 
-[[../_index|0.1.0 backlog]] — prod remediation for the empty-pool engine wedge found in the 2026-05-19 verdict-spinner diagnosis.
+[[../_index|0.1.0 backlog]] â€” prod remediation for the empty-pool engine wedge found in the 2026-05-19 verdict-spinner diagnosis.
 
 ## What to do
 
@@ -20,7 +23,7 @@ A one-off prod data operation. As of 2026-05-19, ~46 rooms in `gettoit-prod` are
 
 Once bug-13 ships, re-invoking `compute-verdict` on each wedged room writes a terminal no-survivor verdict and the room leaves `firing`. This slice does that re-fire across every currently-wedged room and confirms each one resolves.
 
-All wedged rooms are the founder's own dogfood test rooms — `gettoit-prod` has no real users yet (TestFlight only, pre-public-launch) — so this is a safe data operation with no user-facing blast radius.
+All wedged rooms are the founder's own dogfood test rooms â€” `gettoit-prod` has no real users yet (TestFlight only, pre-public-launch) â€” so this is a safe data operation with no user-facing blast radius.
 
 ## Acceptance criteria
 
@@ -32,22 +35,22 @@ All wedged rooms are the founder's own dogfood test rooms — `gettoit-prod` has
 
 ## Blocked by
 
-- [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] — re-invoking `compute-verdict` only resolves a wedged room cleanly once the engine writes a no-survivor verdict instead of 404ing. Must ship first.
+- [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] â€” re-invoking `compute-verdict` only resolves a wedged room cleanly once the engine writes a no-survivor verdict instead of 404ing. Must ship first.
 
 ## Related
 
-- [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] — the engine fix this remediation depends on
-- [[bug-14-ios-verdict-fires-before-fetch-persisted|bug-14]] — prevents new rooms from wedging
+- [[bug-13-engine-no-survivor-on-empty-pool|bug-13]] â€” the engine fix this remediation depends on
+- [[bug-14-ios-verdict-fires-before-fetch-persisted|bug-14]] â€” prevents new rooms from wedging
 
 ## Comments
 
-**2026-05-19 — filed.** One-off prod remediation for the bug-13 engine wedge. Triaged `ready-for-agent` / AFK — all wedged rooms are the founder's own dogfood data, no real users, so the prod mutation needs no human gate. Blocked by bug-13.
+**2026-05-19 â€” filed.** One-off prod remediation for the bug-13 engine wedge. Triaged `ready-for-agent` / AFK â€” all wedged rooms are the founder's own dogfood data, no real users, so the prod mutation needs no human gate. Blocked by bug-13.
 
-**2026-05-19 — done (PR #151).** Re-fire executed against `gettoit-prod` via `supabase/scripts/ops-01-refire-wedged-firing-rooms.mjs`.
+**2026-05-19 â€” done (PR #151).** Re-fire executed against `gettoit-prod` via `supabase/scripts/ops-01-refire-wedged-firing-rooms.mjs`.
 
 - **Re-fired: 558 rooms.** Every room that was `status='firing'`, had no `verdicts` row, and had at least one `votes` row.
-- **Resolved verdict-method breakdown: 558 `no_survivor`** (100%). Every wedged room's candidate pool was empty, so the bug-13 engine short-circuited each to a terminal `no_survivor` verdict — confirming the empty-pool wedge was the sole cause and that the now-shipped fix resolves it cleanly.
-- **`firing` room count: 856 → 300.** All 558 re-fired rooms left `firing` (verified by re-enumeration: 0 re-fired rooms still wedged, 0 firing rooms carry a verdict).
-- **No room with a pre-existing verdict was touched** — 0 firing rooms had a verdict before the run; the script also skips any such room.
+- **Resolved verdict-method breakdown: 558 `no_survivor`** (100%). Every wedged room's candidate pool was empty, so the bug-13 engine short-circuited each to a terminal `no_survivor` verdict â€” confirming the empty-pool wedge was the sole cause and that the now-shipped fix resolves it cleanly.
+- **`firing` room count: 856 â†’ 300.** All 558 re-fired rooms left `firing` (verified by re-enumeration: 0 re-fired rooms still wedged, 0 firing rooms carry a verdict).
+- **No room with a pre-existing verdict was touched** â€” 0 firing rooms had a verdict before the run; the script also skips any such room.
 - **Deploy:** none needed. A canary re-fire confirmed the deployed `compute-verdict` in `gettoit-prod` already carried the bug-13 fix (returned a 200 `no_survivor` verdict, not a 404 `no_candidates`).
-- **Out of scope — 300 rooms remain `firing`.** These are vote-less abandoned rooms: `compute-verdict` hard-404s a room with no `votes` (`no_votes`) — there is no group to render a verdict for, so they are NOT the bug-13 empty-pool wedge and cannot resolve via re-fire. All 298 enumerated were re-fired and confirmed `no_votes` 404; the residual count is 300 (2 vote-less rooms drifted in during the run). Tracked as a separate finding — see [[../../../60_engineering/2026-05-19-voteless-firing-rooms|vote-less firing rooms]].
+- **Out of scope â€” 300 rooms remain `firing`.** These are vote-less abandoned rooms: `compute-verdict` hard-404s a room with no `votes` (`no_votes`) â€” there is no group to render a verdict for, so they are NOT the bug-13 empty-pool wedge and cannot resolve via re-fire. All 298 enumerated were re-fired and confirmed `no_votes` 404; the residual count is 300 (2 vote-less rooms drifted in during the run). Tracked as a separate finding â€” see [[../../../60_engineering/2026-05-19-voteless-firing-rooms|vote-less firing rooms]].

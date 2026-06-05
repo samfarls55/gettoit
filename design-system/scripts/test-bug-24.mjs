@@ -55,8 +55,8 @@ assert(/##\s*C-27\s*·\s*Action Sheet/.test(compMd),
 assert(/native iOS|native-iOS|native\s+grabber/i.test(compMd),
   'components.md C-27 documents the native-iOS shape (grabber)');
 
-assert(/presentationDragIndicator/i.test(compMd) || /presentationDetents/i.test(compMd),
-  'components.md C-27 references SwiftUI native sheet primitives');
+assert(/native grabber|content-height/i.test(compMd),
+  'components.md C-27 references native action-sheet shape details');
 
 assert(/content[-\s]?height/i.test(compMd),
   'components.md C-27 documents the content-height detent');

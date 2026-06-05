@@ -1,9 +1,10 @@
--- Quiz redesign (Q5 open_at fix) — add the search area's timezone to `rooms`.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- Quiz redesign (Q5 open_at fix) â€” add the search area's timezone to `rooms`.
 --
 -- Foursquare's `/places/search` `open_at` filter is interpreted in the
 -- venue's local time. The per-member fetch planner therefore has to
 -- resolve the meal-time wall clock against the timezone of the SEARCH
--- AREA, not the user's device — a manually-picked area can sit in a
+-- AREA, not the user's device â€” a manually-picked area can sit in a
 -- different zone than the phone, and a joiner's device is unrelated to
 -- the initiator's pick.
 --

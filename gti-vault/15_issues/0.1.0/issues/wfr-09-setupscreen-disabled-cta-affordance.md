@@ -10,7 +10,10 @@ github_issue: 250
 pr: 278
 ---
 
-# wfr-09 — SetupScreen disabled CTA uses opacity only
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-09 â€” SetupScreen disabled CTA uses opacity only
 
 ## What to build
 
@@ -23,7 +26,7 @@ When primary CTA is disabled (SetupScreen.swift lines 628, 644, 656, 664), swap 
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Hub anchors
 
@@ -37,4 +40,4 @@ None — can start immediately.
 
 ## Comments
 
-- 2026-05-26 — Closed via PR #278. Both dock CTAs now swap their visible label to `Name your plan` / `NAME YOUR PLAN` when the `nameValid` gate is false; opacity dimming retained as a complementary cue. Voice register stays warm-friend (not `Name required`). Wired through pure `primaryLabelToDisplay` / `secondaryLabelToDisplay` helpers so the disabled label and `.disabled(...)` modifier share a single `nameValid` source of truth. Pure-logic coverage in `SetupScreenTests`; render-smoke coverage of both disabled + enabled dock states in `SetupScreenRenderTests` (per the codebase's snapshot-equivalent convention — pixel-snapshot tooling not yet on the iOS dependency graph, same pattern `QuizScreenSnapshotTests` uses).
+- 2026-05-26 â€” Closed via PR #278. Both dock CTAs now swap their visible label to `Name your plan` / `NAME YOUR PLAN` when the `nameValid` gate is false; opacity dimming retained as a complementary cue. Voice register stays warm-friend (not `Name required`). Wired through pure `primaryLabelToDisplay` / `secondaryLabelToDisplay` helpers so the disabled label and `.disabled(...)` modifier share a single `nameValid` source of truth. Pure-logic coverage in `SetupScreenTests`; render-smoke coverage of both disabled + enabled dock states in `SetupScreenRenderTests` (per the codebase's snapshot-equivalent convention â€” pixel-snapshot tooling not yet on the iOS dependency graph, same pattern `QuizScreenSnapshotTests` uses).

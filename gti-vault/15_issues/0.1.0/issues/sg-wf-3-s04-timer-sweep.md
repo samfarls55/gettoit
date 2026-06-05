@@ -1,7 +1,7 @@
 ---
 
 issue: sg-WF-3
-title: S04 timer sweep — finalize removal beyond the stale marker
+title: S04 timer sweep â€” finalize removal beyond the stale marker
 status: done
 type: AFK
 feature: 0.1.0
@@ -10,11 +10,14 @@ created: 2026-05-19
 closed: 2026-05-19
 ---
 
-# sg-WF-3 — S04 timer sweep
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# sg-WF-3 â€” S04 timer sweep
 
 ## Parent
 
-[[../../../50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] — surfaced during the grill that `design-system/surfaces/04-waiting.md` is partially stale: it still describes a timer countdown + `"Auto-fires in 7:42"` mono-tag + `rooms.deadline_at` cron-auto-fire mechanism that the 0.1.0 quiz redesign PRD (US34, US35, §line 115) explicitly retired on 2026-05-15.
+[[../../../50_product/0.1.0-workflow-overhaul-plan-setup|0.1.0-workflow-overhaul-plan-setup]] â€” surfaced during the grill that `design-system/surfaces/04-waiting.md` is partially stale: it still describes a timer countdown + `"Auto-fires in 7:42"` mono-tag + `rooms.deadline_at` cron-auto-fire mechanism that the 0.1.0 quiz redesign PRD (US34, US35, Â§line 115) explicitly retired on 2026-05-15.
 
 A `partially-superseded-by` frontmatter marker + a top-of-file banner already landed in S04 on 2026-05-19 as part of the grill. **This issue completes the sweep**: actually edits the doc + JSX to remove the dead sections.
 
@@ -33,10 +36,10 @@ A design-system edit pass on `design-system/surfaces/04-waiting.md` and `design-
 
 2. **Rewrites the verdict fire trigger section** to reflect the 0.1.0 canonical model:
    - **(a) All participants have submitted Q5** (auto-fire on quorum-completion), or
-   - **(b) Initiator manually closes voting** via the `Decide now` CTA (the CTA survives, may be relabeled — see [[../../../CONTEXT|CONTEXT.md]] → `Verdict trigger`).
+   - **(b) Initiator manually closes voting** via the `Decide now` CTA (the CTA survives, may be relabeled â€” see [[../../../CONTEXT|CONTEXT.md]] â†’ `Verdict trigger`).
    - Minimum quorum is one member (the initiator alone in the edge case where nobody else responds).
 
-3. **Removes / replaces the no-quorum edge case** — there is no timer to expire, so the "couldn't reach quorum tonight" terminal is unreachable via timer. The only path to a no-survivor outcome is the new `bug-13`/`tb-WF` empty-pool engine wedge handling, which is out of scope for this issue. Document that the timer-expiry edge case is retired; leave the no-survivor terminal in place for the engine-side `no_survivor` resolution path.
+3. **Removes / replaces the no-quorum edge case** â€” there is no timer to expire, so the "couldn't reach quorum tonight" terminal is unreachable via timer. The only path to a no-survivor outcome is the new `bug-13`/`tb-WF` empty-pool engine wedge handling, which is out of scope for this issue. Document that the timer-expiry edge case is retired; leave the no-survivor terminal in place for the engine-side `no_survivor` resolution path.
 
 4. **Drops the `partially-superseded-by` + `stale-sections` frontmatter markers and the top-of-file banner** once the sections they pointed at are removed. Restores the file to `status: locked` with a refreshed `locked-date: 2026-05-19`.
 
@@ -44,16 +47,16 @@ A design-system edit pass on `design-system/surfaces/04-waiting.md` and `design-
 
 ### Files to edit
 
-- `design-system/surfaces/04-waiting.md` — delete retired sections, rewrite verdict-trigger section, drop the stale-markers + banner, refresh `locked-date`.
-- `design-system/code/screens/ScreenWaiting.jsx` — delete the countdown mono-tag, the `"Auto-fires"` copy line, any timer-tick state, and any conditional rendering keyed on timer expiry.
-- `design-system/CHANGELOG.md` — `BREAKING: ...` entry.
+- `design-system/surfaces/04-waiting.md` â€” delete retired sections, rewrite verdict-trigger section, drop the stale-markers + banner, refresh `locked-date`.
+- `design-system/code/screens/ScreenWaiting.jsx` â€” delete the countdown mono-tag, the `"Auto-fires"` copy line, any timer-tick state, and any conditional rendering keyed on timer expiry.
+- `design-system/CHANGELOG.md` â€” `BREAKING: ...` entry.
 - Run `node design-system/scripts/verify.mjs`.
 
 ### Out of scope
 
-- iOS port (deleting `TimerCoordinator.swift`, etc.) — tb-WF-3.
-- `rooms.timer_minutes` / `rooms.deadline_at` schema cleanup — future workflow-overhaul slice (can be additive — leave the columns, mark unused).
-- Any change to the `Decide now` CTA's name or label — the 0.1.0 PRD allows for a rename, but this issue doesn't change it (rename happens in a separate copy pass).
+- iOS port (deleting `TimerCoordinator.swift`, etc.) â€” tb-WF-3.
+- `rooms.timer_minutes` / `rooms.deadline_at` schema cleanup â€” future workflow-overhaul slice (can be additive â€” leave the columns, mark unused).
+- Any change to the `Decide now` CTA's name or label â€” the 0.1.0 PRD allows for a rename, but this issue doesn't change it (rename happens in a separate copy pass).
 
 ## Acceptance criteria
 
@@ -66,8 +69,8 @@ A design-system edit pass on `design-system/surfaces/04-waiting.md` and `design-
 
 ## Blocked by
 
-None — the 0.1.0 PRD ruling has been canonical since 2026-05-15; this issue is overdue cleanup.
+None â€” the 0.1.0 PRD ruling has been canonical since 2026-05-15; this issue is overdue cleanup.
 
 ## Comments
 
-- **2026-05-19 — done (afk/sg-wf-3, PR #TBD).** Surface doc `surfaces/04-waiting.md` had the `Countdown timer (all members)` section, the timer-elapse branch of `Verdict fire trigger`, the `Timer expiry no-quorum edge case`, the `partially-superseded-by` + `stale-sections` frontmatter and the top-of-file banner all removed. `Verdict fire trigger` rewritten to the 0.1.0 canonical model (all-Q5 OR initiator-closes-voting); minimum quorum documented as one member; the `Decide now` CTA is now always tappable for the initiator (no `need 2 in` gate). `locked-date` refreshed to `2026-05-19`. `ScreenWaiting.jsx` lost the `secondsRemaining` prop, the `countdownLabel` binding, the mono-tag render, and the `quorum >= 2` gate on the Decide-now PillCTA. `motion.md` lost the `Waiting countdown tick` row and the `Decide-now CTA quorum unlock` row (the always-tappable CTA has no quorum unlock to animate) — flagged as an adjacency in the PR. `CHANGELOG.md` carries a BREAKING entry. `node design-system/scripts/verify.mjs` is green. iOS port remains tb-WF-3 (#162); `rooms.timer_minutes` / `rooms.deadline_at` schema cleanup remains out of scope.
+- **2026-05-19 â€” done (afk/sg-wf-3, PR #TBD).** Surface doc `surfaces/04-waiting.md` had the `Countdown timer (all members)` section, the timer-elapse branch of `Verdict fire trigger`, the `Timer expiry no-quorum edge case`, the `partially-superseded-by` + `stale-sections` frontmatter and the top-of-file banner all removed. `Verdict fire trigger` rewritten to the 0.1.0 canonical model (all-Q5 OR initiator-closes-voting); minimum quorum documented as one member; the `Decide now` CTA is now always tappable for the initiator (no `need 2 in` gate). `locked-date` refreshed to `2026-05-19`. `ScreenWaiting.jsx` lost the `secondsRemaining` prop, the `countdownLabel` binding, the mono-tag render, and the `quorum >= 2` gate on the Decide-now PillCTA. `motion.md` lost the `Waiting countdown tick` row and the `Decide-now CTA quorum unlock` row (the always-tappable CTA has no quorum unlock to animate) â€” flagged as an adjacency in the PR. `CHANGELOG.md` carries a BREAKING entry. `node design-system/scripts/verify.mjs` is green. iOS port remains tb-WF-3 (#162); `rooms.timer_minutes` / `rooms.deadline_at` schema cleanup remains out of scope.

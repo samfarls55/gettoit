@@ -1,4 +1,5 @@
-// PlacesProxy Edge Function — runtime entry point.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// PlacesProxy Edge Function â€” runtime entry point.
 //
 // Composes the (pure) HTTP handler from `./handler.ts` with the
 // supabase-js cache adapter and the Deno.serve listener. This file
@@ -10,7 +11,7 @@
 //   {
 //     "lat": number,                     // required
 //     "lng": number,                     // required
-//     "radius_meters": number,           // required, 0 < r ≤ 100000
+//     "radius_meters": number,           // required, 0 < r â‰¤ 100000
 //     "filters": {
 //       "dietary": string[]?,            // profile dietary chip ids
 //       "price_tier": 1|2|3|4 ?,         // Q2 cap
@@ -28,7 +29,7 @@
 //   }
 //
 // References:
-//   * Original PRD §"PlacesProxy" (gti-vault/10_prds/0.1.0-prd.md)
+//   * Original PRD Â§"PlacesProxy" (gti-vault/10_prds/0.1.0-prd.md)
 //   * ADR 0002 (gti-vault/60_engineering/adr/0002-places-data-foursquare-mapkit.md)
 //   * TB-05 (gti-vault/15_issues/0.1.0/issues/tb-05-foursquare-placesproxy.md)
 

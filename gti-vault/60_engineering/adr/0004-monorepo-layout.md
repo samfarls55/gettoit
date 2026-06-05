@@ -1,17 +1,20 @@
 ---
 adr: 0004
-title: Monorepo layout — ios/, web/, design-system/, gti-vault/ siblings
+title: Monorepo layout â€” ios/, web/, design-system/, gti-vault/ siblings
 status: accepted
 date: 2026-05-12
 supersedes: null
 superseded_by: null
 ---
 
-# 0004 — Monorepo layout
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# 0004 â€” Monorepo layout
 
 ## Status
 
-Accepted — 2026-05-12.
+Accepted â€” 2026-05-12.
 
 ## Context
 
@@ -60,9 +63,9 @@ GetToIt/
 
 ## Re-evaluation triggers
 
-- Second iOS app (e.g., dedicated initiator-vs-invitee build) — reconsider workspaces.
-- External consumer of `design-system/` appears — convert to a published npm package.
-- CI runtime crosses 15 min — split into separate workflows or repos.
+- Second iOS app (e.g., dedicated initiator-vs-invitee build) â€” reconsider workspaces.
+- External consumer of `design-system/` appears â€” convert to a published npm package.
+- CI runtime crosses 15 min â€” split into separate workflows or repos.
 
 ## References
 

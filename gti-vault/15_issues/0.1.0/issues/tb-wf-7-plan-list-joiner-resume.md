@@ -1,6 +1,6 @@
 ---
 issue: tb-WF-7
-title: iOS Plan list — Joiner journey (JOINED chip + resume-from-state)
+title: iOS Plan list â€” Joiner journey (JOINED chip + resume-from-state)
 status: done
 type: AFK
 feature: 0.1.0
@@ -10,11 +10,14 @@ closed: 2026-05-20
 pr: 184
 ---
 
-# tb-WF-7 — iOS Plan list: Joiner journey
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# tb-WF-7 â€” iOS Plan list: Joiner journey
 
 ## Parent
 
-[[sg-wf-4-plan-list-surface|sg-WF-4]] — design-system spec for the Plan list surface. Locked decisions in [[../../../50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]] §Q3 (JOINED chip) and §Q8 (resume-from-state).
+[[sg-wf-4-plan-list-surface|sg-WF-4]] â€” design-system spec for the Plan list surface. Locked decisions in [[../../../50_product/0.1.0-workflow-overhaul-plan-list|0.1.0-workflow-overhaul-plan-list]] Â§Q3 (JOINED chip) and Â§Q8 (resume-from-state).
 
 Builds on [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]]. Adds the joiner-side journey end-to-end.
 
@@ -22,11 +25,11 @@ Builds on [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]]. Adds the joiner-side journey
 
 End-to-end vertical slice that enables an Account-member joiner to see Plans they've joined on their list, identify them at a glance, and tap to resume wherever they are in the flow.
 
-**Journey demoed:** User A creates a Group Plan on iOS and drops the invite link. User B (also an Account member with iOS) opens the link → joins → starts the quiz → backgrounds the app at Q3 → re-opens the app some time later → lands on their Plan list → sees the joined Plan rendered with a `JOINED` eyebrow chip → taps it → resumes the quiz at Q3 (their last-answered question, NOT Q1). Across other joiner states: tapping a Joined card whose Plan is now decided-active routes to read-only Verdict (joiner can't reroll — initiator-only per parent Q9); tapping a decided-expired Joined card routes to read-only History.
+**Journey demoed:** User A creates a Group Plan on iOS and drops the invite link. User B (also an Account member with iOS) opens the link â†’ joins â†’ starts the quiz â†’ backgrounds the app at Q3 â†’ re-opens the app some time later â†’ lands on their Plan list â†’ sees the joined Plan rendered with a `JOINED` eyebrow chip â†’ taps it â†’ resumes the quiz at Q3 (their last-answered question, NOT Q1). Across other joiner states: tapping a Joined card whose Plan is now decided-active routes to read-only Verdict (joiner can't reroll â€” initiator-only per parent Q9); tapping a decided-expired Joined card routes to read-only History.
 
 ### iOS changes
 
-- **Update:** `PlanListScreen.swift` — render the `JOINED` eyebrow chip top-leading on every Joined card. Use existing C-11 Eyebrow typography (Inter 700 / 11 / tracking 0.18em UPPERCASE). Color: `var(--sun)` per CSS token → iOS `Color(gtiSun)` mapping. Created cards continue to render no chip.
+- **Update:** `PlanListScreen.swift` â€” render the `JOINED` eyebrow chip top-leading on every Joined card. Use existing C-11 Eyebrow typography (Inter 700 / 11 / tracking 0.18em UPPERCASE). Color: `var(--sun)` per CSS token â†’ iOS `Color(gtiSun)` mapping. Created cards continue to render no chip.
 - **Add:** Joined-card tap router. Routing table per Q8:
 
   | Joiner state | Destination |
@@ -37,18 +40,18 @@ End-to-end vertical slice that enables an Account-member joiner to see Plans the
   | Decided-active | `VerdictScreen` read-only (no reroll) |
   | Decided-expired | `VerdictScreen` read-only history |
 
-- **Update:** `RootView.swift` — extend the post-tap routing logic to dispatch Joined-card taps through the resume-from-state table above.
+- **Update:** `RootView.swift` â€” extend the post-tap routing logic to dispatch Joined-card taps through the resume-from-state table above.
 
 ### Backend / data changes
 
-- **Add:** `PlansStore` extension method to query Joined Plans (Plans where the user is a non-owner room member). Returns Plans with per-joiner quiz progress in one batched read — list-render must not require an N+1 lookup per card.
+- **Add:** `PlansStore` extension method to query Joined Plans (Plans where the user is a non-owner room member). Returns Plans with per-joiner quiz progress in one batched read â€” list-render must not require an N+1 lookup per card.
 - **Add (or expose if already present):** per-joiner quiz progress field. The 0.1.0 quiz state machine already persists answers per member; this slice exposes the `last_answered_question` (or equivalent) on the list query result. If the schema already supports it via the existing `votes` / `quiz_state` tables, just surface it through the store. If not, add the minimal field needed.
 
 ### Edge cases to handle
 
-- **Exited joiner.** Per [[../../../CONTEXT|CONTEXT.md]] → `Plan exit`, an Exit drops the joiner from the room. The Plan should not appear on their Joined list. Filter accordingly in the list query.
+- **Exited joiner.** Per [[../../../CONTEXT|CONTEXT.md]] â†’ `Plan exit`, an Exit drops the joiner from the room. The Plan should not appear on their Joined list. Filter accordingly in the list query.
 - **Plan deleted mid-quiz by initiator.** Per `Plan delete`, joiners get a "session ended" toast and are punted. The Plan disappears from their list on next render. This slice does NOT need to wire the realtime push; it just needs to ensure the list query filters dead rooms.
-- **Decided-active Plan where joiner never voted.** Verdict still fired (initiator manually closed voting per 0.1.0 PRD). Tap routes to read-only Verdict — joiner sees the verdict without their vote being counted.
+- **Decided-active Plan where joiner never voted.** Verdict still fired (initiator manually closed voting per 0.1.0 PRD). Tap routes to read-only Verdict â€” joiner sees the verdict without their vote being counted.
 
 ### Tests
 
@@ -73,20 +76,20 @@ End-to-end vertical slice that enables an Account-member joiner to see Plans the
 
 ## Blocked by
 
-- [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] — foundation Plan list shell. Provides `PlanListScreen` to add the chip + router to.
+- [[tb-wf-5-plan-list-solo-cycle|tb-WF-5]] â€” foundation Plan list shell. Provides `PlanListScreen` to add the chip + router to.
 
 ## Comments
 
-**2026-05-20 — merged (PR #184).** All six acceptance criteria green:
+**2026-05-20 â€” merged (PR #184).** All six acceptance criteria green:
 
 1. JOINED chip renders in `GTIColor.sun` top-leading on every Joined card (Created cards still render no chip).
 2. `PlansStore.joinedPlansForList(userID:)` ships as a single-RPC batched read returning per-joiner `last_answered_question_index` + `has_voted` inline.
-3. `PlanListScreen.routeFor(joinedRow:)` pure helper dispatches all 5 §Q8 states via the new `JoinedTapDestination` enum; `RootView.handleJoinedTap` consumes it and mounts the right surface.
+3. `PlanListScreen.routeFor(joinedRow:)` pure helper dispatches all 5 Â§Q8 states via the new `JoinedTapDestination` enum; `RootView.handleJoinedTap` consumes it and mounts the right surface.
 4. Per-joiner quiz progress is preserved end-to-end: `QuizCoordinator(initialProgress:)` hydrates step + Q1..Q4 answers; `advance()` fires the optional `MemberProgressWriter` after every Q1..Q4 -> next-Q step. The wire shape (`{ last_index, answers: { q1, q2, q3, q4 } }`) lives on `members.quiz_progress`, persisted via the `members_progress_upsert` RPC.
-5. Exited joiners are excluded server-side: the `joined_plans_for_user` RPC joins through `members` whose `user_id = auth.uid()` — no membership row → no row in the result set.
+5. Exited joiners are excluded server-side: the `joined_plans_for_user` RPC joins through `members` whose `user_id = auth.uid()` â€” no membership row â†’ no row in the result set.
 6. iOS CI lane green in 2m52s.
 
-Step indexing is 1-based — `last_index = N` means "the joiner is currently on QN" (not "answered up to QN, next is Q(N+1)"). That matches the surface §Q8 wording "resumes the quiz at Q3 (their last-answered question, NOT Q1)."
+Step indexing is 1-based â€” `last_index = N` means "the joiner is currently on QN" (not "answered up to QN, next is Q(N+1)"). That matches the surface Â§Q8 wording "resumes the quiz at Q3 (their last-answered question, NOT Q1)."
 
 Known limitations (documented in PR Decisions):
-- Resume into Q5 lands the user on Q5 but the Q5 candidate set is empty until the next Q4 -> Q5 advance — the resumed coordinator uses the legacy `candidates:` init without a `candidateFetch`. A follow-up could thread the assembler into the resume host.
+- Resume into Q5 lands the user on Q5 but the Q5 candidate set is empty until the next Q4 -> Q5 advance â€” the resumed coordinator uses the legacy `candidates:` init without a `candidateFetch`. A follow-up could thread the assembler into the resume host.

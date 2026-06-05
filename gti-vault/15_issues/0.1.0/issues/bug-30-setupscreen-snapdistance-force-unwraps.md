@@ -8,11 +8,14 @@ created: 2026-05-25
 merged: 2026-05-26
 ---
 
-# bug-30 — SetupScreen.snapDistance force-unwraps
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# bug-30 â€” SetupScreen.snapDistance force-unwraps
 
 ## Symptom
 
-`ios/Sources/App/SetupScreen.swift:103-104` force-unwraps `distanceSteps.first!` and `distanceSteps.last!`. Surfaced by `/swift-code-review` 2026-05-25 against `CODING_STANDARDS.md` rule **OPT-001** (S1 — correctness/safety).
+`ios/Sources/App/SetupScreen.swift:103-104` force-unwraps `distanceSteps.first!` and `distanceSteps.last!`. Surfaced by `/swift-code-review` 2026-05-25 against `CODING_STANDARDS.md` rule **OPT-001** (S1 â€” correctness/safety).
 
 ```swift
 public static func snapDistance(_ value: Double) -> Double {
@@ -22,7 +25,7 @@ public static func snapDistance(_ value: Double) -> Double {
 }
 ```
 
-`distanceSteps` is a `static let` literal so the unwrap cannot crash in practice — but the standards rule still wants the `!` removed (or wrapped in `!!` per OPT-002 if a documented trap is preferred).
+`distanceSteps` is a `static let` literal so the unwrap cannot crash in practice â€” but the standards rule still wants the `!` removed (or wrapped in `!!` per OPT-002 if a documented trap is preferred).
 
 ## Fix scope
 
@@ -58,9 +61,9 @@ Out of scope:
 
 ## References
 
-- `ios/Sources/App/SetupScreen.swift:95-115` — `snapDistance` definition.
+- `ios/Sources/App/SetupScreen.swift:95-115` â€” `snapDistance` definition.
 - `CODING_STANDARDS.md` rule OPT-001, OPT-002.
-- `gti-vault/15_issues/_runs/2026-05-25-*-swift-code-review.md` — run note (to be written by skill).
+- `gti-vault/15_issues/_runs/2026-05-25-*-swift-code-review.md` â€” run note (to be written by skill).
 
 ## Surfaced by
 
@@ -68,13 +71,13 @@ Out of scope:
 
 ## Comments
 
-### 2026-05-26 — done (PR #244)
+### 2026-05-26 â€” done (PR #244)
 
 AFK execution closed via [PR #244](https://github.com/samfarls55/gettoit/pull/244) (merged 2026-05-26 00:51 UTC, squash commit `b58c739`).
 
 - Applied the spec body verbatim: `distanceSteps.first ?? 0` and `distanceSteps.last ?? Self.maxDistanceMiles`, lifted into `firstStop` / `lastStop` locals so each optional is only evaluated once.
-- Fallback constants kept inline (not hoisted) — single use, comment cites OPT-001 + bug-30 so the rationale is at the read site.
-- Added `testSnapDistance_bug30AcceptanceCriteria` in `SetupScreenTests.swift` pinning the three exact acceptance cases (`-1` → first, `100` → last, `distanceSteps[2]` passthrough). Existing `testSnapDistanceMaps_endpoints_andInterior` was not touched (regression lock, surgical-changes rule).
+- Fallback constants kept inline (not hoisted) â€” single use, comment cites OPT-001 + bug-30 so the rationale is at the read site.
+- Added `testSnapDistance_bug30AcceptanceCriteria` in `SetupScreenTests.swift` pinning the three exact acceptance cases (`-1` â†’ first, `100` â†’ last, `distanceSteps[2]` passthrough). Existing `testSnapDistanceMaps_endpoints_andInterior` was not touched (regression lock, surgical-changes rule).
 - All CI gates green including `ios (xcodebuild test)`. No design-system / surface change.
 
 Next swift-code-review sweep should find this site clean.

@@ -6,17 +6,17 @@ jsx:
   - code/screens/ScreenSignIn.jsx
 ---
 
-# S00a · Forced Sign-in Gate (iOS, first launch)
+# S00a · Forced Sign-in Gate (mobile, first launch)
 
 > **Code:** [`../code/screens/ScreenSignIn.jsx`](../code/screens/ScreenSignIn.jsx)
 
-The first surface a fresh-install iOS user sees. A single Sign-in-with-Apple affordance gates the rest of the app. There is no skip, no "continue as guest," no email fallback — the user signs in with Apple, or the app does nothing for them.
+The first surface a fresh-install mobile user sees. Active implementation lives in the React Native / Expo app under `mobile/`. A single Sign-in-with-Apple affordance gates the rest of the app. There is no skip, no "continue as guest," no email fallback — the user signs in with Apple, or the app does nothing for them.
 
-This is the 0.1.0 closure of the iOS half of [[../../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]. The "anonymous default" half of that ADR survives **only** for invite-link arrivals on the web fallback ([[02-invite|S02 web]]); native iOS launches always pass through this gate.
+This is the 0.1.0 closure of the mobile-app half of [[../../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]]. The "anonymous default" half of that ADR survives **only** for invite-link arrivals on the web fallback ([[02-invite|S02 web]]); native mobile launches always pass through this gate.
 
 ## What this surface defends against
 
-- **Anonymous-default carry-over.** 0.1.0 launched anonymous-by-default with a post-quiz upgrade chip ([[../components#c-22-auth-upgrade-chip|C-22]]). For 0.1.0, iOS launches must own a real identity from the first tap. The gate is what closes that.
+- **Anonymous-default carry-over.** 0.1.0 launched anonymous-by-default with a post-quiz upgrade chip ([[../components#c-22-auth-upgrade-chip|C-22]]). For 0.1.0, mobile launches must own a real identity from the first tap. The gate is what closes that.
 - **Onboarding cliff.** Despite the gate, the surface itself is one tap. No fields, no form, no consent boilerplate body. The visual is the welcome; the button is the entire interaction.
 - **Setup framing.** Copy register is the same warm-friend voice as C-22 — `"Save your taste profile"`, never `"Create account"` / `"Sign up"` / `"Get started"`. The user isn't doing setup; they're saying yes.
 - **Algorithm framing.** No mention of accounts, profiles, databases, identifiers. The eyebrow names the destination (`"Tonight's session"`), not the auth machinery.
@@ -29,24 +29,24 @@ This is the 0.1.0 closure of the iOS half of [[../../gti-vault/60_engineering/ad
 | Subsequent launch (session restored from Keychain) | App routes straight to S01 — S00a is skipped | — |
 | Sign-out / data delete via S09 | Next launch routes back through S00a | `signInWithApple` (post-delete reboot lands in `.anonymous` then re-routes through the gate; legacy-anon row covers the dispatch) |
 | Re-install over an existing Apple identity | S00a renders, the user taps once, Apple's flow returns the prior identity, app routes to S01 with prior data intact | `signInWithApple` |
-| **Legacy pre-S00a anonymous session in Keychain** (pre-S00a TestFlight install carried over) | S00a — gate renders even though `Auth.currentSession != nil`, because the cached session is anonymous and the iOS post-S00a invariant ("every iOS session is Linked-Apple") is not yet satisfied | `linkApple` (upgrade the existing anonymous session — preserves `user_id` and every owned `rooms` / `votes` / `members` / `events` row per [[../../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] §"the userID before and after linkApple is the same") |
+| **Legacy pre-S00a anonymous session** (pre-S00a install carried over) | S00a — gate renders even though `Auth.currentSession != nil`, because the cached session is anonymous and the post-S00a mobile invariant ("every app session is Linked-Apple") is not yet satisfied | `linkApple` (upgrade the existing anonymous session — preserves `user_id` and every owned `rooms` / `votes` / `members` / `events` row per [[../../gti-vault/60_engineering/adr/0007-auth-anonymous-default-apple-upgrade|ADR 0007]] §"the userID before and after linkApple is the same") |
 
 The boundary is enforced at the app router level — S00a is the launch destination iff the current session is missing OR anonymous. It is **not** part of the Sunset Pop ritual arc; the user passes through it once per install (or once after a delete, or once at the pre-S00a → S00a upgrade) and never sees it again.
 
-## iOS / web asymmetry
+## Mobile / Web Asymmetry
 
 | Path | Identity model |
 |---|---|
-| iOS first launch | **Forced sign-in.** Surface S00a renders; user must complete the Apple flow before reaching S01. After this surface, no anonymous iOS sessions exist for the duration of the install. |
-| Web fallback ([[02-invite|S02 web]] invite link) | **Anonymous-by-default**, unchanged from 0.1.0 per ADR 0007 §"Web fallback voters stay anonymous indefinitely". The web-fallback voter never sees S00a. On the [[04-waiting|S04 Waiting]] surface they see the "Download the app" CTA (sg-03) which routes to the App Store. On a subsequent iOS install they hit S00a like any other first launch — where the sg-WF-8 `"Voted on the web?"` affordance (see §below) lets them carry their browser vote across via a [[../../CONTEXT|Claim code]] minted from the web `"Getting the app?"` affordance ([[web-01-invitee-shell|web-01]] §C). |
+| Mobile first launch | **Forced sign-in.** Surface S00a renders; user must complete the Apple flow before reaching S01. After this surface, no anonymous app sessions exist for the duration of the install. |
+| Web fallback ([[02-invite|S02 web]] invite link) | **Anonymous-by-default**, unchanged from 0.1.0 per ADR 0007 §"Web fallback voters stay anonymous indefinitely". The web-fallback voter never sees S00a. On the [[04-waiting|S04 Waiting]] surface they see the "Download the app" CTA (sg-03) which routes to the App Store. On a subsequent mobile install they hit S00a like any other first launch — where the sg-WF-8 `"Voted on the web?"` affordance (see §below) lets them carry their browser vote across via a [[../../CONTEXT|Claim code]] minted from the web `"Getting the app?"` affordance ([[web-01-invitee-shell|web-01]] §C). |
 
-This asymmetry is intentional. The web fallback's whole job is to keep the two-tap invitee promise alive for non-installers; gating it would break the invite loop. The iOS gate is acceptable because (a) the user has already chosen to install, and (b) Apple permits a single-button Sign-in-with-Apple gate per HIG (see [[../components#c-22-auth-upgrade-chip|C-22 §"Why not the system SignInWithAppleButton"]] — the same custom-pill argument applies here).
+This asymmetry is intentional. The web fallback's whole job is to keep the two-tap invitee promise alive for non-installers; gating it would break the invite loop. The mobile gate is acceptable because (a) the user has already chosen to install, and (b) Apple permits a single-button Sign-in-with-Apple gate per HIG (see [[../components#c-22-auth-upgrade-chip|C-22 §"Why not the system SignInWithAppleButton"]] — the same custom-pill argument applies here).
 
 ## Interaction with C-22 Auth Upgrade Chip
 
 The C-22 chip on S04 Waiting was designed for the pre-S00a anonymous-default world. After this PR lands:
 
-- **iOS:** every member who reaches S04 is already Apple-linked (they cleared S00a). C-22 renders `hidden` per its existing `hidden`-state trigger (`isAnonymous === false`). No visual change to S04 on iOS beyond what's already there.
+- **Mobile app:** every member who reaches S04 is already Apple-linked (they cleared S00a). C-22 renders `hidden` per its existing `hidden`-state trigger (`isAnonymous === false`). No visual change to S04 in the app beyond what's already there.
 - **Web fallback:** C-22 already renders `hidden` per ADR 0007 (no Sign in with Apple in browser). The new "Download the app" CTA (see [[04-waiting|S04 §"Download the app" CTA]]) occupies the same dock slot.
 
 C-22 stays in the spec — it's the correct fallback if any future surface ever needs to re-prompt mid-session — but its day-one consumer on iOS goes silent. No deletion in this PR.

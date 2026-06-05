@@ -1,9 +1,10 @@
-// tb-WF-11 — schema guard for the members.display_name migration.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// tb-WF-11 â€” schema guard for the members.display_name migration.
 //
-// The web invitee shell (sg-WF-5 surface §A) writes the first real
+// The web invitee shell (sg-WF-5 surface Â§A) writes the first real
 // display-name source into a new `members.display_name` column. This
 // test asserts the structural shape of the committed migration rather
-// than running it against a live PG — the `supabase-db` CI lane already
+// than running it against a live PG â€” the `supabase-db` CI lane already
 // exercises a real `supabase db push --linked` against `gettoit-prod`
 // on merge.
 
@@ -40,7 +41,7 @@ Deno.test("tb-WF-11: migration adds members.display_name as a nullable text colu
 
 Deno.test("tb-WF-11: migration does NOT set a NOT NULL constraint on display_name", () => {
   const sql = displayNameMigration();
-  // The column must stay nullable — a NULL is the explicit "no name
+  // The column must stay nullable â€” a NULL is the explicit "no name
   // entered" signal the verdict fallback keys on (iOS members).
   assert(
     !/display_name\s+text[\s\S]{0,40}not null/i.test(sql),
@@ -50,7 +51,7 @@ Deno.test("tb-WF-11: migration does NOT set a NOT NULL constraint on display_nam
 
 Deno.test("tb-WF-11: migration does NOT set a DEFAULT on display_name", () => {
   const sql = displayNameMigration();
-  // No default — a non-NULL empty-string default would defeat the
+  // No default â€” a non-NULL empty-string default would defeat the
   // NULL-means-no-name distinction the verdict fallback relies on.
   assert(
     !/display_name\s+text[\s\S]{0,40}default/i.test(sql),

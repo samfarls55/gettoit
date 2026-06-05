@@ -1,11 +1,12 @@
-// votes-wire — the vote WIRE CONTRACT shared between the edge functions
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// votes-wire â€” the vote WIRE CONTRACT shared between the edge functions
 // and the web fallback (tb-WF-10, ADR 0014).
 //
 // Why this module exists
-// ──────────────────────
-// The vote wire shape — the `{ meta, answer }` envelope per quiz slot,
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// The vote wire shape â€” the `{ meta, answer }` envelope per quiz slot,
 // plus the helper that builds the five slots from a set of quiz answers
-// — used to be defined three separate times: in iOS Swift, in the web
+// â€” used to be defined three separate times: in iOS Swift, in the web
 // fallback's `web/lib/quiz.ts`, and inside `votes-schema.ts`. The web
 // hand-mirror rotted a whole quiz generation behind (it still wrote the
 // retired pre-redesign typed columns). ADR 0014 fixes that by extracting the wire
@@ -13,11 +14,11 @@
 // edge functions (`votes-schema.ts`) and the web app.
 //
 // Leaf-module rule (ADR 0014, load-bearing)
-// ─────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // `votes-wire.ts` is a LEAF MODULE: it imports no engine code and has
 // NO relative imports of its own. The tiny `Axis` / `Q5Rating` types it
 // needs are DEFINED HERE (they are two lines each) and re-exported by
-// `preference-function.ts` rather than imported from it — so this file
+// `preference-function.ts` rather than imported from it â€” so this file
 // stays a true leaf.
 //
 // That leaf property is what keeps the module consumable by BOTH the
@@ -28,9 +29,9 @@
 // relative import, the Deno/Node portability constraint (ADR 0014
 // re-evaluation trigger) has to be solved first.
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Q5 factorial probe types
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // Defined here, not imported. `preference-function.ts` re-exports them
 // from this module so the engine has one canonical definition while
@@ -41,19 +42,19 @@
 export type Axis = "cuisine" | "reputation" | "vibe";
 
 /** One Q5 factorial card's excitement rating, tagged with the axis that
- *  card deviates on. The Q5 factorial emits exactly three cards — one
- *  per axis — and the member rates each 1…5. Mirrors the Swift
+ *  card deviates on. The Q5 factorial emits exactly three cards â€” one
+ *  per axis â€” and the member rates each 1â€¦5. Mirrors the Swift
  *  `Q5Rating` / `Q5RatingEntry` struct. */
 export interface Q5Rating {
   /** The factorial axis the rated card deviates on. */
   droppedAxis: Axis;
-  /** The member's 1…5 excitement rating for that card. */
+  /** The member's 1â€¦5 excitement rating for that card. */
   score: number;
 }
 
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Question-kind taxonomy
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // The discriminator `meta.question_kind` the verdict-engine mapping
 // layer dispatches on. The full taxonomy lives here so a write path
@@ -73,9 +74,9 @@ export const QUESTION_KINDS = [
 
 export type QuestionKind = typeof QUESTION_KINDS[number];
 
-// ───────────────────────────────────────────────────────────────────────
-// Slot shape — the `{ meta, answer }` jsonb envelope
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Slot shape â€” the `{ meta, answer }` jsonb envelope
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /** Per-session question metadata. `question_kind` is required and
  *  load-bearing; everything else is descriptive and never read by the
@@ -87,7 +88,7 @@ export interface QuestionMeta {
   prompt?: string;
   /** The option labels the session offered. Optional, not read. */
   options?: string[];
-  /** Free-form per-session metadata — anything a later slice wants to
+  /** Free-form per-session metadata â€” anything a later slice wants to
    *  stamp onto the slot without a migration. Never read by the mapper. */
   [extra: string]: unknown;
 }
@@ -95,18 +96,18 @@ export interface QuestionMeta {
 /** One quiz answer as stored in a generic jsonb slot. */
 export interface QuestionSlot {
   meta: QuestionMeta;
-  /** The response payload. Shape depends on `meta.question_kind` —
+  /** The response payload. Shape depends on `meta.question_kind` â€”
    *  see the per-kind `answer` readers in `votes-schema.ts`. */
   answer: Record<string, unknown>;
 }
 
-// ───────────────────────────────────────────────────────────────────────
-// Inverse — build the jsonb row a write path inserts
-// ───────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Inverse â€” build the jsonb row a write path inserts
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
 // The quiz produces typed answers per question; this helper wraps them
 // in the generic `{ meta, answer }` slot shape so the quiz keeps
-// writing — and the engine keeps reading — end-to-end.
+// writing â€” and the engine keeps reading â€” end-to-end.
 
 export interface LegacyTypedAnswers {
   /** Q1-era dietary veto chips. */
@@ -119,7 +120,7 @@ export interface LegacyTypedAnswers {
   reputation?: string;
   /** Q4 vibe energy index 0..4. Soft preference. */
   q4_vibe?: number;
-  /** Q5 factorial preference probe — one `{ droppedAxis, score }` entry
+  /** Q5 factorial preference probe â€” one `{ droppedAxis, score }` entry
    *  per factorial card (cuisine-drop / reputation-drop / vibe-drop).
    *  `compute-verdict` reads this via `mapVotesRowToPreferenceInputs` to
    *  re-weight each member's preference function. */
@@ -137,10 +138,10 @@ export interface VotesSlotInsert {
 
 /** Wrap typed quiz answers in the generic `{ meta, answer }` envelopes.
  *  Q1 carries the quiz-redesign `cuisine_craving` kind; Q3 carries `reputation`.
- *  The `meta.prompt` strings are illustrative session copy — carried
+ *  The `meta.prompt` strings are illustrative session copy â€” carried
  *  for audit, never read by the mapper.
  *
- *  The Q5 `regret` slot emits `answer.ratings` — the canonical quiz-redesign
+ *  The Q5 `regret` slot emits `answer.ratings` â€” the canonical quiz-redesign
  *  factorial probe shape `[{ droppedAxis, score }]` that
  *  `mapVotesRowToPreferenceInputs` / `readQ5Ratings` consume. No
  *  parallel `answer.scores` map is emitted (tb-23 moved verdict scoring

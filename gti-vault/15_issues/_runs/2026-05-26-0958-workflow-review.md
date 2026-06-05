@@ -6,85 +6,88 @@ hub: gti-vault/30_design/interaction-patterns/
 mode: audit
 ---
 
-# Workflow review — whole app — 2026-05-26
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# Workflow review â€” whole app â€” 2026-05-26
 
 Surfaces audited:
 
 **iOS** (Mobile overlay applied to all)
-- `ios/Sources/App/SignInScreen.swift` — Do (auth gate)
-- `ios/Sources/App/LocationPermissionScreen.swift` — Entry (pre-prime)
-- `ios/Sources/App/LockedScreen.swift` — Entry/state (locked-state landing)
-- `ios/Sources/App/PlanListScreen.swift` — Overview (S00 post-sign-in default)
-- `ios/Sources/App/SetupScreen.swift` — Do + Form (Plan create/edit)
-- `ios/Sources/App/QuizScreen.swift` + `QuizChromeView.swift` — Do (wizard)
-- `ios/Sources/App/PostQuizHostScreen.swift` — Do (post-Q5 router)
-- `ios/Sources/App/JoinScreen.swift` — Do (deep-link join)
-- `ios/Sources/App/RerollScreen.swift` — Do (sheet)
-- `ios/Sources/App/CheckinScreen.swift` — Do
-- `ios/Sources/App/VerdictScreen.swift` — Focus (5 modes)
-- `ios/Sources/App/WaitingScreen.swift` — Focus (transient)
-- `ios/Sources/App/SettingsScreen.swift` — Settings
+- `ios/Sources/App/SignInScreen.swift` â€” Do (auth gate)
+- `ios/Sources/App/LocationPermissionScreen.swift` â€” Entry (pre-prime)
+- `ios/Sources/App/LockedScreen.swift` â€” Entry/state (locked-state landing)
+- `ios/Sources/App/PlanListScreen.swift` â€” Overview (S00 post-sign-in default)
+- `ios/Sources/App/SetupScreen.swift` â€” Do + Form (Plan create/edit)
+- `ios/Sources/App/QuizScreen.swift` + `QuizChromeView.swift` â€” Do (wizard)
+- `ios/Sources/App/PostQuizHostScreen.swift` â€” Do (post-Q5 router)
+- `ios/Sources/App/JoinScreen.swift` â€” Do (deep-link join)
+- `ios/Sources/App/RerollScreen.swift` â€” Do (sheet)
+- `ios/Sources/App/CheckinScreen.swift` â€” Do
+- `ios/Sources/App/VerdictScreen.swift` â€” Focus (5 modes)
+- `ios/Sources/App/WaitingScreen.swift` â€” Focus (transient)
+- `ios/Sources/App/SettingsScreen.swift` â€” Settings
 
 **Web**
-- `web/app/page.tsx` — Entry (marketing landing)
-- `web/app/layout.tsx` — global shell
-- `web/app/join/[roomId]/page.tsx` — Entry + Do (universal-link fallback)
-- `web/app/s/[sessionId]/page.tsx` — Focus + Do (session share landing)
-- `web/app/places-fallback/page.tsx` — Focus (error state)
-- `web/app/privacy/page.tsx` — Focus (legal)
-- `web/app/terms/page.tsx` — Focus (legal)
+- `web/app/page.tsx` â€” Entry (marketing landing)
+- `web/app/layout.tsx` â€” global shell
+- `web/app/join/[roomId]/page.tsx` â€” Entry + Do (universal-link fallback)
+- `web/app/s/[sessionId]/page.tsx` â€” Focus + Do (session share landing)
+- `web/app/places-fallback/page.tsx` â€” Focus (error state)
+- `web/app/privacy/page.tsx` â€” Focus (legal)
+- `web/app/terms/page.tsx` â€” Focus (legal)
 
 ---
 
 ## Findings
 
-### S1 — Cognition
+### S1 â€” Cognition
 
-1. [S1] [Route: grill] **VerdictScreen — 5-mode branching crosses Focus single-intent boundary**
+1. [S1] [Route: grill] **VerdictScreen â€” 5-mode branching crosses Focus single-intent boundary**
     Foundation/Pattern: [[principles#P-01. Safe Exploration]], [[surfaces#Focus]], [[patterns#Center Stage]]
     Why this route: Re-scope question, not pattern swap. `.default` / `.committed` / `.readOnly` / `.solo` / `.noSurvivor` each suppress different chrome (Home, ratify, reroll, breadcrumbs) and re-shape the CTA dock; the surface aspires to be 5 surfaces in one enum. Splitting is an IA decision.
     Grill seed:
       Conflict: hub says one screen = one intent; VerdictScreen carries 5 mode-specific layouts with mutually exclusive affordances (read-only suppresses Home + reroll; no-survivor suppresses ratify; solo suppresses ratify; committed suppresses ratify+reroll).
       Term to sharpen: is "verdict" one Focus surface, or is it Focus (default/committed/solo) + read-only-Focus (late-joiner/joined/history) + no-quorum-Focus (separate intent)?
-      Starter question: which mode pairs collapse safely and which need to split out — and what does that mean for `VerdictRerollHost` callers?
+      Starter question: which mode pairs collapse safely and which need to split out â€” and what does that mean for `VerdictRerollHost` callers?
 
-2. [S1] [Route: grill] **web/app/page.tsx — placeholder "Coming soon" violates P-02 (Entry) before public launch**
+2. [S1] [Route: grill] **web/app/page.tsx â€” placeholder "Coming soon" violates P-02 (Entry) before public launch**
     Foundation/Pattern: [[principles#P-02. Instant Gratification]], [[surfaces#Entry]], [[patterns#Clear Entry Points]]
     Why this route: pre-public-launch milestone scope decision. Replacing or holding the placeholder is a product call, not a pattern swap. Cross-references [[project_pre_public_launch_milestone]].
     Grill seed:
       Conflict: marketing root must deliver value or skip-to-app affordance before sign-up wall; current root is a static placeholder with no Clear Entry Points.
       Term to sharpen: is `/` an Entry surface (real landing) or a Redirect surface (Universal-Link fallback only)?
-      Starter question: what does a first-time visitor on getttoit.app see before public launch — and does that change after launch?
+      Starter question: what does a first-time visitor on getttoit.app see before public launch â€” and does that change after launch?
 
-3. [S1] [Route: grill] **PlanListScreen — no global navigation model, no [[patterns#Bottom Navigation]]**
+3. [S1] [Route: grill] **PlanListScreen â€” no global navigation model, no [[patterns#Bottom Navigation]]**
     Foundation/Pattern: [[principles#P-09. Spatial Memory]], [[surfaces#Mobile overlay]], [[surfaces#Navigation models]]
     Why this route: navigation-model decision. Could be intentional "Flat" (per [[surfaces#Navigation models]]) for a single-purpose app; or could be a gap once Settings + Profile + Help land. Cannot pattern-swap without a model choice.
     Grill seed:
       Conflict: Mobile overlay flags Bottom Navigation as required for "top-level sections within thumb reach"; PlanList is the only post-sign-in surface and has none.
       Term to sharpen: is the app Hub-and-Spoke from PlanList, or Flat with one surface, or about-to-become Multilevel as Settings + History entries land?
-      Starter question: which destinations need to be one tap from PlanList today vs in v1.1 — and which nav model fits that set?
+      Starter question: which destinations need to be one tap from PlanList today vs in v1.1 â€” and which nav model fits that set?
 
-4. [S1] [Route: grill] **PlanListScreen — no Feature/Search/Browse, no Dynamic Queries on a multi-section Overview**
+4. [S1] [Route: grill] **PlanListScreen â€” no Feature/Search/Browse, no Dynamic Queries on a multi-section Overview**
     Foundation/Pattern: [[principles#P-03. Satisficing]], [[surfaces#Overview]], [[patterns#Feature, Search, and Browse]], [[patterns#Dynamic Queries]]
     Why this route: depends on expected list cardinality. With ~5 pending plans search is overkill; with 50+ history rows it's required. Re-scope, not swap.
     Grill seed:
       Conflict: Overview playbook lists Feature/Search/Browse as required; PlanList has 4 sections (Pending Created / Pending Joined / Decided / History) and no search, sort, or filter.
-      Term to sharpen: what is the steady-state row count per section for a year-1 user — and at what threshold does History need Jump to Item / search?
+      Term to sharpen: what is the steady-state row count per section for a year-1 user â€” and at what threshold does History need Jump to Item / search?
       Starter question: should History be a separate Multilevel destination instead of a fourth section on PlanList?
 
-5. [S1] [Route: grill] **WaitingScreen — no session-ended / verdict-fired-externally state handler**
+5. [S1] [Route: grill] **WaitingScreen â€” no session-ended / verdict-fired-externally state handler**
     Foundation/Pattern: [[principles#P-04. Changes in Midstream]], [[surfaces#Focus]]
     Why this route: state-machine question. If another device fires the verdict, or the room is closed by the creator's delete (tb-WF-9), this surface needs an explicit transition. Decision affects QuizScreen + JoinScreen too.
     Grill seed:
       Conflict: tb-WF-9 introduced room-expire-on-delete; WaitingScreen has no documented error/closed boundary so a joiner mid-wait when the creator deletes the plan currently has undefined behaviour.
-      Term to sharpen: who owns the "session ended while waiting" transition — coordinator, screen, or RootView precedence chain?
-      Starter question: what does the joiner see at the millisecond the room flips to expired — and where does that copy live?
+      Term to sharpen: who owns the "session ended while waiting" transition â€” coordinator, screen, or RootView precedence chain?
+      Starter question: what does the joiner see at the millisecond the room flips to expired â€” and where does that copy live?
 
-### S2 — Visual / System
+### S2 â€” Visual / System
 
 6. [S2] [Route: issue] **SettingsScreen has no UI entry point anywhere in the app**
     Foundation/Pattern: [[principles#P-07. Habituation]], [[surfaces#Settings]] anti-pattern "Mobile app with no Settings screen at all", [[patterns#Sign-In Tools]]
-    Why this route: one-pattern swap — wire a Sign-In Tools / chrome menu entry on PlanList. RootView.swift:71-79 already documents the gap.
+    Why this route: one-pattern swap â€” wire a Sign-In Tools / chrome menu entry on PlanList. RootView.swift:71-79 already documents the gap.
     Issue draft:
       Title: Wire SettingsScreen entry from PlanList chrome
       Type: AFK
@@ -97,7 +100,7 @@ Surfaces audited:
         - [ ] Snapshot test on PlanListScreen covers chrome glyph render.
       Hub anchors: [[patterns#Sign-In Tools]], [[surfaces#Settings]], [[principles#P-07. Habituation]]
 
-7. [S2] [Route: issue] **SettingsScreen — destructive DELETE button visually dominates DONE**
+7. [S2] [Route: issue] **SettingsScreen â€” destructive DELETE button visually dominates DONE**
     Foundation/Pattern: [[principles#V-01. Visual hierarchy]], [[surfaces#Settings]] gate "destructive actions visually separated from cosmetic ones"
     Why this route: visual-hierarchy tweak; one button swap.
     Issue draft:
@@ -111,7 +114,7 @@ Surfaces audited:
         - [ ] Snapshot test on SettingsScreen render covers new hierarchy.
       Hub anchors: [[patterns#Settings Editor]], [[principles#V-01. Visual hierarchy]]
 
-8. [S2] [Route: issue] **LocationPermissionScreen — two CTAs share equal visual weight**
+8. [S2] [Route: issue] **LocationPermissionScreen â€” two CTAs share equal visual weight**
     Foundation/Pattern: [[principles#V-01. Visual hierarchy]], [[principles#P-03. Satisficing]], [[surfaces#Entry]]
     Why this route: visual tweak.
     Issue draft:
@@ -124,20 +127,20 @@ Surfaces audited:
         - [ ] Snapshot test covers both states.
       Hub anchors: [[principles#V-01. Visual hierarchy]], [[patterns#Clear Entry Points]]
 
-9. [S2] [Route: issue] **SetupScreen — disabled CTA uses opacity only**
+9. [S2] [Route: issue] **SetupScreen â€” disabled CTA uses opacity only**
     Foundation/Pattern: [[principles#V-01. Visual hierarchy]], [[principles#V-02. Color]], [[surfaces#Form]]
     Why this route: a11y + visual tweak.
     Issue draft:
       Title: Add text+icon affordance to SetupScreen disabled CTA
       Type: AFK
       Blocked by: None
-      What to build: When primary CTA is disabled (lines 628, 644, 656, 664), swap label to "Name required" or add a small disabled icon — opacity-only fails for low-vision and colorblind users.
+      What to build: When primary CTA is disabled (lines 628, 644, 656, 664), swap label to "Name required" or add a small disabled icon â€” opacity-only fails for low-vision and colorblind users.
       Acceptance criteria:
         - [ ] Disabled CTA carries a visible label change or icon.
         - [ ] Snapshot test covers disabled + enabled states.
       Hub anchors: [[principles#V-02. Color]], [[surfaces#Form]]
 
-10. [S2] [Route: issue] **web/app/layout.tsx — no global footer, no Help affordance**
+10. [S2] [Route: issue] **web/app/layout.tsx â€” no global footer, no Help affordance**
      Foundation/Pattern: [[principles#S-01. Consistency]], [[patterns#Help Systems]]
      Why this route: system-level consistency; one shared layout edit.
      Issue draft:
@@ -151,7 +154,7 @@ Surfaces audited:
          - [ ] Footer collapses gracefully on mobile widths.
        Hub anchors: [[patterns#Help Systems]], [[principles#S-01. Consistency]]
 
-11. [S2] [Route: issue] **PlanListScreen — no Loading/Progress Indicator on initial fetch + refresh**
+11. [S2] [Route: issue] **PlanListScreen â€” no Loading/Progress Indicator on initial fetch + refresh**
      Foundation/Pattern: [[surfaces#Mobile overlay]], [[patterns#Loading or Progress Indicators]]
      Why this route: one-pattern add.
      Issue draft:
@@ -165,9 +168,9 @@ Surfaces audited:
          - [ ] Snapshot test covers loading state.
        Hub anchors: [[patterns#Loading or Progress Indicators]], [[surfaces#Mobile overlay]]
 
-### S3 — Pattern misuse / missing pattern
+### S3 â€” Pattern misuse / missing pattern
 
-12. [S3] [Route: issue] **LockedScreen — no Escape Hatch from terminal state**
+12. [S3] [Route: issue] **LockedScreen â€” no Escape Hatch from terminal state**
      Foundation/Pattern: [[patterns#Escape Hatch]], [[surfaces#Entry]], [[principles#P-01. Safe Exploration]]
      Why this route: one-pattern add.
      Issue draft:
@@ -181,7 +184,7 @@ Surfaces audited:
          - [ ] Snapshot test covers the new chrome.
        Hub anchors: [[patterns#Escape Hatch]], [[principles#P-01. Safe Exploration]]
 
-13. [S3] [Route: issue] **PostQuizHostScreen — resolving spinner has no Escape Hatch**
+13. [S3] [Route: issue] **PostQuizHostScreen â€” resolving spinner has no Escape Hatch**
      Foundation/Pattern: [[patterns#Escape Hatch]], [[surfaces#Do]]
      Why this route: one-pattern add on transient state.
      Issue draft:
@@ -195,7 +198,7 @@ Surfaces audited:
          - [ ] Snapshot test covers the resolving phase with chrome.
        Hub anchors: [[patterns#Escape Hatch]], [[principles#P-01. Safe Exploration]]
 
-14. [S3] [Route: issue] **JoinScreen — joining spinner has no Cancel; error state has no Back**
+14. [S3] [Route: issue] **JoinScreen â€” joining spinner has no Cancel; error state has no Back**
      Foundation/Pattern: [[patterns#Escape Hatch]], [[patterns#Error Messages]]
      Why this route: one-pattern add per phase.
      Issue draft:
@@ -209,7 +212,7 @@ Surfaces audited:
          - [ ] Cancel clears `deepLink` and returns to PlanList.
        Hub anchors: [[patterns#Escape Hatch]], [[patterns#Error Messages]]
 
-15. [S3] [Route: issue] **CheckinScreen — no Cancel on choice surface**
+15. [S3] [Route: issue] **CheckinScreen â€” no Cancel on choice surface**
      Foundation/Pattern: [[patterns#Escape Hatch]]
      Why this route: one-pattern add.
      Issue draft:
@@ -229,14 +232,14 @@ Surfaces audited:
        Title: Restore Escape affordance on VerdictScreen .readOnly
        Type: AFK
        Blocked by: 1
-       What to build: `.readOnly` currently hides the Home chrome row (VerdictScreen.swift:391-413). Add a "Close" or "Done" affordance that fires the existing `onAdvance` callback — for the late-joiner branch this opens Solo Setup (the existing re-invite CTA), but the chrome should be visible regardless.
+       What to build: `.readOnly` currently hides the Home chrome row (VerdictScreen.swift:391-413). Add a "Close" or "Done" affordance that fires the existing `onAdvance` callback â€” for the late-joiner branch this opens Solo Setup (the existing re-invite CTA), but the chrome should be visible regardless.
        Acceptance criteria:
          - [ ] `.readOnly` mode renders a Close/Done affordance.
          - [ ] Tap fires `onAdvance`.
          - [ ] Snapshot test covers `.readOnly` render with chrome.
        Hub anchors: [[patterns#Escape Hatch]], [[surfaces#Focus]]
 
-17. [S3] [Route: issue] **WaitingScreen — initiator has no Leave affordance**
+17. [S3] [Route: issue] **WaitingScreen â€” initiator has no Leave affordance**
      Foundation/Pattern: [[patterns#Escape Hatch]]
      Why this route: one-pattern add (consider feasibility with state machine).
      Issue draft:
@@ -250,7 +253,7 @@ Surfaces audited:
          - [ ] Snapshot test covers chrome present + tap behaviour.
        Hub anchors: [[patterns#Escape Hatch]], [[principles#P-01. Safe Exploration]]
 
-18. [S3] [Route: issue] **Web — global logo not clickable as home link**
+18. [S3] [Route: issue] **Web â€” global logo not clickable as home link**
      Foundation/Pattern: [[patterns#Escape Hatch]], [[principles#P-07. Habituation]]
      Why this route: one-edit add in shared shell.
      Issue draft:
@@ -263,9 +266,9 @@ Surfaces audited:
          - [ ] Visual style unchanged.
        Hub anchors: [[patterns#Escape Hatch]], [[principles#P-07. Habituation]]
 
-19. [S3] [Route: issue] **web/app/privacy + terms — no in-page back-to-home**
+19. [S3] [Route: issue] **web/app/privacy + terms â€” no in-page back-to-home**
      Foundation/Pattern: [[patterns#Escape Hatch]]
-     Why this route: one-pattern add (overlaps with #18 — if the logo is a home link, this folds into that).
+     Why this route: one-pattern add (overlaps with #18 â€” if the logo is a home link, this folds into that).
      Issue draft:
        Title: Add home link to privacy + terms pages
        Type: AFK
@@ -275,7 +278,7 @@ Surfaces audited:
          - [ ] Either logo-as-home-link or in-page home link is visible on both pages.
        Hub anchors: [[patterns#Escape Hatch]]
 
-20. [S3] [Route: issue] **web/app/join terminal screens — no home link**
+20. [S3] [Route: issue] **web/app/join terminal screens â€” no home link**
      Foundation/Pattern: [[patterns#Escape Hatch]]
      Why this route: one-pattern add on `PlanClosedTerminal` / `PlanLeftTerminal`.
      Issue draft:
@@ -288,7 +291,7 @@ Surfaces audited:
          - [ ] Home link visible on left terminal.
        Hub anchors: [[patterns#Escape Hatch]]
 
-21. [S3] [Route: issue] **SignInScreen — claim-code affordance buried**
+21. [S3] [Route: issue] **SignInScreen â€” claim-code affordance buried**
      Foundation/Pattern: [[patterns#Clear Entry Points]], [[principles#V-01. Visual hierarchy]]
      Why this route: one visual swap; secondary CTA promotion.
      Issue draft:
@@ -301,7 +304,7 @@ Surfaces audited:
          - [ ] Snapshot test covers both Apple-only and Apple+claim renders.
        Hub anchors: [[patterns#Clear Entry Points]]
 
-22. [S3] [Route: issue] **QuizScreen — Progress Indicator capsules lack step labels**
+22. [S3] [Route: issue] **QuizScreen â€” Progress Indicator capsules lack step labels**
      Foundation/Pattern: [[patterns#Progress Indicator]], [[surfaces#Do]]
      Why this route: one-pattern add.
      Issue draft:
@@ -315,7 +318,7 @@ Surfaces audited:
          - [ ] Snapshot test covers Q1..Q5.
        Hub anchors: [[patterns#Progress Indicator]]
 
-23. [S3] [Route: issue] **QuizScreen — Q5 final CTA label is the generic "Next"**
+23. [S3] [Route: issue] **QuizScreen â€” Q5 final CTA label is the generic "Next"**
      Foundation/Pattern: [[patterns#Prominent "Done" Button or Assumed Next Step]]
      Why this route: one-string + visual swap.
      Issue draft:
@@ -329,7 +332,7 @@ Surfaces audited:
          - [ ] Snapshot test covers Q5 CTA render.
        Hub anchors: [[patterns#Prominent "Done" Button or Assumed Next Step]]
 
-24. [S3] [Route: issue] **SetupScreen — Form Input Hints missing on name, distance, location**
+24. [S3] [Route: issue] **SetupScreen â€” Form Input Hints missing on name, distance, location**
      Foundation/Pattern: [[patterns#Input Hints]], [[surfaces#Form]]
      Why this route: one-pattern add across three fields.
      Issue draft:
@@ -345,7 +348,7 @@ Surfaces audited:
          - [ ] Hints persist after the user types.
        Hub anchors: [[patterns#Input Hints]]
 
-25. [S3] [Route: issue] **SetupScreen — errors rendered top-of-dock, not field-local**
+25. [S3] [Route: issue] **SetupScreen â€” errors rendered top-of-dock, not field-local**
      Foundation/Pattern: [[patterns#Error Messages]], [[surfaces#Form]]
      Why this route: one-pattern correction.
      Issue draft:
@@ -359,7 +362,7 @@ Surfaces audited:
          - [ ] Snapshot test covers error placement.
        Hub anchors: [[patterns#Error Messages]]
 
-26. [S3] [Route: issue] **SetupScreen — name field uses placeholder-as-label (anti-pattern)**
+26. [S3] [Route: issue] **SetupScreen â€” name field uses placeholder-as-label (anti-pattern)**
      Foundation/Pattern: [[patterns#Input Prompt]], [[surfaces#Form]] anti-pattern "Placeholder text used as the only label"
      Why this route: anti-pattern hit; one fix.
      Issue draft:
@@ -373,7 +376,7 @@ Surfaces audited:
          - [ ] Snapshot test covers empty + typed states.
        Hub anchors: [[patterns#Input Prompt]]
 
-27. [S3] [Route: issue] **WaitingScreen — no Loading/Progress signal during initial chip-phase load**
+27. [S3] [Route: issue] **WaitingScreen â€” no Loading/Progress signal during initial chip-phase load**
      Foundation/Pattern: [[patterns#Loading or Progress Indicators]], [[surfaces#Mobile overlay]]
      Why this route: one-pattern add.
      Issue draft:
@@ -386,7 +389,7 @@ Surfaces audited:
          - [ ] Snapshot test covers loading state.
        Hub anchors: [[patterns#Loading or Progress Indicators]]
 
-28. [S3] [Route: issue] **PlanListScreen — Action Dot Menu has no discoverability affordance**
+28. [S3] [Route: issue] **PlanListScreen â€” Action Dot Menu has no discoverability affordance**
      Foundation/Pattern: [[patterns#Touch Tools]], [[surfaces#Mobile overlay]]
      Why this route: one-pattern add or visual hint.
      Issue draft:
@@ -399,7 +402,7 @@ Surfaces audited:
          - [ ] First-launch hint or improved icon contrast.
        Hub anchors: [[patterns#Touch Tools]]
 
-29. [S3] [Route: issue] **SettingsScreen — "DONE" label + center placement breaks iOS habituation**
+29. [S3] [Route: issue] **SettingsScreen â€” "DONE" label + center placement breaks iOS habituation**
      Foundation/Pattern: [[principles#P-07. Habituation]], [[surfaces#Settings]]
      Why this route: one-pattern correction.
      Issue draft:
@@ -413,7 +416,7 @@ Surfaces audited:
          - [ ] Bottom-center DONE removed.
        Hub anchors: [[principles#P-07. Habituation]], [[surfaces#Settings]]
 
-30. [S3] [Route: issue] **web/app/join — no Help Systems / FAQ on name entry**
+30. [S3] [Route: issue] **web/app/join â€” no Help Systems / FAQ on name entry**
      Foundation/Pattern: [[patterns#Help Systems]]
      Why this route: one-pattern add.
      Issue draft:
@@ -425,7 +428,7 @@ Surfaces audited:
          - [ ] Help affordance visible on NameEntry surface.
        Hub anchors: [[patterns#Help Systems]]
 
-31. [S3] [Route: issue] **web/app/places-fallback — "open the app on iOS" copy without App Store link**
+31. [S3] [Route: issue] **web/app/places-fallback â€” "open the app on iOS" copy without App Store link**
      Foundation/Pattern: [[patterns#Help Systems]], [[patterns#Richly Connected Apps]]
      Why this route: one-link add.
      Issue draft:
@@ -440,12 +443,12 @@ Surfaces audited:
 
 ### B-tier (beyond-the-screen)
 
-32. [B] [Route: grill] **SignInScreen — claim-code field keyboard focus indicator**
+32. [B] [Route: grill] **SignInScreen â€” claim-code field keyboard focus indicator**
      Foundation/Pattern: [[principles#B-04. Natural user interfaces]], [[principles#P-12. Keyboard Only]]
      Why this route: keyboard-only behaviour on iOS hardware-keyboard / iPad is rare today but covered by hub gate. Decision: does v1 need keyboard-only path or punt to post-launch?
      Grill seed:
        Conflict: hub Form gate P-12 requires every field reachable + visible focus ring; SignInScreen claim-code field has no documented focus ring.
-       Term to sharpen: scope — is the iOS app expected to support a hardware keyboard before public launch?
+       Term to sharpen: scope â€” is the iOS app expected to support a hardware keyboard before public launch?
        Starter question: which iPad / hardware-keyboard scenarios are in scope for v1.1, if any?
 
 ---
@@ -454,11 +457,11 @@ Surfaces audited:
 
 **Systemic vs one-off**
 
-- *Systemic — Escape Hatch missing.* Findings #12, #13, #14, #15, #16, #17, #18, #19, #20 all hit the same anti-pattern across LockedScreen, PostQuizHost, JoinScreen, CheckinScreen, VerdictScreen `.readOnly`, WaitingScreen, plus three web surfaces. The app systematically traps users on transient and terminal screens. Issue #18 (clickable logo) folds #19 and #20 into one fix on the web side; the iOS instances are individual screen-by-screen wires.
-- *Systemic — multi-intent collapse.* Findings #1 (VerdictScreen 5 modes) and to a lesser extent SetupScreen's Do+Form blend show one screen carrying multiple intents. Likely needs explicit splits, not pattern swaps.
-- *Systemic — Mobile overlay loading/progress.* Findings #11 (PlanList) and #27 (WaitingScreen) both miss the required Loading pattern.
-- *One-off — Settings discoverability.* Finding #6 is the load-bearing system-level gap (mobile app with no Settings entry).
-- *One-off — web placeholder.* Finding #2 (`/` is "Coming soon") is a pre-launch product decision distinct from the rest.
+- *Systemic â€” Escape Hatch missing.* Findings #12, #13, #14, #15, #16, #17, #18, #19, #20 all hit the same anti-pattern across LockedScreen, PostQuizHost, JoinScreen, CheckinScreen, VerdictScreen `.readOnly`, WaitingScreen, plus three web surfaces. The app systematically traps users on transient and terminal screens. Issue #18 (clickable logo) folds #19 and #20 into one fix on the web side; the iOS instances are individual screen-by-screen wires.
+- *Systemic â€” multi-intent collapse.* Findings #1 (VerdictScreen 5 modes) and to a lesser extent SetupScreen's Do+Form blend show one screen carrying multiple intents. Likely needs explicit splits, not pattern swaps.
+- *Systemic â€” Mobile overlay loading/progress.* Findings #11 (PlanList) and #27 (WaitingScreen) both miss the required Loading pattern.
+- *One-off â€” Settings discoverability.* Finding #6 is the load-bearing system-level gap (mobile app with no Settings entry).
+- *One-off â€” web placeholder.* Finding #2 (`/` is "Coming soon") is a pre-launch product decision distinct from the rest.
 
 **Routing counts**
 
@@ -477,12 +480,12 @@ Hand this file path to a new session running:
 
 ## Grill bucket progress
 
-- **#1 VerdictScreen 5-mode split** — CLOSED 2026-05-26. 3-way split (live / read-only / no-survivor). Artifacts: [[../../60_engineering/adr/0018-verdict-surface-three-way-split|ADR-0018]], CONTEXT.md §Verdict surfaces, bug-34 ([[../0.1.0/issues/bug-34-verdict-surface-three-way-split|vault]] / GH #273). Re-scoped finding #16.
-- **#2 `web/app/page.tsx` landing page** — CLOSED 2026-05-26. Real Entry surface confirmed; design + build deferred as HITL backlog. Artifacts: [[../../40_marketing_branding/landing-page-positioning|positioning doc]], bug-35 ([[../0.1.0/issues/bug-35-landing-page-pre-launch|vault]] / GH #276).
-- **#3 PlanList nav model** — CLOSED 2026-05-26. Hub-and-Spoke confirmed; top-trailing `gearshape` chrome glyph (Sign-In Tools pattern). Shipped via wfr-06 (PR #274). Workflow design landed in [[../0.1.0/issues/wfr-06-settingsscreen-entry-from-planlist|wfr-06]] + [[../../30_design/interaction-patterns/surfaces#GetToIt app shell — Hub-and-Spoke|surfaces.md app-shell note]]. Pre-decides grill #4: no Multilevel.
-- **#4 PlanList Search/Browse + History** — CLOSED 2026-05-26. History stays a fourth section under PlanList; threshold-gated `Jump to Item` search at `history.count >= 10`; Dynamic Queries deferred. Bounded sections (Pending Created / Joined / Decided) need no affordances. Artifacts: [[../../30_design/interaction-patterns/surfaces#Threshold-gated affordances|surfaces.md addendum]], bug-36 ([[../0.1.0/issues/bug-36-planlist-history-threshold-search|vault]] / GH #279).
-- **#5 WaitingScreen session-ended state machine** — CLOSED 2026-05-26. Surface-owned ownership: each screen mounting a Realtime session watches its store's `status` via `.onChange`; on `.expired` shows "Session ended" toast + fires `onSessionEnded?` callback; host (`PostQuizHostScreen` / `RootView`) tears down precedence-chain state. Rejected coordinator-owned + RootView-owned. Pattern extends to QuizScreen. Artifacts: [[../../60_engineering/adr/0019-surface-owned-session-ended-ownership|ADR-0019]], bug-37 ([[../0.1.0/issues/bug-37-waitingscreen-session-ended-handler|vault]] / GH #280), bug-38 ([[../0.1.0/issues/bug-38-quizscreen-session-ended-handler|vault]] / GH #281). Unblocks finding #17.
-- **#32 SignInScreen keyboard focus scope** — CLOSED 2026-05-26 as `deferred`. Hardware-keyboard / iPad / focus-ring support out of scope for v1.1; iPhone-only target, on-screen keyboard path only, no QA path for hardware-keyboard scenarios. Artifact: [[../../20_plan/post-launch-considerations|post-launch-considerations.md]] with revisit gates (iPad target / Catalyst / signal from real users).
+- **#1 VerdictScreen 5-mode split** â€” CLOSED 2026-05-26. 3-way split (live / read-only / no-survivor). Artifacts: [[../../60_engineering/adr/0018-verdict-surface-three-way-split|ADR-0018]], CONTEXT.md Â§Verdict surfaces, bug-34 ([[../0.1.0/issues/bug-34-verdict-surface-three-way-split|vault]] / GH #273). Re-scoped finding #16.
+- **#2 `web/app/page.tsx` landing page** â€” CLOSED 2026-05-26. Real Entry surface confirmed; design + build deferred as HITL backlog. Artifacts: [[../../40_marketing_branding/landing-page-positioning|positioning doc]], bug-35 ([[../0.1.0/issues/bug-35-landing-page-pre-launch|vault]] / GH #276).
+- **#3 PlanList nav model** â€” CLOSED 2026-05-26. Hub-and-Spoke confirmed; top-trailing `gearshape` chrome glyph (Sign-In Tools pattern). Shipped via wfr-06 (PR #274). Workflow design landed in [[../0.1.0/issues/wfr-06-settingsscreen-entry-from-planlist|wfr-06]] + [[../../30_design/interaction-patterns/surfaces#GetToIt app shell â€” Hub-and-Spoke|surfaces.md app-shell note]]. Pre-decides grill #4: no Multilevel.
+- **#4 PlanList Search/Browse + History** â€” CLOSED 2026-05-26. History stays a fourth section under PlanList; threshold-gated `Jump to Item` search at `history.count >= 10`; Dynamic Queries deferred. Bounded sections (Pending Created / Joined / Decided) need no affordances. Artifacts: [[../../30_design/interaction-patterns/surfaces#Threshold-gated affordances|surfaces.md addendum]], bug-36 ([[../0.1.0/issues/bug-36-planlist-history-threshold-search|vault]] / GH #279).
+- **#5 WaitingScreen session-ended state machine** â€” CLOSED 2026-05-26. Surface-owned ownership: each screen mounting a Realtime session watches its store's `status` via `.onChange`; on `.expired` shows "Session ended" toast + fires `onSessionEnded?` callback; host (`PostQuizHostScreen` / `RootView`) tears down precedence-chain state. Rejected coordinator-owned + RootView-owned. Pattern extends to QuizScreen. Artifacts: [[../../60_engineering/adr/0019-surface-owned-session-ended-ownership|ADR-0019]], bug-37 ([[../0.1.0/issues/bug-37-waitingscreen-session-ended-handler|vault]] / GH #280), bug-38 ([[../0.1.0/issues/bug-38-quizscreen-session-ended-handler|vault]] / GH #281). Unblocks finding #17.
+- **#32 SignInScreen keyboard focus scope** â€” CLOSED 2026-05-26 as `deferred`. Hardware-keyboard / iPad / focus-ring support out of scope for v1.1; iPhone-only target, on-screen keyboard path only, no QA path for hardware-keyboard scenarios. Artifact: [[../../20_plan/post-launch-considerations|post-launch-considerations.md]] with revisit gates (iPad target / Catalyst / signal from real users).
 
 ---
 

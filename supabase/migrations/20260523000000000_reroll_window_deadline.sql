@@ -1,10 +1,11 @@
--- sg-WF-6 (workflow-overhaul) — Plan reroll-window deadline mechanism.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- sg-WF-6 (workflow-overhaul) â€” Plan reroll-window deadline mechanism.
 --
 -- Two earlier tracer-bullets shipped around the reroll window before
 -- the enforcement *how* was grilled:
 --
 --   * tb-WF-1 provisioned `plans.reroll_window_closes_at` and stamped
---     it with an explicit placeholder — `set_plan_decided_active`
+--     it with an explicit placeholder â€” `set_plan_decided_active`
 --     writes `now() + interval '2 days'`.
 --   * tb-WF-8 built the full three-way close on top of that placeholder
 --     (per-minute `cron_expire_reroll_windows`, the 3rd-burn `rerolls`
@@ -14,7 +15,7 @@
 -- open sub-decisions, recorded in ADR 0016
 -- (`60_engineering/adr/0016-plan-reroll-window-enforcement.md`):
 --
---   1. **Timezone anchor — search-area TZ.** The deadline is anchored
+--   1. **Timezone anchor â€” search-area TZ.** The deadline is anchored
 --      to the Plan's search-area IANA timezone
 --      (`plans.location->>'timeZoneIdentifier'`), NOT the creator's
 --      device timezone (never stored). UTC fallback when absent.
@@ -23,16 +24,16 @@
 --      directly so the per-minute cron's ~60s lag cannot admit a
 --      stale reroll.
 --   3. **Three-way close ratified as built.** The tb-WF-8 mechanism
---      stands unchanged — no work here.
+--      stands unchanged â€” no work here.
 --
 -- This migration:
 --
---   * Amends `set_plan_decided_active(uuid)` — replaces the
+--   * Amends `set_plan_decided_active(uuid)` â€” replaces the
 --     `now() + interval '2 days'` placeholder with the search-area-TZ
 --     calendar-day computation. The window closes at 23:59:59 on the
 --     calendar day AFTER the verdict fired, measured in the search
 --     area's wall clock.
---   * Amends `apply_reroll(uuid, text, text, text, int)` — adds the
+--   * Amends `apply_reroll(uuid, text, text, text, int)` â€” adds the
 --     time-exact `window_closed` guard: a reroll is rejected when the
 --     room's linked Plan is `decided-expired`, OR `decided-active` with
 --     `reroll_window_closes_at <= now()`. Rooms with `plan_id IS NULL`
@@ -42,21 +43,21 @@
 --   * gti-vault/15_issues/0.1.0/issues/sg-wf-6-reroll-window-deadline.md
 --   * gti-vault/60_engineering/adr/0016-plan-reroll-window-enforcement.md
 --   * supabase/migrations/20260519000000000_workflow_overhaul_plans_table.sql
---     (tb-WF-1 — the placeholder this migration replaces)
+--     (tb-WF-1 â€” the placeholder this migration replaces)
 --   * supabase/migrations/20260522000000000_plans_decided_history_lifecycle.sql
---     (tb-WF-8 — the verdict_fired_at stamp + three-way close this
+--     (tb-WF-8 â€” the verdict_fired_at stamp + three-way close this
 --      migration leaves intact)
 --   * supabase/migrations/20260514000300000_rerolls.sql
---     (TB-10 — the apply_reroll RPC the guard is added to)
+--     (TB-10 â€” the apply_reroll RPC the guard is added to)
 
--- ── 1. set_plan_decided_active — real search-area-TZ deadline ────────
--- Amends the tb-WF-8 function. The body keeps every prior behavior —
+-- â”€â”€ 1. set_plan_decided_active â€” real search-area-TZ deadline â”€â”€â”€â”€â”€â”€â”€â”€
+-- Amends the tb-WF-8 function. The body keeps every prior behavior â€”
 -- the idempotent `where status = 'pending'` gate, the
 -- `verdict_fired_at = now()` stamp, the `updated_at = now()` stamp,
--- SECURITY DEFINER — and replaces ONLY the `reroll_window_closes_at`
+-- SECURITY DEFINER â€” and replaces ONLY the `reroll_window_closes_at`
 -- computation.
 --
--- The deadline formula (ADR 0016 §1):
+-- The deadline formula (ADR 0016 Â§1):
 --
 --   v_area_tz := coalesce(plans.location->>'timeZoneIdentifier', 'UTC')
 --   reroll_window_closes_at =
@@ -64,15 +65,15 @@
 --          + interval '2 days' - interval '1 second') AT TIME ZONE v_area_tz
 --
 -- Reading the formula:
---   * `now() AT TIME ZONE v_area_tz` — the instant rendered as the
+--   * `now() AT TIME ZONE v_area_tz` â€” the instant rendered as the
 --     search area's wall clock (a `timestamp` without zone).
---   * `date_trunc('day', ...)` — midnight at the start of the search
+--   * `date_trunc('day', ...)` â€” midnight at the start of the search
 --     area's current calendar day.
---   * `+ interval '2 days' - interval '1 second'` — 23:59:59 on the
+--   * `+ interval '2 days' - interval '1 second'` â€” 23:59:59 on the
 --     NEXT calendar day (today's midnight + 2 days lands at the start
 --     of the day-after-tomorrow; minus one second steps back to the
 --     final second of tomorrow).
---   * `... AT TIME ZONE v_area_tz` — converts that wall-clock instant
+--   * `... AT TIME ZONE v_area_tz` â€” converts that wall-clock instant
 --     back to a fixed `timestamptz`.
 --
 -- Because the result is a fixed instant, a later device-timezone
@@ -114,12 +115,12 @@ end;
 $$;
 
 comment on function public.set_plan_decided_active(uuid) is
-    'tb-WF-1 (amended in tb-WF-8, then sg-WF-6) — pending → '
+    'tb-WF-1 (amended in tb-WF-8, then sg-WF-6) â€” pending â†’ '
     'decided-active transition. Stamps verdict_fired_at = now() and '
     'computes the real reroll_window_closes_at: 23:59:59 on the '
     'calendar day AFTER the verdict fired, measured in the Plan''s '
     'search-area timezone (plans.location->>''timeZoneIdentifier'', '
-    'UTC fallback). SECURITY DEFINER. Idempotent — re-invoke on a '
+    'UTC fallback). SECURITY DEFINER. Idempotent â€” re-invoke on a '
     'non-pending plan is a no-op.';
 
 -- The grant from tb-WF-1 / tb-WF-8 carries over; re-issue it
@@ -128,34 +129,34 @@ comment on function public.set_plan_decided_active(uuid) is
 revoke all on function public.set_plan_decided_active(uuid) from public;
 grant execute on function public.set_plan_decided_active(uuid) to authenticated;
 
--- ── 2. apply_reroll — server-authoritative, time-exact window guard ──
+-- â”€â”€ 2. apply_reroll â€” server-authoritative, time-exact window guard â”€â”€
 -- Amends the TB-10 RPC. After the existing member check and before the
 -- 3-cap check, the RPC now resolves the room's linked Plan and rejects
--- the reroll when the reroll window has closed (ADR 0016 §3).
+-- the reroll when the reroll window has closed (ADR 0016 Â§3).
 --
--- The guard reads the deadline DIRECTLY — not the cron-maintained
--- `status` — so the ~60s lag between the deadline passing and the
+-- The guard reads the deadline DIRECTLY â€” not the cron-maintained
+-- `status` â€” so the ~60s lag between the deadline passing and the
 -- per-minute cron flipping the row to `decided-expired` never admits a
 -- stale reroll. The cron still performs the durable `status` flip
 -- (that is what the Plan list + iOS fetch-on-appear read); it is just
 -- not the reroll gate.
 --
 -- Reject conditions:
---   * The linked Plan's `status = 'decided-expired'` — the window is
+--   * The linked Plan's `status = 'decided-expired'` â€” the window is
 --     definitively closed (whichever of the three-way-close paths got
 --     there first).
 --   * The linked Plan's `status = 'decided-active'` AND
---     `reroll_window_closes_at <= now()` — the deadline has passed but
+--     `reroll_window_closes_at <= now()` â€” the deadline has passed but
 --     the cron has not yet flipped the row.
 --
 -- Pass-through:
---   * `rooms.plan_id IS NULL` — a legacy S01-path room with no Plan.
+--   * `rooms.plan_id IS NULL` â€” a legacy S01-path room with no Plan.
 --     No window applies; skip the check entirely.
 --   * The Plan is `decided-active` and `reroll_window_closes_at` is in
---     the future (or NULL — defensive: a Plan with no deadline cannot
+--     the future (or NULL â€” defensive: a Plan with no deadline cannot
 --     be "past" it).
 --
--- Return shape: `{"error": "window_closed"}` — the same JSONB error
+-- Return shape: `{"error": "window_closed"}` â€” the same JSONB error
 -- shape as the existing `cap_exhausted` / `not_a_member` returns, so
 -- the iOS RerollStore consumes it through the existing error path.
 
@@ -195,10 +196,10 @@ begin
         return jsonb_build_object('error', 'room_not_found');
     end if;
 
-    -- Member-only — anyone in the room can reroll. (v2 may restrict to
+    -- Member-only â€” anyone in the room can reroll. (v2 may restrict to
     -- the initiator; the original admits any member per the spec's "initiator-only
     -- reroll trigger" being a UI-level rule, not a server-side gate.
-    -- TB-10's iOS surface only exposes the affordance on the initiator
+    -- TB-10's mobile surface only exposes the affordance on the initiator
     -- path; the RPC is generous so a future role widening doesn't need
     -- a migration.)
     select exists (
@@ -211,13 +212,13 @@ begin
         return jsonb_build_object('error', 'not_a_member');
     end if;
 
-    -- sg-WF-6 — server-authoritative reroll-window guard. The room's
+    -- sg-WF-6 â€” server-authoritative reroll-window guard. The room's
     -- linked Plan owns the reroll window; a reroll past the window's
     -- deadline is rejected here, time-exactly, regardless of whether
     -- the per-minute cron has flipped the Plan's status yet.
     --
     -- Ordering note: this runs after the member check and before the
-    -- 3-cap check. The placement is not load-bearing — any point
+    -- 3-cap check. The placement is not load-bearing â€” any point
     -- before the `rerolls` INSERT is correct. It sits here so a
     -- non-member never even reaches the Plan lookup.
     if v_room.plan_id is not null then
@@ -234,11 +235,11 @@ begin
             end if;
         end if;
     end if;
-    -- A NULL plan_id (legacy S01-path room) falls straight through —
+    -- A NULL plan_id (legacy S01-path room) falls straight through â€”
     -- no Plan, no window, no guard.
 
     -- 3-cap check. The trigger is the belt; this is the suspender that
-    -- surfaces a clean JSONB error rather than letting the iOS layer
+    -- surfaces a clean JSONB error rather than letting the mobile layer
     -- see a raw SQL exception.
     select count(*)::int into v_count
     from public.rerolls
@@ -263,7 +264,7 @@ begin
     end if;
 
     -- Locate the current verdict for the room (needed for avail's
-    -- excluded-option append). Null is fine for the other reasons —
+    -- excluded-option append). Null is fine for the other reasons â€”
     -- the engine just re-runs against the current state.
     select * into v_current_verdict from public.verdicts where room_id = p_room_id;
 
@@ -314,7 +315,7 @@ begin
 
     elsif p_reason = 'diet' then
         -- Append the new dietary chip to the caller's q1_vetoes_extra.
-        -- Uses array_append to keep idempotency of the RPC simple —
+        -- Uses array_append to keep idempotency of the RPC simple â€”
         -- if the caller already added the same chip we tolerate the
         -- duplicate; the engine's chip lookup is set-based.
         update public.votes
@@ -345,13 +346,13 @@ begin
     -- Drop the current verdict so the next compute-verdict run can
     -- write a fresh row under the verdicts.room_id UNIQUE constraint.
     -- The FK cascade on option_cuts.verdict_id drops the prior cuts.
-    -- We don't gate on existence — DELETE on no rows is a no-op.
+    -- We don't gate on existence â€” DELETE on no rows is a no-op.
     delete from public.verdicts where room_id = p_room_id;
 
     -- Reset the room back to verdict_ready=false so the iOS Realtime
     -- subscriber routes back to S04/S05 cleanly. Status flip: from
     -- 'verdict_ready' (or 'locked' if we ever admit reroll past
-    -- lock — the original does NOT — but be defensive) → 'firing' so the
+    -- lock â€” the original does NOT â€” but be defensive) â†’ 'firing' so the
     -- compute-verdict invocation has a fresh slate.
     update public.rooms
     set status = 'firing'
@@ -372,7 +373,7 @@ $$;
 comment on function public.apply_reroll(uuid, text, text, text, int) is
     'TB-10 reroll RPC (amended in sg-WF-6). Validates caller is a room '
     'member, rejects a reroll past the linked Plan''s reroll window '
-    '({"error":"window_closed"} — time-exact, reads '
+    '({"error":"window_closed"} â€” time-exact, reads '
     'reroll_window_closes_at directly so cron lag cannot admit a '
     'stale reroll; null-plan_id rooms skip the guard), enforces the '
     '3/room cap, writes the rerolls row, mutates state per the reason '

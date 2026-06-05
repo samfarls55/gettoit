@@ -10,7 +10,10 @@ github_issue: 253
 pr: 285
 ---
 
-# wfr-12 — LockedScreen has no Escape Hatch from terminal state
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
+# wfr-12 â€” LockedScreen has no Escape Hatch from terminal state
 
 ## What to build
 
@@ -24,7 +27,7 @@ pr: 285
 
 ## Blocked by
 
-None — can start immediately.
+None â€” can start immediately.
 
 ## Hub anchors
 
@@ -38,4 +41,4 @@ None — can start immediately.
 
 ## Comments
 
-- 2026-05-26 — Closed via PR #285. `LockedScreen` gains a top-leading `Home` text-verb chrome row mirroring `VerdictScreen.homeChromeRow` (bug-22) — eyebrow-token treatment (Inter 700 / 11 / 0.18em / UPPERCASE / white 0.78), 44pt min hit row, top-trailing reserved 44pt frame for vertical rhythm, rendered at `zIndex(6)` so it sits above the veil + shutters + plate across the entire hard-close choreography. New `onHome: @escaping () -> Void = {}` initializer parameter (defaulted to no-op so existing call shapes stay source-compatible — `LockedScreen` is not currently mounted in RootView, so the parameter is forward-compatible for future mount sites). New static `LockedScreen.homeChromeLabel = "Home"` matching `VerdictScreen.homeChromeLabel`. Test seam `simulateHomeTapForTesting()` exposes the closure invocation as a public method (SwiftUI snapshot tests don't traverse the rendered tree to hit-test buttons). Surface spec amended in-place at `design-system/surfaces/06-hard-close.md` new §"Locked chrome (Home)" + CHANGELOG entry — the S06 surface was status: locked, but the *Escape Hatch* foundation-P-01 gap outranks the lock.
+- 2026-05-26 â€” Closed via PR #285. `LockedScreen` gains a top-leading `Home` text-verb chrome row mirroring `VerdictScreen.homeChromeRow` (bug-22) â€” eyebrow-token treatment (Inter 700 / 11 / 0.18em / UPPERCASE / white 0.78), 44pt min hit row, top-trailing reserved 44pt frame for vertical rhythm, rendered at `zIndex(6)` so it sits above the veil + shutters + plate across the entire hard-close choreography. New `onHome: @escaping () -> Void = {}` initializer parameter (defaulted to no-op so existing call shapes stay source-compatible â€” `LockedScreen` is not currently mounted in RootView, so the parameter is forward-compatible for future mount sites). New static `LockedScreen.homeChromeLabel = "Home"` matching `VerdictScreen.homeChromeLabel`. Test seam `simulateHomeTapForTesting()` exposes the closure invocation as a public method (SwiftUI snapshot tests don't traverse the rendered tree to hit-test buttons). Surface spec amended in-place at `design-system/surfaces/06-hard-close.md` new Â§"Locked chrome (Home)" + CHANGELOG entry â€” the S06 surface was status: locked, but the *Escape Hatch* foundation-P-01 gap outranks the lock.

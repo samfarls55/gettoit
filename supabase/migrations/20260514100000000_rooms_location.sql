@@ -1,27 +1,28 @@
--- TB-03 (quiz redesign) — add location columns to `rooms`.
+-- Legacy mobile note: references to iOS/Swift/TestFlight in this historical schema file refer to the retired Swift app; active mobile app is React Native / Expo in mobile/.
+-- TB-03 (quiz redesign) â€” add location columns to `rooms`.
 --
--- Owned by tb-03 per `design-system/surfaces/01-initiator.md` §
--- "Persistent location selector — C-23 LocationPicker": the resolved
+-- Owned by tb-03 per `design-system/surfaces/01-initiator.md` Â§
+-- "Persistent location selector â€” C-23 LocationPicker": the resolved
 -- place is written to `rooms.location_*` when the CTA fires.
 --
 -- Columns:
---   * `location_name` — the display name the LocationPicker chip
---     surfaces (e.g. `"Mission · San Francisco"`). NULL until the user
+--   * `location_name` â€” the display name the LocationPicker chip
+--     surfaces (e.g. `"Mission Â· San Francisco"`). NULL until the user
 --     either grants permission (auto-resolved) or commits a manual
 --     pick from the sheet.
---   * `location_lat` / `location_lng` — the coordinate the
+--   * `location_lat` / `location_lng` â€” the coordinate the
 --     PlacesProxy/MapKit fallback both consume. Stored as
 --     `double precision`; Foursquare and MapKit both speak the same
 --     `lat`/`lng` shape (see `PlacesProxyRequest` in `PlacesService.swift`).
---   * `location_source` — provenance of the coordinate. `'gps'` if the
+--   * `location_source` â€” provenance of the coordinate. `'gps'` if the
 --     user accepted the `whenInUse` prompt and the chip resolved via
 --     `CLLocationManager`; `'manual'` if the user committed a value
---     from the typeahead sheet (either path — denied-and-manual or
+--     from the typeahead sheet (either path â€” denied-and-manual or
 --     granted-and-overrode). NULL until set. Stored so the downstream
 --     consumer (Q5 wiring in bug-03) can attribute the source for
 --     debugging the zero-Foursquare-calls failure mode.
 --
--- All four columns are nullable — the `cannotAdvance` guard on S01
+-- All four columns are nullable â€” the `cannotAdvance` guard on S01
 -- (CTA disabled when `state === 'empty'`) prevents a no-location room
 -- from being created in the happy path, but the column has to allow
 -- NULL so a future client (debug RPC, a hypothetical edge function

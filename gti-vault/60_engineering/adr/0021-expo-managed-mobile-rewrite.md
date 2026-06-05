@@ -7,6 +7,9 @@ supersedes: null
 superseded_by: null
 ---
 
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
 # 0021 - Expo managed TypeScript rewrite becomes the active iOS client path
 
 ## Status
@@ -84,6 +87,6 @@ Rejected because it creates two mobile UI stacks in one app during the migration
 ## Open questions
 
 - Which Expo SDK/modules are sufficient for Search area behavior: map camera, current location, typed search, radius display, density preview pins, and iOS feel?
-- How will EAS credentials and bundle-id handoff interact with the existing TestFlight lane?
+- Resolved by TB-18: EAS owns the active TestFlight path from `mobile/`; the legacy Swift TestFlight lane is disabled.
 - Should any shared domain code move into a package later, or should `mobile/` duplicate/adapt until reuse earns its cost?
 - Which Supabase contracts should be simplified first as part of the golden-path migration?

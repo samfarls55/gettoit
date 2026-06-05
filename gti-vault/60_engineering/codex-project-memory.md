@@ -14,6 +14,9 @@ related:
   - "[[../30_design/sunset-pop-handover]]"
 ---
 
+> **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.
+
+
 # Codex Project Memory
 
 These notes migrate the durable Claude project memories into the vault so Codex can recover them without relying on user-level Claude state. Treat this as quick orientation only: when it conflicts with current repo docs, trust the current repo docs.

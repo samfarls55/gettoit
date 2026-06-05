@@ -1,4 +1,5 @@
-// tb-WF-1 — guards for the workflow-overhaul `plans` table migration.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// tb-WF-1 â€” guards for the workflow-overhaul `plans` table migration.
 //
 // The workflow-overhaul phase promotes today's ephemeral `rooms` row
 // into a durable `Plan` entity. This issue lands the schema + the
@@ -6,7 +7,7 @@
 // path is the `PlansStore` covered by Swift tests.
 //
 // These tests assert the structural shape of the committed migration
-// rather than running it against a live PG — the `supabase-db` CI
+// rather than running it against a live PG â€” the `supabase-db` CI
 // lane already exercises a real `supabase db push --linked` against
 // `gettoit-prod` on merge. What we want here is a regression guard
 // that survives reformatting: the migration file's intent does not
@@ -41,7 +42,7 @@ function plansMigration(): string {
   return migrationBySuffix("_workflow_overhaul_plans_table.sql");
 }
 
-// ── plans table shape ───────────────────────────────────────────────
+// â”€â”€ plans table shape â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("tb-WF-1: migration creates public.plans", () => {
   const sql = plansMigration();
@@ -102,7 +103,7 @@ Deno.test("tb-WF-1: plans.status defaults 'pending' with three lifecycle values"
   const sql = plansMigration();
   assertStringIncludes(sql, "status");
   assertStringIncludes(sql, "default 'pending'");
-  // pending → decided-active → decided-expired
+  // pending â†’ decided-active â†’ decided-expired
   assertStringIncludes(sql, "'pending'");
   assertStringIncludes(sql, "'decided-active'");
   assertStringIncludes(sql, "'decided-expired'");
@@ -124,11 +125,11 @@ Deno.test("tb-WF-1: plans has created_at + updated_at defaulted to now()", () =>
   assertStringIncludes(sql, "default now()");
 });
 
-// ── updated_at trigger ──────────────────────────────────────────────
+// â”€â”€ updated_at trigger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("tb-WF-1: updated_at is refreshed by a BEFORE UPDATE trigger", () => {
   const sql = plansMigration();
-  // We don't pin the function name verbatim — just that a trigger
+  // We don't pin the function name verbatim â€” just that a trigger
   // function refreshes `updated_at` and a `before update on
   // public.plans` trigger wires it up.
   assert(
@@ -141,7 +142,7 @@ Deno.test("tb-WF-1: updated_at is refreshed by a BEFORE UPDATE trigger", () => {
   );
 });
 
-// ── rooms.plan_id extension ─────────────────────────────────────────
+// â”€â”€ rooms.plan_id extension â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("tb-WF-1: rooms.plan_id is added as nullable FK to plans", () => {
   const sql = plansMigration();
@@ -157,7 +158,7 @@ Deno.test("tb-WF-1: rooms.plan_id has a partial index", () => {
   assertStringIncludes(sql, "where plan_id is not null");
 });
 
-// ── RLS ─────────────────────────────────────────────────────────────
+// â”€â”€ RLS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("tb-WF-1: plans has RLS enabled", () => {
   const sql = plansMigration();
@@ -179,7 +180,7 @@ Deno.test("tb-WF-1: plans RLS gates select/insert/update/delete to the creator",
   assertStringIncludes(sql, "creator_id = (select auth.uid())");
 });
 
-// ── state-transition function ───────────────────────────────────────
+// â”€â”€ state-transition function â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Deno.test("tb-WF-1: set_plan_decided_active is a security-definer function", () => {
   const sql = plansMigration();
@@ -205,7 +206,7 @@ Deno.test("tb-WF-1: set_plan_decided_active flips status to decided-active", () 
 
 Deno.test("tb-WF-1: set_plan_decided_active populates reroll_window_closes_at", () => {
   const sql = plansMigration();
-  // Function body references reroll_window_closes_at — the exact
+  // Function body references reroll_window_closes_at â€” the exact
   // server-side computation mechanism is sg-WF-6; this issue just
   // provisions the field and stamps a non-null value.
   assertStringIncludes(sql, "reroll_window_closes_at");

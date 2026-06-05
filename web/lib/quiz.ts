@@ -1,7 +1,8 @@
 // GetToIt web — quiz-redesign quiz constants + vote-row shaping (tb-WF-10).
 //
-// The web fallback's quiz, brought to quiz-redesign parity with the iOS app
-// (`ios/Sources/App/QuizCoordinator.swift`) and the verdict engine.
+// The web fallback's quiz, brought to quiz-redesign parity with the active
+// React Native / Expo mobile app under `mobile/` and the verdict engine.
+// Historical reference: legacy Swift `ios/Sources/App/QuizCoordinator.swift`.
 //
 // The vote WIRE SHAPE is no longer hand-mirrored here. Per ADR 0014 the
 // `{ meta, answer }` envelope + the `buildVotesSlotsFromLegacyAnswers`
@@ -12,10 +13,10 @@
 // longer read. This module now writes the generic `q1`..`q5` jsonb slots.
 //
 // The Q1-Q4 surface constants (cuisine ids, budget tiers, reputation
-// chips, vibe labels) re-implement the iOS `QuizCuisine` / `QuizReputation`
+// chips, vibe labels) re-implement the mobile `QuizCuisine` / `QuizReputation`
 // / `QuizConstants` vocabularies. Per ADR 0003 the web fallback
 // re-implements design-system surfaces rather than importing the JSX;
-// the id strings are the engine contract and must match iOS exactly.
+// the id strings are the engine contract and must match mobile exactly.
 
 import {
   buildVotesSlotsFromLegacyAnswers,
@@ -31,7 +32,7 @@ import {
 export const CUISINE_CAP = 3;
 
 /** Q1 cuisine options. The `id` is the stable engine wire value, the
- *  `label` is displayed copy. Display order matches iOS `QuizCuisine`. */
+ *  `label` is displayed copy. Display order matches mobile `QuizCuisine`. */
 export const CUISINE_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "mexican", label: "Mexican" },
   { id: "italian", label: "Italian" },
@@ -62,7 +63,7 @@ export const BUDGET_TIERS: Array<{ tier: 1 | 2 | 3 | 4; label: string; sub: stri
 /** The neutral, non-pruning Q3 answer and Q3 default. */
 export const REPUTATION_NO_PREFERENCE = "no_preference";
 
-/** Q3 reputation chips. Single-select. Display order matches iOS
+/** Q3 reputation chips. Single-select. Display order matches the mobile app
  *  `QuizReputation`. */
 export const REPUTATION_OPTIONS: Array<{ id: string; label: string }> = [
   { id: "popular", label: "Popular" },
@@ -78,7 +79,7 @@ export const REPUTATION_OPTIONS: Array<{ id: string; label: string }> = [
 
 /** Q4 vibe vocabulary — the quiz-redesign energy/loudness scale. Mirrors the
  *  design-system `vibe-labels` token (`QUIET · CHILL · SOCIAL · LIVELY ·
- *  ROWDY`) and iOS `GTIVibeLabels.all`. The pre-redesign `HUSHED · MELLOW · BUZZY
+ *  ROWDY`) and mobile `GTIVibeLabels.all`. The pre-redesign `HUSHED · MELLOW · BUZZY
  *  · LOUD · ROWDY` vocabulary was retired by the quiz redesign. */
 export const VIBE_LABELS = ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"] as const;
 
@@ -89,7 +90,7 @@ export const VIBE_LABELS = ["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"] as co
 export const QUIZ_DEFAULTS = {
   /** Q1 — no cuisine picked. The "No preference" flag also starts off. */
   cuisines: [] as string[],
-  /** Q2 — defaults to tier 1, the same as iOS. */
+  /** Q2 — defaults to tier 1, the same as the mobile app. */
   budget: 1 as 1 | 2 | 3 | 4,
   /** Q3 — the neutral, non-pruning answer. */
   reputation: REPUTATION_NO_PREFERENCE,
@@ -172,7 +173,7 @@ export function buildVoteRow(args: {
   q5Ratings: Q5Rating[];
 }): VoteRow {
   // "No preference" on Q1 is a genuine zero-weight signal — it writes an
-  // empty craved set, exactly as iOS does (`QuizFetchAnswers` zeroes the
+  // empty craved set, exactly as mobile app does (`QuizFetchAnswers` zeroes the
   // cuisine list when `q1NoPreference`).
   const cuisines = args.noPreference
     ? []

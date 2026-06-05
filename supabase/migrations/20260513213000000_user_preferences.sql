@@ -73,7 +73,7 @@ create policy "user_preferences_select_self" on public.user_preferences
     using (user_id = (select auth.uid()));
 
 -- Each user inserts only their own row. UPSERT (insert with
--- on-conflict) is the canonical write path from the iOS client.
+-- on-conflict) is the canonical write path from the mobile client.
 drop policy if exists "user_preferences_insert_self" on public.user_preferences;
 create policy "user_preferences_insert_self" on public.user_preferences
     for insert

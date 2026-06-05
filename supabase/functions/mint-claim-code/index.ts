@@ -1,9 +1,10 @@
-// mint-claim-code Edge Function — runtime entry point.
+// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
+// mint-claim-code Edge Function â€” runtime entry point.
 //
 // Composes the pure HTTP handler from `./handler.ts` with the
 // supabase-js auth + service-role adapters and the Deno.serve listener.
 //
-// tb-WF-13 / ADR 0015 — the mint half of the web-invitee account-claim
+// tb-WF-13 / ADR 0015 â€” the mint half of the web-invitee account-claim
 // bridge. The web "Getting the app?" affordance calls this function;
 // it generates a single-use claim code, encrypts the caller's web
 // anonymous session refresh token against it (~30-min TTL), and returns
@@ -18,10 +19,10 @@
 //
 // Runtime secrets (set via `supabase secrets set`, mirrored in the
 // CI edge-deploy lane):
-//   * SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY — present on every Edge
+//   * SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY â€” present on every Edge
 //     invocation; the service-role key is what writes the RLS-locked
 //     `claim_codes` table.
-//   * CLAIM_CODE_ENC_KEY — a base64-encoded 32-byte AES-GCM key the
+//   * CLAIM_CODE_ENC_KEY â€” a base64-encoded 32-byte AES-GCM key the
 //     refresh token is encrypted under before storage.
 
 import { createClient } from "npm:@supabase/supabase-js@2.43.4";
@@ -39,7 +40,7 @@ function buildAdminClient(env: MintClaimCodeEnv) {
   );
 }
 
-/** Postgres unique-violation SQLSTATE — a primary-key collision on
+/** Postgres unique-violation SQLSTATE â€” a primary-key collision on
  *  `claim_codes.code`. PostgREST surfaces it as `error.code === '23505'`. */
 const PG_UNIQUE_VIOLATION = "23505";
 
@@ -53,7 +54,7 @@ Deno.serve((req) =>
     // Validate the caller's access-token JWT against the auth service
     // and return their user_id. `auth.getUser(jwt)` round-trips to the
     // Supabase Auth endpoint, which verifies the signature, the expiry,
-    // and that the user still exists — so an expired or forged token
+    // and that the user still exists â€” so an expired or forged token
     // resolves to null and the handler returns 401.
     resolveCaller: async (env, jwt) => {
       const admin = buildAdminClient(env);
@@ -62,7 +63,7 @@ Deno.serve((req) =>
       return data.user?.id ?? null;
     },
     // Insert the `claim_codes` row with the service-role client (the
-    // table is RLS-locked — only the service role reaches it). A
+    // table is RLS-locked â€” only the service role reaches it). A
     // primary-key collision on `code` surfaces as SQLSTATE 23505; we
     // map it to `{ ok: false, collision: true }` so the handler retries
     // with a fresh code. Any other error is thrown.
