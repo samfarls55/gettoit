@@ -83,7 +83,6 @@ jobs:
             --non-interactive \
             --wait \
             --auto-submit-with-profile production \
-            --what-to-test "$RELEASE_NOTES" \
             --json | tee "$RUNNER_TEMP/eas-build.json"
 
       - name: EAS build only
@@ -112,6 +111,7 @@ jobs:
             echo "| Git ref | \`${INPUT_GIT_REF}\` |"
             echo "| EAS profile | \`production\` |"
             echo "| Submit to TestFlight | \`${INPUT_SUBMIT}\` |"
+            echo "| Release notes | ${RELEASE_NOTES} |"
             echo ""
             if [ -f "$RUNNER_TEMP/eas-build.json" ]; then
               echo "#### EAS build metadata"

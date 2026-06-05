@@ -32,7 +32,7 @@ Active TestFlight shipping is owned by `.github/workflows/testflight.yml`.
 - Required GitHub secret: `EXPO_TOKEN`.
 - Required GitHub Environment: `testflight`, with required reviewer approval.
 
-The workflow checks out the requested ref, installs `mobile/` dependencies, runs `npm run verify`, then runs `eas build` for iOS with `--wait` and JSON summary output. When submit mode is true, it uses EAS auto-submit with the production submit profile and forwards optional release notes as TestFlight "What to Test" notes.
+The workflow checks out the requested ref, installs `mobile/` dependencies, runs `npm run verify`, then runs `eas build` for iOS with `--wait` and JSON summary output. When submit mode is true, it uses EAS auto-submit with the production submit profile. Optional `/ship` notes are recorded in the GitHub run summary, not forwarded to EAS/TestFlight; EAS currently treats that field as an Enterprise-plan-only changelog parameter for this account.
 
 ## Manual fallback commands
 
