@@ -253,11 +253,16 @@ describe("App", () => {
         />,
       );
 
-      expect(screen.getByText("Tonight's session")).toBeOnTheScreen();
-      expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
+      expect(screen.getByLabelText("GetToIt logo")).toBeOnTheScreen();
+      expect(screen.getByText("Decide Dinner.\nGet To It.")).toBeOnTheScreen();
+      expect(
+        screen.getByText(
+          "Save your taste profile and turn group indecision into a locked pick.",
+        ),
+      ).toBeOnTheScreen();
       expect(screen.getByLabelText("Voted on the web?")).toBeOnTheScreen();
       expect(screen.getByLabelText("Sign in with Apple")).toBeOnTheScreen();
-      expect(screen.getByText("Save my taste profile")).toBeOnTheScreen();
+      expect(screen.getByText("Continue with Apple")).toBeOnTheScreen();
     },
   );
 
@@ -355,7 +360,7 @@ describe("App", () => {
   it("routes visible auth and deep-link event outcomes", () => {
     render(<EventRouterHarness />);
 
-    expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
+    expect(screen.getByText("Decide Dinner.\nGet To It.")).toBeOnTheScreen();
 
     fireEvent.press(screen.getByText("Sign in"));
     expect(screen.getByText("Plans")).toBeOnTheScreen();
@@ -472,7 +477,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(deleteCurrentAccount).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
+      expect(screen.getByText("Decide Dinner.\nGet To It.")).toBeOnTheScreen();
     });
   });
 
@@ -496,7 +501,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(signOut).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("Pick up where you left off")).toBeOnTheScreen();
+      expect(screen.getByText("Decide Dinner.\nGet To It.")).toBeOnTheScreen();
     });
   });
 

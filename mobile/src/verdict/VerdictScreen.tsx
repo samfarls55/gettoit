@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
+import { VerdictBackdrop } from "../design/VerdictBackdrop";
 import type {
   RerollInput,
   VerdictViewModel,
@@ -50,8 +51,7 @@ export function VerdictScreen({
       style={styles.root}
       contentContainerStyle={styles.verdictContent}
     >
-      <View pointerEvents="none" style={styles.sunGlow} />
-      <View pointerEvents="none" style={styles.emberGlow} />
+      <VerdictBackdrop />
 
       <View style={styles.topbar}>
         <View style={styles.liveChip}>
@@ -272,24 +272,6 @@ const styles = StyleSheet.create({
     backgroundColor: mobileTokens.color.ink,
     gap: mobileTokens.spacing[4],
     padding: mobileTokens.spacing[8],
-  },
-  sunGlow: {
-    position: "absolute",
-    right: -54,
-    top: -64,
-    width: 188,
-    height: 188,
-    borderRadius: 94,
-    backgroundColor: "rgba(255,210,63,0.18)",
-  },
-  emberGlow: {
-    position: "absolute",
-    left: -84,
-    bottom: 96,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(255,122,61,0.12)",
   },
   topbar: {
     alignItems: "center",

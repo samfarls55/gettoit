@@ -40,6 +40,7 @@ import {
   emptyPlanListSnapshot,
   fakePlanRepository,
 } from "./src/plans/planRepository";
+import { VerdictBackdrop } from "./src/design/VerdictBackdrop";
 import { PlanListScreen } from "./src/plans/PlanListScreen";
 import { SetupScreen } from "./src/plans/SetupScreen";
 import { QuizScreen } from "./src/quiz/QuizScreen";
@@ -963,22 +964,45 @@ function SignInGate({
   };
 
   return (
-    <View style={styles.root}>
+    <View style={styles.signInRoot}>
       <StatusBar style="light" />
-      <View style={styles.surface}>
-        <Text style={styles.eyebrow}>Tonight's session</Text>
-        <Text style={styles.title}>Pick up where you left off</Text>
-        <Text style={styles.subtitle}>
-          Sign in once and your taste profile saves itself.
-        </Text>
+      <VerdictBackdrop />
+      <View style={styles.signInSurface}>
+        <View style={styles.signInTopSpace} />
+        <View style={styles.signInHero}>
+          <View accessibilityLabel="GetToIt logo" style={styles.logoMark}>
+            <Text style={styles.logoMarkText}>G</Text>
+          </View>
+          <Text style={styles.signInTitle}>
+            Decide Dinner.{"\n"}Get To It.
+          </Text>
+          <Text style={styles.signInSubtitle}>
+            Save your taste profile and turn group indecision into a locked pick.
+          </Text>
+        </View>
         {appleSignInFailed ? (
-          <Text style={styles.inlineError}>Couldn't reach Apple. Try again.</Text>
+          <Text style={styles.signInInlineError}>
+            Couldn't reach Apple. Try again.
+          </Text>
         ) : null}
         {claimRedeemed ? (
-          <Text style={styles.inlineSuccess}>
+          <Text style={styles.signInInlineSuccess}>
             Web Plans ready. Sign in with Apple to finish.
           </Text>
         ) : null}
+        <Pressable
+          accessibilityLabel="Sign in with Apple"
+          accessibilityRole="button"
+          disabled={isSubmitting}
+          onPress={handleAppleSignInPress}
+          style={[
+            styles.appleSignInButton,
+            isSubmitting && styles.disabledButton,
+          ]}
+        >
+          <Text style={styles.appleSignInLogo}>{"\uF8FF"}</Text>
+          <Text style={styles.appleSignInLabel}>Continue with Apple</Text>
+        </Pressable>
         {isClaimPanelOpen ? (
           <View style={styles.claimPanel}>
             <Text style={styles.claimTeaching}>
@@ -1018,20 +1042,12 @@ function SignInGate({
             accessibilityLabel="Voted on the web?"
             accessibilityRole="button"
             onPress={() => setIsClaimPanelOpen(true)}
-            style={styles.secondaryButton}
+            style={styles.signInWebButton}
           >
-            <Text style={styles.secondaryButtonLabel}>Voted on the web?</Text>
+            <Text style={styles.signInWebButtonLabel}>Voted on the Web?</Text>
           </Pressable>
         )}
-        <Pressable
-          accessibilityLabel="Sign in with Apple"
-          accessibilityRole="button"
-          disabled={isSubmitting}
-          onPress={handleAppleSignInPress}
-          style={[styles.primaryButton, isSubmitting && styles.disabledButton]}
-        >
-          <Text style={styles.primaryButtonLabel}>Save my taste profile</Text>
-        </Pressable>
+        <View style={styles.homeIndicator} />
       </View>
     </View>
   );
@@ -1041,6 +1057,108 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: mobileTokens.color.ink,
+  },
+  signInRoot: {
+    flex: 1,
+    backgroundColor: mobileTokens.color.ink,
+    overflow: "hidden",
+  },
+  signInSurface: {
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: mobileTokens.spacing[8],
+    paddingBottom: mobileTokens.spacing[4],
+  },
+  signInTopSpace: {
+    flex: 1,
+    minHeight: 112,
+  },
+  signInHero: {
+    alignItems: "center",
+    marginBottom: mobileTokens.spacing[8],
+  },
+  logoMark: {
+    alignItems: "center",
+    backgroundColor: mobileTokens.color.paper,
+    borderRadius: 22,
+    height: 68,
+    justifyContent: "center",
+    marginBottom: mobileTokens.spacing[4],
+    width: 68,
+  },
+  logoMarkText: {
+    color: mobileTokens.color.ink,
+    fontSize: 32,
+    fontWeight: "900",
+  },
+  signInTitle: {
+    color: mobileTokens.color.paper,
+    fontSize: 36,
+    fontWeight: "900",
+    lineHeight: 40,
+    marginBottom: mobileTokens.spacing[4],
+    textAlign: "center",
+  },
+  signInSubtitle: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 23,
+    textAlign: "center",
+  },
+  appleSignInButton: {
+    alignItems: "center",
+    backgroundColor: mobileTokens.color.paper,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    minHeight: 56,
+    paddingHorizontal: mobileTokens.spacing[4],
+  },
+  appleSignInLogo: {
+    color: "#000000",
+    fontSize: 21,
+    fontWeight: "700",
+    lineHeight: 24,
+  },
+  appleSignInLabel: {
+    color: "#000000",
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  signInWebButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 40,
+    marginTop: mobileTokens.spacing[3],
+  },
+  signInWebButtonLabel: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  signInInlineError: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: mobileTokens.spacing[3],
+    textAlign: "center",
+  },
+  signInInlineSuccess: {
+    color: mobileTokens.color.sun,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: mobileTokens.spacing[3],
+    textAlign: "center",
+  },
+  homeIndicator: {
+    alignSelf: "center",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderRadius: 999,
+    height: 5,
+    marginTop: mobileTokens.spacing[4],
+    width: 134,
   },
   surface: {
     flex: 1,
@@ -1080,6 +1198,7 @@ const styles = StyleSheet.create({
   claimPanel: {
     gap: mobileTokens.spacing[3],
     marginBottom: mobileTokens.spacing[3],
+    marginTop: mobileTokens.spacing[3],
   },
   claimTeaching: {
     color: mobileTokens.color.textSecondaryOnGradient,
