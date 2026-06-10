@@ -1,10 +1,27 @@
+import { createClient } from "@supabase/supabase-js";
+
 import {
+  createMobileSupabaseClient,
   createSupabaseAuthRepository,
   getMobileSupabaseConfig,
   type AppleCredential,
   type MobileAuthRepositoryDependencies,
   type SupabaseAuthSession,
 } from "../src/auth/authRepository";
+
+jest.mock("@supabase/supabase-js", () => ({
+  createClient: jest.fn(() => ({
+    auth: {
+      getSession: jest.fn(),
+      refreshSession: jest.fn(),
+      signInWithIdToken: jest.fn(),
+      signOut: jest.fn(),
+    },
+    functions: {
+      invoke: jest.fn(),
+    },
+  })),
+}));
 
 function session(
   userId: string,
@@ -119,6 +136,29 @@ describe("authRepository", () => {
 
     expect(() => getMobileSupabaseConfig()).toThrow(
       "Supabase env vars are missing",
+    );
+  });
+
+  it("configures Supabase auth with native session storage", () => {
+    createMobileSupabaseClient({
+      supabaseUrl: "https://example.supabase.co",
+      supabaseAnonKey: "public-anon-key",
+    });
+
+    expect(createClient).toHaveBeenCalledWith(
+      "https://example.supabase.co",
+      "public-anon-key",
+      expect.objectContaining({
+        auth: expect.objectContaining({
+          autoRefreshToken: true,
+          persistSession: true,
+          storage: expect.objectContaining({
+            getItem: expect.any(Function),
+            removeItem: expect.any(Function),
+            setItem: expect.any(Function),
+          }),
+        }),
+      }),
     );
   });
 

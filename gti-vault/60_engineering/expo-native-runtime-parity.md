@@ -47,6 +47,7 @@ TB-17 verifies the native iOS runtime pieces that Windows-local mobile tests can
 - App Store Connect API key is EAS-managed: `[Expo] EAS Submit 0HzlJc-8Qf`, key id `8V755S87PA`, role App Manager.
 - Build `1002` still launched to S00a because `restoreSession` swallows missing Supabase env and returns idle, but tapping Apple Sign-In constructed the Supabase client before the native Apple sheet and threw the missing-env error behind the generic `"Couldn't reach Apple. Try again."` UI.
 - Build `1003` is the first TestFlight build with the env-inline fix.
+- 2026-06-10 auth persistence diagnosis: the Expo Supabase client had `persistSession: true` but no React Native storage adapter, so sessions could only survive in memory. `mobile/src/auth/authRepository.ts` now passes a Supabase-recommended large-session adapter: AES key in Expo SecureStore, encrypted session payload in AsyncStorage; `npm run mobile:verify` passed after the fix.
 
 ## Closure note
 

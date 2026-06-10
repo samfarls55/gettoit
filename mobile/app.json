@@ -11,7 +11,8 @@
       "web"
     ],
     "plugins": [
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-secure-store"
     ],
     "ios": {
       "bundleIdentifier": "app.gettoit.GetToIt",
