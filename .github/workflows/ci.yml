@@ -260,7 +260,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: v2.105.0
       - name: supabase db push (linked project)
         if: steps.gate.outputs.skip == 'false'
         run: |
@@ -369,7 +369,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: v2.105.0
       - name: supabase secrets set (Edge Function runtime secrets)
         # The places-proxy handler reads FOURSQUARE_API_KEY from the
         # function runtime environment; a missing key makes it return

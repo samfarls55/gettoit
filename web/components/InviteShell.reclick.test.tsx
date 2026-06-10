@@ -150,6 +150,7 @@ describe("InviteShell — §C decided re-click", () => {
     await waitFor(() =>
       expect(screen.getByText("Ren Soba")).toBeInTheDocument(),
     );
+    await waitFor(() => expect(broadcastHandler).toBeDefined());
 
     // The initiator rerolls — the next decided read returns a new venue.
     readRoomPlanState.mockResolvedValue({
