@@ -323,8 +323,8 @@ describe("App", () => {
         activePlanPhase: "verdict",
         settingsOpen: false,
       },
-      visibleRoute: "Tonight, the verdict is",
-      visibleBody: "Pico's Taqueria",
+      visibleRoute: "Live verdict",
+      visibleBody: "PICO'S\nTAQUERIA",
     },
     {
       name: "settings can cover the signed-in Plan list",
@@ -503,8 +503,8 @@ describe("App", () => {
   it.each([
     ["Open Created Plan Thursday dinner with the crew", "Edit your plan"],
     ["Open Joined Plan Morgan's birthday", "Q1"],
-    ["Open Decided Plan Date night fallback", "Tonight, the verdict is"],
-    ["Open History Plan Taco crawl", "Closed verdict record"],
+    ["Open Decided Plan Date night fallback", "Live verdict"],
+    ["Open History Plan Taco crawl", "Verdict record"],
   ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
     render(
       <App
@@ -546,8 +546,8 @@ describe("App", () => {
         roomId: "history-taco-crawl",
         flavor: "group",
       });
-      expect(screen.getByText("Closed verdict record")).toBeOnTheScreen();
-      expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+      expect(screen.getByText("Verdict record")).toBeOnTheScreen();
+      expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
       expect(screen.queryByText("I'm in")).toBeNull();
       expect(screen.queryByText("Reroll")).toBeNull();
       expect(screen.getByText("Start a new decision")).toBeOnTheScreen();
@@ -896,7 +896,7 @@ describe("App", () => {
       expect(waitingRepository.fireVerdict).toHaveBeenCalledWith({
         roomId: "active-room",
       });
-      expect(screen.getByText("Tonight, the verdict is")).toBeOnTheScreen();
+      expect(screen.getByText("Live verdict")).toBeOnTheScreen();
     });
   });
 
@@ -916,7 +916,7 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Tonight, the verdict is")).toBeOnTheScreen();
+      expect(screen.getByText("Live verdict")).toBeOnTheScreen();
     });
   });
 
@@ -972,8 +972,8 @@ describe("App", () => {
         roomId: "solo-plan",
         flavor: "solo",
       });
-      expect(screen.getByText("Your solo pick")).toBeOnTheScreen();
-      expect(screen.queryByText("Ava")).toBeNull();
+      expect(screen.getByText("Solo verdict")).toBeOnTheScreen();
+      expect(screen.queryByText("Member receipts")).toBeNull();
       expect(screen.getByText("Save taste profile")).toBeOnTheScreen();
     });
   });
@@ -1089,7 +1089,7 @@ describe("App", () => {
         roomId: "decided-room",
         flavor: "group",
       });
-      expect(screen.getByText("Closed verdict record")).toBeOnTheScreen();
+      expect(screen.getByText("Verdict record")).toBeOnTheScreen();
       expect(screen.queryByText("I'm in")).toBeNull();
       expect(screen.queryByText("Reroll")).toBeNull();
     });

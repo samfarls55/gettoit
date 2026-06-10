@@ -35,18 +35,21 @@ describe("VerdictScreen", () => {
   it("renders group live verdict details, receipts, and live actions", () => {
     render(<VerdictScreen verdict={groupVerdict} />);
 
-    expect(screen.getByText("Tonight, the verdict is")).toBeOnTheScreen();
-    expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+    expect(screen.getByText("Live verdict")).toBeOnTheScreen();
+    expect(screen.getByText("LOCKED")).toBeOnTheScreen();
+    expect(screen.getByText("Tonight at 7:00 PM")).toBeOnTheScreen();
+    expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
     expect(screen.getByText("Mexican - $$ - 8 min walk")).toBeOnTheScreen();
     expect(screen.getByText("7:00 PM")).toBeOnTheScreen();
+    expect(screen.getByText("Meet there")).toBeOnTheScreen();
     expect(screen.getByText("All 2 of you")).toBeOnTheScreen();
+    expect(screen.getByText("Rule proof")).toBeOnTheScreen();
     expect(screen.getByText("Best fit for the table.")).toBeOnTheScreen();
-    expect(screen.getByText("Ava")).toBeOnTheScreen();
-    expect(screen.getByText("wanted social")).toBeOnTheScreen();
-    expect(screen.getByText("Morgan")).toBeOnTheScreen();
-    expect(screen.getByText("wanted calm")).toBeOnTheScreen();
+    expect(screen.getByText("Member receipts")).toBeOnTheScreen();
+    expect(screen.getByText("Ava: wanted social")).toBeOnTheScreen();
+    expect(screen.getByText("Morgan: wanted calm")).toBeOnTheScreen();
     expect(screen.getByText("I'm in")).toBeOnTheScreen();
-    expect(screen.getByText("Reroll · 3 left")).toBeOnTheScreen();
+    expect(screen.getByText("Reroll with reason, 3 left")).toBeOnTheScreen();
   });
 
   it("renders solo live verdict copy and suppresses group-only behavior", () => {
@@ -62,12 +65,12 @@ describe("VerdictScreen", () => {
       />,
     );
 
-    expect(screen.getByText("Your solo pick")).toBeOnTheScreen();
-    expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+    expect(screen.getByText("Solo verdict")).toBeOnTheScreen();
+    expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
     expect(screen.getByText("7:00 PM")).toBeOnTheScreen();
     expect(screen.queryByText("All 2 of you")).toBeNull();
-    expect(screen.queryByText("Ava")).toBeNull();
-    expect(screen.queryByText("wanted social")).toBeNull();
+    expect(screen.queryByText("Member receipts")).toBeNull();
+    expect(screen.queryByText("Ava: wanted social")).toBeNull();
     expect(screen.getByText("Save taste profile")).toBeOnTheScreen();
   });
 
@@ -89,7 +92,7 @@ describe("VerdictScreen", () => {
     expect(
       screen.getByText("No rerolls left. Tonight is locked."),
     ).toBeOnTheScreen();
-    expect(screen.queryByText("Reroll · 3 left")).toBeNull();
+    expect(screen.queryByText("Reroll with reason, 3 left")).toBeNull();
   });
 
   it("runs eligible rerolls through the repository action", async () => {
@@ -97,7 +100,7 @@ describe("VerdictScreen", () => {
 
     render(<VerdictScreen verdict={groupVerdict} onReroll={onReroll} />);
 
-    fireEvent.press(screen.getByText("Reroll · 3 left"));
+    fireEvent.press(screen.getByText("Reroll with reason, 3 left"));
 
     await waitFor(() => {
       expect(onReroll).toHaveBeenCalledWith({
@@ -167,12 +170,14 @@ describe("VerdictScreen", () => {
   it("renders read-only verdict records without live-only actions", () => {
     render(<VerdictScreen mode="readOnly" verdict={groupVerdict} />);
 
-    expect(screen.getByText("Closed verdict record")).toBeOnTheScreen();
-    expect(screen.getByText("Pico's Taqueria")).toBeOnTheScreen();
+    expect(screen.getByText("Verdict record")).toBeOnTheScreen();
+    expect(screen.getByText("Closed record")).toBeOnTheScreen();
+    expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
     expect(screen.getByText("Mexican - $$ - 8 min walk")).toBeOnTheScreen();
+    expect(screen.getByText("Rule proof")).toBeOnTheScreen();
     expect(screen.getByText("Best fit for the table.")).toBeOnTheScreen();
-    expect(screen.getByText("Ava")).toBeOnTheScreen();
-    expect(screen.getByText("wanted social")).toBeOnTheScreen();
+    expect(screen.getByText("Member receipts")).toBeOnTheScreen();
+    expect(screen.getByText("Ava: wanted social")).toBeOnTheScreen();
     expect(screen.queryByText("7:00 PM")).toBeNull();
     expect(screen.queryByText("All 2 of you")).toBeNull();
     expect(screen.queryByText("I'm in")).toBeNull();

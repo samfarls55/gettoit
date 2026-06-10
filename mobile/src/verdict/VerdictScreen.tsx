@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
 import type {
@@ -32,59 +32,101 @@ export function VerdictScreen({
 
   const isSolo = verdict.flavor === "solo";
   const isReadOnly = mode === "readOnly";
-  let eyebrowLabel = "Tonight, the verdict is";
-
-  if (isReadOnly) {
-    eyebrowLabel = "Closed verdict record";
-  } else if (isSolo) {
-    eyebrowLabel = "Your solo pick";
-  }
-
   const primaryActionLabel = isReadOnly
     ? "Start a new decision"
     : verdict.primaryActionLabel;
-  const rerollLabel =
+  const rerollActionLabel =
     verdict.reroll.burnsRemaining === 1
-      ? "Reroll · last one"
-      : `Reroll · ${verdict.reroll.burnsRemaining} left`;
+      ? "Reroll with reason, last one"
+      : `Reroll with reason, ${verdict.reroll.burnsRemaining} left`;
+  const topLabel = isReadOnly
+    ? "Verdict record"
+    : isSolo
+      ? "Solo verdict"
+      : "Live verdict";
 
   return (
-    <View style={styles.root}>
-      <Text style={styles.eyebrow}>{eyebrowLabel}</Text>
-      <Text style={styles.title}>{verdict.placeName}</Text>
-      {verdict.metaLine ? (
-        <Text style={styles.subtitle}>{verdict.metaLine}</Text>
-      ) : null}
-      {isReadOnly ? (
-        <Text style={styles.recordCopy}>
-          This Plan is closed. The recommendation is preserved as a record.
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.verdictContent}
+    >
+      <View pointerEvents="none" style={styles.sunGlow} />
+      <View pointerEvents="none" style={styles.emberGlow} />
+
+      <View style={styles.topbar}>
+        <View style={styles.liveChip}>
+          <Text style={styles.liveChipText}>{topLabel}</Text>
+        </View>
+        {verdict.receipts.length > 0 ? (
+          <View
+            accessibilityLabel="Members counted"
+            style={styles.avatarStack}
+          >
+            {verdict.receipts.slice(0, 4).map((receipt) => (
+              <View key={receipt.id} style={styles.avatar}>
+                <Text style={styles.avatarText}>{initialsFor(receipt.name)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.poster}>
+        <View style={styles.seal}>
+          <Text style={styles.sealText}>LOCKED</Text>
+        </View>
+        <Text style={styles.posterKicker}>
+          {liveKickerFor(verdict, isReadOnly)}
         </Text>
-      ) : (
-        <View style={styles.timeBadge}>
-          <Text style={styles.timeText}>{verdict.timeBadge.time}</Text>
-          {verdict.timeBadge.audience ? (
-            <Text style={styles.timeAudience}>
-              {verdict.timeBadge.audience}
-            </Text>
-          ) : null}
-        </View>
-      )}
-      <Text style={styles.ruleText}>{verdict.ruleText}</Text>
-      {verdict.receipts.length > 0 ? (
-        <View style={styles.receiptStack}>
-          {verdict.receipts.map((receipt) => (
-            <View key={receipt.id} style={styles.receiptRow}>
-              <Text style={styles.receiptName}>{receipt.name}</Text>
-              <Text style={styles.receiptAction}>{receipt.action}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <View style={styles.actionRow}>
-        <Pressable accessibilityRole="button" style={styles.primaryButton}>
-          <Text style={styles.primaryButtonLabel}>
-            {primaryActionLabel}
+        <Text accessibilityLabel={verdict.placeName} style={styles.venueTitle}>
+          {stackedPlaceName(verdict.placeName)}
+        </Text>
+        {verdict.metaLine ? (
+          <Text style={styles.metaLine}>{verdict.metaLine}</Text>
+        ) : null}
+        {isReadOnly ? (
+          <Text style={styles.recordCopy}>
+            This Plan is closed. The recommendation is preserved as a record.
           </Text>
+        ) : (
+          <View style={styles.timeBlock}>
+            <View>
+              <Text style={styles.timeMain}>{verdict.timeBadge.time}</Text>
+              <Text style={styles.timeSub}>Meet there</Text>
+            </View>
+            {verdict.timeBadge.audience ? (
+              <Text style={styles.timeAudience}>
+                {verdict.timeBadge.audience}
+              </Text>
+            ) : null}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.proofStack}>
+        <View style={styles.ruleCard}>
+          <Text style={styles.proofLabel}>Rule proof</Text>
+          <Text style={styles.ruleText}>{verdict.ruleText}</Text>
+        </View>
+        {verdict.receipts.length > 0 ? (
+          <View style={styles.receiptBlock}>
+            <Text style={styles.proofLabel}>Member receipts</Text>
+            <View style={styles.receiptRow}>
+              {verdict.receipts.map((receipt) => (
+                <View key={receipt.id} style={styles.receiptChip}>
+                  <Text style={styles.receiptText}>
+                    {receipt.name}: {receipt.action}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.actionStack}>
+        <Pressable accessibilityRole="button" style={styles.primaryButton}>
+          <Text style={styles.primaryButtonLabel}>{primaryActionLabel}</Text>
         </Pressable>
         {isReadOnly ? null : verdict.reroll.isEligible ? (
           <Pressable
@@ -92,13 +134,17 @@ export function VerdictScreen({
             onPress={() => onReroll({ roomId: verdict.roomId, reason: "mood" })}
             style={styles.secondaryButton}
           >
-            <Text style={styles.secondaryButtonLabel}>{rerollLabel}</Text>
+            <Text style={styles.secondaryButtonLabel}>
+              {rerollActionLabel}
+            </Text>
           </Pressable>
         ) : (
-          <Text style={styles.subtitle}>{verdict.reroll.ineligibleReason}</Text>
+          <Text style={styles.rerollUnavailable}>
+            {verdict.reroll.ineligibleReason}
+          </Text>
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -109,6 +155,36 @@ type NoSurvivorVerdictProps = {
 
 function radiusLabel(radiusMiles: number): string {
   return `${radiusMiles.toFixed(1)} mi`;
+}
+
+function initialsFor(name: string): string {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("");
+
+  return initials.toUpperCase() || "?";
+}
+
+function stackedPlaceName(placeName: string): string {
+  return placeName.trim().split(/\s+/).join("\n").toUpperCase();
+}
+
+function liveKickerFor(
+  verdict: Extract<VerdictViewModel, { kind: "live" }>,
+  isReadOnly: boolean,
+): string {
+  if (isReadOnly) {
+    return "Closed record";
+  }
+
+  if (verdict.flavor === "solo") {
+    return "Solo pick";
+  }
+
+  return `Tonight at ${verdict.timeBadge.time}`;
 }
 
 function NoSurvivorVerdict({
@@ -141,7 +217,7 @@ function NoSurvivorVerdict({
   };
 
   return (
-    <View style={styles.root}>
+    <View style={styles.noSurvivorRoot}>
       <Text style={styles.eyebrow}>Try a wider search</Text>
       <Text style={styles.title}>No spot fits tonight</Text>
       <Text style={styles.subtitle}>
@@ -184,8 +260,161 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: mobileTokens.color.ink,
+  },
+  verdictContent: {
+    flexGrow: 1,
+    gap: mobileTokens.spacing[4],
+    overflow: "hidden",
+    padding: mobileTokens.spacing[8],
+  },
+  noSurvivorRoot: {
+    flex: 1,
+    backgroundColor: mobileTokens.color.ink,
     gap: mobileTokens.spacing[4],
     padding: mobileTokens.spacing[8],
+  },
+  sunGlow: {
+    position: "absolute",
+    right: -54,
+    top: -64,
+    width: 188,
+    height: 188,
+    borderRadius: 94,
+    backgroundColor: "rgba(255,210,63,0.18)",
+  },
+  emberGlow: {
+    position: "absolute",
+    left: -84,
+    bottom: 96,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(255,122,61,0.12)",
+  },
+  topbar: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 40,
+  },
+  liveChip: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.24)",
+    borderRadius: 999,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 36,
+    paddingHorizontal: mobileTokens.spacing[3],
+  },
+  liveChipText: {
+    color: mobileTokens.color.paper,
+    fontSize: mobileTokens.typography.eyebrow.size,
+    fontWeight: "800",
+  },
+  avatarStack: {
+    alignItems: "center",
+    flexDirection: "row",
+  },
+  avatar: {
+    alignItems: "center",
+    backgroundColor: mobileTokens.color.paper,
+    borderColor: "rgba(0,0,0,0.52)",
+    borderRadius: 16,
+    borderWidth: 2,
+    height: 32,
+    justifyContent: "center",
+    marginLeft: -8,
+    width: 32,
+  },
+  avatarText: {
+    color: mobileTokens.color.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  poster: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.2)",
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: mobileTokens.spacing[3],
+    marginTop: mobileTokens.spacing[3],
+    padding: mobileTokens.spacing[4],
+    paddingTop: 36,
+  },
+  seal: {
+    alignItems: "center",
+    borderColor: mobileTokens.color.sun,
+    borderRadius: 36,
+    borderWidth: 2,
+    height: 72,
+    justifyContent: "center",
+    position: "absolute",
+    right: 14,
+    top: -20,
+    transform: [{ rotate: "-10deg" }],
+    width: 72,
+  },
+  sealText: {
+    color: mobileTokens.color.sun,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  posterKicker: {
+    color: mobileTokens.color.sun,
+    fontSize: mobileTokens.typography.eyebrow.size,
+    fontWeight: "900",
+  },
+  venueTitle: {
+    color: mobileTokens.color.paper,
+    fontSize: 46,
+    fontWeight: "900",
+    lineHeight: 42,
+    marginTop: mobileTokens.spacing[3],
+  },
+  metaLine: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: 14,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  timeBlock: {
+    alignItems: "center",
+    backgroundColor: mobileTokens.color.sun,
+    borderRadius: 14,
+    flexDirection: "row",
+    gap: mobileTokens.spacing[3],
+    justifyContent: "space-between",
+    marginTop: mobileTokens.spacing[3],
+    padding: mobileTokens.spacing[4],
+  },
+  timeMain: {
+    color: mobileTokens.color.ink,
+    fontSize: 30,
+    fontWeight: "900",
+    lineHeight: 32,
+  },
+  timeSub: {
+    color: mobileTokens.color.ink,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  proofStack: {
+    gap: mobileTokens.spacing[3],
+  },
+  ruleCard: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.22)",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    padding: mobileTokens.spacing[4],
+  },
+  proofLabel: {
+    color: mobileTokens.color.sun,
+    fontSize: mobileTokens.typography.eyebrow.size,
+    fontWeight: "900",
   },
   eyebrow: {
     color: mobileTokens.color.sun,
@@ -205,25 +434,11 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
-  timeBadge: {
-    alignSelf: "flex-start",
-    borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: mobileTokens.spacing[4],
-  },
-  timeText: {
-    color: mobileTokens.color.paper,
-    fontSize: mobileTokens.typography.body.size,
-    fontWeight: "800",
-  },
   timeAudience: {
-    color: mobileTokens.color.textSecondaryOnGradient,
-    fontSize: mobileTokens.typography.eyebrow.size,
-    fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
-    marginTop: mobileTokens.spacing[3],
-    textTransform: "uppercase",
+    color: mobileTokens.color.ink,
+    fontSize: 11,
+    fontWeight: "900",
+    textAlign: "right",
   },
   ruleText: {
     color: mobileTokens.color.paper,
@@ -236,27 +451,33 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
-  receiptStack: {
-    gap: mobileTokens.spacing[3],
-  },
-  receiptRow: {
-    backgroundColor: "rgba(255,255,255,0.10)",
-    borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 12,
+  receiptBlock: {
+    backgroundColor: "rgba(255,255,255,0.07)",
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 14,
     borderWidth: 1,
     gap: mobileTokens.spacing[3],
     padding: mobileTokens.spacing[4],
   },
-  receiptName: {
-    color: mobileTokens.color.paper,
-    fontSize: mobileTokens.typography.body.size,
+  receiptRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: mobileTokens.spacing[3],
+  },
+  receiptChip: {
+    backgroundColor: "rgba(255,255,255,0.09)",
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  receiptText: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: 13,
     fontWeight: "800",
   },
-  receiptAction: {
-    color: mobileTokens.color.textSecondaryOnGradient,
-    fontSize: mobileTokens.typography.body.size,
-  },
-  actionRow: {
+  actionStack: {
     gap: mobileTokens.spacing[3],
     marginTop: mobileTokens.spacing[4],
   },
@@ -272,7 +493,6 @@ const styles = StyleSheet.create({
     color: mobileTokens.color.ink,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
-    textTransform: "uppercase",
   },
   secondaryButton: {
     alignItems: "center",
@@ -287,7 +507,14 @@ const styles = StyleSheet.create({
     color: mobileTokens.color.paper,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
-    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  rerollUnavailable: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "700",
+    lineHeight: mobileTokens.typography.body.lineHeight,
+    textAlign: "center",
   },
   radiusControl: {
     alignItems: "center",
