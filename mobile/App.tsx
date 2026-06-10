@@ -1,6 +1,8 @@
 import { StatusBar } from "expo-status-bar";
-import { type Dispatch, useEffect, useReducer, useState } from "react";
+import { type Dispatch, useEffect, useReducer, useRef, useState } from "react";
 import {
+  Animated,
+  Easing,
   Pressable,
   StyleSheet,
   Text,
@@ -929,6 +931,25 @@ function SignInGate({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const trimmedClaimCode = claimCode.trim();
   const isClaimRedeemDisabled = !trimmedClaimCode || isSubmitting;
+  const heroIntro = useRef(new Animated.Value(0)).current;
+  const actionIntro = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(90, [
+      Animated.timing(heroIntro, {
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.timing(actionIntro, {
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [actionIntro, heroIntro]);
 
   const handleAppleSignInPress = async () => {
     setAppleSignInFailed(false);
@@ -969,7 +990,22 @@ function SignInGate({
       <VerdictBackdrop />
       <View style={styles.signInSurface}>
         <View style={styles.signInTopSpace} />
-        <View style={styles.signInHero}>
+        <Animated.View
+          style={[
+            styles.signInHero,
+            {
+              opacity: heroIntro,
+              transform: [
+                {
+                  translateY: heroIntro.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <View accessibilityLabel="GetToIt logo" style={styles.logoMark}>
             <Text style={styles.logoMarkText}>G</Text>
           </View>
@@ -979,74 +1015,88 @@ function SignInGate({
           <Text style={styles.signInSubtitle}>
             Save your taste profile and turn group indecision into a locked pick.
           </Text>
-        </View>
-        {appleSignInFailed ? (
-          <Text style={styles.signInInlineError}>
-            Couldn't reach Apple. Try again.
-          </Text>
-        ) : null}
-        {claimRedeemed ? (
-          <Text style={styles.signInInlineSuccess}>
-            Web Plans ready. Sign in with Apple to finish.
-          </Text>
-        ) : null}
-        <Pressable
-          accessibilityLabel="Sign in with Apple"
-          accessibilityRole="button"
-          disabled={isSubmitting}
-          onPress={handleAppleSignInPress}
-          style={[
-            styles.appleSignInButton,
-            isSubmitting && styles.disabledButton,
-          ]}
+        </Animated.View>
+        <Animated.View
+          style={{
+            opacity: actionIntro,
+            transform: [
+              {
+                translateY: actionIntro.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [12, 0],
+                }),
+              },
+            ],
+          }}
         >
-          <Text style={styles.appleSignInLogo}>{"\uF8FF"}</Text>
-          <Text style={styles.appleSignInLabel}>Continue with Apple</Text>
-        </Pressable>
-        {isClaimPanelOpen ? (
-          <View style={styles.claimPanel}>
-            <Text style={styles.claimTeaching}>
-              Bring back your recent web Plans. Open any link you voted on, tap
-              Getting the app?, and enter the code here.
+          {appleSignInFailed ? (
+            <Text style={styles.signInInlineError}>
+              Couldn't reach Apple. Try again.
             </Text>
-            <TextInput
-              accessibilityLabel="Claim code"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              onChangeText={setClaimCode}
-              placeholder="Enter your code"
-              placeholderTextColor={mobileTokens.color.textTertiaryOnGradient}
-              style={styles.claimInput}
-              value={claimCode}
-            />
-            {claimRedeemFailed ? (
-              <Text accessibilityRole="alert" style={styles.inlineError}>
-                That code didn't work. Generate a fresh one from your web link.
-              </Text>
-            ) : null}
-            <Pressable
-              accessibilityLabel="Bring my Plans over"
-              accessibilityRole="button"
-              disabled={isClaimRedeemDisabled}
-              onPress={handleClaimCodeRedeemPress}
-              style={[
-                styles.primaryButton,
-                isClaimRedeemDisabled && styles.disabledButton,
-              ]}
-            >
-              <Text style={styles.primaryButtonLabel}>Bring my Plans over</Text>
-            </Pressable>
-          </View>
-        ) : (
+          ) : null}
+          {claimRedeemed ? (
+            <Text style={styles.signInInlineSuccess}>
+              Web Plans ready. Sign in with Apple to finish.
+            </Text>
+          ) : null}
           <Pressable
-            accessibilityLabel="Voted on the web?"
+            accessibilityLabel="Sign in with Apple"
             accessibilityRole="button"
-            onPress={() => setIsClaimPanelOpen(true)}
-            style={styles.signInWebButton}
+            disabled={isSubmitting}
+            onPress={handleAppleSignInPress}
+            style={[
+              styles.appleSignInButton,
+              isSubmitting && styles.disabledButton,
+            ]}
           >
-            <Text style={styles.signInWebButtonLabel}>Voted on the Web?</Text>
+            <Text style={styles.appleSignInLogo}>{"\uF8FF"}</Text>
+            <Text style={styles.appleSignInLabel}>Continue with Apple</Text>
           </Pressable>
-        )}
+          {isClaimPanelOpen ? (
+            <View style={styles.claimPanel}>
+              <Text style={styles.claimTeaching}>
+                Bring back your recent web Plans. Open any link you voted on, tap
+                Getting the app?, and enter the code here.
+              </Text>
+              <TextInput
+                accessibilityLabel="Claim code"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                onChangeText={setClaimCode}
+                placeholder="Enter your code"
+                placeholderTextColor={mobileTokens.color.textTertiaryOnGradient}
+                style={styles.claimInput}
+                value={claimCode}
+              />
+              {claimRedeemFailed ? (
+                <Text accessibilityRole="alert" style={styles.inlineError}>
+                  That code didn't work. Generate a fresh one from your web link.
+                </Text>
+              ) : null}
+              <Pressable
+                accessibilityLabel="Bring my Plans over"
+                accessibilityRole="button"
+                disabled={isClaimRedeemDisabled}
+                onPress={handleClaimCodeRedeemPress}
+                style={[
+                  styles.primaryButton,
+                  isClaimRedeemDisabled && styles.disabledButton,
+                ]}
+              >
+                <Text style={styles.primaryButtonLabel}>Bring my Plans over</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              accessibilityLabel="Voted on the web?"
+              accessibilityRole="button"
+              onPress={() => setIsClaimPanelOpen(true)}
+              style={styles.signInWebButton}
+            >
+              <Text style={styles.signInWebButtonLabel}>Voted on the Web?</Text>
+            </Pressable>
+          )}
+        </Animated.View>
         <View style={styles.homeIndicator} />
       </View>
     </View>
@@ -1071,7 +1121,7 @@ const styles = StyleSheet.create({
   },
   signInTopSpace: {
     flex: 1,
-    minHeight: 112,
+    minHeight: 80,
   },
   signInHero: {
     alignItems: "center",
