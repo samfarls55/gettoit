@@ -61,6 +61,9 @@ function venue(
     fsq_place_id: id,
     name: `Venue ${id}`,
     price_tier: 2,
+    rating: 4.2,
+    user_rating_count: 30,
+    total_ratings: 30,
     categories: ["Restaurant"],
     ...payload,
   };
@@ -169,7 +172,11 @@ Deno.test("AC1/AC2 — a solo session preference-scored over the full pool write
       },
     ],
     votes: [
-      prefVote("u1", { cuisines: ["mexican"], reputation: "no_preference", vibe: 2 }, [
+      prefVote("u1", {
+        cuisines: ["mexican"],
+        reputation: "no_preference",
+        vibe: 2,
+      }, [
         { droppedAxis: "cuisine", score: 1 },
         { droppedAxis: "reputation", score: 5 },
         { droppedAxis: "vibe", score: 5 },
@@ -216,7 +223,11 @@ Deno.test("AC3 — the verdict winner can be a venue shown to no member at Q5", 
       },
     ],
     votes: [
-      prefVote("u1", { cuisines: ["italian"], reputation: "no_preference", vibe: 2 }, [
+      prefVote("u1", {
+        cuisines: ["italian"],
+        reputation: "no_preference",
+        vibe: 2,
+      }, [
         { droppedAxis: "cuisine", score: 1 },
         { droppedAxis: "reputation", score: 5 },
         { droppedAxis: "vibe", score: 5 },
@@ -268,12 +279,20 @@ Deno.test("AC4 — a 2-member room is preference-scored over the shared union (m
       // Both members: cuisine is the ONLY axis that matters (its Q5
       // drop card scored 1, reputation + vibe keeps scored 5). vibe +
       // reputation weights collapse toward zero.
-      prefVote("u1", { cuisines: ["mexican"], reputation: "no_preference", vibe: 2 }, [
+      prefVote("u1", {
+        cuisines: ["mexican"],
+        reputation: "no_preference",
+        vibe: 2,
+      }, [
         { droppedAxis: "cuisine", score: 1 },
         { droppedAxis: "reputation", score: 5 },
         { droppedAxis: "vibe", score: 5 },
       ]),
-      prefVote("u2", { cuisines: ["italian"], reputation: "no_preference", vibe: 2 }, [
+      prefVote("u2", {
+        cuisines: ["italian"],
+        reputation: "no_preference",
+        vibe: 2,
+      }, [
         { droppedAxis: "cuisine", score: 1 },
         { droppedAxis: "reputation", score: 5 },
         { droppedAxis: "vibe", score: 5 },
@@ -325,7 +344,11 @@ Deno.test("AC5 — the verdict does not depend on votes.q5.answer.scores as cand
       },
     ],
     votes: [
-      prefVote("u1", { cuisines: ["mexican"], reputation: "no_preference", vibe: 2 }, [
+      prefVote("u1", {
+        cuisines: ["mexican"],
+        reputation: "no_preference",
+        vibe: 2,
+      }, [
         { droppedAxis: "cuisine", score: 1 },
         { droppedAxis: "reputation", score: 5 },
         { droppedAxis: "vibe", score: 5 },

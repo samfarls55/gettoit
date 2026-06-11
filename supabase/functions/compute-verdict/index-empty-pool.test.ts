@@ -77,7 +77,7 @@ function emptyPoolAdapter(seed: EmptyPoolSeed = {}): EmptyPoolState {
       return { id: VALID_ROOM_ID };
     },
     async fetchOptions(_id) {
-      return seed.options ?? [];
+      return (seed.options ?? []).map(withEligibleGoogleMetadata);
     },
     async fetchVotes(_id) {
       return seed.votes ?? [];
@@ -112,6 +112,17 @@ function emptyPoolAdapter(seed: EmptyPoolSeed = {}): EmptyPoolState {
     },
   };
   return { adapter, inserts, cuts, verdictReadyRoomIds };
+}
+
+function withEligibleGoogleMetadata(row: RoomOptionRow): RoomOptionRow {
+  return {
+    ...row,
+    payload: {
+      rating: 4.2,
+      user_rating_count: 30,
+      ...row.payload,
+    },
+  };
 }
 
 const votesFor = (...userIds: string[]): MemberVoteRow[] =>

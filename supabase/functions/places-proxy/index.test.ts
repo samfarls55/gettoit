@@ -37,7 +37,10 @@ Deno.test("handleRequest — OPTIONS returns 204 with CORS headers", async () =>
     { env: envOk(), buildCacheAdapter: memoryCache },
   );
   assertEquals(res.status, 204);
-  assertEquals(res.headers.get("Access-Control-Allow-Methods")?.includes("POST"), true);
+  assertEquals(
+    res.headers.get("Access-Control-Allow-Methods")?.includes("POST"),
+    true,
+  );
 });
 
 Deno.test("handleRequest — GET returns 405", async () => {
@@ -63,7 +66,10 @@ Deno.test("handleRequest — missing Foursquare key returns 500", async () => {
   const res = await handleRequest(
     new Request("https://example/places-proxy", {
       method: "POST",
-      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      headers: {
+        Authorization: "Bearer test-jwt",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ lat: 0, lng: 0, radius_meters: 100 }),
     }),
     {
@@ -92,7 +98,10 @@ Deno.test("handleRequest — invalid input returns 400 with detail", async () =>
   const res = await handleRequest(
     new Request("https://example/places-proxy", {
       method: "POST",
-      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      headers: {
+        Authorization: "Bearer test-jwt",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ lat: 999, lng: 0, radius_meters: 100 }),
     }),
     { env: envOk(), buildCacheAdapter: memoryCache },
@@ -107,21 +116,29 @@ Deno.test("handleRequest — happy path returns shaped places", async () => {
   // thin-threshold > 1, is_thin must be true; the response still
   // serialises through the proxy with the shaped row.
   const stubFetch = (_url: string | URL, _init?: RequestInit) =>
-    Promise.resolve(new Response(JSON.stringify({
-      results: [{
-        fsq_place_id: "fsq-1",
-        name: "Solo Diner",
-        latitude: 1.0,
-        longitude: 2.0,
-        categories: [],
-        location: {},
-      }],
-    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    Promise.resolve(
+      new Response(
+        JSON.stringify({
+          results: [{
+            fsq_place_id: "fsq-1",
+            name: "Solo Diner",
+            latitude: 1.0,
+            longitude: 2.0,
+            categories: [],
+            location: {},
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
 
   const res = await handleRequest(
     new Request("https://example/places-proxy", {
       method: "POST",
-      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      headers: {
+        Authorization: "Bearer test-jwt",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ lat: 1.0, lng: 2.0, radius_meters: 100 }),
     }),
     {
@@ -141,20 +158,30 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
   const fetchCalls: { url: string; init?: RequestInit }[] = [];
   const stubFetch = (url: string | URL, init?: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
-    return Promise.resolve(new Response(JSON.stringify({
-      places: [{
-        id: "google-1",
-        displayName: { text: "Only Name" },
-        rating: 4.7,
-        formattedAddress: "Hidden address",
-      }],
-    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          places: [{
+            id: "google-1",
+            displayName: { text: "Only Name" },
+            priceLevel: "PRICE_LEVEL_MODERATE",
+            rating: 4.7,
+            userRatingCount: 100,
+            formattedAddress: "Hidden address",
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
   };
 
   const res = await handleRequest(
     new Request("https://example/places-proxy", {
       method: "POST",
-      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      headers: {
+        Authorization: "Bearer test-jwt",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         surface: "q5",
         field_mask: "places.rating,places.formattedAddress",

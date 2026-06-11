@@ -5,18 +5,16 @@
 // loop against a recorded Foursquare response payload (no real HTTP).
 
 import {
+  assert,
   assertEquals,
   assertExists,
   assertRejects,
   assertThrows,
-  assert,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   type CacheAdapter,
   type CacheRow,
   FoursquareUpstreamError,
-  googlePrimaryTypesForCuisineSelection,
-  GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT,
   GOOGLE_Q5_FIELD_MASK,
   GooglePlacesGuardrailError,
   handleGoogleQ5PlacesProxy,
@@ -53,7 +51,10 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       latitude: 40.7130,
       longitude: -74.0062,
       categories: [
-        { fsq_category_id: "52e81612bcbc57f1066b79ff", name: "Halal Restaurant" },
+        {
+          fsq_category_id: "52e81612bcbc57f1066b79ff",
+          name: "Halal Restaurant",
+        },
       ],
       location: { formatted_address: "1 Main St, NYC" },
       price: 2,
@@ -68,7 +69,10 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       latitude: 40.7135,
       longitude: -74.0068,
       categories: [
-        { fsq_category_id: "52e81612bcbc57f1066b79fc", name: "Kosher Restaurant" },
+        {
+          fsq_category_id: "52e81612bcbc57f1066b79fc",
+          name: "Kosher Restaurant",
+        },
       ],
       location: { formatted_address: "2 Main St, NYC" },
       price: 3,
@@ -83,7 +87,10 @@ const RECORDED_FOURSQUARE_RESPONSE: FoursquareSearchResponse = {
       latitude: 40.7140,
       longitude: -74.0080,
       categories: [
-        { fsq_category_id: "4bf58dd8d48988d14e941735", name: "American Restaurant" },
+        {
+          fsq_category_id: "4bf58dd8d48988d14e941735",
+          name: "American Restaurant",
+        },
       ],
       location: { formatted_address: "3 Main St, NYC" },
       price: 2,
@@ -107,7 +114,9 @@ class MemoryCache implements CacheAdapter {
 
   get(geo_h3: string, query_signature: string): Promise<CacheRow | null> {
     this.reads++;
-    return Promise.resolve(this.store.get(this.key(geo_h3, query_signature)) ?? null);
+    return Promise.resolve(
+      this.store.get(this.key(geo_h3, query_signature)) ?? null,
+    );
   }
 
   put(row: CacheRow): Promise<void> {
@@ -143,7 +152,10 @@ function stubFetch(
   };
 }
 
-function recordedResponse(body: FoursquareSearchResponse, status = 200): Response {
+function recordedResponse(
+  body: FoursquareSearchResponse,
+  status = 200,
+): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
@@ -191,7 +203,9 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
           id: "google-place-1",
           displayName: { text: "Pico's" },
           formattedAddress: "1 Main St",
+          priceLevel: "PRICE_LEVEL_MODERATE",
           rating: 4.8,
+          userRatingCount: 200,
           regularOpeningHours: { openNow: true },
           photos: [{ name: "photo-1" }],
           googleMapsUri: "https://maps.google.example/picos",
@@ -202,29 +216,26 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
   };
 
-  const result = await handleGoogleQ5PlacesProxy({
-    ...TYPICAL_INPUT,
-    filters: { ...TYPICAL_INPUT.filters, cuisine: "mexican" },
-  }, {
+  const result = await handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
     fetch,
     googleApiKey: "google-secret",
   });
 
   assertEquals(calls.length, 1);
-  assertEquals(calls[0].url, "https://places.googleapis.com/v1/places:searchNearby");
+  assertEquals(
+    calls[0].url,
+    "https://places.googleapis.com/v1/places:searchNearby",
+  );
   const headers = calls[0].init?.headers as Record<string, string>;
   assertEquals(headers["X-Goog-Api-Key"], "google-secret");
   assertEquals(headers["X-Goog-FieldMask"], GOOGLE_Q5_FIELD_MASK);
   assertEquals(headers["Content-Type"], "application/json");
   const requestBody = JSON.parse(calls[0].init?.body as string);
-  assertEquals(requestBody.includedPrimaryTypes, [
-    "mexican_restaurant",
-    "taco_restaurant",
-    "tex_mex_restaurant",
-    "burrito_restaurant",
-  ]);
   assertEquals(requestBody.locationRestriction.circle.center.latitude, 40.7128);
-  assertEquals(requestBody.locationRestriction.circle.center.longitude, -74.006);
+  assertEquals(
+    requestBody.locationRestriction.circle.center.longitude,
+    -74.006,
+  );
   assertEquals(requestBody.locationRestriction.circle.radius, 1600);
 
   assertEquals(result, {
@@ -239,7 +250,9 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
   for (
     const forbidden of [
       "formattedAddress",
+      "priceLevel",
       "rating",
+      "userRatingCount",
       "regularOpeningHours",
       "photos",
       "googleMapsUri",
@@ -304,10 +317,7 @@ Deno.test("google q5 — No Preference maps to the Q1-selectable union only", as
       "each Google Nearby Search type restriction chunk must stay within provider limits",
     );
   }
-  assertEquals(
-    primaryTypeChunks.flat(),
-    googlePrimaryTypesForCuisineSelection([]),
-  );
+  assertEquals(primaryTypeChunks.flat(), googlePrimaryTypesForCuisineSelection([]));
   assertEquals(primaryTypeChunks.flat().includes("food"), false);
   assertEquals(primaryTypeChunks.flat().includes("vegan_restaurant"), false);
   assertEquals(primaryTypeChunks.flat().includes("breakfast_restaurant"), false);
@@ -336,10 +346,7 @@ Deno.test("google q5 — retries one transient failure then fails closed", async
 
   await assertRejects(
     () =>
-      handleGoogleQ5PlacesProxy({
-        ...TYPICAL_INPUT,
-        filters: { ...TYPICAL_INPUT.filters, cuisine: "mexican" },
-      }, {
+      handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
         fetch,
         googleApiKey: "google-secret",
       }),
@@ -381,7 +388,12 @@ Deno.test("cache miss â€” calls Foursquare, writes cache, returns shaped ro
   assertEquals(headers["Authorization"], "Bearer test-api-key");
   assertEquals(headers["X-Places-Api-Version"], FOURSQUARE_API_VERSION);
   // 3. URL targets the post-migration host, not the v3 legacy.
-  assertEquals(fetchCalls[0].url.startsWith("https://places-api.foursquare.com/places/search?"), true);
+  assertEquals(
+    fetchCalls[0].url.startsWith(
+      "https://places-api.foursquare.com/places/search?",
+    ),
+    true,
+  );
   // 4. Cache was written.
   assertEquals(cache.writes, 1);
   // 5. Response carries the shaped rows.
@@ -397,7 +409,11 @@ Deno.test("cache hit â€” returns cached rows without calling Foursquare", a
   assertEquals(fetchCalls.length, 1);
   // Second call must be served from cache.
   const second = await handlePlacesProxy(TYPICAL_INPUT, deps);
-  assertEquals(fetchCalls.length, 1, "Foursquare must NOT be called on a fresh-cache hit");
+  assertEquals(
+    fetchCalls.length,
+    1,
+    "Foursquare must NOT be called on a fresh-cache hit",
+  );
   assertEquals(second.served_from_cache, true);
   assertEquals(second.places.length, 3);
   // Sanity: only one cache row stored.
@@ -407,7 +423,10 @@ Deno.test("cache hit â€” returns cached rows without calling Foursquare", a
 Deno.test("cache miss â€” same geo but different filter set creates a second row", async () => {
   const { cache, fetchCalls, deps } = buildDeps();
   await handlePlacesProxy(TYPICAL_INPUT, deps);
-  await handlePlacesProxy({ ...TYPICAL_INPUT, filters: { dietary: ["kosher"] } }, deps);
+  await handlePlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { dietary: ["kosher"] },
+  }, deps);
   assertEquals(fetchCalls.length, 2);
   assertEquals(cache.size(), 2);
 });
@@ -422,7 +441,11 @@ Deno.test("cache hit â€” same geo, identical filter set with reordered chip
     ...TYPICAL_INPUT,
     filters: { dietary: ["kosher", "halal"] },
   }, deps);
-  assertEquals(fetchCalls.length, 1, "filter-order permutation must hit the same cache row");
+  assertEquals(
+    fetchCalls.length,
+    1,
+    "filter-order permutation must hit the same cache row",
+  );
 });
 
 Deno.test("cache miss â€” expired cache row triggers re-fetch", async () => {
@@ -477,7 +500,10 @@ Deno.test("dietary filter â€” gluten post-filter rejects results without th
   }, deps);
   assertEquals(result.places.length, 1);
   assertEquals(result.places[0].fsq_place_id, "fsq-place-003");
-  assertEquals(result.places[0].dietary_tags.includes("gluten_free_options"), true);
+  assertEquals(
+    result.places[0].dietary_tags.includes("gluten_free_options"),
+    true,
+  );
 });
 
 Deno.test("dietary filter â€” shellfish chip surfaces as disclaimer in the response", async () => {
@@ -489,7 +515,11 @@ Deno.test("dietary filter â€” shellfish chip surfaces as disclaimer in the 
   assertEquals(result.disclaimers, ["no_shellfish_unverified"]);
   // The shaped rows carry the disclaimer tag so the engine + verdict
   // surface can render the rule chip text.
-  assert(result.places.every((p) => p.dietary_tags.includes("no_shellfish_unverified")));
+  assert(
+    result.places.every((p) =>
+      p.dietary_tags.includes("no_shellfish_unverified")
+    ),
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -540,14 +570,19 @@ Deno.test("cuisine tag â€” unknown cuisine degrades to the general query wi
 Deno.test("cuisine tag â€” per-cuisine and general calls occupy distinct cache rows", async () => {
   const { cache, fetchCalls, deps } = buildDeps();
   await handlePlacesProxy({ ...TYPICAL_INPUT, filters: {} }, deps);
-  await handlePlacesProxy({ ...TYPICAL_INPUT, filters: { cuisine: "thai" } }, deps);
+  await handlePlacesProxy(
+    { ...TYPICAL_INPUT, filters: { cuisine: "thai" } },
+    deps,
+  );
   assertEquals(fetchCalls.length, 2);
   assertEquals(cache.size(), 2);
 });
 
 Deno.test("validateInput â€” keeps a valid cuisine tag on the filters", () => {
   const v = validateInput({
-    lat: 0, lng: 0, radius_meters: 100,
+    lat: 0,
+    lng: 0,
+    radius_meters: 100,
     filters: { cuisine: "mexican" },
   });
   assertEquals(v.filters?.cuisine, "mexican");
@@ -556,10 +591,17 @@ Deno.test("validateInput â€” keeps a valid cuisine tag on the filters", () 
 Deno.test("validateInput â€” tolerates a missing / non-string cuisine key", () => {
   // The general call omits `cuisine` entirely; a malformed value must
   // not throw â€” it simply drops to undefined.
-  const noKey = validateInput({ lat: 0, lng: 0, radius_meters: 100, filters: {} });
+  const noKey = validateInput({
+    lat: 0,
+    lng: 0,
+    radius_meters: 100,
+    filters: {},
+  });
   assertEquals(noKey.filters?.cuisine, undefined);
   const badType = validateInput({
-    lat: 0, lng: 0, radius_meters: 100,
+    lat: 0,
+    lng: 0,
+    radius_meters: 100,
     filters: { cuisine: 42 },
   });
   assertEquals(badType.filters?.cuisine, undefined);
@@ -567,7 +609,9 @@ Deno.test("validateInput â€” tolerates a missing / non-string cuisine key",
 
 Deno.test("validateInput â€” keeps a valid open_at DHHMM token", () => {
   const v = validateInput({
-    lat: 0, lng: 0, radius_meters: 100,
+    lat: 0,
+    lng: 0,
+    radius_meters: 100,
     filters: { open_at: "3T1900" },
   });
   assertEquals(v.filters?.open_at, "3T1900");
@@ -582,11 +626,21 @@ Deno.test("validateInput â€” rejects a malformed open_at loudly", () => {
   // A present-but-malformed open_at is a client bug. Reject with a 400
   // rather than swallowing it â€” a swallowed bad open_at (the unix-epoch
   // format) is exactly what silently broke the Q5 fetch pipeline.
-  for (const bad of ["2026-05-13T18:00:00Z", "1778695200", "0T1900", "3T2500", "3T1960"]) {
+  for (
+    const bad of [
+      "2026-05-13T18:00:00Z",
+      "1778695200",
+      "0T1900",
+      "3T2500",
+      "3T1960",
+    ]
+  ) {
     assertThrows(
       () =>
         validateInput({
-          lat: 0, lng: 0, radius_meters: 100,
+          lat: 0,
+          lng: 0,
+          radius_meters: 100,
           filters: { open_at: bad },
         }),
       PlacesProxyInputError,
@@ -668,12 +722,13 @@ Deno.test("thin-results â€” Foursquare 410 fails loud (version pin slipped)
   const cache = new MemoryCache();
   const stub = stubFetch(new Response("gone", { status: 410 }));
   await assertRejects(
-    () => handlePlacesProxy(TYPICAL_INPUT, {
-      cache,
-      fetch: stub.fetch,
-      apiKey: "test-api-key",
-      now: () => new Date("2026-05-13T12:00:00Z"),
-    }),
+    () =>
+      handlePlacesProxy(TYPICAL_INPUT, {
+        cache,
+        fetch: stub.fetch,
+        apiKey: "test-api-key",
+        now: () => new Date("2026-05-13T12:00:00Z"),
+      }),
     FoursquareUpstreamError,
     "410",
   );
@@ -731,7 +786,10 @@ Deno.test("secret hygiene â€” API key never appears in the response body", 
 Deno.test("secret hygiene â€” API key never appears in the cached payload", async () => {
   const { cache, deps } = buildDeps();
   await handlePlacesProxy(TYPICAL_INPUT, deps);
-  for (const [, row] of (cache as unknown as { store: Map<string, CacheRow> }).store) {
+  for (
+    const [, row] of (cache as unknown as { store: Map<string, CacheRow> })
+      .store
+  ) {
     assertEquals(JSON.stringify(row.payload).includes("test-api-key"), false);
   }
 });

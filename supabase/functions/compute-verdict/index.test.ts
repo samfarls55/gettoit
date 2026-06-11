@@ -57,7 +57,7 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
         : seed.room;
     },
     async fetchOptions(_id) {
-      return seed.options ?? [];
+      return (seed.options ?? []).map(withEligibleGoogleMetadata);
     },
     async fetchVotes(_id) {
       return seed.votes ?? [];
@@ -101,6 +101,17 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
     },
   };
   return { adapter, inserts, cuts, marked, broadcasts };
+}
+
+function withEligibleGoogleMetadata(row: RoomOptionRow): RoomOptionRow {
+  return {
+    ...row,
+    payload: {
+      rating: 4.2,
+      user_rating_count: 30,
+      ...row.payload,
+    },
+  };
 }
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
@@ -165,7 +176,10 @@ Deno.test("compute-verdict â€” invalid JSON body returns 400", async () => 
   const res = await handleRequest(
     new Request("https://example/compute-verdict", {
       method: "POST",
-      headers: { Authorization: "Bearer test", "Content-Type": "application/json" },
+      headers: {
+        Authorization: "Bearer test",
+        "Content-Type": "application/json",
+      },
       body: "not-json",
     }),
     { env: envOk(), buildDataAdapter: () => adapter },
@@ -276,7 +290,7 @@ Deno.test("compute-verdict â€” happy path writes verdict + cuts and returns
   const { adapter, inserts, cuts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's Taqueria", price_tier: 2 } },
-      { id: "opt-ren",  payload: { name: "Ren Soba",        price_tier: 3 } },
+      { id: "opt-ren", payload: { name: "Ren Soba", price_tier: 3 } },
     ],
     votes: [
       {
@@ -284,14 +298,16 @@ Deno.test("compute-verdict â€” happy path writes verdict + cuts and returns
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 2 },
       },
       {
         user_id: "u2",
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 2 },
       },
     ],
   });
@@ -320,7 +336,7 @@ Deno.test("compute-verdict â€” happy path writes verdict + cuts and returns
 Deno.test("compute-verdict â€” single-survivor path writes one verdict and the cuts", async () => {
   const { adapter, inserts, cuts } = memoryAdapter({
     options: [
-      { id: "opt-pico",   payload: { name: "Pico's",  price_tier: 2 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
       { id: "opt-splurge", payload: { name: "Splurge", price_tier: 4 } },
     ],
     votes: [
@@ -329,7 +345,8 @@ Deno.test("compute-verdict â€” single-survivor path writes one verdict and 
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 2,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-splurge": 5 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-splurge": 5 },
       },
     ],
   });
@@ -355,11 +372,25 @@ Deno.test("compute-verdict â€” quorum method passes through to the verdict 
   const { adapter, inserts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
-      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3 } },
+      { id: "opt-ren", payload: { name: "Ren", price_tier: 3 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
-      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 2 },
+      },
+      {
+        user_id: "u2",
+        display_name: "alex",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 2 },
+      },
     ],
   });
 
@@ -378,11 +409,25 @@ Deno.test("compute-verdict â€” deadline method passes through to the verdic
   const { adapter, inserts } = memoryAdapter({
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
-      { id: "opt-ren",  payload: { name: "Ren",    price_tier: 3 } },
+      { id: "opt-ren", payload: { name: "Ren", price_tier: 3 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
-      { user_id: "u2", display_name: "alex", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 2 } },
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 2 },
+      },
+      {
+        user_id: "u2",
+        display_name: "alex",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 2 },
+      },
     ],
   });
 
@@ -402,7 +447,14 @@ Deno.test("compute-verdict â€” unknown method falls back to manual", async 
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5 } },
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-pico": 5 },
+      },
     ],
   });
 
@@ -412,7 +464,11 @@ Deno.test("compute-verdict â€” unknown method falls back to manual", async 
   );
   assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.verdict.method, "manual", "unknown methods must default to manual to avoid CHECK violations");
+  assertEquals(
+    body.verdict.method,
+    "manual",
+    "unknown methods must default to manual to avoid CHECK violations",
+  );
   assertEquals(inserts[0].method, "manual");
 });
 
@@ -422,7 +478,14 @@ Deno.test("compute-verdict â€” happy path flips rooms.status to verdict_rea
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-pico": 5 } },
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-pico": 5 },
+      },
     ],
   });
 
@@ -432,10 +495,16 @@ Deno.test("compute-verdict â€” happy path flips rooms.status to verdict_rea
   );
   assertEquals(res.status, 200);
 
-  assertEquals(marked, [VALID_ROOM_ID],
-    "expected markRoomVerdictReady to be invoked exactly once with the room id");
-  assertEquals(broadcasts.length, 1,
-    "expected exactly one verdict_ready broadcast to be emitted");
+  assertEquals(
+    marked,
+    [VALID_ROOM_ID],
+    "expected markRoomVerdictReady to be invoked exactly once with the room id",
+  );
+  assertEquals(
+    broadcasts.length,
+    1,
+    "expected exactly one verdict_ready broadcast to be emitted",
+  );
   assertEquals(broadcasts[0].room_id, VALID_ROOM_ID);
   assertEquals(broadcasts[0].verdict_id, "verdict-1");
 });
@@ -451,11 +520,32 @@ Deno.test("compute-verdict â€” TB-12: a member's stored profile veto prunes
   // store and fold it into the engine's hard_vetoes channel.
   const { adapter, inserts } = memoryAdapter({
     options: [
-      { id: "opt-taco", payload: { name: "Taco Stand", price_tier: 2, categories: ["Taco Stand"] } },
-      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"] } },
+      {
+        id: "opt-taco",
+        payload: {
+          name: "Taco Stand",
+          price_tier: 2,
+          categories: ["Taco Stand"],
+        },
+      },
+      {
+        id: "opt-sushi",
+        payload: {
+          name: "Sushi Bar",
+          price_tier: 2,
+          categories: ["Sushi Restaurant"],
+        },
+      },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-taco": 5, "opt-sushi": 5 } },
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-taco": 5, "opt-sushi": 5 },
+      },
     ],
     profileVetoes: {
       u1: [{ kind: "cuisine_never", token: "sushi" }],
@@ -484,9 +574,33 @@ Deno.test("compute-verdict â€” TB-12: profile vetoes are unioned with sessi
   // the profile store adds a separate cuisine-NEVER. Both must prune.
   const { adapter } = memoryAdapter({
     options: [
-      { id: "opt-safe", payload: { name: "Safe Spot", price_tier: 2, categories: ["Cafe"], dietary_tags: ["no_nuts_unverified"] } },
-      { id: "opt-nutty", payload: { name: "Nutty Place", price_tier: 2, categories: ["Cafe"], dietary_tags: [] } },
-      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"], dietary_tags: ["no_nuts_unverified"] } },
+      {
+        id: "opt-safe",
+        payload: {
+          name: "Safe Spot",
+          price_tier: 2,
+          categories: ["Cafe"],
+          dietary_tags: ["no_nuts_unverified"],
+        },
+      },
+      {
+        id: "opt-nutty",
+        payload: {
+          name: "Nutty Place",
+          price_tier: 2,
+          categories: ["Cafe"],
+          dietary_tags: [],
+        },
+      },
+      {
+        id: "opt-sushi",
+        payload: {
+          name: "Sushi Bar",
+          price_tier: 2,
+          categories: ["Sushi Restaurant"],
+          dietary_tags: ["no_nuts_unverified"],
+        },
+      },
     ],
     votes: [
       {
@@ -512,8 +626,12 @@ Deno.test("compute-verdict â€” TB-12: profile vetoes are unioned with sessi
   assertEquals(body.verdict.option_id, "opt-safe");
   // opt-nutty pruned by the session allergy tag, opt-sushi by the
   // stored profile cuisine NEVER.
-  assert(body.cuts.some((c: { option_id: string }) => c.option_id === "opt-nutty"));
-  assert(body.cuts.some((c: { option_id: string }) => c.option_id === "opt-sushi"));
+  assert(
+    body.cuts.some((c: { option_id: string }) => c.option_id === "opt-nutty"),
+  );
+  assert(
+    body.cuts.some((c: { option_id: string }) => c.option_id === "opt-sushi"),
+  );
 });
 
 Deno.test("compute-verdict â€” TB-12: a member with no profile row contributes no profile veto", async () => {
@@ -521,10 +639,24 @@ Deno.test("compute-verdict â€” TB-12: a member with no profile row contribu
   // as "no profile vetoes" and the run proceeds normally.
   const { adapter } = memoryAdapter({
     options: [
-      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"] } },
+      {
+        id: "opt-sushi",
+        payload: {
+          name: "Sushi Bar",
+          price_tier: 2,
+          categories: ["Sushi Restaurant"],
+        },
+      },
     ],
     votes: [
-      { user_id: "u1", display_name: "you", q1_vetoes: [], q2_budget: 4, hard_vetoes: [], scores: { "opt-sushi": 5 } },
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-sushi": 5 },
+      },
     ],
     // no `profileVetoes` seed at all
   });
@@ -554,7 +686,8 @@ Deno.test("compute-verdict â€” engine no-survivor exits 200 with method=no_
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 2,
-        hard_vetoes: [], scores: { "opt-splurge": 5 },
+        hard_vetoes: [],
+        scores: { "opt-splurge": 5 },
       },
     ],
   });

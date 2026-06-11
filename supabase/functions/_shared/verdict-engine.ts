@@ -27,7 +27,7 @@
 //      anti-defection mechanic (0.1.0-quiz-amendments Â§4, the Kim 2023
 //      backfire avoidance).
 //   5. Final tiebreak â€” equal minimums break on the higher group sum,
-//      then on the injected random.
+//      then Google quality evidence, then injected random.
 //   6. Empty-floor cascade â€” when no venue clears the floor the engine
 //      relaxes T downward, then widens the search radius, then emits a
 //      terminal `no_survivor` screen. Hard-veto cuts never recover.
@@ -53,9 +53,9 @@ export interface CandidateOption {
   id: string;
   /** Display name surfaced in `rule_text` + cut text. */
   name: string;
-  /** Foursquare price tier 1..4 (`$` to `$$$$`). Null when unknown.
+  /** Google price tier 1..4 (`$` to `$$$$`). Null when unknown.
    *  The EBA prune cuts a candidate whose tier exceeds the MIN member
-   *  Q2 spend cap; an unknown tier never prunes (benefit of the doubt). */
+   *  Q2 spend cap; an unknown tier is also cut for Google eligibility. */
   price_tier: number | null;
   /** Dietary `emit_tag`s carried over from the PlacesProxy. The EBA
    *  prune matches each member's dietary veto against the corresponding
@@ -70,13 +70,15 @@ export interface CandidateOption {
    *  caller pre-filtered the pool to the radius it can be omitted and
    *  the radius gate is a no-op. */
   distance_meters?: number | null;
-  /** Foursquare 0..10 venue rating. The engine never reads it â€” it is
-   *  carried so the TB-23 server-side venue classifier can derive the
-   *  reputation axis. Optional / null when the venue carries no rating. */
+  /** Google 1..5 venue rating. The engine reads this transiently for the
+   *  platform quality floor and above-floor ranking input. Optional /
+   *  null when the venue carries no rating. */
   rating?: number | null;
-  /** Foursquare total-ratings count. Carried for the TB-23 venue
-   *  classifier's pool-relative reputation terciles. The engine never
-   *  reads it. Optional / null when the venue carries no count. */
+  /** Google user-rating count. The engine reads this transiently for the
+   *  platform quality floor and above-floor ranking input. Optional /
+   *  null when absent. */
+  user_rating_count?: number | null;
+  /** Legacy alias carried by older tests/classifier seams. */
   total_ratings?: number | null;
   /** Foursquare ISO-8601 record-creation date. Carried for the TB-23
    *  venue classifier's reputation age check. The engine never reads
@@ -264,6 +266,8 @@ const RADIUS_WIDEN_STEP_METERS = 805;
 
 /** Defensive bound on the cascade loop. */
 const MAX_CASCADE_ITERS = 64;
+const QUALITY_RATING_FLOOR = 3.7;
+const QUALITY_RATING_COUNT_FLOOR = 15;
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Dietary chip â†’ required tag mapping
@@ -280,13 +284,33 @@ interface DietaryRequirement {
 
 const DIETARY_REQUIREMENTS: readonly DietaryRequirement[] = Object.freeze([
   { chip: "vegan", requiredTag: "vegan_friendly", label: "vegan options" },
-  { chip: "vegetarian", requiredTag: "vegetarian_friendly", label: "vegetarian options" },
+  {
+    chip: "vegetarian",
+    requiredTag: "vegetarian_friendly",
+    label: "vegetarian options",
+  },
   { chip: "halal", requiredTag: "halal", label: "halal options" },
   { chip: "kosher", requiredTag: "kosher", label: "kosher options" },
-  { chip: "gluten", requiredTag: "gluten_free_options", label: "gluten-free options" },
-  { chip: "dairy", requiredTag: "no_dairy_unverified", label: "dairy-safe options" },
-  { chip: "shellfish", requiredTag: "no_shellfish_unverified", label: "shellfish-safe options" },
-  { chip: "nuts", requiredTag: "no_nuts_unverified", label: "nut-safe options" },
+  {
+    chip: "gluten",
+    requiredTag: "gluten_free_options",
+    label: "gluten-free options",
+  },
+  {
+    chip: "dairy",
+    requiredTag: "no_dairy_unverified",
+    label: "dairy-safe options",
+  },
+  {
+    chip: "shellfish",
+    requiredTag: "no_shellfish_unverified",
+    label: "shellfish-safe options",
+  },
+  {
+    chip: "nuts",
+    requiredTag: "no_nuts_unverified",
+    label: "nut-safe options",
+  },
 ]);
 
 /** The "Nothing tonight" chip carries no constraint. Accepted
@@ -331,7 +355,8 @@ export function computeVerdict(
     );
   }
 
-  const initialThreshold = input.satisficing_threshold ?? DEFAULT_SATISFICING_THRESHOLD;
+  const initialThreshold = input.satisficing_threshold ??
+    DEFAULT_SATISFICING_THRESHOLD;
   const initialRadius = input.radius_meters ?? null;
   const radiusCap = input.radius_meters_cap ?? DEFAULT_RADIUS_CAP_METERS;
 
@@ -471,7 +496,15 @@ function ebaPrune(
 
   for (const c of candidates) {
     // Q2 spend cap.
-    if (c.price_tier !== null && c.price_tier > minBudget) {
+    if (c.price_tier === null || !Number.isFinite(c.price_tier)) {
+      cuts.push({
+        option_id: c.id,
+        cut_reason: "budget",
+        cut_text: "missing price metadata",
+      });
+      continue;
+    }
+    if (c.price_tier > minBudget) {
       cuts.push({
         option_id: c.id,
         cut_reason: "budget",
@@ -480,8 +513,19 @@ function ebaPrune(
       continue;
     }
 
+    if (!passesQualityFloor(c)) {
+      cuts.push({
+        option_id: c.id,
+        cut_reason: "quality",
+        cut_text: "below the public quality floor",
+      });
+      continue;
+    }
+
     // Dietary menu-compliance.
-    const missingReq = dietaryReqs.find((r) => !c.dietary_tags.includes(r.requiredTag));
+    const missingReq = dietaryReqs.find((r) =>
+      !c.dietary_tags.includes(r.requiredTag)
+    );
     if (missingReq) {
       cuts.push({
         option_id: c.id,
@@ -533,6 +577,26 @@ function ebaPrune(
   return { survivors, cuts };
 }
 
+function passesQualityFloor(candidate: CandidateOption): boolean {
+  const ratingCount = candidateRatingCount(candidate);
+  return (
+    typeof candidate.rating === "number" &&
+    candidate.rating >= QUALITY_RATING_FLOOR &&
+    typeof ratingCount === "number" &&
+    ratingCount >= QUALITY_RATING_COUNT_FLOOR
+  );
+}
+
+function candidateRatingCount(candidate: CandidateOption): number | null {
+  if (typeof candidate.user_rating_count === "number") {
+    return candidate.user_rating_count;
+  }
+  if (typeof candidate.total_ratings === "number") {
+    return candidate.total_ratings;
+  }
+  return null;
+}
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Step 2 â€” per-member scoring
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -545,6 +609,8 @@ interface ScoredCandidate {
   minScore: number;
   /** Sum of member scores â€” the final-tiebreak key. */
   sumScore: number;
+  /** Transient Google quality signal for above-floor ranking ties. */
+  qualityEvidence: number;
 }
 
 /** Score one candidate for one member, via the injected `prefFn` (live
@@ -572,8 +638,20 @@ function scoreCandidates(
       if (s < minScore) minScore = s;
       sumScore += s;
     }
-    return { candidate, memberScores, minScore, sumScore };
+    return {
+      candidate,
+      memberScores,
+      minScore,
+      sumScore,
+      qualityEvidence: qualityRankingEvidence(candidate),
+    };
   });
+}
+
+function qualityRankingEvidence(candidate: CandidateOption): number {
+  const rating = typeof candidate.rating === "number" ? candidate.rating : 0;
+  const count = candidateRatingCount(candidate) ?? 0;
+  return rating + Math.log10(Math.max(1, count));
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -622,14 +700,25 @@ function seatWinner(args: SeatWinnerArgs): VerdictEngineOutput {
     if (sumTied.length === 1) {
       winner = sumTied[0];
     } else {
-      // Fully tied â€” break on the injected random. Deterministic given
-      // the survivor order and the injected source.
-      flatTiebreak = true;
-      const idx = Math.min(
-        Math.max(0, Math.floor(args.random() * sumTied.length)),
-        sumTied.length - 1,
+      const bestQuality = sumTied.reduce(
+        (acc, s) => Math.max(acc, s.qualityEvidence),
+        Number.NEGATIVE_INFINITY,
       );
-      winner = sumTied[idx];
+      const qualityTied = sumTied.filter((s) =>
+        s.qualityEvidence === bestQuality
+      );
+      if (qualityTied.length === 1) {
+        winner = qualityTied[0];
+      } else {
+        // Fully tied â€” break on the injected random. Deterministic given
+        // the survivor order and the injected source.
+        flatTiebreak = true;
+        const idx = Math.min(
+          Math.max(0, Math.floor(args.random() * qualityTied.length)),
+          qualityTied.length - 1,
+        );
+        winner = qualityTied[idx];
+      }
     }
   }
 
@@ -735,7 +824,9 @@ function buildRuleText(args: {
   const parts: string[] = [];
 
   if (args.rerollReason) {
-    parts.push(rerollPrefixSentence(args.rerollReason, args.previousWinnerName));
+    parts.push(
+      rerollPrefixSentence(args.rerollReason, args.previousWinnerName),
+    );
   }
 
   // Maximin is the load-bearing mechanic â€” name the rule, not the
@@ -759,7 +850,9 @@ function buildRuleText(args: {
   return parts.join(" ");
 }
 
-function buildNoSurvivorRuleText(survivingHardNeeds: readonly string[]): string {
+function buildNoSurvivorRuleText(
+  survivingHardNeeds: readonly string[],
+): string {
   if (survivingHardNeeds.length === 0) {
     return "No spot fit the room tonight.";
   }
@@ -814,6 +907,8 @@ function receiptAction(v: MemberVote): string {
   const firstVeto = v.q1_vetoes.find((chip) => lookupRequirement(chip));
   if (firstVeto) return `filtered ${firstVeto}`;
   if (v.hard_vetoes.length > 0) return "set a hard limit";
-  if (v.q2_budget < 4) return `capped at ${"$".repeat(Math.max(1, v.q2_budget))}`;
+  if (v.q2_budget < 4) {
+    return `capped at ${"$".repeat(Math.max(1, v.q2_budget))}`;
+  }
   return "voted in";
 }

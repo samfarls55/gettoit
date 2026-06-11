@@ -53,7 +53,7 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
         : seed.room;
     },
     async fetchOptions(_id) {
-      return seed.options ?? [];
+      return (seed.options ?? []).map(withEligibleGoogleMetadata);
     },
     async fetchVotes(_id) {
       return seed.votes ?? [];
@@ -88,6 +88,17 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
   return { adapter, inserts, cuts, deletedVerdictRoomIds };
 }
 
+function withEligibleGoogleMetadata(row: RoomOptionRow): RoomOptionRow {
+  return {
+    ...row,
+    payload: {
+      rating: 4.2,
+      user_rating_count: 30,
+      ...row.payload,
+    },
+  };
+}
+
 function authedPost(body: unknown): Request {
   return new Request("https://example/compute-verdict", {
     method: "POST",
@@ -118,7 +129,8 @@ Deno.test("compute-verdict — no-survivor exits 200 with method=no_survivor", a
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 2,
-        hard_vetoes: [], scores: { "opt-splurge": 5 },
+        hard_vetoes: [],
+        scores: { "opt-splurge": 5 },
       },
     ],
   });
@@ -126,31 +138,48 @@ Deno.test("compute-verdict — no-survivor exits 200 with method=no_survivor", a
     authedPost({ room_id: VALID_ROOM_ID }),
     { env: envOk(), buildDataAdapter: () => adapter },
   );
-  assertEquals(res.status, 200,
-    "no_survivor must NOT be an error — the surface needs the verdict row");
+  assertEquals(
+    res.status,
+    200,
+    "no_survivor must NOT be an error — the surface needs the verdict row",
+  );
   const body = await res.json();
   assertEquals(body.verdict.method, "no_survivor");
-  assertEquals(body.verdict.option_id, null,
-    "no_survivor verdict carries no winning option_id");
-  assertEquals(body.cuts.length, 0,
-    "no_survivor mode suppresses the cuts drawer — no cuts rows persisted");
+  assertEquals(
+    body.verdict.option_id,
+    null,
+    "no_survivor verdict carries no winning option_id",
+  );
+  assertEquals(
+    body.cuts.length,
+    0,
+    "no_survivor mode suppresses the cuts drawer — no cuts rows persisted",
+  );
   // The verdict row IS persisted so the mobile surface can read it.
   assertEquals(inserts.length, 1);
   assertEquals(inserts[0].method, "no_survivor");
   assertEquals(inserts[0].option_id, null);
-  assertEquals(cuts.length, 0,
-    "insertOptionCuts must not be called with empty cuts on the no-survivor path");
+  assertEquals(
+    cuts.length,
+    0,
+    "insertOptionCuts must not be called with empty cuts on the no-survivor path",
+  );
   // The surface needs the meta line + relax chain telemetry.
   assertExists(body.surviving_hard_needs);
   assert(Array.isArray(body.surviving_hard_needs));
-  assert(body.surviving_hard_needs.length > 0,
-    "no_survivor body should list surviving hard-needs for the S05 meta line");
+  assert(
+    body.surviving_hard_needs.length > 0,
+    "no_survivor body should list surviving hard-needs for the S05 meta line",
+  );
 });
 
 Deno.test("compute-verdict — no-survivor rule_text never names a person", async () => {
   const { adapter } = memoryAdapter({
     options: [
-      { id: "steakhouse", payload: { name: "Steakhouse", price_tier: 2, dietary_tags: [] } },
+      {
+        id: "steakhouse",
+        payload: { name: "Steakhouse", price_tier: 2, dietary_tags: [] },
+      },
     ],
     votes: [
       {
@@ -158,7 +187,8 @@ Deno.test("compute-verdict — no-survivor rule_text never names a person", asyn
         display_name: "alex",
         q1_vetoes: ["vegan"],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "steakhouse": 5 },
+        hard_vetoes: [],
+        scores: { "steakhouse": 5 },
       },
     ],
   });
@@ -169,8 +199,10 @@ Deno.test("compute-verdict — no-survivor rule_text never names a person", asyn
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.verdict.method, "no_survivor");
-  assert(!body.verdict.rule_text.toLowerCase().includes("alex"),
-    `rule_text must not name alex: ${body.verdict.rule_text}`);
+  assert(
+    !body.verdict.rule_text.toLowerCase().includes("alex"),
+    `rule_text must not name alex: ${body.verdict.rule_text}`,
+  );
 });
 
 // ───────────────────────────────────────────────────────────────────────
@@ -210,7 +242,8 @@ Deno.test("compute-verdict — widen-radius re-run replaces an existing no_survi
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-stretch": 5 },
+        hard_vetoes: [],
+        scores: { "opt-stretch": 5 },
       },
     ],
     roomMeta: { radius_meters: 805 }, // 0.5 mi — too tight for the candidate
@@ -224,8 +257,11 @@ Deno.test("compute-verdict — widen-radius re-run replaces an existing no_survi
   const body = await res.json();
   // The prior no_survivor row should be deleted; a fresh manual
   // verdict inserted.
-  assertEquals(deletedVerdictRoomIds, [VALID_ROOM_ID],
-    "widen re-run must drop the prior no_survivor verdict");
+  assertEquals(
+    deletedVerdictRoomIds,
+    [VALID_ROOM_ID],
+    "widen re-run must drop the prior no_survivor verdict",
+  );
   assertEquals(inserts.length, 1);
   assertEquals(inserts[0].method, "manual");
   assertEquals(inserts[0].option_id, "opt-stretch");
@@ -257,7 +293,8 @@ Deno.test("compute-verdict — widen-radius re-run preserves a successful verdic
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5 },
       },
     ],
   });
@@ -269,8 +306,11 @@ Deno.test("compute-verdict — widen-radius re-run preserves a successful verdic
   const body = await res.json();
   assertEquals(body.already_computed, true);
   assertEquals(body.verdict.id, "v-old");
-  assertEquals(deletedVerdictRoomIds.length, 0,
-    "an existing successful verdict must not be replaced by a widen request");
+  assertEquals(
+    deletedVerdictRoomIds.length,
+    0,
+    "an existing successful verdict must not be replaced by a widen request",
+  );
   assertEquals(inserts.length, 0);
 });
 
@@ -291,7 +331,11 @@ Deno.test("compute-verdict — widen-radius override clamped to the 10 mi produc
     options: [
       {
         id: "opt-x",
-        payload: { name: "Edge of Earth", price_tier: 2, distance_meters: 30000 }, // 18.6 mi
+        payload: {
+          name: "Edge of Earth",
+          price_tier: 2,
+          distance_meters: 30000,
+        }, // 18.6 mi
       },
     ],
     votes: [
@@ -300,7 +344,8 @@ Deno.test("compute-verdict — widen-radius override clamped to the 10 mi produc
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-x": 5 },
+        hard_vetoes: [],
+        scores: { "opt-x": 5 },
       },
     ],
     roomMeta: { radius_meters: 805 },
@@ -313,8 +358,11 @@ Deno.test("compute-verdict — widen-radius override clamped to the 10 mi produc
   );
   assertEquals(res.status, 200);
   const body = await res.json();
-  assertEquals(body.verdict.method, "no_survivor",
-    "clamped widen still can't reach a 18.6-mi candidate — surface stays terminal");
+  assertEquals(
+    body.verdict.method,
+    "no_survivor",
+    "clamped widen still can't reach a 18.6-mi candidate — surface stays terminal",
+  );
   assertEquals(inserts.length, 1);
   assertEquals(inserts[0].method, "no_survivor");
 });
@@ -336,7 +384,8 @@ Deno.test("compute-verdict — widen-radius re-run reads room radius and re-runs
         display_name: "you",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-stretch": 5 },
+        hard_vetoes: [],
+        scores: { "opt-stretch": 5 },
       },
     ],
     roomMeta: { radius_meters: 805 },

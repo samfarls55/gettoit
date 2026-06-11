@@ -16,8 +16,8 @@ import {
   type FoursquareSearchResponse,
   OPEN_AT_PATTERN,
   type PlacesProxyInput,
-  shapeFoursquareResult,
   type ShapedPlace,
+  shapeFoursquareResult,
   THIN_RESULTS_THRESHOLD,
 } from "./foursquare.ts";
 
@@ -138,11 +138,17 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const lat = obj.lat;
   const lng = obj.lng;
   const radius = obj.radius_meters;
-  if (typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90) {
+  if (
+    typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90
+  ) {
     throw new PlacesProxyInputError("lat must be a finite number in [-90, 90]");
   }
-  if (typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-    throw new PlacesProxyInputError("lng must be a finite number in [-180, 180]");
+  if (
+    typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180
+  ) {
+    throw new PlacesProxyInputError(
+      "lng must be a finite number in [-180, 180]",
+    );
   }
   if (
     typeof radius !== "number" ||
@@ -183,7 +189,9 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     ? filters.cuisine
     : undefined;
   return {
-    lat, lng, radius_meters: radius,
+    lat,
+    lng,
+    radius_meters: radius,
     filters: { dietary, price_tier, open_at, cuisine },
   };
 }
@@ -251,7 +259,9 @@ export async function handlePlacesProxy(
       // header is unset.
       throw new FoursquareUpstreamError(
         410,
-        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${body.slice(0, 200)}`,
+        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${
+          body.slice(0, 200)
+        }`,
       );
     }
     // Non-410 upstream failure. Degrade to a thin response, but surface
