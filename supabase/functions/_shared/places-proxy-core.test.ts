@@ -14,6 +14,8 @@ import {
 import {
   type CacheAdapter,
   type CacheRow,
+  assertGoogleReasonCode,
+  buildGoogleOverfetchTelemetry,
   FoursquareUpstreamError,
   GOOGLE_Q5_FIELD_MASK,
   GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
@@ -21,8 +23,12 @@ import {
   handleGoogleVerdictDisplayProxy,
   handleGoogleQ5PlacesProxy,
   handlePlacesProxy,
+  isGoogleOperationalReceiptCode,
+  isGoogleOutcomeLabel,
+  isGoogleReasonCode,
   isCacheRowFresh,
   PlacesProxyInputError,
+  redactGoogleObservabilityValue,
   type ProxyDeps,
   validateInput,
 } from "./places-proxy-core.ts";
@@ -429,6 +435,93 @@ Deno.test("google q5 — missing API key fails closed before fetch", async () =>
     "GOOGLE_PLACES_API_KEY",
   );
   assertEquals(called, false);
+});
+
+Deno.test("google observability — outcome labels and operational receipts stay separate", () => {
+  assertEquals(isGoogleOutcomeLabel("verdict_accepted"), true);
+  assertEquals(isGoogleOutcomeLabel("q5_unrated_exit"), true);
+  assertEquals(isGoogleOutcomeLabel("refetch_failed"), false);
+  assertEquals(isGoogleOutcomeLabel("place_unavailable"), false);
+
+  assertEquals(isGoogleOperationalReceiptCode("refetch_failed"), true);
+  assertEquals(isGoogleOperationalReceiptCode("place_unavailable"), true);
+  assertEquals(isGoogleOperationalReceiptCode("verdict_accepted"), false);
+});
+
+Deno.test("google observability — reason codes are controlled and app-authored", () => {
+  assertEquals(isGoogleReasonCode("selected_contrast_pool"), true);
+  assertEquals(assertGoogleReasonCode("wrong_vibe"), "wrong_vibe");
+  assertThrows(
+    () => assertGoogleReasonCode("Pico's was closed and rated 4.8"),
+    PlacesProxyInputError,
+    "controlled app-authored code",
+  );
+});
+
+Deno.test("google observability — log and analytics redaction removes provider content", () => {
+  const redacted = redactGoogleObservabilityValue({
+    room_id: "room-1",
+    google_place_id: "google-secret-place",
+    display_name: "Pico's Taqueria",
+    formattedAddress: "1 Main St",
+    rating: 4.8,
+    nested: {
+      googleMapsUri: "https://maps.google.example/picos",
+      reviewSummary: { text: "Loved by locals" },
+      reason_code: "refetch_failed",
+    },
+  });
+
+  assertEquals(redacted, {
+    room_id: "room-1",
+    google_place_id: "[redacted_google_place_id]",
+    display_name: "[redacted_google_display_content]",
+    formattedAddress: "[redacted_google_display_content]",
+    rating: "[redacted_google_display_content]",
+    nested: {
+      googleMapsUri: "[redacted_google_display_content]",
+      reviewSummary: "[redacted_google_display_content]",
+      reason_code: "refetch_failed",
+    },
+  });
+  const serialized = JSON.stringify(redacted);
+  for (const forbidden of ["Pico", "1 Main", "4.8", "Loved by locals", "google-secret-place"]) {
+    assertEquals(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+Deno.test("google observability — access-controlled debug logs may keep Place IDs only explicitly", () => {
+  const redacted = redactGoogleObservabilityValue({
+    google_place_id: "google-debug-place",
+    display_name: "Pico's Taqueria",
+  }, { allowGooglePlaceIds: true });
+
+  assertEquals(redacted, {
+    google_place_id: "google-debug-place",
+    display_name: "[redacted_google_display_content]",
+  });
+});
+
+Deno.test("google observability — overfetch telemetry is aggregate-only", () => {
+  const telemetry = buildGoogleOverfetchTelemetry({
+    committedRadiusMeters: 1600,
+    providerRadiusMeters: 1840,
+    beforeTrimCount: 20,
+    afterTrimCount: 14,
+    trimReasonCounts: { outside_search_area: 6 },
+  });
+
+  assertEquals(telemetry, {
+    committed_radius_meters: 1600,
+    provider_radius_meters: 1840,
+    overfetch_delta_meters: 240,
+    before_trim_count: 20,
+    after_trim_count: 14,
+    trim_reason_counts: { outside_search_area: 6 },
+  });
+  const serialized = JSON.stringify(telemetry);
+  assertEquals(serialized.includes("place_id"), false);
+  assertEquals(serialized.includes("google-place"), false);
 });
 
 // ---------------------------------------------------------------------------

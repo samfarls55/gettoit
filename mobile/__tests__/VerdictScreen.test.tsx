@@ -193,4 +193,61 @@ describe("VerdictScreen", () => {
     expect(screen.queryByText("Reroll")).toBeNull();
     expect(screen.getByText("Start a new decision")).toBeOnTheScreen();
   });
+
+  it("renders available history records with current refetched Google display", () => {
+    render(
+      <VerdictScreen
+        verdict={{
+          kind: "history",
+          roomId: "room-history",
+          planName: "Taco crawl",
+          decidedAtLabel: "Decided Jun 4",
+          display: {
+            status: "available",
+            placeName: "Current Taco",
+            formattedAddress: "9 Fresh St",
+            googleMapsUri: "https://maps.google.example/current",
+            attributionText: "Powered by Google",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Verdict record")).toBeOnTheScreen();
+    expect(screen.getByText("Decided Jun 4")).toBeOnTheScreen();
+    expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
+    expect(screen.getByText("CURRENT\nTACO")).toBeOnTheScreen();
+    expect(screen.getByText("9 Fresh St")).toBeOnTheScreen();
+    expect(screen.getByText("https://maps.google.example/current")).toBeOnTheScreen();
+    expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
+  });
+
+  it("renders degraded history records without stale Google display content", () => {
+    render(
+      <VerdictScreen
+        verdict={{
+          kind: "history",
+          roomId: "room-history",
+          planName: "Taco crawl",
+          decidedAtLabel: "Decided Jun 4",
+          display: {
+            status: "unavailable",
+            placeName: "Place unavailable",
+            details: "Unavailable details. Current place data could not be refetched.",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Verdict record")).toBeOnTheScreen();
+    expect(screen.getByText("Decided Jun 4")).toBeOnTheScreen();
+    expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
+    expect(screen.getByText("PLACE\nUNAVAILABLE")).toBeOnTheScreen();
+    expect(
+      screen.getByText("Unavailable details. Current place data could not be refetched."),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText("Stale Taco")).toBeNull();
+    expect(screen.queryByText("https://maps.google.example/stale")).toBeNull();
+    expect(screen.queryByText("Powered by Google")).toBeNull();
+  });
 });

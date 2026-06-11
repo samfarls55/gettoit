@@ -53,15 +53,40 @@ export type NoSurvivorVerdictViewModel = {
   stepMiles: number;
 };
 
+export type HistoryVerdictViewModel = {
+  kind: "history";
+  roomId: string;
+  planName: string;
+  decidedAtLabel: string;
+  display:
+    | {
+        status: "available";
+        placeName: string;
+        formattedAddress: string | null;
+        googleMapsUri: string;
+        attributionText: string;
+      }
+    | {
+        status: "unavailable";
+        placeName: "Place unavailable";
+        details: string;
+      };
+};
+
 export type VerdictViewModel =
   | LiveVerdictViewModel
-  | NoSurvivorVerdictViewModel;
+  | NoSurvivorVerdictViewModel
+  | HistoryVerdictViewModel;
 
 export type VerdictRepository = {
   loadVerdict: (input: {
     roomId: string;
     flavor: VerdictFlavor;
   }) => Promise<VerdictViewModel>;
+  loadHistoryVerdict: (input: {
+    roomId: string;
+    flavor: VerdictFlavor;
+  }) => Promise<HistoryVerdictViewModel>;
   reroll: (input: RerollInput) => Promise<void>;
   widenAndRerun: (input: WidenAndRerunInput) => Promise<void>;
 };
@@ -104,6 +129,13 @@ type SupabaseVerdictRow = {
   computed_at: string;
   method: string;
   rule_text: string;
+};
+
+type SupabasePlanHistoryRow = {
+  id: string;
+  name: string;
+  verdict_fired_at: string | null;
+  rooms?: Array<{ id: string }> | null;
 };
 
 type SupabaseVerdictSlateEntryRow = {
@@ -210,6 +242,19 @@ export const fakeVerdictRepository: VerdictRepository = {
       windowClosesAt: null,
     },
   }),
+  loadHistoryVerdict: async ({ roomId }) => ({
+    kind: "history",
+    roomId,
+    planName: "Taco crawl",
+    decidedAtLabel: "Decided Jun 4",
+    display: {
+      status: "available",
+      placeName: "Pico's Taqueria",
+      formattedAddress: "1 Main St",
+      googleMapsUri: "https://maps.google.example/picos",
+      attributionText: "Powered by Google",
+    },
+  }),
   reroll: async () => undefined,
   widenAndRerun: async () => undefined,
 };
@@ -300,6 +345,22 @@ function rerollStateFor(rerolls: SupabaseRerollRow[]): RerollViewModel {
     isEligible: burnsRemaining > 0,
     windowClosesAt: null,
   };
+}
+
+function decidedAtLabel(isoTime: string | null): string {
+  if (!isoTime) {
+    return "Decided time unavailable";
+  }
+
+  const date = new Date(isoTime);
+  if (Number.isNaN(date.getTime())) {
+    return "Decided time unavailable";
+  }
+
+  return `Decided ${date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })}`;
 }
 
 function mapSlateRowsToEntries(
@@ -418,6 +479,25 @@ export function createSupabaseVerdictRepository({
     };
   };
 
+  const loadPlanHistoryContext = async (
+    roomId: string,
+  ): Promise<SupabasePlanHistoryRow> => {
+    const rows = assertSupabaseRows(
+      await supabase
+        .from<SupabasePlanHistoryRow>("plans")
+        .select("id, name, verdict_fired_at, rooms(id)")
+        .eq("rooms.id", roomId),
+      "Plan history read",
+    );
+    const plan = rows[0];
+
+    if (!plan) {
+      throw new Error("Plan history read failed: no row returned");
+    }
+
+    return plan;
+  };
+
   return {
     loadVerdict: async ({ roomId, flavor }) => {
       const { verdict, slateRows } = await loadLatestVerdictAndSlate(roomId);
@@ -481,6 +561,55 @@ export function createSupabaseVerdictRepository({
           flavor === "solo" ? "Save taste profile" : "I'm in",
         reroll: rerollStateFor(rerollRows),
       };
+    },
+    loadHistoryVerdict: async ({ roomId }) => {
+      const [plan, { verdict, slateRows }] = await Promise.all([
+        loadPlanHistoryContext(roomId),
+        loadLatestVerdictAndSlate(roomId),
+      ]);
+      const googlePlaceId =
+        verdict.winner_google_place_id ?? slateRows[0]?.google_place_id;
+      const base = {
+        kind: "history" as const,
+        roomId,
+        planName: plan.name,
+        decidedAtLabel: decidedAtLabel(plan.verdict_fired_at),
+      };
+
+      if (!googlePlaceId) {
+        return {
+          ...base,
+          display: {
+            status: "unavailable",
+            placeName: "Place unavailable",
+            details: "Unavailable details. Current place data could not be refetched.",
+          },
+        };
+      }
+
+      try {
+        const display = await refetchVerdictDisplay(supabase, googlePlaceId);
+
+        return {
+          ...base,
+          display: {
+            status: "available",
+            placeName: display.place.display_name,
+            formattedAddress: display.place.formatted_address ?? null,
+            googleMapsUri: display.place.google_maps_uri,
+            attributionText: display.attribution.text,
+          },
+        };
+      } catch {
+        return {
+          ...base,
+          display: {
+            status: "unavailable",
+            placeName: "Place unavailable",
+            details: "Unavailable details. Current place data could not be refetched.",
+          },
+        };
+      }
     },
     reroll: async ({ roomId, reason }) => {
       const { verdict, slateRows } = await loadLatestVerdictAndSlate(roomId);

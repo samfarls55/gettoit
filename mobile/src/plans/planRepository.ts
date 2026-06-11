@@ -49,6 +49,7 @@ const serviceShapes: readonly PlanServiceShape[] = [
 
 export type PlanListItem = {
   id: string;
+  roomId?: string;
   title: string;
   subtitle: string;
   badge: string;
@@ -185,6 +186,7 @@ export const fakePlanRepository: PlanRepository = {
     decided: [
       {
         id: "decided-date-night",
+        roomId: "room-decided-date-night",
         title: "Date night fallback",
         subtitle: "Live verdict - Reroll still open",
         badge: "Decided",
@@ -194,6 +196,7 @@ export const fakePlanRepository: PlanRepository = {
     history: [
       {
         id: "history-taco-crawl",
+        roomId: "room-history-taco-crawl",
         title: "Taco crawl",
         subtitle: "Closed verdict - Read-only",
         badge: "History",
@@ -244,6 +247,16 @@ function joinedPlanIdForRoom(
   }
 
   return room.plan_id;
+}
+
+function roomIdByPlanId(rooms: SupabaseRoomRow[]): Map<string, string> {
+  const byPlanId = new Map<string, string>();
+  for (const room of rooms) {
+    if (room.plan_id) {
+      byPlanId.set(room.plan_id, room.id);
+    }
+  }
+  return byPlanId;
 }
 
 function isOneOf<TValue extends string>(
@@ -373,9 +386,11 @@ function pendingJoinedItem(plan: SupabasePlanRow): PlanListItem {
 function decidedItem(
   plan: SupabasePlanRow,
   isJoinedByUser: boolean,
+  roomId: string | undefined,
 ): PlanListItem {
   return {
     id: plan.id,
+    ...(roomId ? { roomId } : {}),
     title: plan.name,
     subtitle: "Live verdict",
     badge: isJoinedByUser ? "Joined" : "Decided",
@@ -386,9 +401,11 @@ function decidedItem(
 function historyItem(
   plan: SupabasePlanRow,
   isJoinedByUser: boolean,
+  roomId: string | undefined,
 ): PlanListItem {
   return {
     id: plan.id,
+    ...(roomId ? { roomId } : {}),
     title: plan.name,
     subtitle: "Closed verdict",
     badge: isJoinedByUser ? "Joined" : "History",
@@ -424,6 +441,7 @@ export function createSupabasePlanRepository({
           .map((room) => joinedPlanIdForRoom(room, joinedRoomIds))
           .filter((planId): planId is string => planId !== null),
       );
+      const roomsByPlanId = roomIdByPlanId(rooms);
 
       const plansResult = await supabase
         .from<SupabasePlanRow>("plans")
@@ -455,11 +473,15 @@ export function createSupabasePlanRepository({
         decided: sortByNewest(
           plans.filter((plan) => plan.status === "decided-active"),
           (plan) => plan.verdict_fired_at,
-        ).map((plan) => decidedItem(plan, isJoinedByUser(plan))),
+        ).map((plan) =>
+          decidedItem(plan, isJoinedByUser(plan), roomsByPlanId.get(plan.id))
+        ),
         history: sortByNewest(
           plans.filter((plan) => plan.status === "decided-expired"),
           (plan) => plan.expired_at,
-        ).map((plan) => historyItem(plan, isJoinedByUser(plan))),
+        ).map((plan) =>
+          historyItem(plan, isJoinedByUser(plan), roomsByPlanId.get(plan.id))
+        ),
       };
     },
     savePlan: async (plan) => {

@@ -163,6 +163,8 @@ describe("planRepository", () => {
             data: [
               { id: "room-joined", plan_id: "joined-plan" },
               { id: "room-joined-decided", plan_id: "joined-decided-plan" },
+              { id: "room-created-decided", plan_id: "created-decided-plan" },
+              { id: "room-history", plan_id: "history-plan" },
             ],
             error: null,
           },
@@ -270,6 +272,7 @@ describe("planRepository", () => {
       decided: [
         {
           id: "created-decided-plan",
+          roomId: "room-created-decided",
           title: "Date night",
           subtitle: "Live verdict",
           badge: "Decided",
@@ -277,6 +280,7 @@ describe("planRepository", () => {
         },
         {
           id: "joined-decided-plan",
+          roomId: "room-joined-decided",
           title: "Team lunch",
           subtitle: "Live verdict",
           badge: "Joined",
@@ -286,6 +290,7 @@ describe("planRepository", () => {
       history: [
         {
           id: "history-plan",
+          roomId: "room-history",
           title: "Taco crawl",
           subtitle: "Closed verdict",
           badge: "History",

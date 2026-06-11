@@ -316,6 +316,10 @@ function editSetupPlan(plan: PlanListItem): PlanSetup {
   );
 }
 
+function roomIdForPlanRoute(plan: PlanListItem): string {
+  return plan.roomId ?? plan.id;
+}
+
 function filterDeletedCreatedPlans(
   snapshot: PlanListSnapshot,
   deletedCreatedPlanIds: Set<string>,
@@ -452,15 +456,15 @@ export default function App({
             dispatch({ type: "openSetup" });
             break;
           case "joined":
-            setQuizSession(groupQuizSession(plan.id, "joiner"));
+            setQuizSession(groupQuizSession(roomIdForPlanRoute(plan), "joiner"));
             dispatch({ type: "startQuiz" });
             break;
           case "decided":
-            setQuizSession(groupQuizSession(plan.id, "initiator"));
+            setQuizSession(groupQuizSession(roomIdForPlanRoute(plan), "initiator"));
             dispatch({ type: "showVerdict" });
             break;
           case "history":
-            setQuizSession(groupQuizSession(plan.id, "initiator"));
+            setQuizSession(groupQuizSession(roomIdForPlanRoute(plan), "initiator"));
             dispatch({ type: "showReadOnlyVerdict" });
             break;
         }
@@ -623,11 +627,15 @@ export function MobileAppShell({
     let isCurrent = true;
     setVerdict(null);
 
-    verdictRepository
-      .loadVerdict({
-        roomId: quizSession.roomId,
-        flavor: verdictFlavor,
-      })
+    const loadVerdict =
+      route.name === "readOnlyVerdict"
+        ? verdictRepository.loadHistoryVerdict
+        : verdictRepository.loadVerdict;
+
+    loadVerdict({
+      roomId: quizSession.roomId,
+      flavor: verdictFlavor,
+    })
       .then((nextVerdict) => {
         if (isCurrent) {
           setVerdict(nextVerdict);

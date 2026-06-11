@@ -345,6 +345,134 @@ describe("verdictRepository", () => {
     ).rejects.toThrow("Verdict display refetch failed");
   });
 
+  it("loads history verdicts by refetching current Google display by Place ID", async () => {
+    const invoke = jest.fn().mockResolvedValue({
+      data: googleDisplay({
+        placeId: "google-history",
+        name: "Current Taco",
+        mapsUri: "https://maps.google.example/current",
+        formattedAddress: "9 Fresh St",
+      }),
+      error: null,
+    });
+    const repository = createSupabaseVerdictRepository({
+      supabase: makeSupabaseClient({
+        plans: {
+          data: [
+            {
+              id: "plan-history",
+              name: "Taco crawl",
+              verdict_fired_at: "2026-06-04T19:00:00Z",
+              rooms: [{ id: "room-history" }],
+            },
+          ],
+          error: null,
+        },
+        verdicts: {
+          data: [
+            {
+              id: "verdict-1",
+              room_id: "room-history",
+              option_id: "option-1",
+              winner_google_place_id: "google-history",
+              computed_at: "2026-06-04T19:00:00Z",
+              method: "manual",
+              rule_text: "Best fit.",
+            },
+          ],
+          error: null,
+        },
+        verdict_slate_entries: {
+          data: [],
+          error: null,
+        },
+      }, [], invoke, jest.fn()),
+    });
+
+    await expect(
+      repository.loadHistoryVerdict({ roomId: "room-history", flavor: "group" }),
+    ).resolves.toEqual({
+      kind: "history",
+      roomId: "room-history",
+      planName: "Taco crawl",
+      decidedAtLabel: "Decided Jun 4",
+      display: {
+        status: "available",
+        placeName: "Current Taco",
+        formattedAddress: "9 Fresh St",
+        googleMapsUri: "https://maps.google.example/current",
+        attributionText: "Powered by Google",
+      },
+    });
+    expect(invoke).toHaveBeenCalledWith("places-proxy", {
+      body: {
+        surface: "verdict_display",
+        google_place_id: "google-history",
+      },
+    });
+  });
+
+  it("degrades history verdicts without stale Google display content when refetch fails", async () => {
+    const repository = createSupabaseVerdictRepository({
+      supabase: makeSupabaseClient({
+        plans: {
+          data: [
+            {
+              id: "plan-history",
+              name: "Taco crawl",
+              verdict_fired_at: "2026-06-04T19:00:00Z",
+              rooms: [{ id: "room-history" }],
+            },
+          ],
+          error: null,
+        },
+        verdicts: {
+          data: [
+            {
+              id: "verdict-1",
+              room_id: "room-history",
+              option_id: "option-1",
+              winner_google_place_id: "google-stale",
+              computed_at: "2026-06-04T19:00:00Z",
+              method: "manual",
+              rule_text: "Best fit.",
+            },
+          ],
+          error: null,
+        },
+        verdict_slate_entries: {
+          data: [],
+          error: null,
+        },
+      }, [], jest.fn().mockResolvedValue({
+        data: null,
+        error: new Error("google_place_unavailable"),
+      }), jest.fn()),
+    });
+
+    const result = await repository.loadHistoryVerdict({
+      roomId: "room-history",
+      flavor: "group",
+    });
+
+    expect(result).toEqual({
+      kind: "history",
+      roomId: "room-history",
+      planName: "Taco crawl",
+      decidedAtLabel: "Decided Jun 4",
+      display: {
+        status: "unavailable",
+        placeName: "Place unavailable",
+        details: "Unavailable details. Current place data could not be refetched.",
+      },
+    });
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("google-stale");
+    expect(serialized).not.toContain("googleMapsUri");
+    expect(serialized).not.toContain("formattedAddress");
+    expect(serialized).not.toContain("Powered by Google");
+  });
+
   it("advances through the stored slate, skips unavailable entries, and burns only on presented replacement", async () => {
     const refetch = jest
       .fn()
