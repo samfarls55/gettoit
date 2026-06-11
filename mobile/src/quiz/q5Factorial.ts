@@ -50,12 +50,19 @@ type ReplacementInput = GenerateInput & {
   retryCardSetId?: string;
 };
 
+type Q5PickRules = {
+  cuisine: (cuisine: string | null) => boolean;
+  reputation: (reputation: string) => boolean;
+  vibe: (vibe: number) => boolean;
+};
+
 export type Q5ReplacementResult =
   | { kind: "replaced"; cards: Q5FactorialCard[] }
   | { kind: "retry"; cards: Q5FactorialCard[] }
   | { kind: "no-results" };
 
 const noPreferenceReputation = "noPreference";
+const vibeToleranceBands = [0, 1, 2, 3, 4] as const;
 
 export function generateQ5FactorialCards({
   member,
@@ -67,14 +74,18 @@ export function generateQ5FactorialCards({
   const reputationDropCuisine = probedCuisines[0] ?? null;
   const vibeDropCuisine = probedCuisines[1] ?? probedCuisines[0] ?? null;
 
-  for (const vibeTolerance of [0, 1, 2, 3, 4]) {
+  for (const vibeTolerance of vibeToleranceBands) {
+    const vibeMatches = (vibe: number) =>
+      isWithinVibeTolerance(vibe, member.vibe, vibeTolerance);
+    const vibeDiffers = (vibe: number) =>
+      isOutsideVibeTolerance(vibe, member.vibe, vibeTolerance);
     const usedVenueIds = new Set<string>();
     const cuisineDrop = pickVenue(pool, usedVenueIds, {
       cuisine: (cuisine) => !cuisine || !member.cuisines.includes(cuisine),
       reputation: (reputation) =>
         member.reputation === noPreferenceReputation ||
         reputation === member.reputation,
-      vibe: (vibe) => Math.abs(vibe - member.vibe) <= vibeTolerance,
+      vibe: vibeMatches,
     });
 
     if (!cuisineDrop) {
@@ -89,7 +100,7 @@ export function generateQ5FactorialCards({
       reputation: (reputation) =>
         member.reputation === noPreferenceReputation ||
         reputation !== member.reputation,
-      vibe: (vibe) => Math.abs(vibe - member.vibe) <= vibeTolerance,
+      vibe: vibeMatches,
     });
 
     if (!reputationDrop) {
@@ -99,11 +110,12 @@ export function generateQ5FactorialCards({
     usedVenueIds.add(reputationDrop.id);
 
     const vibeDrop = pickVenue(pool, usedVenueIds, {
-      cuisine: (cuisine) => vibeDropCuisine === null || cuisine === vibeDropCuisine,
+      cuisine: (cuisine) =>
+        vibeDropCuisine === null || cuisine === vibeDropCuisine,
       reputation: (reputation) =>
         member.reputation === noPreferenceReputation ||
         reputation === member.reputation,
-      vibe: (vibe) => Math.abs(vibe - member.vibe) > vibeTolerance,
+      vibe: vibeDiffers,
     });
 
     if (!vibeDrop) {
@@ -125,15 +137,21 @@ export function generateQ5FactorialCards({
 }
 
 export function q5CardsToCandidates(cards: Q5FactorialCard[]): Q5Candidate[] {
-  return cards.map((card) => ({
-    id: card.venue.id,
-    name: card.venue.name,
-    meta: card.venue.attributionText ? "" : metaString(card.venue),
-    ...(card.venue.attributionText
-      ? { attributionText: card.venue.attributionText }
-      : {}),
-    droppedAxis: card.droppedAxis,
-  }));
+  return cards.map(({ droppedAxis, venue }) => {
+    const attributionText = venue.attributionText;
+    const candidate: Q5Candidate = {
+      id: venue.id,
+      name: venue.name,
+      meta: attributionText ? "" : metaString(venue),
+      droppedAxis,
+    };
+
+    if (attributionText) {
+      candidate.attributionText = attributionText;
+    }
+
+    return candidate;
+  });
 }
 
 export function replaceQ5FactorialCard({
@@ -177,11 +195,11 @@ export function replaceQ5FactorialCard({
 
   const retryCards = retryCardSetId
     ? generateQ5FactorialCards({
-      member,
-      memberId,
-      pool: (retryPool ?? pool).filter((venue) => venue.id !== failedVenueId),
-      q5CardSetId: retryCardSetId,
-    })
+        member,
+        memberId,
+        pool: (retryPool ?? pool).filter((venue) => venue.id !== failedVenueId),
+        q5CardSetId: retryCardSetId,
+      })
     : null;
 
   if (retryCards) {
@@ -229,11 +247,7 @@ export function selectProbedCuisines(
 function pickVenue(
   pool: Q5PoolVenue[],
   usedVenueIds: Set<string>,
-  rules: {
-    cuisine: (cuisine: string | null) => boolean;
-    reputation: (reputation: string) => boolean;
-    vibe: (vibe: number) => boolean;
-  },
+  rules: Q5PickRules,
 ): Q5PoolVenue | null {
   return (
     pool.find(
@@ -252,40 +266,8 @@ function pickReplacementForAxis(
   pool: Q5PoolVenue[],
   usedVenueIds: Set<string>,
 ): Q5PoolVenue | null {
-  for (const vibeTolerance of [0, 1, 2, 3, 4]) {
-    const vibeMatches = (vibe: number) =>
-      Math.abs(vibe - member.vibe) <= vibeTolerance;
-    const vibeDiffers = (vibe: number) =>
-      Math.abs(vibe - member.vibe) > vibeTolerance;
-
-    const rules = axis === "cuisine"
-      ? {
-        cuisine: (cuisine: string | null) =>
-          !cuisine || !member.cuisines.includes(cuisine),
-        reputation: (reputation: string) =>
-          member.reputation === noPreferenceReputation ||
-          reputation === member.reputation,
-        vibe: vibeMatches,
-      }
-      : axis === "reputation"
-      ? {
-        cuisine: (cuisine: string | null) =>
-          member.cuisines.length === 0 ||
-          (cuisine !== null && member.cuisines.includes(cuisine)),
-        reputation: (reputation: string) =>
-          member.reputation === noPreferenceReputation ||
-          reputation !== member.reputation,
-        vibe: vibeMatches,
-      }
-      : {
-        cuisine: (cuisine: string | null) =>
-          member.cuisines.length === 0 ||
-          (cuisine !== null && member.cuisines.includes(cuisine)),
-        reputation: (reputation: string) =>
-          member.reputation === noPreferenceReputation ||
-          reputation === member.reputation,
-        vibe: vibeDiffers,
-      };
+  for (const vibeTolerance of vibeToleranceBands) {
+    const rules = replacementRulesForAxis(axis, member, vibeTolerance);
     const replacement = pickVenue(pool, usedVenueIds, rules);
     if (replacement) {
       return replacement;
@@ -293,6 +275,63 @@ function pickReplacementForAxis(
   }
 
   return null;
+}
+
+function replacementRulesForAxis(
+  axis: Q5Axis,
+  member: Q5MemberProfile,
+  vibeTolerance: number,
+): Q5PickRules {
+  const selectedCuisine = (cuisine: string | null) =>
+    member.cuisines.length === 0 ||
+    (cuisine !== null && member.cuisines.includes(cuisine));
+  const vibeMatches = (vibe: number) =>
+    isWithinVibeTolerance(vibe, member.vibe, vibeTolerance);
+  const vibeDiffers = (vibe: number) =>
+    isOutsideVibeTolerance(vibe, member.vibe, vibeTolerance);
+
+  switch (axis) {
+    case "cuisine":
+      return {
+        cuisine: (cuisine) => !cuisine || !member.cuisines.includes(cuisine),
+        reputation: (reputation) =>
+          member.reputation === noPreferenceReputation ||
+          reputation === member.reputation,
+        vibe: vibeMatches,
+      };
+    case "reputation":
+      return {
+        cuisine: selectedCuisine,
+        reputation: (reputation) =>
+          member.reputation === noPreferenceReputation ||
+          reputation !== member.reputation,
+        vibe: vibeMatches,
+      };
+    case "vibe":
+      return {
+        cuisine: selectedCuisine,
+        reputation: (reputation) =>
+          member.reputation === noPreferenceReputation ||
+          reputation === member.reputation,
+        vibe: vibeDiffers,
+      };
+  }
+}
+
+function isWithinVibeTolerance(
+  vibe: number,
+  targetVibe: number,
+  tolerance: number,
+): boolean {
+  return Math.abs(vibe - targetVibe) <= tolerance;
+}
+
+function isOutsideVibeTolerance(
+  vibe: number,
+  targetVibe: number,
+  tolerance: number,
+): boolean {
+  return Math.abs(vibe - targetVibe) > tolerance;
 }
 
 function deterministicShuffle<T>(items: T[], seed: string): T[] {

@@ -185,9 +185,23 @@ describe("generateQ5FactorialCards", () => {
     const cards = generateQ5FactorialCards({
       member: mexicanSocialPopular,
       pool: [
-        { ...venue("contrast", "thai", "popular", 2), profile: { cuisine: "thai", reputation: "popular", vibe: 2 } },
-        { ...venue("keep-reputation", "mexican", "hiddenGem", 2), profile: { cuisine: "mexican", reputation: "hiddenGem", vibe: 2 } },
-        { ...venue("keep-vibe", "mexican", "popular", 4), profile: { cuisine: "mexican", reputation: "popular", vibe: 4, vibeConfidence: 0 } },
+        {
+          ...venue("contrast", "thai", "popular", 2),
+          profile: { cuisine: "thai", reputation: "popular", vibe: 2 },
+        },
+        {
+          ...venue("keep-reputation", "mexican", "hiddenGem", 2),
+          profile: { cuisine: "mexican", reputation: "hiddenGem", vibe: 2 },
+        },
+        {
+          ...venue("keep-vibe", "mexican", "popular", 4),
+          profile: {
+            cuisine: "mexican",
+            reputation: "popular",
+            vibe: 4,
+            vibeConfidence: 0,
+          },
+        },
       ],
     });
 
@@ -283,9 +297,24 @@ describe("generateQ5FactorialCards", () => {
     const cards = generateQ5FactorialCards({
       member: mexicanSocialPopular,
       pool: [
-        { ...venue("google-cuisine", "thai", "popular", 2), name: "Thai Orchid", categories: [], attributionText: "Powered by Google" },
-        { ...venue("google-reputation", "mexican", "hiddenGem", 2), name: "Casa Lupita", categories: [], attributionText: "Powered by Google" },
-        { ...venue("google-vibe", "mexican", "popular", 4), name: "El Farol", categories: [], attributionText: "Powered by Google" },
+        {
+          ...venue("google-cuisine", "thai", "popular", 2),
+          name: "Thai Orchid",
+          categories: [],
+          attributionText: "Powered by Google",
+        },
+        {
+          ...venue("google-reputation", "mexican", "hiddenGem", 2),
+          name: "Casa Lupita",
+          categories: [],
+          attributionText: "Powered by Google",
+        },
+        {
+          ...venue("google-vibe", "mexican", "popular", 4),
+          name: "El Farol",
+          categories: [],
+          attributionText: "Powered by Google",
+        },
       ],
     });
 
