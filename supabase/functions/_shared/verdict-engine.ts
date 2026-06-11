@@ -51,6 +51,8 @@
 export interface CandidateOption {
   /** Stable id used in score maps + `verdicts.option_id`. */
   id: string;
+  /** Google Place ID carried into the durable Verdict slate. */
+  google_place_id?: string;
   /** Display name surfaced in `rule_text` + cut text. */
   name: string;
   /** Foursquare price tier 1..4 (`$` to `$$$$`). Null when unknown.
@@ -259,6 +261,16 @@ export interface VerdictEngineOutput {
    *  the supplied / default T for a clean run; lower when the
    *  empty-floor cascade relaxed it. Null for `no_survivor`. */
   threshold_used: number | null;
+  /** Top-four app-owned Verdict slate, without provider display content. */
+  slate: VerdictSlateEntry[];
+}
+
+export interface VerdictSlateEntry {
+  option_id: string;
+  google_place_id: string;
+  slate_rank: number;
+  final_fit_score: number;
+  scoring_version: string;
 }
 
 export interface VerdictEngineOptions {
@@ -369,7 +381,23 @@ export function computeVerdict(
   });
 
   // â”€â”€ Empty-pool / all-pruned short circuit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (ebaResult.survivors.length === 0) {
+  const radiusCuts: OptionCut[] = [];
+  const eligibleSurvivors = initialRadius === null
+    ? ebaResult.survivors
+    : ebaResult.survivors.filter((candidate) => {
+      const inRadius = candidate.distance_meters == null ||
+        candidate.distance_meters <= initialRadius;
+      if (!inRadius) {
+        radiusCuts.push({
+          option_id: candidate.id,
+          cut_reason: "radius",
+          cut_text: "outside the Search area",
+        });
+      }
+      return inRadius;
+    });
+
+  if (eligibleSurvivors.length === 0) {
     return buildNoSurvivorOutput({
       votes,
       relaxChainApplied: [],
@@ -380,7 +408,7 @@ export function computeVerdict(
 
   // Score every EBA survivor for every member, once. Scoring is pure
   // and deterministic, so the cascade re-uses this matrix.
-  const scored = scoreCandidates(ebaResult.survivors, votes);
+  const scored = scoreCandidates(eligibleSurvivors, votes);
 
   // â”€â”€ Steps 3-6 â€” satisficing floor + maximin + cascade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let threshold = initialThreshold;
@@ -388,24 +416,14 @@ export function computeVerdict(
   const relaxChain: RelaxStep[] = [];
 
   for (let iter = 0; iter < MAX_CASCADE_ITERS; iter++) {
-    // Radius gate â€” applied inside the cascade because the radius-widen
-    // step mutates it. A candidate with no distance metadata always
-    // passes (the caller pre-filtered).
-    const inRadius = radius === null
-      ? scored
-      : scored.filter((s) =>
-        s.candidate.distance_meters == null ||
-        s.candidate.distance_meters <= radius!
-      );
-
     // Satisficing floor â€” keep venues every member scores >= threshold.
-    const floorSurvivors = inRadius.filter((s) => s.minScore >= threshold);
+    const floorSurvivors = scored.filter((s) => s.minScore >= threshold);
 
     if (floorSurvivors.length > 0) {
       return seatWinner({
         floorSurvivors,
         allScored: scored,
-        ebaCuts: ebaResult.cuts,
+        ebaCuts: [...ebaResult.cuts, ...radiusCuts],
         votes,
         method: input.method ?? "manual",
         threshold,
@@ -424,12 +442,6 @@ export function computeVerdict(
       relaxChain.push("threshold");
       continue;
     }
-    if (radius !== null && radius < radiusCap) {
-      radius = Math.min(radius + RADIUS_WIDEN_STEP_METERS, radiusCap);
-      relaxChain.push("radius_widen");
-      continue;
-    }
-
     // Cascade exhausted â€” terminal no_survivor screen.
     break;
   }
@@ -750,16 +762,14 @@ function seatWinner(args: SeatWinnerArgs): VerdictEngineOutput {
     if (sumTied.length === 1) {
       winner = sumTied[0];
     } else {
-      // Fully tied â€” break on the injected random. Deterministic given
-      // the survivor order and the injected source.
+      // Fully tied: TB-10 keeps provider order and ambient randomness
+      // out of ranking. Break by app-owned stable identity.
       flatTiebreak = true;
-      const idx = Math.min(
-        Math.max(0, Math.floor(args.random() * sumTied.length)),
-        sumTied.length - 1,
-      );
-      winner = sumTied[idx];
+      winner = [...sumTied].sort(compareScoredCandidateIdentity)[0];
     }
   }
+
+  const slate = buildVerdictSlate(floorSurvivors);
 
   // Cuts â€” the full elimination picture for the S05 Cuts drawer:
   // first the EBA hard-veto cuts, then every scored survivor that did
@@ -801,7 +811,38 @@ function seatWinner(args: SeatWinnerArgs): VerdictEngineOutput {
     surviving_hard_needs: buildSurvivingHardNeeds(votes),
     radius_meters_used: args.radiusMetersUsed,
     threshold_used: threshold,
+    slate,
   };
+}
+
+const SCORING_VERSION = "verdict-fit-v1";
+
+function buildVerdictSlate(scored: ScoredCandidate[]): VerdictSlateEntry[] {
+  return [...scored]
+    .sort((a, b) => {
+      const fitDelta = finalFitScore(b) - finalFitScore(a);
+      if (fitDelta !== 0) return fitDelta;
+      return compareScoredCandidateIdentity(a, b);
+    })
+    .slice(0, 4)
+    .map((entry, index) => ({
+      option_id: entry.candidate.id,
+      google_place_id: entry.candidate.google_place_id ?? entry.candidate.id,
+      slate_rank: index + 1,
+      final_fit_score: finalFitScore(entry),
+      scoring_version: SCORING_VERSION,
+    }));
+}
+
+function finalFitScore(scored: ScoredCandidate): number {
+  const memberCount = Math.max(1, scored.memberScores.size);
+  return Number((scored.minScore + scored.sumScore / (memberCount * 10)).toFixed(6));
+}
+
+function compareScoredCandidateIdentity(a: ScoredCandidate, b: ScoredCandidate): number {
+  const aKey = a.candidate.google_place_id ?? a.candidate.id;
+  const bKey = b.candidate.google_place_id ?? b.candidate.id;
+  return aKey.localeCompare(bKey) || a.candidate.id.localeCompare(b.candidate.id);
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -828,6 +869,7 @@ function buildNoSurvivorOutput(args: BuildNoSurvivorArgs): VerdictEngineOutput {
     surviving_hard_needs: surviving,
     radius_meters_used: args.radiusMetersUsed,
     threshold_used: args.thresholdUsed,
+    slate: [],
   };
 }
 

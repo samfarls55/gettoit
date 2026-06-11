@@ -39,6 +39,7 @@ import {
   computeVerdict,
   type HardVeto,
   type MemberVote,
+  type VerdictSlateEntry,
   type VerdictEngineOutput,
   type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
@@ -72,6 +73,8 @@ export interface ComputeVerdictEnv {
   SUPABASE_URL?: string;
   /** Service-role key — bypasses RLS for verdict + cut writes. */
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  /** Google Places API key for the server-owned verdict fetch. */
+  GOOGLE_PLACES_API_KEY?: string;
 }
 
 /** Read-side dependencies the handler needs. The Edge entry point
@@ -97,6 +100,13 @@ export interface ComputeVerdictDataAdapter {
   fetchActiveMemberIds?(room_id: string): Promise<string[]>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
+  /** TB-10 — run the server-owned final Google verdict fetch cycle.
+   *  When present, this is the source of truth for the final candidate
+   *  pool. Q5 probe fetches are not reused for verdict ranking. */
+  fetchGoogleVerdictCandidates?(
+    room_id: string,
+    context: GoogleVerdictFetchContext,
+  ): Promise<GoogleVerdictCandidateRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
    *  the room (`member_fetches` rows). The handler unions these into
    *  the candidate pool and writes the union into `options` before the
@@ -116,6 +126,8 @@ export interface ComputeVerdictDataAdapter {
   insertVerdict(row: VerdictInsert): Promise<VerdictRow>;
   /** Insert the option_cuts rows for a verdict. */
   insertOptionCuts(rows: OptionCutInsert[]): Promise<void>;
+  /** Persist the top-four Google Verdict slate. */
+  insertVerdictSlateEntries?(rows: VerdictSlateEntryInsert[]): Promise<void>;
   /** Check whether a verdict already exists for this room (idempotency). */
   existingVerdict(room_id: string): Promise<VerdictRow | null>;
   /** Flip rooms.status to `verdict_ready` after the verdict row
@@ -203,9 +215,12 @@ export interface ComputeVerdictDeps {
 export interface RoomOptionRow {
   /** `options.id` — uuid. */
   id: string;
+  /** Google provider identity, present after the Google baseline. */
+  google_place_id?: string;
+  place_provider?: "google";
   /** Shape mirrors `options.payload` JSONB. The engine reads the slice
    *  it cares about from this nested payload. */
-  payload: {
+  payload?: {
     fsq_place_id?: string;
     name?: string;
     price_tier?: number | null;
@@ -231,7 +246,21 @@ export interface RoomOptionRow {
     /** TB-23 — Foursquare crowd-sourced `tastes` tag cloud. Read by the
      *  classifier for the vibe nudge. */
     tastes?: string[];
+    current_open_now?: boolean | null;
+    regular_opening_periods?: CandidateOption["regular_opening_periods"];
+    dine_in?: boolean | null;
+    takeout?: boolean | null;
   };
+}
+
+export interface GoogleVerdictFetchContext {
+  active_member_ids: string[];
+  votes: MemberVoteRow[];
+}
+
+export interface GoogleVerdictCandidateRow {
+  google_place_id: string;
+  payload: NonNullable<RoomOptionRow["payload"]>;
 }
 
 export interface MemberVoteRow {
@@ -273,6 +302,11 @@ export interface VerdictInsert {
   option_id: string | null;
   method: VerdictMethod;
   rule_text: string;
+  winner_place_provider?: "google" | null;
+  winner_google_place_id?: string | null;
+  final_fit_score?: number | null;
+  scoring_version?: string | null;
+  receipts?: unknown[];
   /** TB-10 — set when the verdict was produced after an apply_reroll
    *  RPC call. Drives the rule_chip prefix on subsequent renders.
    *  Null on clean runs. */
@@ -293,6 +327,17 @@ export interface OptionCutInsert {
   option_id: string;
   cut_reason: string;
   cut_text: string;
+}
+
+export interface VerdictSlateEntryInsert {
+  verdict_id: string;
+  room_id: string;
+  slate_rank: number;
+  place_provider: "google";
+  google_place_id: string;
+  final_fit_score: number;
+  scoring_version: string;
+  receipts: unknown[];
 }
 
 // ───────────────────────────────────────────────────────────────────────
@@ -363,6 +408,20 @@ export function mergeHardVetoes(
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(v);
+  }
+  return out;
+}
+
+function dedupeGoogleVerdictCandidates(
+  candidates: readonly GoogleVerdictCandidateRow[],
+): GoogleVerdictCandidateRow[] {
+  const seen = new Set<string>();
+  const out: GoogleVerdictCandidateRow[] = [];
+  for (const candidate of candidates) {
+    const id = candidate.google_place_id.trim();
+    if (id.length === 0 || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ ...candidate, google_place_id: id });
   }
   return out;
 }
@@ -447,6 +506,15 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
+  if (widenOverride !== null) {
+    return jsonResponse({
+      error: "search_area_locked",
+      detail: "Room parameters are locked; start a new decision to change them.",
+    }, {
+      status: 409,
+      headers: corsHeaders(),
+    });
+  }
 
   const data = deps.buildDataAdapter(deps.env);
 
@@ -495,13 +563,25 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
-  const activeMemberIdSet = data.fetchActiveMemberIds
-    ? new Set(await data.fetchActiveMemberIds(roomId))
+  const activeMemberIds = data.fetchActiveMemberIds
+    ? await data.fetchActiveMemberIds(roomId)
     : null;
+  const activeMemberIdSet = activeMemberIds ? new Set(activeMemberIds) : null;
   const filterToActiveMembers = <T extends { user_id: string }>(rows: T[]): T[] =>
     activeMemberIdSet
       ? rows.filter((row) => activeMemberIdSet.has(row.user_id))
       : rows;
+
+  const voteRows = filterToActiveMembers(await data.fetchVotes(roomId));
+
+  // A room with no member votes can't yield a verdict at all — there
+  // is no group to render the result for. That stays a hard 404.
+  if (voteRows.length === 0) {
+    return jsonResponse({ error: "no_votes" }, {
+      status: 404,
+      headers: corsHeaders(),
+    });
+  }
 
   // TB-21 — populate `options` from the per-member persisted fetches.
   //
@@ -520,7 +600,33 @@ export async function handleRequest(
   // whose pool was already populated (a prior fire, a reroll re-run)
   // is left untouched, so the union is idempotent across re-invokes.
   let optionRows = await data.fetchOptions(roomId);
-  if (
+  const googleCandidates = data.fetchGoogleVerdictCandidates
+    ? await data.fetchGoogleVerdictCandidates(roomId, {
+      active_member_ids: activeMemberIds ?? voteRows.map((row) => row.user_id),
+      votes: voteRows,
+    })
+    : [];
+  const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(googleCandidates);
+  if (dedupedGoogleCandidates.length > 0 && data.insertOptions) {
+    await data.insertOptions(dedupedGoogleCandidates.map((candidate) => ({
+      room_id: roomId,
+      fsq_place_id: candidate.google_place_id,
+      google_place_id: candidate.google_place_id,
+      payload: candidate.payload,
+    })));
+    const persistedOptionRows = await data.fetchOptions(roomId);
+    const optionIdByGooglePlaceId = new Map(
+      persistedOptionRows
+        .filter((row) => typeof row.google_place_id === "string")
+        .map((row) => [row.google_place_id as string, row.id]),
+    );
+    optionRows = dedupedGoogleCandidates.map((candidate) => ({
+      id: optionIdByGooglePlaceId.get(candidate.google_place_id) ?? candidate.google_place_id,
+      google_place_id: candidate.google_place_id,
+      place_provider: "google",
+      payload: candidate.payload,
+    }));
+  } else if (
     optionRows.length === 0 &&
     data.fetchMemberFetches &&
     data.insertOptions
@@ -533,17 +639,6 @@ export async function handleRequest(
       await data.insertOptions(unionRows);
       optionRows = await data.fetchOptions(roomId);
     }
-  }
-
-  const voteRows = filterToActiveMembers(await data.fetchVotes(roomId));
-
-  // A room with no member votes can't yield a verdict at all — there
-  // is no group to render the result for. That stays a hard 404.
-  if (voteRows.length === 0) {
-    return jsonResponse({ error: "no_votes" }, {
-      status: 404,
-      headers: corsHeaders(),
-    });
   }
 
   // bug-13 — an EMPTY candidate pool is NOT an error. It is a valid
@@ -570,6 +665,7 @@ export async function handleRequest(
 
   const candidates: CandidateOption[] = optionRows.map((row) => ({
     id: row.id,
+    google_place_id: row.google_place_id,
     name: row.payload?.name ?? "Unnamed",
     price_tier: row.payload?.price_tier ?? null,
     dietary_tags: row.payload?.dietary_tags ?? [],
@@ -582,6 +678,10 @@ export async function handleRequest(
     total_ratings: row.payload?.total_ratings ?? null,
     date_created: row.payload?.date_created ?? null,
     tastes: row.payload?.tastes ?? [],
+    current_open_now: row.payload?.current_open_now ?? null,
+    regular_opening_periods: row.payload?.regular_opening_periods,
+    dine_in: row.payload?.dine_in ?? null,
+    takeout: row.payload?.takeout ?? null,
   }));
 
   // TB-23 — classify the FULL candidate pool into per-venue
@@ -704,6 +804,11 @@ export async function handleRequest(
     option_id: result.winning_option_id,
     method: result.method,
     rule_text: result.rule_text,
+    winner_place_provider: result.slate[0]?.google_place_id ? "google" : null,
+    winner_google_place_id: result.slate[0]?.google_place_id ?? null,
+    final_fit_score: result.slate[0]?.final_fit_score ?? null,
+    scoring_version: result.slate[0]?.scoring_version ?? null,
+    receipts: result.receipts,
     reroll_reason: rerollState?.last_reroll_reason ?? null,
   });
 
@@ -713,6 +818,18 @@ export async function handleRequest(
       option_id: c.option_id,
       cut_reason: c.cut_reason,
       cut_text: c.cut_text,
+    })));
+  }
+  if (data.insertVerdictSlateEntries && result.slate.length > 0) {
+    await data.insertVerdictSlateEntries(result.slate.map((entry) => ({
+      verdict_id: verdict.id,
+      room_id: roomId,
+      slate_rank: entry.slate_rank,
+      place_provider: "google",
+      google_place_id: entry.google_place_id,
+      final_fit_score: entry.final_fit_score,
+      scoring_version: entry.scoring_version,
+      receipts: result.receipts,
     })));
   }
 

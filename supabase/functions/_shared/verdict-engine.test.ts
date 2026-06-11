@@ -386,12 +386,13 @@ Deno.test("final tiebreak — equal minimums break on the higher sum", () => {
   assertEquals(out.winning_option_id, "bigsum");
 });
 
-Deno.test("final tiebreak — fully-tied survivors break on the injected random", () => {
-  // two survivors identical on both min and sum → random decides.
+Deno.test("final tiebreak — fully-tied survivors break on stable identity", () => {
+  // two survivors identical on both min and sum → app-owned stable
+  // identity decides, independent of injected randomness or input order.
   const a = makeCandidate({ id: "a", name: "A" });
   const b = makeCandidate({ id: "b", name: "B" });
   const input: VerdictEngineInput = {
-    candidates: [a, b],
+    candidates: [b, a],
     votes: [
       scoredVote("u1", { a: 4, b: 4 }),
       scoredVote("u2", { a: 4, b: 4 }),
@@ -400,7 +401,8 @@ Deno.test("final tiebreak — fully-tied survivors break on the injected random"
   const first = run(input, { random: () => 0.0 });
   const second = run(input, { random: () => 0.99 });
   assertEquals(first.winning_option_id, "a");
-  assertEquals(second.winning_option_id, "b");
+  assertEquals(second.winning_option_id, "a");
+  assertEquals(first.slate.map((entry) => entry.option_id), ["a", "b"]);
   assert(first.flat_tiebreak_fallback);
 });
 
