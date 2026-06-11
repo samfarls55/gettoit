@@ -27,9 +27,9 @@
 //      anti-defection mechanic (0.1.0-quiz-amendments Â§4, the Kim 2023
 //      backfire avoidance).
 //   5. Final tiebreak â€” equal minimums break on the higher group sum,
-//      then Google quality evidence, then injected random.
-//   6. Empty-floor cascade â€” when no venue clears the floor the engine
-//      relaxes T downward, then widens the search radius, then emits a
+//      then on the injected random.
+//   6. Empty-floor cascade â€” when no venue clears the floor inside the
+//      locked Search area, the engine relaxes T downward, then emits a
 //      terminal `no_survivor` screen. Hard-veto cuts never recover.
 //
 // Why TypeScript rather than PL/pgSQL: the rule-text formatting is
@@ -53,9 +53,9 @@ export interface CandidateOption {
   id: string;
   /** Display name surfaced in `rule_text` + cut text. */
   name: string;
-  /** Google price tier 1..4 (`$` to `$$$$`). Null when unknown.
+  /** Foursquare price tier 1..4 (`$` to `$$$$`). Null when unknown.
    *  The EBA prune cuts a candidate whose tier exceeds the MIN member
-   *  Q2 spend cap; an unknown tier is also cut for Google eligibility. */
+   *  Q2 spend cap; an unknown tier never prunes (benefit of the doubt). */
   price_tier: number | null;
   /** Dietary `emit_tag`s carried over from the PlacesProxy. The EBA
    *  prune matches each member's dietary veto against the corresponding
@@ -65,20 +65,18 @@ export interface CandidateOption {
    *  "Sushi Restaurant"). Used to match cuisine-NEVER hard vetoes and
    *  for diagnostic rule text. */
   categories: string[];
-  /** Distance from the room's search centre, in meters. Used by the
-   *  empty-floor cascade's radius-widen step. Optional â€” when the
+  /** Distance from the room's search centre, in meters. Used only as
+   *  a hard Search area eligibility boundary. Optional â€” when the
    *  caller pre-filtered the pool to the radius it can be omitted and
    *  the radius gate is a no-op. */
   distance_meters?: number | null;
-  /** Google 1..5 venue rating. The engine reads this transiently for the
-   *  platform quality floor and above-floor ranking input. Optional /
-   *  null when the venue carries no rating. */
+  /** Foursquare 0..10 venue rating. The engine never reads it â€” it is
+   *  carried so the TB-23 server-side venue classifier can derive the
+   *  reputation axis. Optional / null when the venue carries no rating. */
   rating?: number | null;
-  /** Google user-rating count. The engine reads this transiently for the
-   *  platform quality floor and above-floor ranking input. Optional /
-   *  null when absent. */
-  user_rating_count?: number | null;
-  /** Legacy alias carried by older tests/classifier seams. */
+  /** Foursquare total-ratings count. Carried for the TB-23 venue
+   *  classifier's pool-relative reputation terciles. The engine never
+   *  reads it. Optional / null when the venue carries no count. */
   total_ratings?: number | null;
   /** Foursquare ISO-8601 record-creation date. Carried for the TB-23
    *  venue classifier's reputation age check. The engine never reads
@@ -166,12 +164,12 @@ export interface VerdictEngineInput {
    *  0.1.0-quiz-amendments Â§4). Tunable post-cohort. */
   satisficing_threshold?: number;
   /** Initial room radius in meters. When supplied (with candidate
-   *  `distance_meters`), the EBA prune gates on it and the empty-floor
-   *  cascade may widen it. Omitting it (and `radius_meters_cap`) turns
-   *  the radius gate off â€” the caller pre-filtered the pool. */
+   *  `distance_meters`), the engine treats it as the locked Search area
+   *  boundary. Omitting it turns the radius gate off â€” the caller
+   *  pre-filtered the pool. */
   radius_meters?: number;
-  /** Upper bound for the radius-widen cascade step. Defaults to 8047 m
-   *  (5.0 mi â€” the S01 slider ceiling). */
+  /** Deprecated. Radius is locked for active Rooms. Kept for older
+   *  call sites that still pass the field. */
   radius_meters_cap?: number;
   /** Option ids to remove from the candidate pool BEFORE pruning.
    *  Populated by `avail`-reason rerolls. */
@@ -206,7 +204,7 @@ export interface VoiceReceipt {
 /** Canonical empty-floor cascade step labels, in the order the engine
  *  applies them. Kept on the module surface so iOS / web / QA share one
  *  vocabulary for the cascade. */
-export const RELAX_STEPS = ["threshold", "radius_widen"] as const;
+export const RELAX_STEPS = ["threshold"] as const;
 export type RelaxStep = typeof RELAX_STEPS[number];
 
 export interface VerdictEngineOutput {
@@ -258,16 +256,8 @@ const MIN_THRESHOLD = 1;
 /** Step the cascade relaxes T by on each iteration. */
 const THRESHOLD_RELAX_STEP = 1;
 
-/** Default radius cap when the caller omits it (5.0 mi â‰ˆ 8047 m). */
-const DEFAULT_RADIUS_CAP_METERS = 8047;
-
-/** Radius widen step â€” 0.5 mi â‰ˆ 805 m. */
-const RADIUS_WIDEN_STEP_METERS = 805;
-
 /** Defensive bound on the cascade loop. */
 const MAX_CASCADE_ITERS = 64;
-const QUALITY_RATING_FLOOR = 3.7;
-const QUALITY_RATING_COUNT_FLOOR = 15;
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Dietary chip â†’ required tag mapping
@@ -284,33 +274,13 @@ interface DietaryRequirement {
 
 const DIETARY_REQUIREMENTS: readonly DietaryRequirement[] = Object.freeze([
   { chip: "vegan", requiredTag: "vegan_friendly", label: "vegan options" },
-  {
-    chip: "vegetarian",
-    requiredTag: "vegetarian_friendly",
-    label: "vegetarian options",
-  },
+  { chip: "vegetarian", requiredTag: "vegetarian_friendly", label: "vegetarian options" },
   { chip: "halal", requiredTag: "halal", label: "halal options" },
   { chip: "kosher", requiredTag: "kosher", label: "kosher options" },
-  {
-    chip: "gluten",
-    requiredTag: "gluten_free_options",
-    label: "gluten-free options",
-  },
-  {
-    chip: "dairy",
-    requiredTag: "no_dairy_unverified",
-    label: "dairy-safe options",
-  },
-  {
-    chip: "shellfish",
-    requiredTag: "no_shellfish_unverified",
-    label: "shellfish-safe options",
-  },
-  {
-    chip: "nuts",
-    requiredTag: "no_nuts_unverified",
-    label: "nut-safe options",
-  },
+  { chip: "gluten", requiredTag: "gluten_free_options", label: "gluten-free options" },
+  { chip: "dairy", requiredTag: "no_dairy_unverified", label: "dairy-safe options" },
+  { chip: "shellfish", requiredTag: "no_shellfish_unverified", label: "shellfish-safe options" },
+  { chip: "nuts", requiredTag: "no_nuts_unverified", label: "nut-safe options" },
 ]);
 
 /** The "Nothing tonight" chip carries no constraint. Accepted
@@ -355,10 +325,8 @@ export function computeVerdict(
     );
   }
 
-  const initialThreshold = input.satisficing_threshold ??
-    DEFAULT_SATISFICING_THRESHOLD;
+  const initialThreshold = input.satisficing_threshold ?? DEFAULT_SATISFICING_THRESHOLD;
   const initialRadius = input.radius_meters ?? null;
-  const radiusCap = input.radius_meters_cap ?? DEFAULT_RADIUS_CAP_METERS;
 
   // â”€â”€ Step 1 â€” EBA prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Hard vetoes never relax. The EBA pass is run once; its survivors
@@ -375,38 +343,37 @@ export function computeVerdict(
     });
   }
 
-  // Score every EBA survivor for every member, once. Scoring is pure
+  const searchAreaResult = searchAreaPrune(ebaResult.survivors, initialRadius);
+  if (searchAreaResult.survivors.length === 0) {
+    return buildNoSurvivorOutput({
+      votes,
+      relaxChainApplied: [],
+      radiusMetersUsed: initialRadius,
+      thresholdUsed: null,
+    });
+  }
+
+  // Score every Search area survivor for every member, once. Scoring is pure
   // and deterministic, so the cascade re-uses this matrix.
-  const scored = scoreCandidates(ebaResult.survivors, votes);
+  const scored = scoreCandidates(searchAreaResult.survivors, votes);
 
   // â”€â”€ Steps 3-6 â€” satisficing floor + maximin + cascade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let threshold = initialThreshold;
-  let radius = initialRadius;
   const relaxChain: RelaxStep[] = [];
 
   for (let iter = 0; iter < MAX_CASCADE_ITERS; iter++) {
-    // Radius gate â€” applied inside the cascade because the radius-widen
-    // step mutates it. A candidate with no distance metadata always
-    // passes (the caller pre-filtered).
-    const inRadius = radius === null
-      ? scored
-      : scored.filter((s) =>
-        s.candidate.distance_meters == null ||
-        s.candidate.distance_meters <= radius!
-      );
-
     // Satisficing floor â€” keep venues every member scores >= threshold.
-    const floorSurvivors = inRadius.filter((s) => s.minScore >= threshold);
+    const floorSurvivors = scored.filter((s) => s.minScore >= threshold);
 
     if (floorSurvivors.length > 0) {
       return seatWinner({
         floorSurvivors,
         allScored: scored,
-        ebaCuts: ebaResult.cuts,
+        preScoreCuts: [...ebaResult.cuts, ...searchAreaResult.cuts],
         votes,
         method: input.method ?? "manual",
         threshold,
-        radiusMetersUsed: radius,
+        radiusMetersUsed: initialRadius,
         relaxChain,
         random,
         rerollReason: input.reroll_reason,
@@ -414,16 +381,11 @@ export function computeVerdict(
       });
     }
 
-    // Empty floor â€” relax in canonical order: threshold first, radius
-    // second.
+    // Empty floor â€” relax the acceptability threshold only. The
+    // committed Search area never widens inside an active Room.
     if (threshold > MIN_THRESHOLD) {
       threshold = Math.max(MIN_THRESHOLD, threshold - THRESHOLD_RELAX_STEP);
       relaxChain.push("threshold");
-      continue;
-    }
-    if (radius !== null && radius < radiusCap) {
-      radius = Math.min(radius + RADIUS_WIDEN_STEP_METERS, radiusCap);
-      relaxChain.push("radius_widen");
       continue;
     }
 
@@ -434,7 +396,7 @@ export function computeVerdict(
   return buildNoSurvivorOutput({
     votes,
     relaxChainApplied: relaxChain,
-    radiusMetersUsed: radius,
+    radiusMetersUsed: initialRadius,
     thresholdUsed: null,
   });
 }
@@ -496,15 +458,7 @@ function ebaPrune(
 
   for (const c of candidates) {
     // Q2 spend cap.
-    if (c.price_tier === null || !Number.isFinite(c.price_tier)) {
-      cuts.push({
-        option_id: c.id,
-        cut_reason: "budget",
-        cut_text: "missing price metadata",
-      });
-      continue;
-    }
-    if (c.price_tier > minBudget) {
+    if (c.price_tier !== null && c.price_tier > minBudget) {
       cuts.push({
         option_id: c.id,
         cut_reason: "budget",
@@ -513,19 +467,8 @@ function ebaPrune(
       continue;
     }
 
-    if (!passesQualityFloor(c)) {
-      cuts.push({
-        option_id: c.id,
-        cut_reason: "quality",
-        cut_text: "below the public quality floor",
-      });
-      continue;
-    }
-
     // Dietary menu-compliance.
-    const missingReq = dietaryReqs.find((r) =>
-      !c.dietary_tags.includes(r.requiredTag)
-    );
+    const missingReq = dietaryReqs.find((r) => !c.dietary_tags.includes(r.requiredTag));
     if (missingReq) {
       cuts.push({
         option_id: c.id,
@@ -577,24 +520,28 @@ function ebaPrune(
   return { survivors, cuts };
 }
 
-function passesQualityFloor(candidate: CandidateOption): boolean {
-  const ratingCount = candidateRatingCount(candidate);
-  return (
-    typeof candidate.rating === "number" &&
-    candidate.rating >= QUALITY_RATING_FLOOR &&
-    typeof ratingCount === "number" &&
-    ratingCount >= QUALITY_RATING_COUNT_FLOOR
-  );
-}
-
-function candidateRatingCount(candidate: CandidateOption): number | null {
-  if (typeof candidate.user_rating_count === "number") {
-    return candidate.user_rating_count;
+function searchAreaPrune(
+  candidates: CandidateOption[],
+  radiusMeters: number | null,
+): EbaResult {
+  if (radiusMeters === null) return { survivors: candidates, cuts: [] };
+  const survivors: CandidateOption[] = [];
+  const cuts: OptionCut[] = [];
+  for (const candidate of candidates) {
+    if (
+      candidate.distance_meters != null &&
+      candidate.distance_meters > radiusMeters
+    ) {
+      cuts.push({
+        option_id: candidate.id,
+        cut_reason: "radius",
+        cut_text: "outside the search area",
+      });
+      continue;
+    }
+    survivors.push(candidate);
   }
-  if (typeof candidate.total_ratings === "number") {
-    return candidate.total_ratings;
-  }
-  return null;
+  return { survivors, cuts };
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -609,8 +556,6 @@ interface ScoredCandidate {
   minScore: number;
   /** Sum of member scores â€” the final-tiebreak key. */
   sumScore: number;
-  /** Transient Google quality signal for above-floor ranking ties. */
-  qualityEvidence: number;
 }
 
 /** Score one candidate for one member, via the injected `prefFn` (live
@@ -638,20 +583,8 @@ function scoreCandidates(
       if (s < minScore) minScore = s;
       sumScore += s;
     }
-    return {
-      candidate,
-      memberScores,
-      minScore,
-      sumScore,
-      qualityEvidence: qualityRankingEvidence(candidate),
-    };
+    return { candidate, memberScores, minScore, sumScore };
   });
-}
-
-function qualityRankingEvidence(candidate: CandidateOption): number {
-  const rating = typeof candidate.rating === "number" ? candidate.rating : 0;
-  const count = candidateRatingCount(candidate) ?? 0;
-  return rating + Math.log10(Math.max(1, count));
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -661,10 +594,10 @@ function qualityRankingEvidence(candidate: CandidateOption): number {
 interface SeatWinnerArgs {
   floorSurvivors: ScoredCandidate[];
   allScored: ScoredCandidate[];
-  /** Cuts emitted by the EBA prune â€” candidates dropped on a hard veto
-   *  before scoring. Merged into the final cuts so the S05 Cuts drawer
+  /** Cuts emitted before scoring: hard vetoes plus locked Search area
+   *  eligibility. Merged into the final cuts so the S05 Cuts drawer
    *  shows the full elimination picture. */
-  ebaCuts: OptionCut[];
+  preScoreCuts: OptionCut[];
   votes: MemberVote[];
   method: VerdictMethod;
   threshold: number;
@@ -700,32 +633,21 @@ function seatWinner(args: SeatWinnerArgs): VerdictEngineOutput {
     if (sumTied.length === 1) {
       winner = sumTied[0];
     } else {
-      const bestQuality = sumTied.reduce(
-        (acc, s) => Math.max(acc, s.qualityEvidence),
-        Number.NEGATIVE_INFINITY,
+      // Fully tied â€” break on the injected random. Deterministic given
+      // the survivor order and the injected source.
+      flatTiebreak = true;
+      const idx = Math.min(
+        Math.max(0, Math.floor(args.random() * sumTied.length)),
+        sumTied.length - 1,
       );
-      const qualityTied = sumTied.filter((s) =>
-        s.qualityEvidence === bestQuality
-      );
-      if (qualityTied.length === 1) {
-        winner = qualityTied[0];
-      } else {
-        // Fully tied â€” break on the injected random. Deterministic given
-        // the survivor order and the injected source.
-        flatTiebreak = true;
-        const idx = Math.min(
-          Math.max(0, Math.floor(args.random() * qualityTied.length)),
-          qualityTied.length - 1,
-        );
-        winner = qualityTied[idx];
-      }
+      winner = sumTied[idx];
     }
   }
 
   // Cuts â€” the full elimination picture for the S05 Cuts drawer:
-  // first the EBA hard-veto cuts, then every scored survivor that did
-  // not win (split into below-floor cuts and lower-maximin cuts).
-  const cuts: OptionCut[] = [...args.ebaCuts];
+  // first the pre-score eligibility cuts, then every scored survivor
+  // that did not win (split into below-floor cuts and lower-maximin cuts).
+  const cuts: OptionCut[] = [...args.preScoreCuts];
   for (const s of args.allScored) {
     if (s.candidate.id === winner.candidate.id) continue;
     if (s.minScore < threshold) {
@@ -824,9 +746,7 @@ function buildRuleText(args: {
   const parts: string[] = [];
 
   if (args.rerollReason) {
-    parts.push(
-      rerollPrefixSentence(args.rerollReason, args.previousWinnerName),
-    );
+    parts.push(rerollPrefixSentence(args.rerollReason, args.previousWinnerName));
   }
 
   // Maximin is the load-bearing mechanic â€” name the rule, not the
@@ -841,18 +761,10 @@ function buildRuleText(args: {
     );
   }
 
-  // Surface the cascade honestly when it fired â€” the relax is recorded
-  // for observability even though it is silent on the surface.
-  if (args.relaxChain.includes("radius_widen")) {
-    parts.push("The search radius was widened to find it.");
-  }
-
   return parts.join(" ");
 }
 
-function buildNoSurvivorRuleText(
-  survivingHardNeeds: readonly string[],
-): string {
+function buildNoSurvivorRuleText(survivingHardNeeds: readonly string[]): string {
   if (survivingHardNeeds.length === 0) {
     return "No spot fit the room tonight.";
   }
@@ -907,8 +819,6 @@ function receiptAction(v: MemberVote): string {
   const firstVeto = v.q1_vetoes.find((chip) => lookupRequirement(chip));
   if (firstVeto) return `filtered ${firstVeto}`;
   if (v.hard_vetoes.length > 0) return "set a hard limit";
-  if (v.q2_budget < 4) {
-    return `capped at ${"$".repeat(Math.max(1, v.q2_budget))}`;
-  }
+  if (v.q2_budget < 4) return `capped at ${"$".repeat(Math.max(1, v.q2_budget))}`;
   return "voted in";
 }

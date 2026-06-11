@@ -16,8 +16,8 @@ import {
   type FoursquareSearchResponse,
   OPEN_AT_PATTERN,
   type PlacesProxyInput,
-  type ShapedPlace,
   shapeFoursquareResult,
+  type ShapedPlace,
   THIN_RESULTS_THRESHOLD,
 } from "./foursquare.ts";
 
@@ -94,6 +94,14 @@ export interface GoogleQ5Place {
   display_name: string;
 }
 
+export interface GoogleOverfetchTelemetry {
+  committed_radius_meters: number;
+  provider_radius_meters: number;
+  pre_trim_count: number;
+  post_trim_count: number;
+  trimmed_count: number;
+}
+
 export interface GoogleAttributionPayload {
   provider: "google";
   render: "text";
@@ -103,6 +111,7 @@ export interface GoogleAttributionPayload {
 export interface GoogleQ5Response {
   places: GoogleQ5Place[];
   attribution: GoogleAttributionPayload;
+  overfetch_telemetry: GoogleOverfetchTelemetry;
 }
 
 interface GoogleQ5ProxyDeps {
@@ -138,17 +147,11 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const lat = obj.lat;
   const lng = obj.lng;
   const radius = obj.radius_meters;
-  if (
-    typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90
-  ) {
+  if (typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90) {
     throw new PlacesProxyInputError("lat must be a finite number in [-90, 90]");
   }
-  if (
-    typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180
-  ) {
-    throw new PlacesProxyInputError(
-      "lng must be a finite number in [-180, 180]",
-    );
+  if (typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180) {
+    throw new PlacesProxyInputError("lng must be a finite number in [-180, 180]");
   }
   if (
     typeof radius !== "number" ||
@@ -189,9 +192,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     ? filters.cuisine
     : undefined;
   return {
-    lat,
-    lng,
-    radius_meters: radius,
+    lat, lng, radius_meters: radius,
     filters: { dietary, price_tier, open_at, cuisine },
   };
 }
@@ -259,9 +260,7 @@ export async function handlePlacesProxy(
       // header is unset.
       throw new FoursquareUpstreamError(
         410,
-        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${
-          body.slice(0, 200)
-        }`,
+        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${body.slice(0, 200)}`,
       );
     }
     // Non-410 upstream failure. Degrade to a thin response, but surface
@@ -322,9 +321,10 @@ export async function handlePlacesProxy(
 const GOOGLE_NEARBY_SEARCH_URL =
   "https://places.googleapis.com/v1/places:searchNearby";
 export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
-export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName";
+export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName,places.location";
 export const GOOGLE_Q5_MAX_RESULTS = 20;
 export const GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT = 50;
+export const GOOGLE_OVERFETCH_CAP_METERS = 805;
 
 export const GOOGLE_Q1_CUISINE_PRIMARY_TYPES: Record<string, readonly string[]> = {
   american: [
@@ -430,6 +430,7 @@ type GoogleNearbySearchResponse = {
   places?: Array<{
     id?: unknown;
     displayName?: { text?: unknown };
+    location?: { latitude?: unknown; longitude?: unknown };
   }>;
 };
 
@@ -450,9 +451,7 @@ export async function handleGoogleQ5PlacesProxy(
     deps.fetch,
     googleApiKey,
   );
-
-  const places: GoogleQ5Place[] = [];
-  const seenPlaceIds = new Set<string>();
+  const rawPlaces: NonNullable<GoogleNearbySearchResponse["places"]> = [];
   for (const response of responses) {
     if (!response.ok) {
       throw new GooglePlacesGuardrailError(
@@ -460,23 +459,19 @@ export async function handleGoogleQ5PlacesProxy(
         `Google Places returned ${response.status}`,
       );
     }
-
-    for (const place of shapeGoogleQ5Places(
-      (await response.json()) as GoogleNearbySearchResponse,
-    )) {
-      if (seenPlaceIds.has(place.place_id)) continue;
-      seenPlaceIds.add(place.place_id);
-      places.push(place);
-    }
+    const body = (await response.json()) as GoogleNearbySearchResponse;
+    rawPlaces.push(...(body.places ?? []));
   }
 
+  const shaped = shapeGoogleQ5Places({ places: rawPlaces }, input);
   return {
-    places,
+    places: shaped.places,
     attribution: {
       provider: "google",
       render: "text",
       text: "Powered by Google",
     },
+    overfetch_telemetry: shaped.overfetchTelemetry,
   };
 }
 
@@ -498,22 +493,50 @@ async function fetchGoogleNearbyWithRetry(
 
 function shapeGoogleQ5Places(
   body: GoogleNearbySearchResponse,
-): GoogleQ5Place[] {
+  input: PlacesProxyInput,
+): { places: GoogleQ5Place[]; overfetchTelemetry: GoogleOverfetchTelemetry } {
   const places: GoogleQ5Place[] = [];
-  for (const place of body.places ?? []) {
+  const seenPlaceIds = new Set<string>();
+  const rawPlaces = body.places ?? [];
+  const providerRadiusMeters = googleProviderRadiusMeters(input.radius_meters);
+  for (const place of rawPlaces) {
     if (
       typeof place.id !== "string" ||
-      typeof place.displayName?.text !== "string"
+      typeof place.displayName?.text !== "string" ||
+      typeof place.location?.latitude !== "number" ||
+      typeof place.location?.longitude !== "number"
     ) {
       continue;
     }
+    const distanceFromSearchCenter = distanceMeters(
+      input.lat,
+      input.lng,
+      place.location.latitude,
+      place.location.longitude,
+    );
+    if (distanceFromSearchCenter > input.radius_meters) {
+      continue;
+    }
+    if (seenPlaceIds.has(place.id)) {
+      continue;
+    }
+    seenPlaceIds.add(place.id);
 
     places.push({
       place_id: place.id,
       display_name: place.displayName.text,
     });
   }
-  return places;
+  return {
+    places,
+    overfetchTelemetry: {
+      committed_radius_meters: input.radius_meters,
+      provider_radius_meters: providerRadiusMeters,
+      pre_trim_count: rawPlaces.length,
+      post_trim_count: places.length,
+      trimmed_count: rawPlaces.length - places.length,
+    },
+  };
 }
 
 function buildGoogleQ5Requests(
@@ -521,9 +544,7 @@ function buildGoogleQ5Requests(
   apiKey: string,
 ): RequestInit[] {
   const primaryTypes = googlePrimaryTypesForInput(input);
-  return chunkGoogleIncludedPrimaryTypes(primaryTypes).map((
-    includedPrimaryTypes,
-  ) => ({
+  return chunkGoogleIncludedPrimaryTypes(primaryTypes).map((includedPrimaryTypes) => ({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -539,7 +560,7 @@ function buildGoogleQ5Requests(
             latitude: input.lat,
             longitude: input.lng,
           },
-          radius: input.radius_meters,
+          radius: googleProviderRadiusMeters(input.radius_meters),
         },
       },
     }),
@@ -561,4 +582,25 @@ function chunkGoogleIncludedPrimaryTypes(types: string[]): string[][] {
     chunks.push(types.slice(index, index + GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT));
   }
   return chunks;
+}
+
+function googleProviderRadiusMeters(committedRadiusMeters: number): number {
+  return committedRadiusMeters +
+    Math.min(committedRadiusMeters * 0.15, GOOGLE_OVERFETCH_CAP_METERS);
+}
+
+function distanceMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (degrees: number) => degrees * Math.PI / 180;
+  const dLat = toRadians(lat2 - lat1);
+  const dLng = toRadians(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+      Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }

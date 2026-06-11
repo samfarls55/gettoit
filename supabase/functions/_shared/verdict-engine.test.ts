@@ -12,8 +12,8 @@
 //   4. Maximin tiebreak  — highest minimum member score wins; a
 //                          polarizing higher-sum pick LOSES to a
 //                          worst-off-protecting pick.
-//   5. Final tiebreak    — highest sum, quality evidence, then injected random.
-//   6. Empty-floor cascade — relax T, then widen radius, then a
+//   5. Final tiebreak    — highest sum, then injected random.
+//   6. Empty-floor cascade — relax T inside the locked Search area, then a
 //                          terminal `no_survivor` screen.
 //
 // A good test asserts external behavior through the public interface,
@@ -22,7 +22,6 @@
 import {
   assert,
   assertEquals,
-  assertExists,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   type CandidateOption,
@@ -35,23 +34,14 @@ import {
 // Fixture helpers
 // ───────────────────────────────────────────────────────────────────────
 
-function makeCandidate(
-  overrides: Partial<CandidateOption> = {},
-): CandidateOption {
+function makeCandidate(overrides: Partial<CandidateOption> = {}): CandidateOption {
   return {
     id: overrides.id ?? "opt-a",
     name: overrides.name ?? "Generic Spot",
-    price_tier: "price_tier" in overrides ? overrides.price_tier! : 2,
+    price_tier: overrides.price_tier ?? 2,
     dietary_tags: overrides.dietary_tags ?? [],
     categories: overrides.categories ?? ["Restaurant"],
     distance_meters: overrides.distance_meters,
-    rating: "rating" in overrides ? overrides.rating : 4.2,
-    user_rating_count: "user_rating_count" in overrides
-      ? overrides.user_rating_count
-      : 30,
-    total_ratings: "total_ratings" in overrides
-      ? overrides.total_ratings
-      : undefined,
   };
 }
 
@@ -95,16 +85,8 @@ function run(input: VerdictEngineInput, opts = {}) {
 // ───────────────────────────────────────────────────────────────────────
 
 Deno.test("EBA prune — Q2 spend cap drops candidates over the MIN member cap", () => {
-  const cheap = makeCandidate({
-    id: "cheap",
-    name: "Cheap Eats",
-    price_tier: 1,
-  });
-  const pricey = makeCandidate({
-    id: "pricey",
-    name: "Pricey Place",
-    price_tier: 4,
-  });
+  const cheap = makeCandidate({ id: "cheap", name: "Cheap Eats", price_tier: 1 });
+  const pricey = makeCandidate({ id: "pricey", name: "Pricey Place", price_tier: 4 });
   const out = run({
     candidates: [cheap, pricey],
     votes: [
@@ -118,104 +100,6 @@ Deno.test("EBA prune — Q2 spend cap drops candidates over the MIN member cap",
     out.cuts.some((c) => c.option_id === "pricey" && c.cut_reason === "budget"),
     "pricey should be cut for budget",
   );
-});
-
-Deno.test("EBA prune — TB-05 cuts missing price and quality metadata for Google candidates", () => {
-  const eligible = makeCandidate({ id: "eligible", name: "Eligible" });
-  const missingPrice = makeCandidate({
-    id: "missing-price",
-    name: "Missing Price",
-    price_tier: null,
-  });
-  const lowRating = makeCandidate({
-    id: "low-rating",
-    name: "Low Rating",
-    rating: 3.6,
-  });
-  const lowCount = makeCandidate({
-    id: "low-count",
-    name: "Low Count",
-    user_rating_count: 14,
-  });
-  const missingRating = makeCandidate({
-    id: "missing-rating",
-    name: "Missing Rating",
-    rating: null,
-  });
-  const missingCount = makeCandidate({
-    id: "missing-count",
-    name: "Missing Count",
-    user_rating_count: null,
-  });
-
-  const out = run({
-    candidates: [
-      eligible,
-      missingPrice,
-      lowRating,
-      lowCount,
-      missingRating,
-      missingCount,
-    ],
-    votes: [
-      scoredVote(
-        "u1",
-        {
-          eligible: 5,
-          "missing-price": 5,
-          "low-rating": 5,
-          "low-count": 5,
-          "missing-rating": 5,
-          "missing-count": 5,
-        },
-        5,
-        { q2_budget: 2 },
-      ),
-    ],
-  });
-
-  assertEquals(out.winning_option_id, "eligible");
-  assert(
-    out.cuts.some((c) =>
-      c.option_id === "missing-price" && c.cut_reason === "budget"
-    ),
-  );
-  for (
-    const id of ["low-rating", "low-count", "missing-rating", "missing-count"]
-  ) {
-    assert(
-      out.cuts.some((c) => c.option_id === id && c.cut_reason === "quality"),
-    );
-  }
-});
-
-Deno.test("final tiebreak — TB-05 above-floor quality evidence is a transient ranking input", () => {
-  const weakerQuality = makeCandidate({
-    id: "weaker-quality",
-    name: "Weaker Quality",
-    rating: 3.8,
-    user_rating_count: 20,
-  });
-  const strongerQuality = makeCandidate({
-    id: "stronger-quality",
-    name: "Stronger Quality",
-    rating: 4.8,
-    user_rating_count: 300,
-  });
-
-  const out = run({
-    candidates: [weakerQuality, strongerQuality],
-    votes: [
-      scoredVote("u1", { "weaker-quality": 4, "stronger-quality": 4 }),
-      scoredVote("u2", { "weaker-quality": 4, "stronger-quality": 4 }),
-    ],
-  }, { random: () => 0 });
-
-  assertEquals(out.winning_option_id, "stronger-quality");
-  assertEquals(out.flat_tiebreak_fallback, false);
-  const serialized = JSON.stringify(out);
-  assertEquals(serialized.includes("4.8"), false);
-  assertEquals(serialized.includes("300"), false);
 });
 
 Deno.test("EBA prune — a profile/dietary hard veto drops the violating venue", () => {
@@ -235,9 +119,7 @@ Deno.test("EBA prune — a profile/dietary hard veto drops the violating venue",
   });
   assertEquals(out.winning_option_id, "vegan-ok");
   assert(
-    out.cuts.some((c) =>
-      c.option_id === "no-vegan" && c.cut_reason === "dietary"
-    ),
+    out.cuts.some((c) => c.option_id === "no-vegan" && c.cut_reason === "dietary"),
   );
 });
 
@@ -246,11 +128,7 @@ Deno.test("EBA prune — a generic hard_veto entry drops a candidate by tag", ()
   // profile allergies / NEVERS feed it. A candidate is pruned when it
   // carries (or, for a cuisine NEVER, matches a category of) a vetoed
   // tag.
-  const safe = makeCandidate({
-    id: "safe",
-    name: "Safe Spot",
-    categories: ["Taco Stand"],
-  });
+  const safe = makeCandidate({ id: "safe", name: "Safe Spot", categories: ["Taco Stand"] });
   const sushi = makeCandidate({
     id: "sushi",
     name: "Sushi Bar",
@@ -265,9 +143,7 @@ Deno.test("EBA prune — a generic hard_veto entry drops a candidate by tag", ()
     ],
   });
   assertEquals(out.winning_option_id, "safe");
-  assert(
-    out.cuts.some((c) => c.option_id === "sushi" && c.cut_reason === "veto"),
-  );
+  assert(out.cuts.some((c) => c.option_id === "sushi" && c.cut_reason === "veto"));
 });
 
 Deno.test("EBA prune — TB-12: a profile dietary hard_veto drops a non-compliant venue", () => {
@@ -280,11 +156,7 @@ Deno.test("EBA prune — TB-12: a profile dietary hard_veto drops a non-complian
     name: "Green Plate",
     dietary_tags: ["vegan_friendly"],
   });
-  const noVegan = makeCandidate({
-    id: "no-vegan",
-    name: "Steakhouse",
-    dietary_tags: [],
-  });
+  const noVegan = makeCandidate({ id: "no-vegan", name: "Steakhouse", dietary_tags: [] });
   const out = run({
     candidates: [veganOk, noVegan],
     votes: [
@@ -295,9 +167,7 @@ Deno.test("EBA prune — TB-12: a profile dietary hard_veto drops a non-complian
   });
   assertEquals(out.winning_option_id, "vegan-ok");
   assert(
-    out.cuts.some((c) =>
-      c.option_id === "no-vegan" && c.cut_reason === "dietary"
-    ),
+    out.cuts.some((c) => c.option_id === "no-vegan" && c.cut_reason === "dietary"),
   );
 });
 
@@ -309,11 +179,7 @@ Deno.test("EBA prune — TB-12: a profile allergy `tag` hard_veto drops a venue 
     name: "Safe Kitchen",
     dietary_tags: ["no_peanut_unverified"],
   });
-  const unknown = makeCandidate({
-    id: "unknown",
-    name: "Mystery Diner",
-    dietary_tags: [],
-  });
+  const unknown = makeCandidate({ id: "unknown", name: "Mystery Diner", dietary_tags: [] });
   const out = run({
     candidates: [peanutSafe, unknown],
     votes: [
@@ -323,24 +189,14 @@ Deno.test("EBA prune — TB-12: a profile allergy `tag` hard_veto drops a venue 
     ],
   });
   assertEquals(out.winning_option_id, "peanut-safe");
-  assert(
-    out.cuts.some((c) => c.option_id === "unknown" && c.cut_reason === "veto"),
-  );
+  assert(out.cuts.some((c) => c.option_id === "unknown" && c.cut_reason === "veto"));
 });
 
 Deno.test("EBA prune — TB-12: one member's profile veto prunes for the whole room", () => {
   // Hard vetoes are room-wide: a venue failing ANY member's profile
   // veto is dropped for everyone, even members who scored it 5.
-  const taco = makeCandidate({
-    id: "taco",
-    name: "Taqueria",
-    categories: ["Taco Stand"],
-  });
-  const sushi = makeCandidate({
-    id: "sushi",
-    name: "Omakase",
-    categories: ["Sushi Restaurant"],
-  });
+  const taco = makeCandidate({ id: "taco", name: "Taqueria", categories: ["Taco Stand"] });
+  const sushi = makeCandidate({ id: "sushi", name: "Omakase", categories: ["Sushi Restaurant"] });
   const out = run({
     candidates: [taco, sushi],
     votes: [
@@ -353,9 +209,7 @@ Deno.test("EBA prune — TB-12: one member's profile veto prunes for the whole r
     ],
   });
   assertEquals(out.winning_option_id, "taco");
-  assert(
-    out.cuts.some((c) => c.option_id === "sushi" && c.cut_reason === "veto"),
-  );
+  assert(out.cuts.some((c) => c.option_id === "sushi" && c.cut_reason === "veto"));
 });
 
 // ───────────────────────────────────────────────────────────────────────
@@ -398,10 +252,7 @@ Deno.test("maximin — a worst-off-protecting pick beats a polarizing higher-sum
   // balanced:   scores 4 + 4 + 4  → sum 12, min 4.
   // A pure-sum engine picks `polarizing`. The maximin engine picks
   // `balanced` — it protects the worst-off member (min 4 > min 3).
-  const polarizing = makeCandidate({
-    id: "polarizing",
-    name: "Polarizing Pick",
-  });
+  const polarizing = makeCandidate({ id: "polarizing", name: "Polarizing Pick" });
   const balanced = makeCandidate({ id: "balanced", name: "Balanced Pick" });
   const out = run({
     candidates: [polarizing, balanced],
@@ -434,7 +285,7 @@ Deno.test("maximin — among floor survivors the highest minimum score wins", ()
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// 5. Final tiebreak — highest sum, quality evidence, then random
+// 5. Final tiebreak — highest sum, then random
 // ───────────────────────────────────────────────────────────────────────
 
 Deno.test("final tiebreak — equal minimums break on the higher sum", () => {
@@ -492,37 +343,49 @@ Deno.test("empty-floor cascade — relaxes T when no venue clears the floor", ()
   );
 });
 
-Deno.test("empty-floor cascade — widens radius after the threshold relax is exhausted", () => {
-  // The only in-radius venue is hard-vetoed (over the spend cap) so no
-  // amount of T relaxation can recover it — a hard-veto cut never
-  // relaxes. A second venue is loved by everyone but sits outside the
-  // start radius. The cascade exhausts the threshold relax (no effect)
-  // then widens the radius to admit the loved venue.
-  const near = makeCandidate({
-    id: "near",
-    name: "Near But Pricey",
+Deno.test("Search area eligibility — outside candidates are cut before scoring", () => {
+  // The committed Search area is a hard boundary. A loved candidate
+  // outside the circle cannot recover through threshold relaxation.
+  const inside = makeCandidate({
+    id: "inside",
+    name: "Inside But Pricey",
     price_tier: 4,
     distance_meters: 500,
   });
-  const far = makeCandidate({
-    id: "far",
-    name: "Far Gem",
+  const outside = makeCandidate({
+    id: "outside",
+    name: "Outside Gem",
     price_tier: 1,
     distance_meters: 6000,
   });
   const out = run({
-    candidates: [near, far],
+    candidates: [inside, outside],
     votes: [
-      scoredVote("u1", { near: 5, far: 5 }, 5, { q2_budget: 1 }),
-      scoredVote("u2", { near: 5, far: 5 }, 5, { q2_budget: 1 }),
+      scoredVote("u1", { inside: 5, outside: 5 }, 5, { q2_budget: 1 }),
+      scoredVote("u2", { inside: 5, outside: 5 }, 5, { q2_budget: 1 }),
     ],
     radius_meters: 3219,
     radius_meters_cap: 8047,
   });
+  assertEquals(out.winning_option_id, null);
+  assertEquals(out.method, "no_survivor");
+  assertEquals(out.relax_chain_applied, []);
+});
+
+Deno.test("Search area eligibility — distance inside the circle is not a tiebreaker", () => {
+  const near = makeCandidate({ id: "near", name: "Near", distance_meters: 100 });
+  const far = makeCandidate({ id: "far", name: "Far", distance_meters: 3000 });
+  const out = run({
+    candidates: [near, far],
+    votes: [
+      scoredVote("u1", { near: 4, far: 4 }),
+      scoredVote("u2", { near: 4, far: 4 }),
+    ],
+    radius_meters: 3219,
+  }, { random: () => 0.99 });
   assertEquals(out.winning_option_id, "far");
-  assert(out.relax_chain_applied.includes("radius_widen"));
-  assertExists(out.radius_meters_used);
-  assert((out.radius_meters_used ?? 0) >= 6000);
+  assertEquals(out.rule_text.toLowerCase().includes("distance"), false);
+  assertEquals(out.cuts.some((cut) => cut.cut_text.toLowerCase().includes("distance")), false);
 });
 
 Deno.test("empty-floor cascade — exhausted cascade yields a no_survivor terminal", () => {
@@ -573,10 +436,7 @@ Deno.test("rule_text uses aggregate attribution and never names a member", () =>
   const out = run({
     candidates: [a, b],
     votes: [
-      scoredVote("u1", { a: 4, b: 4 }, 4, {
-        display_name: "samuel",
-        q2_budget: 2,
-      }),
+      scoredVote("u1", { a: 4, b: 4 }, 4, { display_name: "samuel", q2_budget: 2 }),
       scoredVote("u2", { a: 4, b: 4 }, 4, { display_name: "alex" }),
     ],
   });
