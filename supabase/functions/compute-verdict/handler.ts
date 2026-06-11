@@ -88,7 +88,9 @@ export interface ComputeVerdictDataAdapter {
    *  here and the Plan transition is skipped entirely. The supabase
    *  adapter selects `id, plan_id` so the field is always populated
    *  one-way-or-the-other. */
-  fetchRoom(room_id: string): Promise<{ id: string; plan_id?: string | null } | null>;
+  fetchRoom(
+    room_id: string,
+  ): Promise<{ id: string; plan_id?: string | null } | null>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
@@ -121,7 +123,10 @@ export interface ComputeVerdictDataAdapter {
   /** Emit a `verdict_ready` broadcast on `room:{room_id}` so iOS
    *  subscribers route into S05 within the Realtime window. Optional
    *  — production wires this to supabase-js Realtime, tests omit. */
-  emitVerdictReadyBroadcast?(room_id: string, verdict_id: string): Promise<void>;
+  emitVerdictReadyBroadcast?(
+    room_id: string,
+    verdict_id: string,
+  ): Promise<void>;
   /** Fetch the room's stored `radius_meters` so the engine can use it
    *  as the starting radius for the cascade. Returns null when the
    *  row doesn't carry the field (legacy / pre-TB-03 rooms). */
@@ -216,6 +221,9 @@ export interface RoomOptionRow {
     /** TB-23 — Foursquare total-ratings count. Read by the classifier
      *  for the pool-relative reputation terciles. */
     total_ratings?: number | null;
+    /** TB-05 — Google user-rating count. Read transiently by the
+     *  verdict engine for the public quality floor. */
+    user_rating_count?: number | null;
     /** TB-23 — Foursquare ISO-8601 record-creation date. Read by the
      *  classifier for the reputation age check. */
     date_created?: string | null;
@@ -402,7 +410,10 @@ export async function handleRequest(
 
   const roomId = (body as { room_id?: unknown })?.room_id;
   if (!isUuid(roomId)) {
-    return jsonResponse({ error: "invalid_input", detail: "room_id must be a uuid" }, {
+    return jsonResponse({
+      error: "invalid_input",
+      detail: "room_id must be a uuid",
+    }, {
       status: 400,
       headers: corsHeaders(),
     });
@@ -413,16 +424,16 @@ export async function handleRequest(
   // fire actually happened. Anything else falls back to `manual` (the
   // legacy TB-06 behavior).
   const rawMethod = (body as { method?: unknown })?.method;
-  const method: VerdictMethod = (rawMethod === "quorum" || rawMethod === "deadline")
-    ? rawMethod
-    : "manual";
+  const method: VerdictMethod =
+    (rawMethod === "quorum" || rawMethod === "deadline") ? rawMethod : "manual";
 
   // Optional widen-radius override (S05 no-survivor "Widen radius"
   // CTA, TB-09). When supplied, the handler bypasses the standard
   // idempotency check for prior `no_survivor` verdicts so the engine
   // can re-run at the wider radius. Clamped to the 1..10 mi window
   // exposed by the S05 slider.
-  const rawWiden = (body as { radius_meters_override?: unknown })?.radius_meters_override;
+  const rawWiden = (body as { radius_meters_override?: unknown })
+    ?.radius_meters_override;
   let widenOverride: number | null = null;
   if (typeof rawWiden === "number" && Number.isFinite(rawWiden)) {
     widenOverride = Math.max(
@@ -540,15 +551,13 @@ export async function handleRequest(
 
   // Start with the override when supplied; fall back to the stored
   // room radius for the standard fire path.
-  const startingRadius = widenOverride
-    ?? (await data.fetchRoomRadius(roomId))
-    ?? null;
+  const startingRadius = widenOverride ??
+    (await data.fetchRoomRadius(roomId)) ??
+    null;
   // Widen-radius re-runs lift the cap to the requested override (so
   // the engine doesn't itself widen past where the user asked). The
   // standard fire path keeps the engine's default 5 mi cap.
-  const radiusCap = widenOverride !== null
-    ? widenOverride
-    : undefined;
+  const radiusCap = widenOverride !== null ? widenOverride : undefined;
 
   const candidates: CandidateOption[] = optionRows.map((row) => ({
     id: row.id,
@@ -561,6 +570,7 @@ export async function handleRequest(
     // server-side venue classifier can derive the preference axes. The
     // engine itself never reads these fields.
     rating: row.payload?.rating ?? null,
+    user_rating_count: row.payload?.user_rating_count ?? null,
     total_ratings: row.payload?.total_ratings ?? null,
     date_created: row.payload?.date_created ?? null,
     tastes: row.payload?.tastes ?? [],
@@ -652,9 +662,10 @@ export async function handleRequest(
 
   // TB-10 — fetch the previous winner's display name when this run is
   // a reroll. The aggregate-rule prefix reads "Cost reroll cut Pico's."
-  const previousWinnerName: string | undefined = (isRerollRun && data.fetchPreviousWinnerName)
-    ? ((await data.fetchPreviousWinnerName(roomId)) ?? undefined)
-    : undefined;
+  const previousWinnerName: string | undefined =
+    (isRerollRun && data.fetchPreviousWinnerName)
+      ? ((await data.fetchPreviousWinnerName(roomId)) ?? undefined)
+      : undefined;
 
   let result: VerdictEngineOutput;
   try {

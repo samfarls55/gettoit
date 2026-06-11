@@ -16,8 +16,8 @@ import {
   type FoursquareSearchResponse,
   OPEN_AT_PATTERN,
   type PlacesProxyInput,
-  shapeFoursquareResult,
   type ShapedPlace,
+  shapeFoursquareResult,
   THIN_RESULTS_THRESHOLD,
 } from "./foursquare.ts";
 
@@ -138,11 +138,17 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const lat = obj.lat;
   const lng = obj.lng;
   const radius = obj.radius_meters;
-  if (typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90) {
+  if (
+    typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90
+  ) {
     throw new PlacesProxyInputError("lat must be a finite number in [-90, 90]");
   }
-  if (typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-    throw new PlacesProxyInputError("lng must be a finite number in [-180, 180]");
+  if (
+    typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180
+  ) {
+    throw new PlacesProxyInputError(
+      "lng must be a finite number in [-180, 180]",
+    );
   }
   if (
     typeof radius !== "number" ||
@@ -183,7 +189,9 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     ? filters.cuisine
     : undefined;
   return {
-    lat, lng, radius_meters: radius,
+    lat,
+    lng,
+    radius_meters: radius,
     filters: { dietary, price_tier, open_at, cuisine },
   };
 }
@@ -251,7 +259,9 @@ export async function handlePlacesProxy(
       // header is unset.
       throw new FoursquareUpstreamError(
         410,
-        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${body.slice(0, 200)}`,
+        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${
+          body.slice(0, 200)
+        }`,
       );
     }
     // Non-410 upstream failure. Degrade to a thin response, but surface
@@ -311,14 +321,20 @@ export async function handlePlacesProxy(
 
 const GOOGLE_NEARBY_SEARCH_URL =
   "https://places.googleapis.com/v1/places:searchNearby";
-export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
-export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName";
+export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_eligibility_name_only_v1";
+export const GOOGLE_Q5_FIELD_MASK =
+  "places.id,places.displayName,places.priceLevel,places.rating,places.userRatingCount";
 export const GOOGLE_Q5_MAX_RESULTS = 20;
+const GOOGLE_QUALITY_RATING_FLOOR = 3.7;
+const GOOGLE_QUALITY_RATING_COUNT_FLOOR = 15;
 
 type GoogleNearbySearchResponse = {
   places?: Array<{
     id?: unknown;
     displayName?: { text?: unknown };
+    priceLevel?: unknown;
+    rating?: unknown;
+    userRatingCount?: unknown;
   }>;
 };
 
@@ -348,7 +364,7 @@ export async function handleGoogleQ5PlacesProxy(
 
   const body = (await response.json()) as GoogleNearbySearchResponse;
   return {
-    places: shapeGoogleQ5Places(body),
+    places: shapeGoogleQ5Places(body, input.filters?.price_tier),
     attribution: {
       provider: "google",
       render: "text",
@@ -372,6 +388,7 @@ async function fetchGoogleNearbyWithRetry(
 
 function shapeGoogleQ5Places(
   body: GoogleNearbySearchResponse,
+  priceCap: number | undefined,
 ): GoogleQ5Place[] {
   const places: GoogleQ5Place[] = [];
   for (const place of body.places ?? []) {
@@ -381,6 +398,9 @@ function shapeGoogleQ5Places(
     ) {
       continue;
     }
+    if (!googleEligibilityMetadataPasses(place, priceCap)) {
+      continue;
+    }
 
     places.push({
       place_id: place.id,
@@ -388,6 +408,45 @@ function shapeGoogleQ5Places(
     });
   }
   return places;
+}
+
+function googleEligibilityMetadataPasses(
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+  priceCap: number | undefined,
+): boolean {
+  const priceTier = googlePriceLevelToTier(place.priceLevel);
+  if (priceTier === null) return false;
+  if (typeof priceCap === "number" && priceTier > priceCap) return false;
+  if (
+    typeof place.rating !== "number" ||
+    place.rating < GOOGLE_QUALITY_RATING_FLOOR
+  ) {
+    return false;
+  }
+  if (
+    typeof place.userRatingCount !== "number" ||
+    place.userRatingCount < GOOGLE_QUALITY_RATING_COUNT_FLOOR
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function googlePriceLevelToTier(raw: unknown): number | null {
+  switch (raw) {
+    case "PRICE_LEVEL_FREE":
+      return 0;
+    case "PRICE_LEVEL_INEXPENSIVE":
+      return 1;
+    case "PRICE_LEVEL_MODERATE":
+      return 2;
+    case "PRICE_LEVEL_EXPENSIVE":
+      return 3;
+    case "PRICE_LEVEL_VERY_EXPENSIVE":
+      return 4;
+    default:
+      return null;
+  }
 }
 
 function buildGoogleQ5Request(

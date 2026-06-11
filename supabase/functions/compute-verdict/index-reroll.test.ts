@@ -59,9 +59,15 @@ function memoryAdapter(seed: RerollAdapterSeed = {}): RerollAdapterState {
         ? { id: "00000000-0000-0000-0000-000000000001" }
         : seed.room;
     },
-    async fetchOptions(_id) { return seed.options ?? []; },
-    async fetchVotes(_id) { return seed.votes ?? []; },
-    async existingVerdict(_id) { return seed.existing ?? null; },
+    async fetchOptions(_id) {
+      return (seed.options ?? []).map(withEligibleGoogleMetadata);
+    },
+    async fetchVotes(_id) {
+      return seed.votes ?? [];
+    },
+    async existingVerdict(_id) {
+      return seed.existing ?? null;
+    },
     async insertVerdict(row) {
       inserts.push(row);
       return {
@@ -73,11 +79,17 @@ function memoryAdapter(seed: RerollAdapterSeed = {}): RerollAdapterState {
         computed_at: "2026-05-14T00:00:00Z",
       };
     },
-    async insertOptionCuts(rows) { cuts.push(rows); },
+    async insertOptionCuts(rows) {
+      cuts.push(rows);
+    },
     async markRoomVerdictReady(_id) {},
     async emitVerdictReadyBroadcast(_a, _b) {},
-    async fetchRoomRadius(_id) { return null; },
-    async deleteVerdictForRoom(id) { deletedRooms.push(id); },
+    async fetchRoomRadius(_id) {
+      return null;
+    },
+    async deleteVerdictForRoom(id) {
+      deletedRooms.push(id);
+    },
     async fetchRoomRerollState(_id) {
       return seed.rerollState ?? {
         excluded_option_ids: [],
@@ -91,6 +103,17 @@ function memoryAdapter(seed: RerollAdapterSeed = {}): RerollAdapterState {
     },
   };
   return { adapter, inserts, cuts, deletedRooms };
+}
+
+function withEligibleGoogleMetadata(row: RoomOptionRow): RoomOptionRow {
+  return {
+    ...row,
+    payload: {
+      rating: 4.2,
+      user_rating_count: 30,
+      ...row.payload,
+    },
+  };
 }
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
@@ -140,7 +163,8 @@ Deno.test("compute-verdict reroll — bypasses already_computed when last_reroll
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-ren": 5 },
+        hard_vetoes: [],
+        scores: { "opt-ren": 5 },
       },
     ],
     previousWinnerName: "Pico's",
@@ -173,14 +197,16 @@ Deno.test("compute-verdict reroll — clean run leaves reroll_reason null on ver
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5 },
       },
       {
         user_id: "u2",
         display_name: "maya",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5 },
       },
     ],
   });
@@ -207,8 +233,8 @@ Deno.test("compute-verdict reroll avail — excluded_option_ids removes the prio
       last_reroll_reason: "avail",
     },
     options: [
-      { id: "opt-pico", payload: { name: "Pico's",   price_tier: 2 } },
-      { id: "opt-ren",  payload: { name: "Ren Soba", price_tier: 2 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
+      { id: "opt-ren", payload: { name: "Ren Soba", price_tier: 2 } },
     ],
     votes: [
       {
@@ -216,14 +242,16 @@ Deno.test("compute-verdict reroll avail — excluded_option_ids removes the prio
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 4 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 4 },
       },
       {
         user_id: "u2",
         display_name: "maya",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-ren": 4 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-ren": 4 },
       },
     ],
     previousWinnerName: "Pico's",
@@ -257,8 +285,8 @@ Deno.test("compute-verdict reroll cost — budget_tier_override prunes candidate
       last_reroll_reason: "cost",
     },
     options: [
-      { id: "opt-pico",   payload: { name: "Pico's",   price_tier: 2 } },
-      { id: "opt-cheap",  payload: { name: "Diner",    price_tier: 1 } },
+      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
+      { id: "opt-cheap", payload: { name: "Diner", price_tier: 1 } },
     ],
     votes: [
       {
@@ -266,14 +294,16 @@ Deno.test("compute-verdict reroll cost — budget_tier_override prunes candidate
         display_name: "alex",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-cheap": 4 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-cheap": 4 },
       },
       {
         user_id: "u2",
         display_name: "maya",
         q1_vetoes: [],
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-cheap": 4 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-cheap": 4 },
       },
     ],
     previousWinnerName: "Pico's",
@@ -311,7 +341,7 @@ Deno.test("compute-verdict reroll dist — re-runs the engine and stamps the Dis
     },
     options: [
       { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
-      { id: "opt-near", payload: { name: "Diner",  price_tier: 2 } },
+      { id: "opt-near", payload: { name: "Diner", price_tier: 2 } },
     ],
     // The re-fetched pool re-scored `opt-near` as the worst-off-safe
     // pick (both members at 5) and `opt-pico` lower (a 3 floors it).
@@ -359,8 +389,18 @@ Deno.test("compute-verdict reroll diet — q1_vetoes_extra are merged with q1_ve
       last_reroll_reason: "diet",
     },
     options: [
-      { id: "opt-pico", payload: { name: "Pico's", price_tier: 2, dietary_tags: [] } },
-      { id: "opt-vegan", payload: { name: "Plant",  price_tier: 2, dietary_tags: ["vegan_friendly"] } },
+      {
+        id: "opt-pico",
+        payload: { name: "Pico's", price_tier: 2, dietary_tags: [] },
+      },
+      {
+        id: "opt-vegan",
+        payload: {
+          name: "Plant",
+          price_tier: 2,
+          dietary_tags: ["vegan_friendly"],
+        },
+      },
     ],
     votes: [
       {
@@ -369,7 +409,8 @@ Deno.test("compute-verdict reroll diet — q1_vetoes_extra are merged with q1_ve
         q1_vetoes: [],
         q1_vetoes_extra: ["vegan"], // added by the diet reroll
         q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-pico": 5, "opt-vegan": 4 },
+        hard_vetoes: [],
+        scores: { "opt-pico": 5, "opt-vegan": 4 },
       },
     ],
     previousWinnerName: "Pico's",
