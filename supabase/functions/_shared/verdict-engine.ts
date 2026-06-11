@@ -28,8 +28,8 @@
 //      backfire avoidance).
 //   5. Final tiebreak â€” equal minimums break on the higher group sum,
 //      then on the injected random.
-//   6. Empty-floor cascade â€” when no venue clears the floor the engine
-//      relaxes T downward, then widens the search radius, then emits a
+//   6. Empty-floor cascade â€” when no venue clears the floor inside the
+//      locked Search area, the engine relaxes T downward, then emits a
 //      terminal `no_survivor` screen. Hard-veto cuts never recover.
 //
 // Why TypeScript rather than PL/pgSQL: the rule-text formatting is
@@ -369,7 +369,7 @@ export function computeVerdict(
       return seatWinner({
         floorSurvivors,
         allScored: scored,
-        ebaCuts: [...ebaResult.cuts, ...searchAreaResult.cuts],
+        preScoreCuts: [...ebaResult.cuts, ...searchAreaResult.cuts],
         votes,
         method: input.method ?? "manual",
         threshold,
@@ -594,10 +594,10 @@ function scoreCandidates(
 interface SeatWinnerArgs {
   floorSurvivors: ScoredCandidate[];
   allScored: ScoredCandidate[];
-  /** Cuts emitted by the EBA prune â€” candidates dropped on a hard veto
-   *  before scoring. Merged into the final cuts so the S05 Cuts drawer
+  /** Cuts emitted before scoring: hard vetoes plus locked Search area
+   *  eligibility. Merged into the final cuts so the S05 Cuts drawer
    *  shows the full elimination picture. */
-  ebaCuts: OptionCut[];
+  preScoreCuts: OptionCut[];
   votes: MemberVote[];
   method: VerdictMethod;
   threshold: number;
@@ -645,9 +645,9 @@ function seatWinner(args: SeatWinnerArgs): VerdictEngineOutput {
   }
 
   // Cuts â€” the full elimination picture for the S05 Cuts drawer:
-  // first the EBA hard-veto cuts, then every scored survivor that did
-  // not win (split into below-floor cuts and lower-maximin cuts).
-  const cuts: OptionCut[] = [...args.ebaCuts];
+  // first the pre-score eligibility cuts, then every scored survivor
+  // that did not win (split into below-floor cuts and lower-maximin cuts).
+  const cuts: OptionCut[] = [...args.preScoreCuts];
   for (const s of args.allScored) {
     if (s.candidate.id === winner.candidate.id) continue;
     if (s.minScore < threshold) {

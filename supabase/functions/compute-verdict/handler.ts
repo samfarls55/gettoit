@@ -31,7 +31,7 @@
 //         empty candidate pool is NOT a 404 — bug-13 made it a terminal
 //         `no_survivor` verdict (200), so the room never wedges in
 //         `firing`.
-//   409 — verdict already computed for this room
+//   409 — locked Search area mutation attempted
 //   500 — engine misconfigured
 
 import {
@@ -116,8 +116,8 @@ export interface ComputeVerdictDataAdapter {
    *  subscribers route into S05 within the Realtime window. Optional
    *  — production wires this to supabase-js Realtime, tests omit. */
   emitVerdictReadyBroadcast?(room_id: string, verdict_id: string): Promise<void>;
-  /** Fetch the room's stored `radius_meters` so the engine can use it
-   *  as the starting radius for the cascade. Returns null when the
+  /** Fetch the room's stored `radius_meters` so the engine can enforce
+   *  the locked Search area boundary. Returns null when the
    *  row doesn't carry the field (legacy / pre-TB-03 rooms). */
   fetchRoomRadius(room_id: string): Promise<number | null>;
   /** Drop the prior verdict + cascaded option_cuts (FK cascade) for a
@@ -200,9 +200,9 @@ export interface RoomOptionRow {
     dietary_tags?: string[];
     categories?: string[];
     /** Distance from the room's search centre in meters. Used by the
-     *  TB-11 empty-floor cascade's radius-widen step. PlacesProxy
-     *  populates this in its `ShapedPlace` and the iOS / Edge writes it
-     *  through the options payload. */
+     *  engine's locked Search area gate. PlacesProxy populates this in
+     *  its `ShapedPlace` and the iOS / Edge writes it through the
+     *  options payload. */
     distance_meters?: number | null;
     /** TB-23 — Foursquare 0..10 venue rating. Read by the server-side
      *  venue classifier for the reputation axis. */

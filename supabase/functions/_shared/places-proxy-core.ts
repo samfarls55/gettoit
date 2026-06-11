@@ -389,7 +389,8 @@ function shapeGoogleQ5Places(
 ): { places: GoogleQ5Place[]; overfetchTelemetry: GoogleOverfetchTelemetry } {
   const places: GoogleQ5Place[] = [];
   const rawPlaces = body.places ?? [];
-  for (const place of body.places ?? []) {
+  const providerRadiusMeters = googleProviderRadiusMeters(input.radius_meters);
+  for (const place of rawPlaces) {
     if (
       typeof place.id !== "string" ||
       typeof place.displayName?.text !== "string" ||
@@ -398,10 +399,13 @@ function shapeGoogleQ5Places(
     ) {
       continue;
     }
-    if (
-      distanceMeters(input.lat, input.lng, place.location.latitude, place.location.longitude) >
-        input.radius_meters
-    ) {
+    const distanceFromSearchCenter = distanceMeters(
+      input.lat,
+      input.lng,
+      place.location.latitude,
+      place.location.longitude,
+    );
+    if (distanceFromSearchCenter > input.radius_meters) {
       continue;
     }
 
@@ -414,7 +418,7 @@ function shapeGoogleQ5Places(
     places,
     overfetchTelemetry: {
       committed_radius_meters: input.radius_meters,
-      provider_radius_meters: googleProviderRadiusMeters(input.radius_meters),
+      provider_radius_meters: providerRadiusMeters,
       pre_trim_count: rawPlaces.length,
       post_trim_count: places.length,
       trimmed_count: rawPlaces.length - places.length,

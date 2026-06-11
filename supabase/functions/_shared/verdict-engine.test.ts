@@ -13,7 +13,7 @@
 //                          polarizing higher-sum pick LOSES to a
 //                          worst-off-protecting pick.
 //   5. Final tiebreak    — highest sum, then injected random.
-//   6. Empty-floor cascade — relax T, then widen radius, then a
+//   6. Empty-floor cascade — relax T inside the locked Search area, then a
 //                          terminal `no_survivor` screen.
 //
 // A good test asserts external behavior through the public interface,
@@ -345,8 +345,7 @@ Deno.test("empty-floor cascade — relaxes T when no venue clears the floor", ()
 
 Deno.test("Search area eligibility — outside candidates are cut before scoring", () => {
   // The committed Search area is a hard boundary. A loved candidate
-  // outside the circle cannot recover through threshold relaxation or
-  // radius widening.
+  // outside the circle cannot recover through threshold relaxation.
   const inside = makeCandidate({
     id: "inside",
     name: "Inside But Pricey",
