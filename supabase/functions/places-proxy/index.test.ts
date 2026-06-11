@@ -7,6 +7,7 @@ import { handleRequest } from "./handler.ts";
 import {
   type CacheAdapter,
   GOOGLE_Q5_FIELD_MASK,
+  GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
 } from "../_shared/places-proxy-core.ts";
 
 function memoryCache(): CacheAdapter {
@@ -187,4 +188,59 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
   const serialized = JSON.stringify(body);
   assertEquals(serialized.includes("rating"), false);
   assertEquals(serialized.includes("Hidden address"), false);
+});
+
+Deno.test("handleRequest — verdict display refetches by Place ID without lat/radius", async () => {
+  const fetchCalls: { url: string; init?: RequestInit }[] = [];
+  const stubFetch = (url: string | URL, init?: RequestInit) => {
+    fetchCalls.push({ url: String(url), init });
+    return Promise.resolve(new Response(JSON.stringify({
+      id: "google-1",
+      displayName: { text: "Pico's" },
+      googleMapsUri: "https://maps.google.example/picos",
+      formattedAddress: "1 Main St",
+      rating: 4.8,
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  };
+
+  const res = await handleRequest(
+    new Request("https://example/places-proxy", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        surface: "verdict_display",
+        google_place_id: "google-1",
+        field_mask: "rating",
+      }),
+    }),
+    {
+      env: { ...envOk(), FOURSQUARE_API_KEY: "" },
+      buildCacheAdapter: memoryCache,
+      fetch: stubFetch as typeof fetch,
+    },
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(fetchCalls.length, 1);
+  assertEquals(
+    fetchCalls[0].url,
+    "https://places.googleapis.com/v1/places/google-1",
+  );
+  const headers = fetchCalls[0].init?.headers as Record<string, string>;
+  assertEquals(headers["X-Goog-FieldMask"], GOOGLE_VERDICT_DISPLAY_FIELD_MASK);
+  const body = await res.json();
+  assertEquals(body, {
+    place: {
+      place_id: "google-1",
+      display_name: "Pico's",
+      google_maps_uri: "https://maps.google.example/picos",
+      formatted_address: "1 Main St",
+    },
+    attribution: {
+      provider: "google",
+      render: "text",
+      text: "Powered by Google",
+    },
+  });
+  assertEquals(JSON.stringify(body).includes("rating"), false);
 });

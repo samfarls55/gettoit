@@ -11,8 +11,10 @@ import {
   FoursquareUpstreamError,
   GooglePlacesGuardrailError,
   handleGoogleQ5PlacesProxy,
+  handleGoogleVerdictDisplayProxy,
   handlePlacesProxy,
   isGoogleQ5Input,
+  isGoogleVerdictDisplayInput,
   PlacesProxyInputError,
   validateInput,
 } from "../_shared/places-proxy-core.ts";
@@ -103,6 +105,33 @@ export async function handleRequest(
     });
   }
 
+  const isGoogleVerdictDisplayRequest = isGoogleVerdictDisplayInput(body);
+  const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
+  if (isGoogleVerdictDisplayRequest) {
+    try {
+      const result = await handleGoogleVerdictDisplayProxy(body, {
+        fetch,
+        googleApiKey: deps.env.GOOGLE_PLACES_API_KEY ?? "",
+      });
+      return jsonResponse(result, { headers: corsHeaders() });
+    } catch (e) {
+      if (e instanceof PlacesProxyInputError) {
+        return jsonResponse({ error: "invalid_input", detail: e.message }, {
+          status: 400,
+          headers: corsHeaders(),
+        });
+      }
+      if (e instanceof GooglePlacesGuardrailError) {
+        console.error("Google Places verdict display guardrail:", e.code);
+        return jsonResponse({ error: e.code }, {
+          status: 200,
+          headers: corsHeaders(),
+        });
+      }
+      throw e;
+    }
+  }
+
   let input;
   try {
     input = validateInput(body);
@@ -126,7 +155,6 @@ export async function handleRequest(
   }
 
   try {
-    const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
     if (isGoogleQ5Request) {
       const result = await handleGoogleQ5PlacesProxy(input, {
         fetch,

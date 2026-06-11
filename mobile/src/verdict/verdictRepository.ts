@@ -31,7 +31,9 @@ export type LiveVerdictViewModel = {
   roomId: string;
   flavor: VerdictFlavor;
   placeName: string;
-  metaLine: string;
+  formattedAddress: string | null;
+  googleMapsUri: string;
+  attributionText: string;
   ruleText: string;
   timeBadge: {
     time: string;
@@ -82,25 +84,32 @@ export type VerdictSupabaseQuery<TRow> = PromiseLike<
 
 export type VerdictSupabaseClient = {
   from: <TRow>(table: string) => VerdictSupabaseQuery<TRow>;
+  functions: {
+    invoke: <TData>(
+      functionName: string,
+      options: { body: Record<string, unknown> },
+    ) => Promise<{ data: TData | null; error: Error | null }>;
+  };
+  rpc: <TData>(
+    functionName: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: TData | null; error: Error | null }>;
 };
 
 type SupabaseVerdictRow = {
   id: string;
   room_id: string;
   option_id: string | null;
+  winner_google_place_id?: string | null;
   computed_at: string;
   method: string;
   rule_text: string;
 };
 
-type SupabaseOptionRow = {
-  id: string;
-  payload: {
-    name?: string;
-    categories?: string[];
-    price_tier?: number;
-    walk_minutes_estimate?: number;
-  };
+type SupabaseVerdictSlateEntryRow = {
+  verdict_id: string;
+  slate_rank: number;
+  google_place_id: string;
 };
 
 type SupabaseMemberRow = {
@@ -128,13 +137,54 @@ type SupabaseRerollRow = {
   room_id: string;
 };
 
+type GoogleAttributionPayload = {
+  provider: "google";
+  render: "text";
+  text: "Powered by Google";
+};
+
+export type GoogleVerdictDisplay = {
+  place: {
+    place_id: string;
+    display_name: string;
+    google_maps_uri: string;
+    formatted_address?: string;
+  };
+  attribution: GoogleAttributionPayload;
+};
+
+export type VerdictSlateDisplayRefetch = (
+  googlePlaceId: string,
+) => Promise<GoogleVerdictDisplay | null>;
+
+export type VerdictSlateEntry = {
+  googlePlaceId: string;
+  rank: number;
+};
+
+export type VerdictSlateAdvanceResult =
+  | {
+      status: "presented";
+      entry: VerdictSlateEntry;
+      display: GoogleVerdictDisplay;
+      burnsUsed: number;
+      skippedPlaceIds: string[];
+    }
+  | {
+      status: "exhausted";
+      burnsUsed: number;
+      skippedPlaceIds: string[];
+    };
+
 export const fakeVerdictRepository: VerdictRepository = {
   loadVerdict: async ({ roomId, flavor }) => ({
     kind: "live",
     roomId,
     flavor,
     placeName: "Pico's Taqueria",
-    metaLine: "Mexican - $$ - 8 min walk",
+    formattedAddress: "1 Main St",
+    googleMapsUri: "https://maps.google.example/picos",
+    attributionText: "Powered by Google",
     ruleText: "Best fit for the table.",
     timeBadge: {
       time: "7:00 PM",
@@ -178,21 +228,6 @@ function latestVerdict(rows: SupabaseVerdictRow[]): SupabaseVerdictRow | null {
 
 function dollarsForTier(tier: number): string {
   return "$".repeat(Math.max(1, Math.min(tier, 4)));
-}
-
-function metaLineForOption(option: SupabaseOptionRow): string {
-  const payload = option.payload;
-  const parts = [
-    payload.categories?.[0],
-    typeof payload.price_tier === "number"
-      ? dollarsForTier(payload.price_tier)
-      : null,
-    typeof payload.walk_minutes_estimate === "number"
-      ? `${payload.walk_minutes_estimate} min walk`
-      : null,
-  ].filter((part): part is string => Boolean(part));
-
-  return parts.join(" - ");
 }
 
 function audienceCopy(memberCount: number, flavor: VerdictFlavor): string {
@@ -262,26 +297,110 @@ function rerollStateFor(rerolls: SupabaseRerollRow[]): RerollViewModel {
   };
 }
 
+export async function advanceVerdictSlate({
+  slate,
+  currentGooglePlaceId,
+  burnsUsed,
+  refetch,
+}: {
+  slate: VerdictSlateEntry[];
+  currentGooglePlaceId: string;
+  burnsUsed: number;
+  refetch: VerdictSlateDisplayRefetch;
+}): Promise<VerdictSlateAdvanceResult> {
+  const currentIndex = slate.findIndex(
+    (entry) => entry.googlePlaceId === currentGooglePlaceId,
+  );
+  const startIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
+  const skippedPlaceIds: string[] = [];
+
+  for (const entry of slate.slice(startIndex)) {
+    const display = await refetch(entry.googlePlaceId);
+    if (!display) {
+      skippedPlaceIds.push(entry.googlePlaceId);
+      continue;
+    }
+
+    return {
+      status: "presented",
+      entry,
+      display,
+      burnsUsed: burnsUsed + 1,
+      skippedPlaceIds,
+    };
+  }
+
+  return {
+    status: "exhausted",
+    burnsUsed,
+    skippedPlaceIds,
+  };
+}
+
+async function refetchVerdictDisplay(
+  supabase: VerdictSupabaseClient,
+  googlePlaceId: string,
+): Promise<GoogleVerdictDisplay> {
+  const { data, error } = await supabase.functions.invoke<GoogleVerdictDisplay>(
+    "places-proxy",
+    {
+      body: {
+        surface: "verdict_display",
+        google_place_id: googlePlaceId,
+      },
+    },
+  );
+
+  if (error) {
+    throw new Error(`Verdict display refetch failed: ${error.message}`);
+  }
+  if (!data) {
+    throw new Error("Verdict display refetch failed: no display data returned");
+  }
+
+  return data;
+}
+
 export function createSupabaseVerdictRepository({
   supabase,
 }: {
   supabase: VerdictSupabaseClient;
 }): VerdictRepository {
+  const loadLatestVerdictAndSlate = async (roomId: string) => {
+    const verdictRows = assertSupabaseRows(
+      await supabase
+        .from<SupabaseVerdictRow>("verdicts")
+        .select("id, room_id, option_id, winner_google_place_id, computed_at, method, rule_text")
+        .eq("room_id", roomId)
+        .order("computed_at", { ascending: false }),
+      "Verdict read",
+    );
+    const verdict = latestVerdict(verdictRows);
+
+    if (!verdict) {
+      throw new Error("Verdict read failed: no row returned");
+    }
+
+    const slateRows = verdict.method === "no_survivor" || !verdict.option_id
+      ? []
+      : assertSupabaseRows(
+        await supabase
+          .from<SupabaseVerdictSlateEntryRow>("verdict_slate_entries")
+          .select("verdict_id, slate_rank, google_place_id")
+          .eq("verdict_id", verdict.id)
+          .order("slate_rank", { ascending: true }),
+        "Verdict slate read",
+      );
+
+    return {
+      verdict,
+      slateRows,
+    };
+  };
+
   return {
     loadVerdict: async ({ roomId, flavor }) => {
-      const verdictRows = assertSupabaseRows(
-        await supabase
-          .from<SupabaseVerdictRow>("verdicts")
-          .select("id, room_id, option_id, computed_at, method, rule_text")
-          .eq("room_id", roomId)
-          .order("computed_at", { ascending: false }),
-        "Verdict read",
-      );
-      const verdict = latestVerdict(verdictRows);
-
-      if (!verdict) {
-        throw new Error("Verdict read failed: no row returned");
-      }
+      const { verdict, slateRows } = await loadLatestVerdictAndSlate(roomId);
 
       if (verdict.method === "no_survivor" || !verdict.option_id) {
         return {
@@ -294,18 +413,13 @@ export function createSupabaseVerdictRepository({
         };
       }
 
-      const optionRows = assertSupabaseRows(
-        await supabase
-          .from<SupabaseOptionRow>("options")
-          .select("id, payload")
-          .eq("id", verdict.option_id),
-        "Verdict option read",
-      );
-      const option = optionRows[0];
+      const googlePlaceId =
+        verdict.winner_google_place_id ?? slateRows[0]?.google_place_id;
 
-      if (!option) {
-        throw new Error("Verdict option read failed: no row returned");
+      if (!googlePlaceId) {
+        throw new Error("Verdict slate read failed: no Google Place ID returned");
       }
+      const display = await refetchVerdictDisplay(supabase, googlePlaceId);
 
       const memberRows = assertSupabaseRows(
         await supabase
@@ -333,8 +447,10 @@ export function createSupabaseVerdictRepository({
         kind: "live",
         roomId,
         flavor,
-        placeName: option.payload.name ?? "Unnamed",
-        metaLine: metaLineForOption(option),
+        placeName: display.place.display_name,
+        formattedAddress: display.place.formatted_address ?? null,
+        googleMapsUri: display.place.google_maps_uri,
+        attributionText: display.attribution.text,
         ruleText: verdict.rule_text,
         timeBadge: {
           time: "7:00 PM",
@@ -346,7 +462,47 @@ export function createSupabaseVerdictRepository({
         reroll: rerollStateFor(rerollRows),
       };
     },
-    reroll: async () => undefined,
+    reroll: async ({ roomId, reason }) => {
+      const { verdict, slateRows } = await loadLatestVerdictAndSlate(roomId);
+      const currentGooglePlaceId =
+        verdict.winner_google_place_id ?? slateRows[0]?.google_place_id;
+
+      if (!currentGooglePlaceId) {
+        throw new Error("Verdict slate reroll failed: no current Google Place ID");
+      }
+
+      const rerollRows = assertSupabaseRows(
+        await supabase
+          .from<SupabaseRerollRow>("rerolls")
+          .select("id, room_id")
+          .eq("room_id", roomId),
+        "Verdict rerolls read",
+      );
+      const advance = await advanceVerdictSlate({
+        slate: slateRows.map((row) => ({
+          googlePlaceId: row.google_place_id,
+          rank: row.slate_rank,
+        })),
+        currentGooglePlaceId,
+        burnsUsed: rerollRows.length,
+        refetch: (googlePlaceId) =>
+          refetchVerdictDisplay(supabase, googlePlaceId).catch(() => null),
+      });
+
+      if (advance.status === "exhausted") {
+        throw new Error("Verdict slate exhausted: start a new decision");
+      }
+
+      const { error } = await supabase.rpc("apply_verdict_slate_reroll", {
+        p_room_id: roomId,
+        p_google_place_id: advance.entry.googlePlaceId,
+        p_reason: reason,
+      });
+
+      if (error) {
+        throw new Error(`Verdict slate reroll failed: ${error.message}`);
+      }
+    },
     widenAndRerun: async () => undefined,
   };
 }

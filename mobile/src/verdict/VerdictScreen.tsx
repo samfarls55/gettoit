@@ -81,9 +81,11 @@ export function VerdictScreen({
         <Text accessibilityLabel={verdict.placeName} style={styles.venueTitle}>
           {stackedPlaceName(verdict.placeName)}
         </Text>
-        {verdict.metaLine ? (
-          <Text style={styles.metaLine}>{verdict.metaLine}</Text>
+        {verdict.formattedAddress ? (
+          <Text style={styles.metaLine}>{verdict.formattedAddress}</Text>
         ) : null}
+        <Text style={styles.mapsLink}>{verdict.googleMapsUri}</Text>
+        <Text style={styles.attribution}>{verdict.attributionText}</Text>
         {isReadOnly ? (
           <Text style={styles.recordCopy}>
             This Plan is closed. The recommendation is preserved as a record.
@@ -359,6 +361,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 20,
+  },
+  mapsLink: {
+    color: mobileTokens.color.paper,
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 18,
+  },
+  attribution: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
   },
   timeBlock: {
     alignItems: "center",

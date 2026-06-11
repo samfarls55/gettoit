@@ -105,12 +105,27 @@ export interface GoogleQ5Response {
   attribution: GoogleAttributionPayload;
 }
 
+export interface GoogleVerdictDisplayPlace {
+  place_id: string;
+  display_name: string;
+  google_maps_uri: string;
+  formatted_address?: string;
+}
+
+export interface GoogleVerdictDisplayResponse {
+  place: GoogleVerdictDisplayPlace;
+  attribution: GoogleAttributionPayload;
+}
+
 interface GoogleQ5ProxyDeps {
   fetch: FetchFn;
   googleApiKey: string;
 }
 
-export type PlacesProxyResponse = ProxyResponse | GoogleQ5Response;
+export type PlacesProxyResponse =
+  | ProxyResponse
+  | GoogleQ5Response
+  | GoogleVerdictDisplayResponse;
 
 /** Returned when validation rejects the input. */
 export class PlacesProxyInputError extends Error {
@@ -198,6 +213,11 @@ export function validateInput(raw: unknown): PlacesProxyInput {
 export function isGoogleQ5Input(raw: unknown): boolean {
   return !!raw && typeof raw === "object" &&
     (raw as Record<string, unknown>).surface === "q5";
+}
+
+export function isGoogleVerdictDisplayInput(raw: unknown): boolean {
+  return !!raw && typeof raw === "object" &&
+    (raw as Record<string, unknown>).surface === "verdict_display";
 }
 
 function ttlForRow(_row: CacheRow, deps: ProxyDeps): number {
@@ -328,6 +348,14 @@ export const GOOGLE_Q5_FIELD_MASK = [
   "places.takeout",
 ].join(",");
 export const GOOGLE_Q5_MAX_RESULTS = 20;
+export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK_VERSION =
+  "verdict_display_v1";
+export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK = [
+  "id",
+  "displayName",
+  "googleMapsUri",
+  "formattedAddress",
+].join(",");
 
 type GoogleNearbySearchResponse = {
   places?: Array<{
@@ -338,6 +366,13 @@ type GoogleNearbySearchResponse = {
     dineIn?: unknown;
     takeout?: unknown;
   }>;
+};
+
+type GooglePlaceDetailsResponse = {
+  id?: unknown;
+  displayName?: { text?: unknown };
+  googleMapsUri?: unknown;
+  formattedAddress?: unknown;
 };
 
 interface GoogleOpeningHours {
@@ -387,6 +422,108 @@ export async function handleGoogleQ5PlacesProxy(
       provider: "google",
       render: "text",
       text: "Powered by Google",
+    },
+  };
+}
+
+export async function handleGoogleVerdictDisplayProxy(
+  raw: unknown,
+  deps: GoogleQ5ProxyDeps,
+): Promise<GoogleVerdictDisplayResponse> {
+  const googleApiKey = deps.googleApiKey;
+  if (!googleApiKey) {
+    throw new GooglePlacesGuardrailError(
+      "google_places_misconfigured",
+      "GOOGLE_PLACES_API_KEY is not set",
+    );
+  }
+
+  const placeId = validateGoogleVerdictDisplayInput(raw);
+  const response = await fetchGooglePlaceDetailsWithRetry(
+    placeId,
+    deps.fetch,
+    googleApiKey,
+  );
+  if (!response.ok) {
+    throw new GooglePlacesGuardrailError(
+      `google_places_refetch_${response.status}`,
+      `Google Places refetch returned ${response.status}`,
+    );
+  }
+
+  return {
+    place: shapeGoogleVerdictDisplayPlace(
+      placeId,
+      (await response.json()) as GooglePlaceDetailsResponse,
+    ),
+    attribution: {
+      provider: "google",
+      render: "text",
+      text: "Powered by Google",
+    },
+  };
+}
+
+function validateGoogleVerdictDisplayInput(raw: unknown): string {
+  if (!raw || typeof raw !== "object") {
+    throw new PlacesProxyInputError("body must be a JSON object");
+  }
+  const placeId = (raw as Record<string, unknown>).google_place_id;
+  if (typeof placeId !== "string" || placeId.trim().length === 0) {
+    throw new PlacesProxyInputError("google_place_id must be a non-empty string");
+  }
+  return placeId.trim();
+}
+
+function shapeGoogleVerdictDisplayPlace(
+  requestedPlaceId: string,
+  body: GooglePlaceDetailsResponse,
+): GoogleVerdictDisplayPlace {
+  if (
+    typeof body.id !== "string" ||
+    body.id !== requestedPlaceId ||
+    typeof body.displayName?.text !== "string" ||
+    typeof body.googleMapsUri !== "string"
+  ) {
+    throw new GooglePlacesGuardrailError(
+      "google_place_unavailable",
+      "Google Places refetch did not return displayable verdict data",
+    );
+  }
+
+  return {
+    place_id: body.id,
+    display_name: body.displayName.text,
+    google_maps_uri: body.googleMapsUri,
+    ...(typeof body.formattedAddress === "string"
+      ? { formatted_address: body.formattedAddress }
+      : {}),
+  };
+}
+
+async function fetchGooglePlaceDetailsWithRetry(
+  placeId: string,
+  fetch: FetchFn,
+  googleApiKey: string,
+): Promise<Response> {
+  const init = buildGoogleVerdictDisplayRequest(googleApiKey);
+  const url = `https://places.googleapis.com/v1/places/${
+    encodeURIComponent(placeId)
+  }`;
+  let response = await fetch(url, init);
+  if (response.status === 429 || response.status >= 500) {
+    response = await fetch(url, init);
+  }
+  return response;
+}
+
+function buildGoogleVerdictDisplayRequest(googleApiKey: string): RequestInit {
+  return {
+    method: "GET",
+    headers: {
+      "X-Goog-Api-Key": googleApiKey,
+      "X-Goog-FieldMask": GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
+      "Accept": "application/json",
     },
   };
 }

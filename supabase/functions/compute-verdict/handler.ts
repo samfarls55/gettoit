@@ -222,6 +222,9 @@ export interface RoomOptionRow {
     /** TB-23 — Foursquare total-ratings count. Read by the classifier
      *  for the pool-relative reputation terciles. */
     total_ratings?: number | null;
+    /** Google user rating count. Kept transient in option payloads for
+     *  eligibility/scoring; never surfaced as verdict display content. */
+    user_rating_count?: number | null;
     /** TB-23 — Foursquare ISO-8601 record-creation date. Read by the
      *  classifier for the reputation age check. */
     date_created?: string | null;

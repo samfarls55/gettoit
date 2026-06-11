@@ -16,7 +16,9 @@ import {
   type CacheRow,
   FoursquareUpstreamError,
   GOOGLE_Q5_FIELD_MASK,
+  GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
   GooglePlacesGuardrailError,
+  handleGoogleVerdictDisplayProxy,
   handleGoogleQ5PlacesProxy,
   handlePlacesProxy,
   isCacheRowFresh,
@@ -240,6 +242,88 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
   ) {
     assertEquals(serialized.includes(forbidden), false, forbidden);
   }
+});
+
+Deno.test("google verdict display — refetches by Place ID with display-only field mask and attribution", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fetch: ProxyDeps["fetch"] = (input, init) => {
+    calls.push({ url: String(input), init });
+    return Promise.resolve(new Response(JSON.stringify({
+      id: "google-place-1",
+      displayName: { text: "Pico's" },
+      formattedAddress: "1 Main St",
+      googleMapsUri: "https://maps.google.example/picos",
+      rating: 4.8,
+      currentOpeningHours: { openNow: true },
+      photos: [{ name: "photo-1" }],
+      generativeSummary: { overview: { text: "summary" } },
+      reviewSummary: { text: "review summary" },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  };
+
+  const result = await handleGoogleVerdictDisplayProxy({
+    surface: "verdict_display",
+    google_place_id: "google-place-1",
+    field_mask: "rating,photos,generativeSummary",
+  }, {
+    fetch,
+    googleApiKey: "google-secret",
+  });
+
+  assertEquals(calls.length, 1);
+  assertEquals(
+    calls[0].url,
+    "https://places.googleapis.com/v1/places/google-place-1",
+  );
+  const headers = calls[0].init?.headers as Record<string, string>;
+  assertEquals(headers["X-Goog-Api-Key"], "google-secret");
+  assertEquals(headers["X-Goog-FieldMask"], GOOGLE_VERDICT_DISPLAY_FIELD_MASK);
+  assertEquals(headers["Accept"], "application/json");
+  assertEquals(result, {
+    place: {
+      place_id: "google-place-1",
+      display_name: "Pico's",
+      google_maps_uri: "https://maps.google.example/picos",
+      formatted_address: "1 Main St",
+    },
+    attribution: {
+      provider: "google",
+      render: "text",
+      text: "Powered by Google",
+    },
+  });
+  const serialized = JSON.stringify(result);
+  for (
+    const forbidden of [
+      "rating",
+      "currentOpeningHours",
+      "photos",
+      "generativeSummary",
+      "reviewSummary",
+      "google-secret",
+      "summary",
+    ]
+  ) {
+    assertEquals(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+Deno.test("google verdict display — failed refetch does not return stale display content", async () => {
+  const error = await assertRejects(
+    () => handleGoogleVerdictDisplayProxy({
+      surface: "verdict_display",
+      google_place_id: "google-place-1",
+    }, {
+      fetch: () =>
+        Promise.resolve(new Response(JSON.stringify({
+          id: "google-place-1",
+          displayName: { text: "Stale from caller must not appear" },
+        }), { status: 200, headers: { "Content-Type": "application/json" } })),
+      googleApiKey: "google-secret",
+    }),
+    GooglePlacesGuardrailError,
+  );
+  assertEquals(error.code, "google_place_unavailable");
 });
 
 Deno.test("google q5 — applies meal timing and service-mode eligibility before shaping", async () => {

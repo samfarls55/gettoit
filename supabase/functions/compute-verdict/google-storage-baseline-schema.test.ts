@@ -13,6 +13,7 @@ import {
 
 const MIGRATIONS_DIR = new URL("../../migrations/", import.meta.url);
 const BASELINE_SUFFIX = "_google_only_durable_storage_baseline.sql";
+const SLATE_REROLL_SUFFIX = "_verdict_slate_reroll_rpc.sql";
 const FORBIDDEN_DISPLAY_COLUMN_NAMES = [
   "display_name",
   "place_name",
@@ -41,6 +42,10 @@ function migrationBySuffix(suffix: string): string {
 
 function baselineMigration(): string {
   return migrationBySuffix(BASELINE_SUFFIX);
+}
+
+function slateRerollMigration(): string {
+  return migrationBySuffix(SLATE_REROLL_SUFFIX);
 }
 
 function assertSqlDoesNotMatch(
@@ -105,6 +110,45 @@ Deno.test("TB-02: verdict slate stores top-four Google IDs and app-owned metadat
   assertStringIncludes(sql, "receipts");
   assertStringIncludes(sql, "check (slate_rank between 1 and 4)");
   assertStringIncludes(sql, "check (place_provider = 'google')");
+});
+
+Deno.test("TB-11: slate reroll RPC advances through stored Google slate without display storage", () => {
+  const sql = slateRerollMigration();
+
+  assertStringIncludes(sql, "create or replace function public.apply_verdict_slate_reroll");
+  assertStringIncludes(sql, "public.verdict_slate_entries");
+  assertStringIncludes(sql, "google_place_id = p_google_place_id");
+  assertStringIncludes(sql, "insert into public.rerolls");
+  assertStringIncludes(sql, "winner_google_place_id = p_google_place_id");
+  assertStringIncludes(sql, "grant execute on function public.apply_verdict_slate_reroll");
+
+  for (const forbidden of ["display_name", "formatted_address", "maps_uri", "rating", "hours", "photos", "summary"]) {
+    assertSqlDoesNotMatch(
+      sql,
+      new RegExp(`\\b${forbidden}\\b`, "i"),
+      `slate reroll RPC must not store ${forbidden}`,
+    );
+  }
+});
+
+Deno.test("TB-11: slate reroll RPC burns only after membership, cap, verdict, and slate checks", () => {
+  const sql = slateRerollMigration();
+  const burnIndex = sql.toLowerCase().indexOf("insert into public.rerolls");
+
+  for (
+    const requiredBeforeBurn of [
+      "not_a_member",
+      "cap_exhausted",
+      "verdict_not_found",
+      "not_in_slate",
+    ]
+  ) {
+    const guardIndex = sql.toLowerCase().indexOf(requiredBeforeBurn);
+    assert(
+      guardIndex >= 0 && guardIndex < burnIndex,
+      `${requiredBeforeBurn} guard must run before the reroll burn insert`,
+    );
+  }
 });
 
 Deno.test("TB-02: durable schema does not add forbidden Google display-content fields", () => {

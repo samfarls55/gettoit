@@ -12,7 +12,9 @@ const groupVerdict = {
   roomId: "room-1",
   flavor: "group" as const,
   placeName: "Pico's Taqueria",
-  metaLine: "Mexican - $$ - 8 min walk",
+  formattedAddress: "1 Main St",
+  googleMapsUri: "https://maps.google.example/picos",
+  attributionText: "Powered by Google",
   ruleText: "Best fit for the table.",
   timeBadge: {
     time: "7:00 PM",
@@ -39,7 +41,12 @@ describe("VerdictScreen", () => {
     expect(screen.getByText("LOCKED")).toBeOnTheScreen();
     expect(screen.getByText("Tonight at 7:00 PM")).toBeOnTheScreen();
     expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
-    expect(screen.getByText("Mexican - $$ - 8 min walk")).toBeOnTheScreen();
+    expect(screen.getByText("1 Main St")).toBeOnTheScreen();
+    expect(screen.getByText("https://maps.google.example/picos")).toBeOnTheScreen();
+    expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
+    expect(screen.queryByText("4.8")).toBeNull();
+    expect(screen.queryByText("Open now")).toBeNull();
+    expect(screen.queryByText("Best rated nearby")).toBeNull();
     expect(screen.getByText("7:00 PM")).toBeOnTheScreen();
     expect(screen.getByText("Meet there")).toBeOnTheScreen();
     expect(screen.getByText("All 2 of you")).toBeOnTheScreen();
@@ -173,7 +180,9 @@ describe("VerdictScreen", () => {
     expect(screen.getByText("Verdict record")).toBeOnTheScreen();
     expect(screen.getByText("Closed record")).toBeOnTheScreen();
     expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
-    expect(screen.getByText("Mexican - $$ - 8 min walk")).toBeOnTheScreen();
+    expect(screen.getByText("1 Main St")).toBeOnTheScreen();
+    expect(screen.getByText("https://maps.google.example/picos")).toBeOnTheScreen();
+    expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
     expect(screen.getByText("Rule proof")).toBeOnTheScreen();
     expect(screen.getByText("Best fit for the table.")).toBeOnTheScreen();
     expect(screen.getByText("Member receipts")).toBeOnTheScreen();
