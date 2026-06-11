@@ -510,10 +510,10 @@ function buildGoogleQ5Requests(
   input: PlacesProxyInput,
   apiKey: string,
 ): RequestInit[] {
-  const cuisine = input.filters?.cuisine;
-  return chunkPrimaryTypes(
-    googlePrimaryTypesForCuisineSelection(cuisine ? [cuisine] : []),
-  ).map((includedPrimaryTypes) => ({
+  const primaryTypes = googlePrimaryTypesForInput(input);
+  return chunkGoogleIncludedPrimaryTypes(primaryTypes).map((
+    includedPrimaryTypes,
+  ) => ({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -536,9 +536,18 @@ function buildGoogleQ5Requests(
   }));
 }
 
-function chunkPrimaryTypes(types: string[]): string[][] {
+function googlePrimaryTypesForInput(input: PlacesProxyInput): string[] {
+  const cuisine = input.filters?.cuisine;
+  return googlePrimaryTypesForCuisineSelection(cuisine ? [cuisine] : []);
+}
+
+function chunkGoogleIncludedPrimaryTypes(types: string[]): string[][] {
   const chunks: string[][] = [];
-  for (let index = 0; index < types.length; index += GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT) {
+  for (
+    let index = 0;
+    index < types.length;
+    index += GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT
+  ) {
     chunks.push(types.slice(index, index + GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT));
   }
   return chunks;
