@@ -492,9 +492,13 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
-  const activeMemberIds = data.fetchActiveMemberIds
+  const activeMemberIdSet = data.fetchActiveMemberIds
     ? new Set(await data.fetchActiveMemberIds(roomId))
     : null;
+  const filterToActiveMembers = <T extends { user_id: string }>(rows: T[]): T[] =>
+    activeMemberIdSet
+      ? rows.filter((row) => activeMemberIdSet.has(row.user_id))
+      : rows;
 
   // TB-21 — populate `options` from the per-member persisted fetches.
   //
@@ -518,10 +522,9 @@ export async function handleRequest(
     data.fetchMemberFetches &&
     data.insertOptions
   ) {
-    const fetchedRows = await data.fetchMemberFetches(roomId);
-    const memberFetches = activeMemberIds
-      ? fetchedRows.filter((row) => activeMemberIds.has(row.user_id))
-      : fetchedRows;
+    const memberFetches = filterToActiveMembers(
+      await data.fetchMemberFetches(roomId),
+    );
     const unionRows = unionMemberFetches(roomId, memberFetches);
     if (unionRows.length > 0) {
       await data.insertOptions(unionRows);
@@ -529,10 +532,7 @@ export async function handleRequest(
     }
   }
 
-  const fetchedVoteRows = await data.fetchVotes(roomId);
-  const voteRows = activeMemberIds
-    ? fetchedVoteRows.filter((row) => activeMemberIds.has(row.user_id))
-    : fetchedVoteRows;
+  const voteRows = filterToActiveMembers(await data.fetchVotes(roomId));
 
   // A room with no member votes can't yield a verdict at all — there
   // is no group to render the result for. That stays a hard 404.
