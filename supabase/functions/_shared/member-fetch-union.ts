@@ -58,6 +58,7 @@ export interface MemberFetchRow {
 export interface OptionInsertRow {
   room_id: string;
   fsq_place_id: string;
+  google_place_id?: string;
   payload: unknown;
 }
 

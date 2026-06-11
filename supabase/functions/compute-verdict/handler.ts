@@ -39,6 +39,7 @@ import {
   computeVerdict,
   type HardVeto,
   type MemberVote,
+  type VerdictSlateEntry,
   type VerdictEngineOutput,
   type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
@@ -61,17 +62,13 @@ export type { MemberFetchRow, OptionInsertRow };
 // `_shared/votes-schema.ts`.
 export type { MemberPreferenceInputs };
 
-/** Hard upper bound for `radius_meters_override`. S05's widen-radius
- *  slider exposes 1..10 mi (1609..16093 m); the handler clamps
- *  defensively against client tampering or accidental wild values. */
-const WIDEN_RADIUS_HARD_CAP_METERS = 16093;
-const WIDEN_RADIUS_HARD_MIN_METERS = 805;
-
 export interface ComputeVerdictEnv {
   /** Supabase project URL. */
   SUPABASE_URL?: string;
   /** Service-role key — bypasses RLS for verdict + cut writes. */
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  /** Google Places API key for the server-owned verdict fetch. */
+  GOOGLE_PLACES_API_KEY?: string;
 }
 
 /** Read-side dependencies the handler needs. The Edge entry point
@@ -97,6 +94,13 @@ export interface ComputeVerdictDataAdapter {
   fetchActiveMemberIds?(room_id: string): Promise<string[]>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
+  /** TB-10 — run the server-owned final Google verdict fetch cycle.
+   *  When present, this is the source of truth for the final candidate
+   *  pool. Q5 probe fetches are not reused for verdict ranking. */
+  fetchGoogleVerdictCandidates?(
+    room_id: string,
+    context: GoogleVerdictFetchContext,
+  ): Promise<GoogleVerdictCandidateRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
    *  the room (`member_fetches` rows). The handler unions these into
    *  the candidate pool and writes the union into `options` before the
@@ -116,6 +120,8 @@ export interface ComputeVerdictDataAdapter {
   insertVerdict(row: VerdictInsert): Promise<VerdictRow>;
   /** Insert the option_cuts rows for a verdict. */
   insertOptionCuts(rows: OptionCutInsert[]): Promise<void>;
+  /** Persist the top-four Google Verdict slate. */
+  insertVerdictSlateEntries?(rows: VerdictSlateEntryInsert[]): Promise<void>;
   /** Check whether a verdict already exists for this room (idempotency). */
   existingVerdict(room_id: string): Promise<VerdictRow | null>;
   /** Flip rooms.status to `verdict_ready` after the verdict row
@@ -203,9 +209,12 @@ export interface ComputeVerdictDeps {
 export interface RoomOptionRow {
   /** `options.id` — uuid. */
   id: string;
+  /** Google provider identity, present after the Google baseline. */
+  google_place_id?: string;
+  place_provider?: "google";
   /** Shape mirrors `options.payload` JSONB. The engine reads the slice
    *  it cares about from this nested payload. */
-  payload: {
+  payload?: {
     fsq_place_id?: string;
     name?: string;
     price_tier?: number | null;
@@ -231,7 +240,21 @@ export interface RoomOptionRow {
     /** TB-23 — Foursquare crowd-sourced `tastes` tag cloud. Read by the
      *  classifier for the vibe nudge. */
     tastes?: string[];
+    current_open_now?: boolean | null;
+    regular_opening_periods?: CandidateOption["regular_opening_periods"];
+    dine_in?: boolean | null;
+    takeout?: boolean | null;
   };
+}
+
+export interface GoogleVerdictFetchContext {
+  active_member_ids: string[];
+  votes: MemberVoteRow[];
+}
+
+export interface GoogleVerdictCandidateRow {
+  google_place_id: string;
+  payload: NonNullable<RoomOptionRow["payload"]>;
 }
 
 export interface MemberVoteRow {
@@ -273,6 +296,11 @@ export interface VerdictInsert {
   option_id: string | null;
   method: VerdictMethod;
   rule_text: string;
+  winner_place_provider?: "google" | null;
+  winner_google_place_id?: string | null;
+  final_fit_score?: number | null;
+  scoring_version?: string | null;
+  receipts?: unknown[];
   /** TB-10 — set when the verdict was produced after an apply_reroll
    *  RPC call. Drives the rule_chip prefix on subsequent renders.
    *  Null on clean runs. */
@@ -293,6 +321,17 @@ export interface OptionCutInsert {
   option_id: string;
   cut_reason: string;
   cut_text: string;
+}
+
+export interface VerdictSlateEntryInsert {
+  verdict_id: string;
+  room_id: string;
+  slate_rank: number;
+  place_provider: "google";
+  google_place_id: string;
+  final_fit_score: number;
+  scoring_version: string;
+  receipts: unknown[];
 }
 
 // ───────────────────────────────────────────────────────────────────────
@@ -367,6 +406,63 @@ export function mergeHardVetoes(
   return out;
 }
 
+function dedupeGoogleVerdictCandidates(
+  candidates: readonly GoogleVerdictCandidateRow[],
+): GoogleVerdictCandidateRow[] {
+  const seen = new Set<string>();
+  const out: GoogleVerdictCandidateRow[] = [];
+  for (const candidate of candidates) {
+    const id = candidate.google_place_id.trim();
+    if (id.length === 0 || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ ...candidate, google_place_id: id });
+  }
+  return out;
+}
+
+async function fetchGoogleVerdictOptionRows(
+  data: ComputeVerdictDataAdapter,
+  roomId: string,
+  activeMemberIds: string[] | null,
+  voteRows: MemberVoteRow[],
+): Promise<RoomOptionRow[] | null> {
+  if (!data.fetchGoogleVerdictCandidates) return null;
+
+  const googleCandidates = await data.fetchGoogleVerdictCandidates(roomId, {
+    active_member_ids: activeMemberIds ?? voteRows.map((row) => row.user_id),
+    votes: voteRows,
+  });
+  const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(googleCandidates);
+  if (dedupedGoogleCandidates.length === 0 || !data.insertOptions) return null;
+
+  await data.insertOptions(dedupedGoogleCandidates.map((candidate) => ({
+    room_id: roomId,
+    fsq_place_id: candidate.google_place_id,
+    google_place_id: candidate.google_place_id,
+    payload: candidate.payload,
+  })));
+
+  const optionIdByGooglePlaceId = buildGoogleOptionIdMap(
+    await data.fetchOptions(roomId),
+  );
+  return dedupedGoogleCandidates.map((candidate) => ({
+    id: optionIdByGooglePlaceId.get(candidate.google_place_id) ?? candidate.google_place_id,
+    google_place_id: candidate.google_place_id,
+    place_provider: "google",
+    payload: candidate.payload,
+  }));
+}
+
+function buildGoogleOptionIdMap(optionRows: readonly RoomOptionRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const row of optionRows) {
+    if (typeof row.google_place_id === "string") {
+      out.set(row.google_place_id, row.id);
+    }
+  }
+  return out;
+}
+
 export async function handleRequest(
   req: Request,
   deps: ComputeVerdictDeps,
@@ -427,18 +523,19 @@ export async function handleRequest(
     : "manual";
 
   // Optional widen-radius override (S05 no-survivor "Widen radius"
-  // CTA, TB-09). When supplied, the handler bypasses the standard
-  // idempotency check for prior `no_survivor` verdicts so the engine
-  // can re-run at the wider radius. Clamped to the 1..10 mi window
-  // exposed by the S05 slider.
+  // CTA, TB-09). Plan-backed Rooms now lock search area parameters,
+  // so a numeric override is rejected before any adapter calls.
   const rawWiden = (body as { radius_meters_override?: unknown })?.radius_meters_override;
-  let widenOverride: number | null = null;
   if (typeof rawWiden === "number" && Number.isFinite(rawWiden)) {
-    widenOverride = Math.max(
-      WIDEN_RADIUS_HARD_MIN_METERS,
-      Math.min(WIDEN_RADIUS_HARD_CAP_METERS, Math.round(rawWiden)),
-    );
-  } else if (rawWiden !== undefined) {
+    return jsonResponse({
+      error: "search_area_locked",
+      detail: "Room parameters are locked; start a new decision to change them.",
+    }, {
+      status: 409,
+      headers: corsHeaders(),
+    });
+  }
+  if (rawWiden !== undefined) {
     return jsonResponse({
       error: "invalid_input",
       detail: "radius_meters_override must be a number when supplied",
@@ -462,25 +559,17 @@ export async function handleRequest(
 
   // Idempotency — if a verdict already exists for this room, return it
   // with the cuts, 200. TB-07 will use ON CONFLICT to support trigger-
-  // retry. The widen-radius re-run path is the one exception: when
-  // the caller supplies `radius_meters_override` AND the existing
-  // verdict is a `no_survivor`, drop the old verdict (cascading the
-  // option_cuts) so the engine can write a fresh row. TB-10 widens
-  // the exception list — when `last_reroll_reason` is set on the
-  // room, the apply_reroll RPC already deleted the prior verdict;
-  // any verdict we see now is post-reroll and must NOT be re-returned
-  // as "already_computed."
+  // retry. TB-10's reroll run is the exception: when
+  // `last_reroll_reason` is set on the room, the apply_reroll RPC
+  // already deleted the prior verdict; any verdict we see now is
+  // post-reroll and must NOT be re-returned as "already_computed."
   const existing = await data.existingVerdict(roomId);
   if (existing && !isRerollRun) {
-    if (widenOverride !== null && existing.method === "no_survivor") {
-      await data.deleteVerdictForRoom(roomId);
-    } else {
-      return jsonResponse({
-        verdict: existing,
-        cuts: [],
-        already_computed: true,
-      }, { status: 200, headers: corsHeaders() });
-    }
+    return jsonResponse({
+      verdict: existing,
+      cuts: [],
+      already_computed: true,
+    }, { status: 200, headers: corsHeaders() });
   } else if (existing && isRerollRun) {
     // Race: a stale verdict slipped past the apply_reroll DELETE.
     // Drop it so the fresh engine run can write under the UNIQUE
@@ -495,13 +584,25 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
-  const activeMemberIdSet = data.fetchActiveMemberIds
-    ? new Set(await data.fetchActiveMemberIds(roomId))
+  const activeMemberIds = data.fetchActiveMemberIds
+    ? await data.fetchActiveMemberIds(roomId)
     : null;
+  const activeMemberIdSet = activeMemberIds ? new Set(activeMemberIds) : null;
   const filterToActiveMembers = <T extends { user_id: string }>(rows: T[]): T[] =>
     activeMemberIdSet
       ? rows.filter((row) => activeMemberIdSet.has(row.user_id))
       : rows;
+
+  const voteRows = filterToActiveMembers(await data.fetchVotes(roomId));
+
+  // A room with no member votes can't yield a verdict at all — there
+  // is no group to render the result for. That stays a hard 404.
+  if (voteRows.length === 0) {
+    return jsonResponse({ error: "no_votes" }, {
+      status: 404,
+      headers: corsHeaders(),
+    });
+  }
 
   // TB-21 — populate `options` from the per-member persisted fetches.
   //
@@ -520,7 +621,15 @@ export async function handleRequest(
   // whose pool was already populated (a prior fire, a reroll re-run)
   // is left untouched, so the union is idempotent across re-invokes.
   let optionRows = await data.fetchOptions(roomId);
-  if (
+  const googleOptionRows = await fetchGoogleVerdictOptionRows(
+    data,
+    roomId,
+    activeMemberIds,
+    voteRows,
+  );
+  if (googleOptionRows) {
+    optionRows = googleOptionRows;
+  } else if (
     optionRows.length === 0 &&
     data.fetchMemberFetches &&
     data.insertOptions
@@ -535,17 +644,6 @@ export async function handleRequest(
     }
   }
 
-  const voteRows = filterToActiveMembers(await data.fetchVotes(roomId));
-
-  // A room with no member votes can't yield a verdict at all — there
-  // is no group to render the result for. That stays a hard 404.
-  if (voteRows.length === 0) {
-    return jsonResponse({ error: "no_votes" }, {
-      status: 404,
-      headers: corsHeaders(),
-    });
-  }
-
   // bug-13 — an EMPTY candidate pool is NOT an error. It is a valid
   // terminal outcome: the engine short-circuits an empty pool to a
   // `no_survivor` output (verdict-engine.ts: empty EBA survivors →
@@ -556,20 +654,12 @@ export async function handleRequest(
   // landed, so the room stayed `firing` forever and iOS polled a
   // verdict that never resolved. The empty pool now flows through.
 
-  // Start with the override when supplied; fall back to the stored
-  // room radius for the standard fire path.
-  const startingRadius = widenOverride
-    ?? (await data.fetchRoomRadius(roomId))
-    ?? null;
-  // Widen-radius re-runs lift the cap to the requested override (so
-  // the engine doesn't itself widen past where the user asked). The
-  // standard fire path keeps the engine's default 5 mi cap.
-  const radiusCap = widenOverride !== null
-    ? widenOverride
-    : undefined;
+  // Use the committed room radius as the hard Search area boundary.
+  const startingRadius = (await data.fetchRoomRadius(roomId)) ?? null;
 
   const candidates: CandidateOption[] = optionRows.map((row) => ({
     id: row.id,
+    google_place_id: row.google_place_id,
     name: row.payload?.name ?? "Unnamed",
     price_tier: row.payload?.price_tier ?? null,
     dietary_tags: row.payload?.dietary_tags ?? [],
@@ -582,6 +672,10 @@ export async function handleRequest(
     total_ratings: row.payload?.total_ratings ?? null,
     date_created: row.payload?.date_created ?? null,
     tastes: row.payload?.tastes ?? [],
+    current_open_now: row.payload?.current_open_now ?? null,
+    regular_opening_periods: row.payload?.regular_opening_periods,
+    dine_in: row.payload?.dine_in ?? null,
+    takeout: row.payload?.takeout ?? null,
   }));
 
   // TB-23 — classify the FULL candidate pool into per-venue
@@ -681,7 +775,6 @@ export async function handleRequest(
       votes,
       method,
       radius_meters: startingRadius ?? undefined,
-      radius_meters_cap: radiusCap,
       excluded_option_ids: rerollState?.excluded_option_ids,
       reroll_reason: rerollState?.last_reroll_reason ?? undefined,
       previous_winner_name: previousWinnerName,
@@ -704,6 +797,11 @@ export async function handleRequest(
     option_id: result.winning_option_id,
     method: result.method,
     rule_text: result.rule_text,
+    winner_place_provider: result.slate[0]?.google_place_id ? "google" : null,
+    winner_google_place_id: result.slate[0]?.google_place_id ?? null,
+    final_fit_score: result.slate[0]?.final_fit_score ?? null,
+    scoring_version: result.slate[0]?.scoring_version ?? null,
+    receipts: result.receipts,
     reroll_reason: rerollState?.last_reroll_reason ?? null,
   });
 
@@ -713,6 +811,18 @@ export async function handleRequest(
       option_id: c.option_id,
       cut_reason: c.cut_reason,
       cut_text: c.cut_text,
+    })));
+  }
+  if (data.insertVerdictSlateEntries && result.slate.length > 0) {
+    await data.insertVerdictSlateEntries(result.slate.map((entry) => ({
+      verdict_id: verdict.id,
+      room_id: roomId,
+      slate_rank: entry.slate_rank,
+      place_provider: "google",
+      google_place_id: entry.google_place_id,
+      final_fit_score: entry.final_fit_score,
+      scoring_version: entry.scoring_version,
+      receipts: result.receipts,
     })));
   }
 

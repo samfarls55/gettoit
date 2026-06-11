@@ -13,6 +13,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.4
 import {
   type ComputeVerdictDataAdapter,
   type ComputeVerdictEnv,
+  type GoogleVerdictCandidateRow,
   handleRequest,
   type MemberFetchRow,
   type MemberVoteRow,
@@ -21,6 +22,7 @@ import {
   type RoomOptionRow,
   type VerdictInsert,
   type VerdictRow,
+  type VerdictSlateEntryInsert,
 } from "./handler.ts";
 import {
   mapVotesRowToMemberVote,
@@ -34,6 +36,21 @@ import { resolveMemberDisplayName } from "./member-display-name.ts";
 // `HardVeto` is referenced by the `fetchProfileVetoes` adapter method
 // below; import it so `deno check` resolves the type.
 import type { HardVeto } from "../_shared/verdict-engine.ts";
+
+const GOOGLE_NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby";
+const GOOGLE_VERDICT_FETCH_FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.types",
+  "places.primaryType",
+  "places.priceLevel",
+  "places.rating",
+  "places.userRatingCount",
+  "places.currentOpeningHours.openNow",
+  "places.regularOpeningHours.periods",
+  "places.dineIn",
+  "places.takeout",
+].join(",");
 
 function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter {
   const supabaseUrl = env.SUPABASE_URL ?? "";
@@ -66,13 +83,68 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
     async fetchOptions(room_id): Promise<RoomOptionRow[]> {
       const { data, error } = await client
         .from("options")
-        .select("id, payload")
+        .select("id, google_place_id, place_provider")
         .eq("room_id", room_id);
       if (error) {
         console.warn("compute-verdict fetchOptions failed:", error.message);
         return [];
       }
       return (data ?? []) as RoomOptionRow[];
+    },
+    async fetchGoogleVerdictCandidates(room_id): Promise<GoogleVerdictCandidateRow[]> {
+      const googleApiKey = env.GOOGLE_PLACES_API_KEY ?? "";
+      if (!googleApiKey) {
+        console.warn("compute-verdict Google verdict fetch skipped: GOOGLE_PLACES_API_KEY is not set");
+        return [];
+      }
+      const { data, error } = await client
+        .from("rooms")
+        .select("location_lat, location_lng, radius_meters")
+        .eq("id", room_id)
+        .maybeSingle();
+      if (error || !data) {
+        console.warn("compute-verdict Google verdict fetch room read failed:", error?.message ?? "no row");
+        return [];
+      }
+      const room = data as {
+        location_lat: number | null;
+        location_lng: number | null;
+        radius_meters: number | null;
+      };
+      if (
+        typeof room.location_lat !== "number" ||
+        typeof room.location_lng !== "number" ||
+        typeof room.radius_meters !== "number"
+      ) {
+        console.warn("compute-verdict Google verdict fetch skipped: room search area is incomplete");
+        return [];
+      }
+      const response = await fetch(GOOGLE_NEARBY_SEARCH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": googleApiKey,
+          "X-Goog-FieldMask": GOOGLE_VERDICT_FETCH_FIELD_MASK,
+        },
+        body: JSON.stringify({
+          includedPrimaryTypes: ["restaurant"],
+          maxResultCount: 20,
+          locationRestriction: {
+            circle: {
+              center: {
+                latitude: room.location_lat,
+                longitude: room.location_lng,
+              },
+              radius: room.radius_meters,
+            },
+          },
+        }),
+      });
+      if (!response.ok) {
+        console.warn(`compute-verdict Google verdict fetch failed: ${response.status}`);
+        return [];
+      }
+      return shapeGoogleVerdictCandidates(await response.json());
     },
     async fetchActiveMemberIds(room_id): Promise<string[]> {
       const { data, error } = await client
@@ -123,10 +195,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .upsert(
           rows.map((r) => ({
             room_id: r.room_id,
-            fsq_place_id: r.fsq_place_id,
-            payload: r.payload,
+            google_place_id: r.google_place_id ?? r.fsq_place_id,
+            place_provider: "google",
           })),
-          { onConflict: "room_id,fsq_place_id", ignoreDuplicates: true },
+          { onConflict: "room_id,place_provider,google_place_id", ignoreDuplicates: true },
         );
       if (error) {
         console.error("compute-verdict insertOptions failed:", error.message);
@@ -351,6 +423,14 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
       return data as VerdictRow;
     },
+    async insertVerdictSlateEntries(rows: VerdictSlateEntryInsert[]): Promise<void> {
+      if (rows.length === 0) return;
+      const { error } = await client.from("verdict_slate_entries").insert(rows);
+      if (error) {
+        console.error("compute-verdict insertVerdictSlateEntries failed:", error.message);
+        throw error;
+      }
+    },
     async insertOptionCuts(rows: OptionCutInsert[]): Promise<void> {
       if (rows.length === 0) return;
       const { error } = await client.from("option_cuts").insert(rows);
@@ -444,11 +524,91 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
   };
 }
 
+function shapeGoogleVerdictCandidates(body: unknown): GoogleVerdictCandidateRow[] {
+  const places = (body && typeof body === "object" &&
+      Array.isArray((body as { places?: unknown }).places))
+    ? (body as { places: unknown[] }).places
+    : [];
+  const out: GoogleVerdictCandidateRow[] = [];
+  for (const raw of places) {
+    if (!raw || typeof raw !== "object") continue;
+    const place = raw as Record<string, unknown>;
+    if (typeof place.id !== "string" || place.id.trim().length === 0) continue;
+    const displayName = place.displayName &&
+        typeof place.displayName === "object" &&
+        typeof (place.displayName as { text?: unknown }).text === "string"
+      ? (place.displayName as { text: string }).text
+      : "Unnamed";
+    out.push({
+      google_place_id: place.id.trim(),
+      payload: {
+        name: displayName,
+        price_tier: googlePriceTier(place.priceLevel),
+        rating: typeof place.rating === "number" ? place.rating : null,
+        total_ratings: typeof place.userRatingCount === "number" ? place.userRatingCount : null,
+        user_rating_count: typeof place.userRatingCount === "number" ? place.userRatingCount : null,
+        categories: googleCategories(place),
+        dietary_tags: [],
+        current_open_now: googleOpenNow(place),
+        regular_opening_periods: googleOpeningPeriods(place),
+        dine_in: typeof place.dineIn === "boolean" ? place.dineIn : null,
+        takeout: typeof place.takeout === "boolean" ? place.takeout : null,
+      },
+    });
+  }
+  return out;
+}
+
+function googlePriceTier(value: unknown): number | null {
+  switch (value) {
+    case "PRICE_LEVEL_INEXPENSIVE":
+      return 1;
+    case "PRICE_LEVEL_MODERATE":
+      return 2;
+    case "PRICE_LEVEL_EXPENSIVE":
+      return 3;
+    case "PRICE_LEVEL_VERY_EXPENSIVE":
+      return 4;
+    default:
+      return null;
+  }
+}
+
+function googleCategories(place: Record<string, unknown>): string[] {
+  const categories: string[] = [];
+  if (typeof place.primaryType === "string") categories.push(place.primaryType);
+  if (Array.isArray(place.types)) {
+    for (const type of place.types) {
+      if (typeof type === "string" && !categories.includes(type)) {
+        categories.push(type);
+      }
+    }
+  }
+  return categories;
+}
+
+function googleOpenNow(place: Record<string, unknown>): boolean | null {
+  const hours = place.currentOpeningHours;
+  if (!hours || typeof hours !== "object") return null;
+  const openNow = (hours as { openNow?: unknown }).openNow;
+  return typeof openNow === "boolean" ? openNow : null;
+}
+
+function googleOpeningPeriods(place: Record<string, unknown>): GoogleVerdictCandidateRow["payload"]["regular_opening_periods"] {
+  const hours = place.regularOpeningHours;
+  if (!hours || typeof hours !== "object") return undefined;
+  const periods = (hours as { periods?: unknown }).periods;
+  return Array.isArray(periods)
+    ? periods as GoogleVerdictCandidateRow["payload"]["regular_opening_periods"]
+    : undefined;
+}
+
 Deno.serve((req) =>
   handleRequest(req, {
     env: {
       SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
       SUPABASE_SERVICE_ROLE_KEY: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
+      GOOGLE_PLACES_API_KEY: Deno.env.get("GOOGLE_PLACES_API_KEY"),
     },
     buildDataAdapter: buildSupabaseAdapter,
   })
