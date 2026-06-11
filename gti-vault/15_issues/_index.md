@@ -20,6 +20,8 @@ See `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md` for the fu
 
 ## Cycles
 
+- [[google-places-provider-migration/_index|google-places-provider-migration]] - Google Places API replacement for Foursquare / MapKit provider behavior, governed by [[../60_engineering/adr/0022-google-places-primary-provider|ADR 0022]].
+
 - [[expo-mobile-rewrite/_index|expo-mobile-rewrite]] - full pre-launch migration of the mobile iOS client to Expo managed React Native + TypeScript.
 
 - [[0.1.0/_index|0.1.0]] â€” pre-launch development cycle. Collapses the former `v1`, `v1.1`, and `workflow-overhaul` batches into a single named cycle (since `v1` is reserved for the first public-launch release). Three organizational phases:

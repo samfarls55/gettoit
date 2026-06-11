@@ -1,10 +1,11 @@
 ---
 adr: 0002
 title: Places data source â€” Foursquare primary, MapKit fallback
-status: accepted
+status: superseded
 date: 2026-05-12
 supersedes: null
-superseded_by: null
+superseded_by: 0022
+supersession_note: Active v0.1.0 removes Foursquare / MapKit provider code and fsq_* artifacts rather than keeping dormant compatibility paths.
 ---
 
 > **Legacy mobile note (2026-06-05):** References to iOS, Swift, SwiftUI, TestFlight, or ios/ in this historical note refer to the retired Swift app unless explicitly stated otherwise. Active mobile app work now lives in React Native / Expo under mobile/.

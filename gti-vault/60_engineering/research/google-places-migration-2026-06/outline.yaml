@@ -1,0 +1,17 @@
+topic: Google Places API migration from Foursquare
+date: 2026-06-10
+items:
+  - name: places_proxy_edge_function
+    description: Replace Foursquare upstream with Google Places API while preserving app-facing proxy semantics.
+  - name: provider_neutral_place_identity
+    description: Rename Foursquare-specific identifiers and uniqueness constraints to provider-neutral columns.
+  - name: google_field_mask_and_billing
+    description: Choose returned fields deliberately because Google field masks drive SKU tier and cost.
+  - name: cache_policy_and_attribution
+    description: Resolve Google storage, photo, attribution, and terms requirements before production rollout.
+  - name: q5_and_verdict_classifiers
+    description: Retune venue classification from Foursquare-specific ratings/categories/tastes to Google fields.
+execution:
+  batch_size: 3
+  items_per_agent: 1
+  output_dir: ./results

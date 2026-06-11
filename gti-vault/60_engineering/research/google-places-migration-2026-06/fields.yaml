@@ -1,0 +1,26 @@
+fields:
+  implementation_scope:
+    description: Local files, functions, migrations, tests, and docs touched by the migration.
+    detail_level: detailed
+  api_request_mapping:
+    description: How existing PlacesProxy inputs map to Google Places API requests.
+    detail_level: detailed
+  response_shape_mapping:
+    description: How Google Place fields map to the app's shaped venue payload.
+    detail_level: detailed
+  schema_changes:
+    description: Database and persisted payload changes required to avoid Foursquare-specific naming.
+    detail_level: detailed
+  billing_impact:
+    description: SKU tier, field-mask, fanout, and photo/detail cost implications.
+    detail_level: moderate
+  policy_constraints:
+    description: Caching, storage, attribution, photo, terms, and map-display constraints.
+    detail_level: detailed
+  rollout_sequence:
+    description: Suggested migration steps with verification gates.
+    detail_level: detailed
+uncertain:
+  - Whether Google-sourced room verdict payloads may be persisted as product history under the current terms.
+  - Whether first cut should pay for Enterprise fields or simplify product behavior to Pro-only fields.
+  - Exact final Google type floor for food trucks/food stands because direct Table A equivalents were not found in the inspected excerpt.
