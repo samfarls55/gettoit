@@ -566,9 +566,9 @@ export async function handleRequest(
     dietary_tags: row.payload?.dietary_tags ?? [],
     categories: row.payload?.categories ?? [],
     distance_meters: row.payload?.distance_meters ?? null,
-    // TB-23 — carry the Foursquare reputation / vibe signal so the
-    // server-side venue classifier can derive the preference axes. The
-    // engine itself never reads these fields.
+    // Carry reputation / vibe signals for two consumers: the classifier
+    // derives preference axes, and the engine applies the Google quality
+    // floor plus above-floor quality tiebreak.
     rating: row.payload?.rating ?? null,
     user_rating_count: row.payload?.user_rating_count ?? null,
     total_ratings: row.payload?.total_ratings ?? null,

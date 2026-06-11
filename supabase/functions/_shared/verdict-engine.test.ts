@@ -12,7 +12,7 @@
 //   4. Maximin tiebreak  — highest minimum member score wins; a
 //                          polarizing higher-sum pick LOSES to a
 //                          worst-off-protecting pick.
-//   5. Final tiebreak    — highest sum, then injected random.
+//   5. Final tiebreak    — highest sum, quality evidence, then injected random.
 //   6. Empty-floor cascade — relax T, then widen radius, then a
 //                          terminal `no_survivor` screen.
 //
@@ -434,7 +434,7 @@ Deno.test("maximin — among floor survivors the highest minimum score wins", ()
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// 5. Final tiebreak — highest sum, then random
+// 5. Final tiebreak — highest sum, quality evidence, then random
 // ───────────────────────────────────────────────────────────────────────
 
 Deno.test("final tiebreak — equal minimums break on the higher sum", () => {

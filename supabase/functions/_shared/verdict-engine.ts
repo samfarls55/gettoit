@@ -27,7 +27,7 @@
 //      anti-defection mechanic (0.1.0-quiz-amendments Â§4, the Kim 2023
 //      backfire avoidance).
 //   5. Final tiebreak â€” equal minimums break on the higher group sum,
-//      then on the injected random.
+//      then Google quality evidence, then injected random.
 //   6. Empty-floor cascade â€” when no venue clears the floor the engine
 //      relaxes T downward, then widens the search radius, then emits a
 //      terminal `no_survivor` screen. Hard-veto cuts never recover.
@@ -513,13 +513,7 @@ function ebaPrune(
       continue;
     }
 
-    const ratingCount = candidateRatingCount(c);
-    if (
-      typeof c.rating !== "number" ||
-      c.rating < QUALITY_RATING_FLOOR ||
-      typeof ratingCount !== "number" ||
-      ratingCount < QUALITY_RATING_COUNT_FLOOR
-    ) {
+    if (!passesQualityFloor(c)) {
       cuts.push({
         option_id: c.id,
         cut_reason: "quality",
@@ -581,6 +575,16 @@ function ebaPrune(
   }
 
   return { survivors, cuts };
+}
+
+function passesQualityFloor(candidate: CandidateOption): boolean {
+  const ratingCount = candidateRatingCount(candidate);
+  return (
+    typeof candidate.rating === "number" &&
+    candidate.rating >= QUALITY_RATING_FLOOR &&
+    typeof ratingCount === "number" &&
+    ratingCount >= QUALITY_RATING_COUNT_FLOOR
+  );
 }
 
 function candidateRatingCount(candidate: CandidateOption): number | null {
