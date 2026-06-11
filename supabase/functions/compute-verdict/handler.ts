@@ -31,7 +31,7 @@
 //         empty candidate pool is NOT a 404 — bug-13 made it a terminal
 //         `no_survivor` verdict (200), so the room never wedges in
 //         `firing`.
-//   409 — locked Search area mutation attempted
+//   409 — verdict already computed for this room
 //   500 — engine misconfigured
 
 import {
@@ -39,7 +39,6 @@ import {
   computeVerdict,
   type HardVeto,
   type MemberVote,
-  type OpeningPeriod,
   type VerdictEngineOutput,
   type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
@@ -62,6 +61,12 @@ export type { MemberFetchRow, OptionInsertRow };
 // `_shared/votes-schema.ts`.
 export type { MemberPreferenceInputs };
 
+/** Hard upper bound for `radius_meters_override`. S05's widen-radius
+ *  slider exposes 1..10 mi (1609..16093 m); the handler clamps
+ *  defensively against client tampering or accidental wild values. */
+const WIDEN_RADIUS_HARD_CAP_METERS = 16093;
+const WIDEN_RADIUS_HARD_MIN_METERS = 805;
+
 export interface ComputeVerdictEnv {
   /** Supabase project URL. */
   SUPABASE_URL?: string;
@@ -83,11 +88,13 @@ export interface ComputeVerdictDataAdapter {
    *  here and the Plan transition is skipped entirely. The supabase
    *  adapter selects `id, plan_id` so the field is always populated
    *  one-way-or-the-other. */
-  fetchRoom(room_id: string): Promise<{
-    id: string;
-    plan_id?: string | null;
-    session_params?: Record<string, unknown> | null;
-  } | null>;
+  fetchRoom(room_id: string): Promise<{ id: string; plan_id?: string | null } | null>;
+  /** Current active member user IDs for the room. Exited members have
+   *  no `members` row and must not contribute fetches, votes, profile
+   *  vetoes, budgets, or preference signals to the verdict. Optional
+   *  for legacy tests; when omitted, the handler preserves the prior
+   *  all-votes behavior. */
+  fetchActiveMemberIds?(room_id: string): Promise<string[]>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
@@ -121,13 +128,13 @@ export interface ComputeVerdictDataAdapter {
    *  subscribers route into S05 within the Realtime window. Optional
    *  — production wires this to supabase-js Realtime, tests omit. */
   emitVerdictReadyBroadcast?(room_id: string, verdict_id: string): Promise<void>;
-  /** Fetch the room's stored `radius_meters` so the engine can enforce
-   *  the locked Search area boundary. Returns null when the
+  /** Fetch the room's stored `radius_meters` so the engine can use it
+   *  as the starting radius for the cascade. Returns null when the
    *  row doesn't carry the field (legacy / pre-TB-03 rooms). */
   fetchRoomRadius(room_id: string): Promise<number | null>;
   /** Drop the prior verdict + cascaded option_cuts (FK cascade) for a
-   *  room when a reroll race leaves a stale verdict under the
-   *  `verdicts.room_id` UNIQUE constraint. */
+   *  room. Called by the widen-radius re-run path so a fresh verdict
+   *  can be inserted under the `verdicts.room_id` UNIQUE constraint. */
   deleteVerdictForRoom(room_id: string): Promise<void>;
   /** TB-10 — fetch the reroll-state slice the engine needs:
    *    * `excluded_option_ids` — option ids appended by `avail`-reason
@@ -205,9 +212,9 @@ export interface RoomOptionRow {
     dietary_tags?: string[];
     categories?: string[];
     /** Distance from the room's search centre in meters. Used by the
-     *  engine's locked Search area gate. PlacesProxy populates this in
-     *  its `ShapedPlace` and the iOS / Edge writes it through the
-     *  options payload. */
+     *  TB-11 empty-floor cascade's radius-widen step. PlacesProxy
+     *  populates this in its `ShapedPlace` and the iOS / Edge writes it
+     *  through the options payload. */
     distance_meters?: number | null;
     /** TB-23 — Foursquare 0..10 venue rating. Read by the server-side
      *  venue classifier for the reputation axis. */
@@ -221,17 +228,6 @@ export interface RoomOptionRow {
     /** TB-23 — Foursquare crowd-sourced `tastes` tag cloud. Read by the
      *  classifier for the vibe nudge. */
     tastes?: string[];
-    current_open_now?: boolean | null;
-    currentOpeningHours?: { openNow?: boolean | null } | null;
-    regular_open_now?: boolean | null;
-    regular_opening_periods?: OpeningPeriod[];
-    regularOpeningHours?: {
-      openNow?: boolean | null;
-      periods?: OpeningPeriod[];
-    } | null;
-    dine_in?: boolean | null;
-    dineIn?: boolean | null;
-    takeout?: boolean | null;
   };
 }
 
@@ -368,71 +364,6 @@ export function mergeHardVetoes(
   return out;
 }
 
-function roomMealTiming(
-  sessionParams: Record<string, unknown> | null,
-): { open_at?: string | null } | undefined {
-  if (!sessionParams) return undefined;
-  const nested = sessionParams.meal_timing;
-  const nestedOpenAt = nested && typeof nested === "object"
-    ? (nested as Record<string, unknown>).open_at
-    : undefined;
-  const openAt = typeof nestedOpenAt === "string"
-    ? nestedOpenAt
-    : sessionParams.open_at;
-  return { open_at: typeof openAt === "string" ? openAt : null };
-}
-
-function isRoomServiceShape(value: unknown): value is "dineIn" | "takeout" {
-  return value === "dineIn" || value === "takeout";
-}
-
-function roomServiceShape(
-  sessionParams: Record<string, unknown> | null,
-): "dineIn" | "takeout" | null {
-  const serviceShape = sessionParams?.service_shape;
-  return isRoomServiceShape(serviceShape) ? serviceShape : null;
-}
-
-type OptionPayload = RoomOptionRow["payload"] | undefined;
-
-function optionCurrentOpenNow(payload: OptionPayload): boolean | null {
-  return payload?.current_open_now ??
-    payload?.currentOpeningHours?.openNow ??
-    payload?.regular_open_now ??
-    payload?.regularOpeningHours?.openNow ??
-    null;
-}
-
-function optionRegularOpeningPeriods(
-  payload: OptionPayload,
-): OpeningPeriod[] | undefined {
-  return payload?.regular_opening_periods ??
-    payload?.regularOpeningHours?.periods;
-}
-
-function toCandidateOption(row: RoomOptionRow): CandidateOption {
-  const { payload } = row;
-  return {
-    id: row.id,
-    name: payload?.name ?? "Unnamed",
-    price_tier: payload?.price_tier ?? null,
-    dietary_tags: payload?.dietary_tags ?? [],
-    categories: payload?.categories ?? [],
-    distance_meters: payload?.distance_meters ?? null,
-    // TB-23 — carry the Foursquare reputation / vibe signal so the
-    // server-side venue classifier can derive the preference axes. The
-    // engine itself never reads these fields.
-    rating: payload?.rating ?? null,
-    total_ratings: payload?.total_ratings ?? null,
-    date_created: payload?.date_created ?? null,
-    tastes: payload?.tastes ?? [],
-    current_open_now: optionCurrentOpenNow(payload),
-    regular_opening_periods: optionRegularOpeningPeriods(payload),
-    dine_in: payload?.dine_in ?? payload?.dineIn ?? null,
-    takeout: payload?.takeout ?? null,
-  };
-}
-
 export async function handleRequest(
   req: Request,
   deps: ComputeVerdictDeps,
@@ -492,18 +423,18 @@ export async function handleRequest(
     ? rawMethod
     : "manual";
 
-  // TB-06 Google migration — Search area is a locked Room parameter.
-  // Older clients may still send the retired no-survivor widen payload;
-  // fail closed instead of mutating active Room eligibility.
+  // Optional widen-radius override (S05 no-survivor "Widen radius"
+  // CTA, TB-09). When supplied, the handler bypasses the standard
+  // idempotency check for prior `no_survivor` verdicts so the engine
+  // can re-run at the wider radius. Clamped to the 1..10 mi window
+  // exposed by the S05 slider.
   const rawWiden = (body as { radius_meters_override?: unknown })?.radius_meters_override;
+  let widenOverride: number | null = null;
   if (typeof rawWiden === "number" && Number.isFinite(rawWiden)) {
-    return jsonResponse({
-      error: "search_area_locked",
-      detail: "Search area is locked for this Room; start a new decision to change it.",
-    }, {
-      status: 409,
-      headers: corsHeaders(),
-    });
+    widenOverride = Math.max(
+      WIDEN_RADIUS_HARD_MIN_METERS,
+      Math.min(WIDEN_RADIUS_HARD_CAP_METERS, Math.round(rawWiden)),
+    );
   } else if (rawWiden !== undefined) {
     return jsonResponse({
       error: "invalid_input",
@@ -528,17 +459,25 @@ export async function handleRequest(
 
   // Idempotency — if a verdict already exists for this room, return it
   // with the cuts, 200. TB-07 will use ON CONFLICT to support trigger-
-  // retry. TB-10 widens the exception list — when
-  // `last_reroll_reason` is set on the room, the apply_reroll RPC
-  // already deleted the prior verdict; any verdict we see now is
-  // post-reroll and must NOT be re-returned as "already_computed."
+  // retry. The widen-radius re-run path is the one exception: when
+  // the caller supplies `radius_meters_override` AND the existing
+  // verdict is a `no_survivor`, drop the old verdict (cascading the
+  // option_cuts) so the engine can write a fresh row. TB-10 widens
+  // the exception list — when `last_reroll_reason` is set on the
+  // room, the apply_reroll RPC already deleted the prior verdict;
+  // any verdict we see now is post-reroll and must NOT be re-returned
+  // as "already_computed."
   const existing = await data.existingVerdict(roomId);
   if (existing && !isRerollRun) {
-    return jsonResponse({
-      verdict: existing,
-      cuts: [],
-      already_computed: true,
-    }, { status: 200, headers: corsHeaders() });
+    if (widenOverride !== null && existing.method === "no_survivor") {
+      await data.deleteVerdictForRoom(roomId);
+    } else {
+      return jsonResponse({
+        verdict: existing,
+        cuts: [],
+        already_computed: true,
+      }, { status: 200, headers: corsHeaders() });
+    }
   } else if (existing && isRerollRun) {
     // Race: a stale verdict slipped past the apply_reroll DELETE.
     // Drop it so the fresh engine run can write under the UNIQUE
@@ -553,6 +492,13 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
+  const activeMemberIdSet = data.fetchActiveMemberIds
+    ? new Set(await data.fetchActiveMemberIds(roomId))
+    : null;
+  const filterToActiveMembers = <T extends { user_id: string }>(rows: T[]): T[] =>
+    activeMemberIdSet
+      ? rows.filter((row) => activeMemberIdSet.has(row.user_id))
+      : rows;
 
   // TB-21 — populate `options` from the per-member persisted fetches.
   //
@@ -576,7 +522,9 @@ export async function handleRequest(
     data.fetchMemberFetches &&
     data.insertOptions
   ) {
-    const memberFetches = await data.fetchMemberFetches(roomId);
+    const memberFetches = filterToActiveMembers(
+      await data.fetchMemberFetches(roomId),
+    );
     const unionRows = unionMemberFetches(roomId, memberFetches);
     if (unionRows.length > 0) {
       await data.insertOptions(unionRows);
@@ -584,7 +532,7 @@ export async function handleRequest(
     }
   }
 
-  const voteRows = await data.fetchVotes(roomId);
+  const voteRows = filterToActiveMembers(await data.fetchVotes(roomId));
 
   // A room with no member votes can't yield a verdict at all — there
   // is no group to render the result for. That stays a hard 404.
@@ -605,9 +553,33 @@ export async function handleRequest(
   // landed, so the room stayed `firing` forever and iOS polled a
   // verdict that never resolved. The empty pool now flows through.
 
-  const startingRadius = (await data.fetchRoomRadius(roomId)) ?? null;
+  // Start with the override when supplied; fall back to the stored
+  // room radius for the standard fire path.
+  const startingRadius = widenOverride
+    ?? (await data.fetchRoomRadius(roomId))
+    ?? null;
+  // Widen-radius re-runs lift the cap to the requested override (so
+  // the engine doesn't itself widen past where the user asked). The
+  // standard fire path keeps the engine's default 5 mi cap.
+  const radiusCap = widenOverride !== null
+    ? widenOverride
+    : undefined;
 
-  const candidates: CandidateOption[] = optionRows.map(toCandidateOption);
+  const candidates: CandidateOption[] = optionRows.map((row) => ({
+    id: row.id,
+    name: row.payload?.name ?? "Unnamed",
+    price_tier: row.payload?.price_tier ?? null,
+    dietary_tags: row.payload?.dietary_tags ?? [],
+    categories: row.payload?.categories ?? [],
+    distance_meters: row.payload?.distance_meters ?? null,
+    // TB-23 — carry the Foursquare reputation / vibe signal so the
+    // server-side venue classifier can derive the preference axes. The
+    // engine itself never reads these fields.
+    rating: row.payload?.rating ?? null,
+    total_ratings: row.payload?.total_ratings ?? null,
+    date_created: row.payload?.date_created ?? null,
+    tastes: row.payload?.tastes ?? [],
+  }));
 
   // TB-23 — classify the FULL candidate pool into per-venue
   // `Q5VenueProfile`s, ONCE. Reputation is pool-relative (its volume
@@ -704,10 +676,9 @@ export async function handleRequest(
     result = computeVerdict({
       candidates,
       votes,
-      meal_timing: roomMealTiming(room.session_params ?? null),
-      service_shape: roomServiceShape(room.session_params ?? null),
       method,
       radius_meters: startingRadius ?? undefined,
+      radius_meters_cap: radiusCap,
       excluded_option_ids: rerollState?.excluded_option_ids,
       reroll_reason: rerollState?.last_reroll_reason ?? undefined,
       previous_winner_name: previousWinnerName,

@@ -30,6 +30,7 @@ interface AdapterSeed {
   room?: { id: string } | null;
   options?: RoomOptionRow[];
   votes?: MemberVoteRow[];
+  activeMemberIds?: string[];
   existing?: VerdictRow | null;
   /** TB-12 â€” per-account sticky profile vetoes, keyed by user_id.
    *  A user_id absent from this map (or an absent map entirely) means
@@ -58,6 +59,9 @@ function memoryAdapter(seed: AdapterSeed = {}): AdapterState {
     },
     async fetchOptions(_id) {
       return (seed.options ?? []).map(withEligibleGoogleMetadata);
+    },
+    async fetchActiveMemberIds(_id) {
+      return seed.activeMemberIds ?? (seed.votes ?? []).map((v) => v.user_id);
     },
     async fetchVotes(_id) {
       return seed.votes ?? [];
@@ -668,6 +672,137 @@ Deno.test("compute-verdict â€” TB-12: a member with no profile row contribu
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.verdict.option_id, "opt-sushi");
+});
+
+Deno.test("compute-verdict â€” TB-08: exited members do not contribute votes, profile vetoes, budgets, or scores", async () => {
+  const { adapter } = memoryAdapter({
+    activeMemberIds: ["u1"],
+    options: [
+      { id: "opt-taco", payload: { name: "Taco Stand", price_tier: 2, categories: ["Taco Stand"] } },
+      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 3, categories: ["Sushi Restaurant"] } },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "active",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-taco": 3, "opt-sushi": 5 },
+      },
+      {
+        user_id: "u2",
+        display_name: "exited",
+        q1_vetoes: [],
+        q2_budget: 2,
+        hard_vetoes: [{ kind: "cuisine_never", token: "sushi" }],
+        scores: { "opt-taco": 5, "opt-sushi": 1 },
+      },
+    ],
+    profileVetoes: {
+      u2: [{ kind: "tag", token: "no_shellfish_unverified" }],
+    },
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, method: "manual" }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.option_id, "opt-sushi");
+  assertEquals(
+    body.cuts.some((c: { option_id: string }) => c.option_id === "opt-sushi"),
+    false,
+    "the exited member's cuisine NEVER, budget cap, profile veto, and low score must not cut sushi",
+  );
+});
+
+Deno.test("compute-verdict â€” TB-08: manual close ignores active members without submitted votes", async () => {
+  const { adapter } = memoryAdapter({
+    activeMemberIds: ["u1", "u2"],
+    options: [
+      { id: "opt-taco", payload: { name: "Taco Stand", price_tier: 2, categories: ["Taco Stand"] } },
+      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"] } },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "submitted",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [],
+        scores: { "opt-taco": 3, "opt-sushi": 5 },
+      },
+    ],
+    profileVetoes: {
+      u2: [{ kind: "cuisine_never", token: "sushi" }],
+    },
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, method: "manual" }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.option_id, "opt-sushi");
+});
+
+Deno.test("compute-verdict â€” TB-08: hard safety and cuisine NEVERs ignore summaries and free text", async () => {
+  const { adapter } = memoryAdapter({
+    options: [
+      {
+        id: "opt-summary-sushi",
+        payload: {
+          name: "Summary Sushi Cafe",
+          price_tier: 2,
+          categories: ["Cafe"],
+          dietary_tags: ["vegan_friendly"],
+          reviewSummary: "Guests mention sushi specials.",
+          generativeSummary: "A neighborhood cafe with sushi pop-ups.",
+        } as RoomOptionRow["payload"],
+      },
+      {
+        id: "opt-summary-vegan",
+        payload: {
+          name: "Summary Vegan Cafe",
+          price_tier: 2,
+          categories: ["Cafe"],
+          dietary_tags: [],
+          reviewSummary: "Guests mention vegan options.",
+          generativeSummary: "A good pick for vegan diners.",
+        } as RoomOptionRow["payload"],
+      },
+    ],
+    votes: [
+      {
+        user_id: "u1",
+        display_name: "you",
+        q1_vetoes: [],
+        q2_budget: 4,
+        hard_vetoes: [
+          { kind: "cuisine_never", token: "sushi" },
+          { kind: "dietary", token: "vegan" },
+        ],
+        scores: { "opt-summary-sushi": 5, "opt-summary-vegan": 4 },
+      },
+    ],
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assertEquals(body.verdict.option_id, "opt-summary-sushi");
+  assert(
+    body.cuts.some((c: { option_id: string; cut_reason: string }) =>
+      c.option_id === "opt-summary-vegan" && c.cut_reason === "dietary"
+    ),
+    "summary/free text must not satisfy hard dietary safety",
+  );
 });
 
 Deno.test("compute-verdict â€” engine no-survivor exits 200 with method=no_survivor (TB-09)", async () => {
