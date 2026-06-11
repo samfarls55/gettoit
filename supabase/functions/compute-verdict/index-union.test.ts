@@ -61,6 +61,7 @@ interface UnionAdapterSeed {
   /** Per-member persisted raw fetches. */
   memberFetches?: MemberFetchRow[];
   votes?: MemberVoteRow[];
+  activeMemberIds?: string[];
 }
 
 interface UnionAdapterState {
@@ -81,6 +82,9 @@ function unionAdapter(seed: UnionAdapterSeed = {}): UnionAdapterState {
   const adapter: ComputeVerdictDataAdapter = {
     async fetchRoom(_id) {
       return { id: VALID_ROOM_ID };
+    },
+    async fetchActiveMemberIds(_id) {
+      return seed.activeMemberIds ?? (seed.votes ?? []).map((v) => v.user_id);
     },
     async fetchMemberFetches(_id) {
       return seed.memberFetches ?? [];
@@ -208,6 +212,29 @@ Deno.test("compute-verdict — a group room's options pool is the union across a
     insertedOptions.map((o) => o.fsq_place_id).sort(),
     ["a", "b", "c", "d"],
     "the pool is the union across both members, deduped by fsq_place_id",
+  );
+});
+
+Deno.test("compute-verdict — TB-08: exited members do not seed the member-fetch union", async () => {
+  const { adapter, insertedOptions } = unionAdapter({
+    activeMemberIds: ["u1"],
+    memberFetches: [
+      { user_id: "u1", payload: [venue("a")] },
+      { user_id: "u2", payload: [venue("exited-only")] },
+    ],
+    votes: votesFor("u1", "u2"),
+  });
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(
+    insertedOptions.map((o) => o.fsq_place_id),
+    ["a"],
+    "only active members' persisted fetches seed the verdict candidate pool",
   );
 });
 

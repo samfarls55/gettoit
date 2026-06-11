@@ -70,6 +70,17 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
       return (data ?? []) as RoomOptionRow[];
     },
+    async fetchActiveMemberIds(room_id): Promise<string[]> {
+      const { data, error } = await client
+        .from("members")
+        .select("user_id")
+        .eq("room_id", room_id);
+      if (error) {
+        console.warn("compute-verdict fetchActiveMemberIds failed:", error.message);
+        return [];
+      }
+      return ((data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id);
+    },
     async fetchMemberFetches(room_id): Promise<MemberFetchRow[]> {
       // TB-21 â€” read every member's persisted raw Foursquare fetch for
       // the room. `member_fetches.payload` is the jsonb array of every

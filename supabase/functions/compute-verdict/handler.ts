@@ -89,6 +89,12 @@ export interface ComputeVerdictDataAdapter {
    *  adapter selects `id, plan_id` so the field is always populated
    *  one-way-or-the-other. */
   fetchRoom(room_id: string): Promise<{ id: string; plan_id?: string | null } | null>;
+  /** Current active member user IDs for the room. Exited members have
+   *  no `members` row and must not contribute fetches, votes, profile
+   *  vetoes, budgets, or preference signals to the verdict. Optional
+   *  for legacy tests; when omitted, the handler preserves the prior
+   *  all-votes behavior. */
+  fetchActiveMemberIds?(room_id: string): Promise<string[]>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
@@ -486,6 +492,9 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
+  const activeMemberIds = data.fetchActiveMemberIds
+    ? new Set(await data.fetchActiveMemberIds(roomId))
+    : null;
 
   // TB-21 — populate `options` from the per-member persisted fetches.
   //
@@ -509,7 +518,10 @@ export async function handleRequest(
     data.fetchMemberFetches &&
     data.insertOptions
   ) {
-    const memberFetches = await data.fetchMemberFetches(roomId);
+    const fetchedRows = await data.fetchMemberFetches(roomId);
+    const memberFetches = activeMemberIds
+      ? fetchedRows.filter((row) => activeMemberIds.has(row.user_id))
+      : fetchedRows;
     const unionRows = unionMemberFetches(roomId, memberFetches);
     if (unionRows.length > 0) {
       await data.insertOptions(unionRows);
@@ -517,7 +529,10 @@ export async function handleRequest(
     }
   }
 
-  const voteRows = await data.fetchVotes(roomId);
+  const fetchedVoteRows = await data.fetchVotes(roomId);
+  const voteRows = activeMemberIds
+    ? fetchedVoteRows.filter((row) => activeMemberIds.has(row.user_id))
+    : fetchedVoteRows;
 
   // A room with no member votes can't yield a verdict at all — there
   // is no group to render the result for. That stays a hard 404.
