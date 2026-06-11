@@ -61,12 +61,6 @@ export type { MemberFetchRow, OptionInsertRow };
 // `_shared/votes-schema.ts`.
 export type { MemberPreferenceInputs };
 
-/** Hard upper bound for `radius_meters_override`. S05's widen-radius
- *  slider exposes 1..10 mi (1609..16093 m); the handler clamps
- *  defensively against client tampering or accidental wild values. */
-const WIDEN_RADIUS_HARD_CAP_METERS = 16093;
-const WIDEN_RADIUS_HARD_MIN_METERS = 805;
-
 export interface ComputeVerdictEnv {
   /** Supabase project URL. */
   SUPABASE_URL?: string;
@@ -127,8 +121,8 @@ export interface ComputeVerdictDataAdapter {
    *  row doesn't carry the field (legacy / pre-TB-03 rooms). */
   fetchRoomRadius(room_id: string): Promise<number | null>;
   /** Drop the prior verdict + cascaded option_cuts (FK cascade) for a
-   *  room. Called by the widen-radius re-run path so a fresh verdict
-   *  can be inserted under the `verdicts.room_id` UNIQUE constraint. */
+   *  room when a reroll race leaves a stale verdict under the
+   *  `verdicts.room_id` UNIQUE constraint. */
   deleteVerdictForRoom(room_id: string): Promise<void>;
   /** TB-10 — fetch the reroll-state slice the engine needs:
    *    * `excluded_option_ids` — option ids appended by `avail`-reason
@@ -417,18 +411,18 @@ export async function handleRequest(
     ? rawMethod
     : "manual";
 
-  // Optional widen-radius override (S05 no-survivor "Widen radius"
-  // CTA, TB-09). When supplied, the handler bypasses the standard
-  // idempotency check for prior `no_survivor` verdicts so the engine
-  // can re-run at the wider radius. Clamped to the 1..10 mi window
-  // exposed by the S05 slider.
+  // TB-06 Google migration — Search area is a locked Room parameter.
+  // Older clients may still send the retired no-survivor widen payload;
+  // fail closed instead of mutating active Room eligibility.
   const rawWiden = (body as { radius_meters_override?: unknown })?.radius_meters_override;
-  let widenOverride: number | null = null;
   if (typeof rawWiden === "number" && Number.isFinite(rawWiden)) {
-    widenOverride = Math.max(
-      WIDEN_RADIUS_HARD_MIN_METERS,
-      Math.min(WIDEN_RADIUS_HARD_CAP_METERS, Math.round(rawWiden)),
-    );
+    return jsonResponse({
+      error: "search_area_locked",
+      detail: "Search area is locked for this Room; start a new decision to change it.",
+    }, {
+      status: 409,
+      headers: corsHeaders(),
+    });
   } else if (rawWiden !== undefined) {
     return jsonResponse({
       error: "invalid_input",
@@ -453,25 +447,17 @@ export async function handleRequest(
 
   // Idempotency — if a verdict already exists for this room, return it
   // with the cuts, 200. TB-07 will use ON CONFLICT to support trigger-
-  // retry. The widen-radius re-run path is the one exception: when
-  // the caller supplies `radius_meters_override` AND the existing
-  // verdict is a `no_survivor`, drop the old verdict (cascading the
-  // option_cuts) so the engine can write a fresh row. TB-10 widens
-  // the exception list — when `last_reroll_reason` is set on the
-  // room, the apply_reroll RPC already deleted the prior verdict;
-  // any verdict we see now is post-reroll and must NOT be re-returned
-  // as "already_computed."
+  // retry. TB-10 widens the exception list — when
+  // `last_reroll_reason` is set on the room, the apply_reroll RPC
+  // already deleted the prior verdict; any verdict we see now is
+  // post-reroll and must NOT be re-returned as "already_computed."
   const existing = await data.existingVerdict(roomId);
   if (existing && !isRerollRun) {
-    if (widenOverride !== null && existing.method === "no_survivor") {
-      await data.deleteVerdictForRoom(roomId);
-    } else {
-      return jsonResponse({
-        verdict: existing,
-        cuts: [],
-        already_computed: true,
-      }, { status: 200, headers: corsHeaders() });
-    }
+    return jsonResponse({
+      verdict: existing,
+      cuts: [],
+      already_computed: true,
+    }, { status: 200, headers: corsHeaders() });
   } else if (existing && isRerollRun) {
     // Race: a stale verdict slipped past the apply_reroll DELETE.
     // Drop it so the fresh engine run can write under the UNIQUE
@@ -538,17 +524,7 @@ export async function handleRequest(
   // landed, so the room stayed `firing` forever and iOS polled a
   // verdict that never resolved. The empty pool now flows through.
 
-  // Start with the override when supplied; fall back to the stored
-  // room radius for the standard fire path.
-  const startingRadius = widenOverride
-    ?? (await data.fetchRoomRadius(roomId))
-    ?? null;
-  // Widen-radius re-runs lift the cap to the requested override (so
-  // the engine doesn't itself widen past where the user asked). The
-  // standard fire path keeps the engine's default 5 mi cap.
-  const radiusCap = widenOverride !== null
-    ? widenOverride
-    : undefined;
+  const startingRadius = (await data.fetchRoomRadius(roomId)) ?? null;
 
   const candidates: CandidateOption[] = optionRows.map((row) => ({
     id: row.id,
@@ -663,7 +639,6 @@ export async function handleRequest(
       votes,
       method,
       radius_meters: startingRadius ?? undefined,
-      radius_meters_cap: radiusCap,
       excluded_option_ids: rerollState?.excluded_option_ids,
       reroll_reason: rerollState?.last_reroll_reason ?? undefined,
       previous_winner_name: previousWinnerName,

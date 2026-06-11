@@ -22,7 +22,6 @@
 import {
   assert,
   assertEquals,
-  assertExists,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   type CandidateOption,
@@ -344,37 +343,50 @@ Deno.test("empty-floor cascade — relaxes T when no venue clears the floor", ()
   );
 });
 
-Deno.test("empty-floor cascade — widens radius after the threshold relax is exhausted", () => {
-  // The only in-radius venue is hard-vetoed (over the spend cap) so no
-  // amount of T relaxation can recover it — a hard-veto cut never
-  // relaxes. A second venue is loved by everyone but sits outside the
-  // start radius. The cascade exhausts the threshold relax (no effect)
-  // then widens the radius to admit the loved venue.
-  const near = makeCandidate({
-    id: "near",
-    name: "Near But Pricey",
+Deno.test("Search area eligibility — outside candidates are cut before scoring", () => {
+  // The committed Search area is a hard boundary. A loved candidate
+  // outside the circle cannot recover through threshold relaxation or
+  // radius widening.
+  const inside = makeCandidate({
+    id: "inside",
+    name: "Inside But Pricey",
     price_tier: 4,
     distance_meters: 500,
   });
-  const far = makeCandidate({
-    id: "far",
-    name: "Far Gem",
+  const outside = makeCandidate({
+    id: "outside",
+    name: "Outside Gem",
     price_tier: 1,
     distance_meters: 6000,
   });
   const out = run({
-    candidates: [near, far],
+    candidates: [inside, outside],
     votes: [
-      scoredVote("u1", { near: 5, far: 5 }, 5, { q2_budget: 1 }),
-      scoredVote("u2", { near: 5, far: 5 }, 5, { q2_budget: 1 }),
+      scoredVote("u1", { inside: 5, outside: 5 }, 5, { q2_budget: 1 }),
+      scoredVote("u2", { inside: 5, outside: 5 }, 5, { q2_budget: 1 }),
     ],
     radius_meters: 3219,
     radius_meters_cap: 8047,
   });
+  assertEquals(out.winning_option_id, null);
+  assertEquals(out.method, "no_survivor");
+  assertEquals(out.relax_chain_applied, []);
+});
+
+Deno.test("Search area eligibility — distance inside the circle is not a tiebreaker", () => {
+  const near = makeCandidate({ id: "near", name: "Near", distance_meters: 100 });
+  const far = makeCandidate({ id: "far", name: "Far", distance_meters: 3000 });
+  const out = run({
+    candidates: [near, far],
+    votes: [
+      scoredVote("u1", { near: 4, far: 4 }),
+      scoredVote("u2", { near: 4, far: 4 }),
+    ],
+    radius_meters: 3219,
+  }, { random: () => 0.99 });
   assertEquals(out.winning_option_id, "far");
-  assert(out.relax_chain_applied.includes("radius_widen"));
-  assertExists(out.radius_meters_used);
-  assert((out.radius_meters_used ?? 0) >= 6000);
+  assertEquals(out.rule_text.toLowerCase().includes("distance"), false);
+  assertEquals(out.cuts.some((cut) => cut.cut_text.toLowerCase().includes("distance")), false);
 });
 
 Deno.test("empty-floor cascade — exhausted cascade yields a no_survivor terminal", () => {

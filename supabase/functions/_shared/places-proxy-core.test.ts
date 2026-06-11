@@ -188,6 +188,7 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
         {
           id: "google-place-1",
           displayName: { text: "Pico's" },
+          location: { latitude: 40.7128, longitude: -74.006 },
           formattedAddress: "1 Main St",
           rating: 4.8,
           regularOpeningHours: { openNow: true },
@@ -214,7 +215,7 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
   const requestBody = JSON.parse(calls[0].init?.body as string);
   assertEquals(requestBody.locationRestriction.circle.center.latitude, 40.7128);
   assertEquals(requestBody.locationRestriction.circle.center.longitude, -74.006);
-  assertEquals(requestBody.locationRestriction.circle.radius, 1600);
+  assertEquals(requestBody.locationRestriction.circle.radius, 1840);
 
   assertEquals(result, {
     places: [{ place_id: "google-place-1", display_name: "Pico's" }],
@@ -222,6 +223,13 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
       provider: "google",
       render: "text",
       text: "Powered by Google",
+    },
+    overfetch_telemetry: {
+      committed_radius_meters: 1600,
+      provider_radius_meters: 1840,
+      pre_trim_count: 1,
+      post_trim_count: 1,
+      trimmed_count: 0,
     },
   });
   const serialized = JSON.stringify(result);
@@ -236,10 +244,63 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
       "reviewSummary",
       "google-secret",
       "summary",
+      "location",
     ]
   ) {
     assertEquals(serialized.includes(forbidden), false, forbidden);
   }
+});
+
+Deno.test("google q5 — overfetches with a capped radius and trims to the committed Search area", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fetch: ProxyDeps["fetch"] = (input, init) => {
+    calls.push({ url: String(input), init });
+    return Promise.resolve(new Response(JSON.stringify({
+      places: [
+        {
+          id: "inside",
+          displayName: { text: "Inside" },
+          location: { latitude: 40.7128, longitude: -74.006 },
+        },
+        {
+          id: "outside",
+          displayName: { text: "Outside" },
+          location: { latitude: 40.72, longitude: -74.006 },
+        },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  };
+
+  const result = await handleGoogleQ5PlacesProxy(
+    { lat: 40.7128, lng: -74.006, radius_meters: 100, filters: {} },
+    { fetch, googleApiKey: "google-secret" },
+  );
+
+  const requestBody = JSON.parse(calls[0].init?.body as string);
+  assertEquals(requestBody.locationRestriction.circle.radius, 115);
+  assertEquals(result.places, [{ place_id: "inside", display_name: "Inside" }]);
+  const serialized = JSON.stringify(result);
+  assertEquals(serialized.includes("location"), false);
+  assertEquals(serialized.includes("Outside"), false);
+});
+
+Deno.test("google q5 — overfetch expansion is capped at 805 meters", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fetch: ProxyDeps["fetch"] = (input, init) => {
+    calls.push({ url: String(input), init });
+    return Promise.resolve(new Response(JSON.stringify({ places: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+  };
+
+  await handleGoogleQ5PlacesProxy(
+    { lat: 40.7128, lng: -74.006, radius_meters: 10_000, filters: {} },
+    { fetch, googleApiKey: "google-secret" },
+  );
+
+  const requestBody = JSON.parse(calls[0].init?.body as string);
+  assertEquals(requestBody.locationRestriction.circle.radius, 10_805);
 });
 
 Deno.test("google q5 — retries one transient failure then fails closed", async () => {

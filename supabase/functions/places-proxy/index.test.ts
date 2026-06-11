@@ -145,6 +145,7 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
       places: [{
         id: "google-1",
         displayName: { text: "Only Name" },
+        location: { latitude: 1.0, longitude: 2.0 },
         rating: 4.7,
         formattedAddress: "Hidden address",
       }],
@@ -182,8 +183,16 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
       render: "text",
       text: "Powered by Google",
     },
+    overfetch_telemetry: {
+      committed_radius_meters: 100,
+      provider_radius_meters: 115,
+      pre_trim_count: 1,
+      post_trim_count: 1,
+      trimmed_count: 0,
+    },
   });
   const serialized = JSON.stringify(body);
   assertEquals(serialized.includes("rating"), false);
   assertEquals(serialized.includes("Hidden address"), false);
+  assertEquals(serialized.includes("location"), false);
 });

@@ -1,6 +1,6 @@
-// HTTP-layer tests for the no-survivor terminal + widen-radius
-// re-run (TB-09). Lives alongside `index.test.ts` and shares its
-// in-memory adapter style.
+// HTTP-layer tests for the no-survivor terminal and locked Search area
+// behavior. Lives alongside `index.test.ts` and shares its in-memory
+// adapter style.
 
 import {
   assert,
@@ -174,14 +174,10 @@ Deno.test("compute-verdict — no-survivor rule_text never names a person", asyn
 });
 
 // ───────────────────────────────────────────────────────────────────────
-// Widen-radius re-run — bypasses idempotency, replaces existing verdict
+// Locked Search area — radius mutation is rejected
 // ───────────────────────────────────────────────────────────────────────
 
-Deno.test("compute-verdict — widen-radius re-run replaces an existing no_survivor verdict", async () => {
-  // The existing verdict is a no-survivor row at the default radius.
-  // The widen re-run posts with `radius_meters_override` and the
-  // candidate is now within reach. The handler must drop the prior
-  // verdict + cuts and compute a fresh one.
+Deno.test("compute-verdict — radius override on an active Room is rejected", async () => {
   const existing: VerdictRow = {
     id: "v-old",
     room_id: VALID_ROOM_ID,
@@ -215,29 +211,18 @@ Deno.test("compute-verdict — widen-radius re-run replaces an existing no_survi
     ],
     roomMeta: { radius_meters: 805 }, // 0.5 mi — too tight for the candidate
   });
-  // First widen — request 3.0 mi (4828 m).
   const res = await handleRequest(
     authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 4828 }),
     { env: envOk(), buildDataAdapter: () => adapter },
   );
-  assertEquals(res.status, 200);
+  assertEquals(res.status, 409);
   const body = await res.json();
-  // The prior no_survivor row should be deleted; a fresh manual
-  // verdict inserted.
-  assertEquals(deletedVerdictRoomIds, [VALID_ROOM_ID],
-    "widen re-run must drop the prior no_survivor verdict");
-  assertEquals(inserts.length, 1);
-  assertEquals(inserts[0].method, "manual");
-  assertEquals(inserts[0].option_id, "opt-stretch");
-  assertEquals(body.verdict.method, "manual");
-  assertEquals(body.verdict.option_id, "opt-stretch");
+  assertEquals(body.error, "search_area_locked");
+  assertEquals(deletedVerdictRoomIds.length, 0);
+  assertEquals(inserts.length, 0);
 });
 
-Deno.test("compute-verdict — widen-radius re-run preserves a successful verdict (idempotent on hit)", async () => {
-  // A manual verdict already exists. Even with `radius_meters_override`,
-  // the handler must NOT replace a successful verdict — only no_survivor
-  // verdicts are replaceable via widen. This defends against a duplicate
-  // "Widen radius" tap after the engine has already produced a winner.
+Deno.test("compute-verdict — radius override does not replace a successful verdict", async () => {
   const existing: VerdictRow = {
     id: "v-old",
     room_id: VALID_ROOM_ID,
@@ -265,29 +250,16 @@ Deno.test("compute-verdict — widen-radius re-run preserves a successful verdic
     authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 4828 }),
     { env: envOk(), buildDataAdapter: () => adapter },
   );
-  assertEquals(res.status, 200);
+  assertEquals(res.status, 409);
   const body = await res.json();
-  assertEquals(body.already_computed, true);
-  assertEquals(body.verdict.id, "v-old");
+  assertEquals(body.error, "search_area_locked");
   assertEquals(deletedVerdictRoomIds.length, 0,
-    "an existing successful verdict must not be replaced by a widen request");
+    "an existing successful verdict must not be replaced by a radius override");
   assertEquals(inserts.length, 0);
 });
 
-Deno.test("compute-verdict — widen-radius override clamped to the 10 mi product cap", async () => {
-  // The S05 slider exposes 1..10 mi. The handler must clamp absurd
-  // values defensively rather than handing the engine a 100-mi
-  // radius and surveying half the state.
-  const existing: VerdictRow = {
-    id: "v-old",
-    room_id: VALID_ROOM_ID,
-    option_id: null,
-    method: "no_survivor",
-    rule_text: "previous",
-    computed_at: "2026-05-13T00:00:00Z",
-  };
+Deno.test("compute-verdict — active Room keeps committed radius when no override is supplied", async () => {
   const { adapter, inserts } = memoryAdapter({
-    existing,
     options: [
       {
         id: "opt-x",
@@ -305,49 +277,14 @@ Deno.test("compute-verdict — widen-radius override clamped to the 10 mi produc
     ],
     roomMeta: { radius_meters: 805 },
   });
-  // Ask for 100 mi. The handler should clamp to 10 mi (16093 m),
-  // which still doesn't seat the 18.6-mi candidate.
   const res = await handleRequest(
-    authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 160000 }),
+    authedPost({ room_id: VALID_ROOM_ID }),
     { env: envOk(), buildDataAdapter: () => adapter },
   );
   assertEquals(res.status, 200);
   const body = await res.json();
   assertEquals(body.verdict.method, "no_survivor",
-    "clamped widen still can't reach a 18.6-mi candidate — surface stays terminal");
+    "candidate outside the committed Search area cannot be seated");
   assertEquals(inserts.length, 1);
   assertEquals(inserts[0].method, "no_survivor");
-});
-
-Deno.test("compute-verdict — widen-radius re-run reads room radius and re-runs at the override", async () => {
-  // Defensive: when no prior verdict exists (the engine hasn't fired
-  // yet) but the caller posts with a widen override, the handler
-  // should still honour the override — not treat it as an error.
-  const { adapter, inserts } = memoryAdapter({
-    options: [
-      {
-        id: "opt-stretch",
-        payload: { name: "Stretch", price_tier: 2, distance_meters: 2414 },
-      },
-    ],
-    votes: [
-      {
-        user_id: "u1",
-        display_name: "you",
-        q1_vetoes: [],
-        q2_budget: 4,
-        hard_vetoes: [], scores: { "opt-stretch": 5 },
-      },
-    ],
-    roomMeta: { radius_meters: 805 },
-  });
-  const res = await handleRequest(
-    authedPost({ room_id: VALID_ROOM_ID, radius_meters_override: 4828 }),
-    { env: envOk(), buildDataAdapter: () => adapter },
-  );
-  assertEquals(res.status, 200);
-  const body = await res.json();
-  assertEquals(body.verdict.method, "manual");
-  assertEquals(body.verdict.option_id, "opt-stretch");
-  assertEquals(inserts.length, 1);
 });

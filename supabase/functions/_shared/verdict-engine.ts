@@ -65,8 +65,8 @@ export interface CandidateOption {
    *  "Sushi Restaurant"). Used to match cuisine-NEVER hard vetoes and
    *  for diagnostic rule text. */
   categories: string[];
-  /** Distance from the room's search centre, in meters. Used by the
-   *  empty-floor cascade's radius-widen step. Optional â€” when the
+  /** Distance from the room's search centre, in meters. Used only as
+   *  a hard Search area eligibility boundary. Optional â€” when the
    *  caller pre-filtered the pool to the radius it can be omitted and
    *  the radius gate is a no-op. */
   distance_meters?: number | null;
@@ -164,12 +164,12 @@ export interface VerdictEngineInput {
    *  0.1.0-quiz-amendments Â§4). Tunable post-cohort. */
   satisficing_threshold?: number;
   /** Initial room radius in meters. When supplied (with candidate
-   *  `distance_meters`), the EBA prune gates on it and the empty-floor
-   *  cascade may widen it. Omitting it (and `radius_meters_cap`) turns
-   *  the radius gate off â€” the caller pre-filtered the pool. */
+   *  `distance_meters`), the engine treats it as the locked Search area
+   *  boundary. Omitting it turns the radius gate off â€” the caller
+   *  pre-filtered the pool. */
   radius_meters?: number;
-  /** Upper bound for the radius-widen cascade step. Defaults to 8047 m
-   *  (5.0 mi â€” the S01 slider ceiling). */
+  /** Deprecated. Radius is locked for active Rooms. Kept for older
+   *  call sites that still pass the field. */
   radius_meters_cap?: number;
   /** Option ids to remove from the candidate pool BEFORE pruning.
    *  Populated by `avail`-reason rerolls. */
@@ -204,7 +204,7 @@ export interface VoiceReceipt {
 /** Canonical empty-floor cascade step labels, in the order the engine
  *  applies them. Kept on the module surface so iOS / web / QA share one
  *  vocabulary for the cascade. */
-export const RELAX_STEPS = ["threshold", "radius_widen"] as const;
+export const RELAX_STEPS = ["threshold"] as const;
 export type RelaxStep = typeof RELAX_STEPS[number];
 
 export interface VerdictEngineOutput {
@@ -255,12 +255,6 @@ const MIN_THRESHOLD = 1;
 
 /** Step the cascade relaxes T by on each iteration. */
 const THRESHOLD_RELAX_STEP = 1;
-
-/** Default radius cap when the caller omits it (5.0 mi â‰ˆ 8047 m). */
-const DEFAULT_RADIUS_CAP_METERS = 8047;
-
-/** Radius widen step â€” 0.5 mi â‰ˆ 805 m. */
-const RADIUS_WIDEN_STEP_METERS = 805;
 
 /** Defensive bound on the cascade loop. */
 const MAX_CASCADE_ITERS = 64;
@@ -333,7 +327,6 @@ export function computeVerdict(
 
   const initialThreshold = input.satisficing_threshold ?? DEFAULT_SATISFICING_THRESHOLD;
   const initialRadius = input.radius_meters ?? null;
-  const radiusCap = input.radius_meters_cap ?? DEFAULT_RADIUS_CAP_METERS;
 
   // â”€â”€ Step 1 â€” EBA prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Hard vetoes never relax. The EBA pass is run once; its survivors
@@ -350,38 +343,37 @@ export function computeVerdict(
     });
   }
 
-  // Score every EBA survivor for every member, once. Scoring is pure
+  const searchAreaResult = searchAreaPrune(ebaResult.survivors, initialRadius);
+  if (searchAreaResult.survivors.length === 0) {
+    return buildNoSurvivorOutput({
+      votes,
+      relaxChainApplied: [],
+      radiusMetersUsed: initialRadius,
+      thresholdUsed: null,
+    });
+  }
+
+  // Score every Search area survivor for every member, once. Scoring is pure
   // and deterministic, so the cascade re-uses this matrix.
-  const scored = scoreCandidates(ebaResult.survivors, votes);
+  const scored = scoreCandidates(searchAreaResult.survivors, votes);
 
   // â”€â”€ Steps 3-6 â€” satisficing floor + maximin + cascade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let threshold = initialThreshold;
-  let radius = initialRadius;
   const relaxChain: RelaxStep[] = [];
 
   for (let iter = 0; iter < MAX_CASCADE_ITERS; iter++) {
-    // Radius gate â€” applied inside the cascade because the radius-widen
-    // step mutates it. A candidate with no distance metadata always
-    // passes (the caller pre-filtered).
-    const inRadius = radius === null
-      ? scored
-      : scored.filter((s) =>
-        s.candidate.distance_meters == null ||
-        s.candidate.distance_meters <= radius!
-      );
-
     // Satisficing floor â€” keep venues every member scores >= threshold.
-    const floorSurvivors = inRadius.filter((s) => s.minScore >= threshold);
+    const floorSurvivors = scored.filter((s) => s.minScore >= threshold);
 
     if (floorSurvivors.length > 0) {
       return seatWinner({
         floorSurvivors,
         allScored: scored,
-        ebaCuts: ebaResult.cuts,
+        ebaCuts: [...ebaResult.cuts, ...searchAreaResult.cuts],
         votes,
         method: input.method ?? "manual",
         threshold,
-        radiusMetersUsed: radius,
+        radiusMetersUsed: initialRadius,
         relaxChain,
         random,
         rerollReason: input.reroll_reason,
@@ -389,16 +381,11 @@ export function computeVerdict(
       });
     }
 
-    // Empty floor â€” relax in canonical order: threshold first, radius
-    // second.
+    // Empty floor â€” relax the acceptability threshold only. The
+    // committed Search area never widens inside an active Room.
     if (threshold > MIN_THRESHOLD) {
       threshold = Math.max(MIN_THRESHOLD, threshold - THRESHOLD_RELAX_STEP);
       relaxChain.push("threshold");
-      continue;
-    }
-    if (radius !== null && radius < radiusCap) {
-      radius = Math.min(radius + RADIUS_WIDEN_STEP_METERS, radiusCap);
-      relaxChain.push("radius_widen");
       continue;
     }
 
@@ -409,7 +396,7 @@ export function computeVerdict(
   return buildNoSurvivorOutput({
     votes,
     relaxChainApplied: relaxChain,
-    radiusMetersUsed: radius,
+    radiusMetersUsed: initialRadius,
     thresholdUsed: null,
   });
 }
@@ -530,6 +517,30 @@ function ebaPrune(
     survivors.push(c);
   }
 
+  return { survivors, cuts };
+}
+
+function searchAreaPrune(
+  candidates: CandidateOption[],
+  radiusMeters: number | null,
+): EbaResult {
+  if (radiusMeters === null) return { survivors: candidates, cuts: [] };
+  const survivors: CandidateOption[] = [];
+  const cuts: OptionCut[] = [];
+  for (const candidate of candidates) {
+    if (
+      candidate.distance_meters != null &&
+      candidate.distance_meters > radiusMeters
+    ) {
+      cuts.push({
+        option_id: candidate.id,
+        cut_reason: "radius",
+        cut_text: "outside the search area",
+      });
+      continue;
+    }
+    survivors.push(candidate);
+  }
   return { survivors, cuts };
 }
 
@@ -748,12 +759,6 @@ function buildRuleText(args: {
     parts.push(
       `${args.winner.name} was the only spot the whole group was OK with.`,
     );
-  }
-
-  // Surface the cascade honestly when it fired â€” the relax is recorded
-  // for observability even though it is silent on the surface.
-  if (args.relaxChain.includes("radius_widen")) {
-    parts.push("The search radius was widened to find it.");
   }
 
   return parts.join(" ");
