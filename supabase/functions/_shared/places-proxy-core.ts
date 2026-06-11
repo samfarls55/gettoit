@@ -54,6 +54,7 @@ export interface ProxyDeps {
   cache: CacheAdapter;
   fetch: FetchFn;
   apiKey: string;
+  googleApiKey?: string;
   /** Time-source override for deterministic tests. */
   now?: () => Date;
   /** Hot-zone TTL â€” applied when the cached row has the
@@ -89,9 +90,33 @@ export interface ProxyResponse {
   error?: string;
 }
 
+export interface GoogleQ5Place {
+  place_id: string;
+  display_name: string;
+}
+
+export interface GoogleAttributionPayload {
+  provider: "google";
+  render: "text";
+  text: "Powered by Google";
+}
+
+export interface GoogleQ5Response {
+  places: GoogleQ5Place[];
+  attribution: GoogleAttributionPayload;
+}
+
+export type PlacesProxyResponse = ProxyResponse | GoogleQ5Response;
+
 /** Returned when validation rejects the input. */
 export class PlacesProxyInputError extends Error {
   status = 400;
+}
+
+export class GooglePlacesGuardrailError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+  }
 }
 
 /** Returned when Foursquare returns a non-2xx the proxy doesn't handle. */
@@ -157,6 +182,11 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     lat, lng, radius_meters: radius,
     filters: { dietary, price_tier, open_at, cuisine },
   };
+}
+
+export function isGoogleQ5Input(raw: unknown): boolean {
+  return !!raw && typeof raw === "object" &&
+    (raw as Record<string, unknown>).surface === "q5";
 }
 
 function ttlForRow(_row: CacheRow, deps: ProxyDeps): number {
@@ -272,5 +302,101 @@ export async function handlePlacesProxy(
     disclaimers: plan.post_filters.disclaimers,
     is_thin: places.length < THIN_RESULTS_THRESHOLD,
     served_from_cache: false,
+  };
+}
+
+const GOOGLE_NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby";
+export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
+export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName";
+export const GOOGLE_Q5_MAX_RESULTS = 20;
+
+type GoogleNearbySearchResponse = {
+  places?: Array<{
+    id?: unknown;
+    displayName?: { text?: unknown };
+  }>;
+};
+
+export async function handleGoogleQ5PlacesProxy(
+  input: PlacesProxyInput,
+  deps: Pick<ProxyDeps, "fetch" | "googleApiKey">,
+): Promise<GoogleQ5Response> {
+  if (!deps.googleApiKey) {
+    throw new GooglePlacesGuardrailError(
+      "google_places_misconfigured",
+      "GOOGLE_PLACES_API_KEY is not set",
+    );
+  }
+
+  const response = await fetchGoogleNearbyWithRetry(input, deps);
+  if (!response.ok) {
+    throw new GooglePlacesGuardrailError(
+      `google_places_upstream_${response.status}`,
+      `Google Places returned ${response.status}`,
+    );
+  }
+
+  const body = (await response.json()) as GoogleNearbySearchResponse;
+  const places = (body.places ?? [])
+    .map((place): GoogleQ5Place | null => {
+      if (
+        typeof place.id !== "string" ||
+        typeof place.displayName?.text !== "string"
+      ) {
+        return null;
+      }
+      return {
+        place_id: place.id,
+        display_name: place.displayName.text,
+      };
+    })
+    .filter((place): place is GoogleQ5Place => place !== null);
+
+  return {
+    places,
+    attribution: {
+      provider: "google",
+      render: "text",
+      text: "Powered by Google",
+    },
+  };
+}
+
+async function fetchGoogleNearbyWithRetry(
+  input: PlacesProxyInput,
+  deps: Pick<ProxyDeps, "fetch" | "googleApiKey">,
+): Promise<Response> {
+  const init = buildGoogleQ5Request(input, deps.googleApiKey ?? "");
+  let response = await deps.fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+  if (response.status === 429 || response.status >= 500) {
+    response = await deps.fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+  }
+  return response;
+}
+
+function buildGoogleQ5Request(
+  input: PlacesProxyInput,
+  apiKey: string,
+): RequestInit {
+  return {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": GOOGLE_Q5_FIELD_MASK,
+    },
+    body: JSON.stringify({
+      includedPrimaryTypes: ["restaurant"],
+      maxResultCount: GOOGLE_Q5_MAX_RESULTS,
+      locationRestriction: {
+        circle: {
+          center: {
+            latitude: input.lat,
+            longitude: input.lng,
+          },
+          radius: input.radius_meters,
+        },
+      },
+    }),
   };
 }

@@ -83,6 +83,7 @@ Deno.serve((req) =>
   handleRequest(req, {
     env: {
       FOURSQUARE_API_KEY: Deno.env.get("FOURSQUARE_API_KEY"),
+      GOOGLE_PLACES_API_KEY: Deno.env.get("GOOGLE_PLACES_API_KEY"),
       SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
       SUPABASE_SERVICE_ROLE_KEY: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
     },

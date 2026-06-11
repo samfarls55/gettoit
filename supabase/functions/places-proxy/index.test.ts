@@ -24,6 +24,7 @@ function memoryCache(): CacheAdapter {
 function envOk() {
   return {
     FOURSQUARE_API_KEY: "test-key",
+    GOOGLE_PLACES_API_KEY: "google-key",
     SUPABASE_URL: "https://example.supabase.co",
     SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
   };
@@ -133,4 +134,54 @@ Deno.test("handleRequest — happy path returns shaped places", async () => {
   assertEquals(body.places.length, 1);
   assertEquals(body.places[0].fsq_place_id, "fsq-1");
   assertEquals(body.is_thin, true); // 1 < THIN_RESULTS_THRESHOLD
+});
+
+Deno.test("handleRequest — q5 uses Google name-only contract and ignores client field masks", async () => {
+  const fetchCalls: { url: string; init?: RequestInit }[] = [];
+  const stubFetch = (url: string | URL, init?: RequestInit) => {
+    fetchCalls.push({ url: String(url), init });
+    return Promise.resolve(new Response(JSON.stringify({
+      places: [{
+        id: "google-1",
+        displayName: { text: "Only Name" },
+        rating: 4.7,
+        formattedAddress: "Hidden address",
+      }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  };
+
+  const res = await handleRequest(
+    new Request("https://example/places-proxy", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        surface: "q5",
+        field_mask: "places.rating,places.formattedAddress",
+        lat: 1.0,
+        lng: 2.0,
+        radius_meters: 100,
+      }),
+    }),
+    {
+      env: { ...envOk(), FOURSQUARE_API_KEY: "" },
+      buildCacheAdapter: memoryCache,
+      fetch: stubFetch as typeof fetch,
+    },
+  );
+
+  assertEquals(res.status, 200);
+  const headers = fetchCalls[0].init?.headers as Record<string, string>;
+  assertEquals(headers["X-Goog-FieldMask"], "places.id,places.displayName");
+  const body = await res.json();
+  assertEquals(body, {
+    places: [{ place_id: "google-1", display_name: "Only Name" }],
+    attribution: {
+      provider: "google",
+      render: "text",
+      text: "Powered by Google",
+    },
+  });
+  const serialized = JSON.stringify(body);
+  assertEquals(serialized.includes("rating"), false);
+  assertEquals(serialized.includes("Hidden address"), false);
 });

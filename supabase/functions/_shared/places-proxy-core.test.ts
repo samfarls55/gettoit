@@ -15,6 +15,9 @@ import {
   type CacheAdapter,
   type CacheRow,
   FoursquareUpstreamError,
+  GOOGLE_Q5_FIELD_MASK,
+  GooglePlacesGuardrailError,
+  handleGoogleQ5PlacesProxy,
   handlePlacesProxy,
   isCacheRowFresh,
   PlacesProxyInputError,
@@ -171,6 +174,110 @@ const TYPICAL_INPUT: PlacesProxyInput = {
   radius_meters: 1600,
   filters: { dietary: ["halal"] },
 };
+
+// ---------------------------------------------------------------------------
+// Google Q5 name-only contract.
+// ---------------------------------------------------------------------------
+
+Deno.test("google q5 — owns field mask and returns name-only places with attribution", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fetch: ProxyDeps["fetch"] = (input, init) => {
+    calls.push({ url: String(input), init });
+    return Promise.resolve(new Response(JSON.stringify({
+      places: [
+        {
+          id: "google-place-1",
+          displayName: { text: "Pico's" },
+          formattedAddress: "1 Main St",
+          rating: 4.8,
+          regularOpeningHours: { openNow: true },
+          photos: [{ name: "photo-1" }],
+          googleMapsUri: "https://maps.google.example/picos",
+          generativeSummary: { overview: { text: "summary" } },
+          reviewSummary: { text: "review summary" },
+        },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+  };
+
+  const result = await handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
+    fetch,
+    googleApiKey: "google-secret",
+  });
+
+  assertEquals(calls.length, 1);
+  assertEquals(calls[0].url, "https://places.googleapis.com/v1/places:searchNearby");
+  const headers = calls[0].init?.headers as Record<string, string>;
+  assertEquals(headers["X-Goog-Api-Key"], "google-secret");
+  assertEquals(headers["X-Goog-FieldMask"], GOOGLE_Q5_FIELD_MASK);
+  assertEquals(headers["Content-Type"], "application/json");
+  const requestBody = JSON.parse(calls[0].init?.body as string);
+  assertEquals(requestBody.locationRestriction.circle.center.latitude, 40.7128);
+  assertEquals(requestBody.locationRestriction.circle.center.longitude, -74.006);
+  assertEquals(requestBody.locationRestriction.circle.radius, 1600);
+
+  assertEquals(result, {
+    places: [{ place_id: "google-place-1", display_name: "Pico's" }],
+    attribution: {
+      provider: "google",
+      render: "text",
+      text: "Powered by Google",
+    },
+  });
+  const serialized = JSON.stringify(result);
+  for (
+    const forbidden of [
+      "formattedAddress",
+      "rating",
+      "regularOpeningHours",
+      "photos",
+      "googleMapsUri",
+      "generativeSummary",
+      "reviewSummary",
+      "google-secret",
+      "summary",
+    ]
+  ) {
+    assertEquals(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+Deno.test("google q5 — retries one transient failure then fails closed", async () => {
+  const calls: Response[] = [
+    new Response("temporary", { status: 503 }),
+    new Response("still down", { status: 503 }),
+  ];
+  let callCount = 0;
+  const fetch: ProxyDeps["fetch"] = () => Promise.resolve(calls[callCount++]);
+
+  await assertRejects(
+    () =>
+      handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
+        fetch,
+        googleApiKey: "google-secret",
+      }),
+    GooglePlacesGuardrailError,
+    "Google Places returned 503",
+  );
+  assertEquals(callCount, 2);
+});
+
+Deno.test("google q5 — missing API key fails closed before fetch", async () => {
+  let called = false;
+  await assertRejects(
+    () =>
+      handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
+        fetch: () => {
+          called = true;
+          return Promise.resolve(new Response("{}"));
+        },
+        googleApiKey: "",
+      }),
+    GooglePlacesGuardrailError,
+    "GOOGLE_PLACES_API_KEY",
+  );
+  assertEquals(called, false);
+});
 
 // ---------------------------------------------------------------------------
 // Cache hit / miss / write.

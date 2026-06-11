@@ -9,7 +9,10 @@
 import {
   type CacheAdapter,
   FoursquareUpstreamError,
+  GooglePlacesGuardrailError,
+  handleGoogleQ5PlacesProxy,
   handlePlacesProxy,
+  isGoogleQ5Input,
   PlacesProxyInputError,
   validateInput,
 } from "../_shared/places-proxy-core.ts";
@@ -17,6 +20,8 @@ import {
 export interface HandlerEnv {
   /** Foursquare service key — server-only secret. */
   FOURSQUARE_API_KEY?: string;
+  /** Google Places service key — server-only secret. */
+  GOOGLE_PLACES_API_KEY?: string;
   /** Supabase project URL — present on every Edge invocation. */
   SUPABASE_URL?: string;
   /** Supabase service-role key — bypasses RLS for cache writes. */
@@ -78,15 +83,6 @@ export async function handleRequest(
     });
   }
 
-  const apiKey = deps.env.FOURSQUARE_API_KEY ?? "";
-  if (!apiKey) {
-    console.error("FOURSQUARE_API_KEY is not set on the Edge Function");
-    return jsonResponse({ error: "places_proxy_misconfigured" }, {
-      status: 500,
-      headers: corsHeaders(),
-    });
-  }
-
   const supabaseUrl = deps.env.SUPABASE_URL ?? "";
   const serviceRoleKey = deps.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   if (!supabaseUrl || !serviceRoleKey) {
@@ -120,16 +116,35 @@ export async function handleRequest(
     throw e;
   }
 
-  const cache = deps.buildCacheAdapter(deps.env);
+  if (!isGoogleQ5Input(body) && !deps.env.FOURSQUARE_API_KEY) {
+    console.error("FOURSQUARE_API_KEY is not set on the Edge Function");
+    return jsonResponse({ error: "places_proxy_misconfigured" }, {
+      status: 500,
+      headers: corsHeaders(),
+    });
+  }
 
   try {
-    const result = await handlePlacesProxy(input, {
-      cache,
-      fetch: deps.fetch ?? globalThis.fetch.bind(globalThis),
-      apiKey,
-    });
+    const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
+    const result = isGoogleQ5Input(body)
+      ? await handleGoogleQ5PlacesProxy(input, {
+        fetch,
+        googleApiKey: deps.env.GOOGLE_PLACES_API_KEY ?? "",
+      })
+      : await handlePlacesProxy(input, {
+        cache: deps.buildCacheAdapter(deps.env),
+        fetch,
+        apiKey: deps.env.FOURSQUARE_API_KEY ?? "",
+      });
     return jsonResponse(result, { headers: corsHeaders() });
   } catch (e) {
+    if (e instanceof GooglePlacesGuardrailError) {
+      console.error("Google Places Q5 guardrail:", e.code);
+      return jsonResponse({ error: e.code }, {
+        status: 200,
+        headers: corsHeaders(),
+      });
+    }
     if (e instanceof FoursquareUpstreamError && e.status === 410) {
       console.error("Foursquare 410:", e.message);
       return jsonResponse({
