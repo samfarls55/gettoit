@@ -22,6 +22,10 @@ export function VerdictScreen({
   onWidenAndRerun = async () => undefined,
   verdict,
 }: VerdictScreenProps) {
+  if (verdict.kind === "history") {
+    return <HistoryVerdict verdict={verdict} />;
+  }
+
   if (verdict.kind === "noSurvivor") {
     return (
       <NoSurvivorVerdict
@@ -155,6 +159,10 @@ type NoSurvivorVerdictProps = {
   verdict: Extract<VerdictViewModel, { kind: "noSurvivor" }>;
 };
 
+type HistoryVerdictProps = {
+  verdict: Extract<VerdictViewModel, { kind: "history" }>;
+};
+
 function radiusLabel(radiusMiles: number): string {
   return `${radiusMiles.toFixed(1)} mi`;
 }
@@ -258,6 +266,53 @@ function NoSurvivorVerdict({
   );
 }
 
+function HistoryVerdict({ verdict }: HistoryVerdictProps) {
+  return (
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.verdictContent}
+    >
+      <VerdictBackdrop />
+      <View style={styles.topbar}>
+        <View style={styles.liveChip}>
+          <Text style={styles.liveChipText}>Verdict record</Text>
+        </View>
+      </View>
+
+      <View style={styles.poster}>
+        <Text style={styles.posterKicker}>{verdict.decidedAtLabel}</Text>
+        <Text style={styles.historyPlanName}>{verdict.planName}</Text>
+        <Text
+          accessibilityLabel={verdict.display.placeName}
+          style={styles.venueTitle}
+        >
+          {stackedPlaceName(verdict.display.placeName)}
+        </Text>
+        {verdict.display.status === "available" &&
+        verdict.display.formattedAddress ? (
+          <Text style={styles.metaLine}>{verdict.display.formattedAddress}</Text>
+        ) : null}
+        {verdict.display.status === "available" ? (
+          <>
+            <Text style={styles.mapsLink}>{verdict.display.googleMapsUri}</Text>
+            <Text style={styles.attribution}>
+              {verdict.display.attributionText}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.recordCopy}>{verdict.display.details}</Text>
+        )}
+      </View>
+
+      <View style={styles.actionStack}>
+        <Pressable accessibilityRole="button" style={styles.primaryButton}>
+          <Text style={styles.primaryButtonLabel}>Start a new decision</Text>
+        </Pressable>
+      </View>
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -355,6 +410,11 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     lineHeight: 42,
     marginTop: mobileTokens.spacing[3],
+  },
+  historyPlanName: {
+    color: mobileTokens.color.paper,
+    fontSize: mobileTokens.typography.body.size,
+    fontWeight: "800",
   },
   metaLine: {
     color: mobileTokens.color.textSecondaryOnGradient,

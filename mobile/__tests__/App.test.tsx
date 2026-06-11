@@ -221,6 +221,9 @@ function makeVerdictRepository(
       if (verdict.kind === "noSurvivor") {
         return { ...verdict, roomId };
       }
+      if (verdict.kind === "history") {
+        return { ...verdict, roomId };
+      }
 
       return {
         ...verdict,
@@ -235,6 +238,19 @@ function makeVerdictRepository(
           flavor === "solo" ? "Save taste profile" : verdict.primaryActionLabel,
       };
     }),
+    loadHistoryVerdict: jest.fn(async ({ roomId }) => ({
+      kind: "history" as const,
+      roomId,
+      planName: "Taco crawl",
+      decidedAtLabel: "Decided Jun 4",
+      display: {
+        status: "available" as const,
+        placeName: "Pico's Taqueria",
+        formattedAddress: "1 Main St",
+        googleMapsUri: "https://maps.google.example/picos",
+        attributionText: "Powered by Google",
+      },
+    })),
     reroll: jest.fn(async () => undefined),
     widenAndRerun: jest.fn(async () => undefined),
   };
@@ -549,8 +565,8 @@ describe("App", () => {
     fireEvent.press(screen.getByLabelText("Open History Plan Taco crawl"));
 
     await waitFor(() => {
-      expect(verdictRepository.loadVerdict).toHaveBeenCalledWith({
-        roomId: "history-taco-crawl",
+      expect(verdictRepository.loadHistoryVerdict).toHaveBeenCalledWith({
+        roomId: "room-history-taco-crawl",
         flavor: "group",
       });
       expect(screen.getByText("Verdict record")).toBeOnTheScreen();
@@ -1092,7 +1108,7 @@ describe("App", () => {
       expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
         "https://gettoit.example/join/decided-room",
       );
-      expect(verdictRepository.loadVerdict).toHaveBeenCalledWith({
+      expect(verdictRepository.loadHistoryVerdict).toHaveBeenCalledWith({
         roomId: "decided-room",
         flavor: "group",
       });

@@ -357,6 +357,161 @@ export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK = [
   "formattedAddress",
 ].join(",");
 
+export const GOOGLE_OUTCOME_LABELS = [
+  "q5_rated",
+  "q5_unrated_exit",
+  "verdict_accepted",
+  "verdict_rerolled",
+  "verdict_skipped",
+  "verdict_abandoned",
+] as const;
+
+export const GOOGLE_OPERATIONAL_RECEIPT_CODES = [
+  "place_unavailable",
+  "refetch_failed",
+  "quota_exhausted",
+  "budget_exhausted",
+  "cost_guardrail_blocked",
+  "overfetch_trimmed",
+] as const;
+
+export const GOOGLE_REASON_CODES = [
+  "selected_cuisine_keep_feasible",
+  "selected_contrast_pool",
+  "selected_vibe_band_edge",
+  "selected_crowd_quality_floor",
+  "wrong_vibe",
+  "too_expensive",
+  "place_unavailable",
+  "refetch_failed",
+] as const;
+
+export type GoogleOutcomeLabel = typeof GOOGLE_OUTCOME_LABELS[number];
+export type GoogleOperationalReceiptCode =
+  typeof GOOGLE_OPERATIONAL_RECEIPT_CODES[number];
+export type GoogleReasonCode = typeof GOOGLE_REASON_CODES[number];
+type GoogleObservabilityRedactionOptions = {
+  allowGooglePlaceIds?: boolean;
+};
+
+const GOOGLE_DISPLAY_CONTENT_REDACTION = "[redacted_google_display_content]";
+const GOOGLE_PLACE_ID_REDACTION = "[redacted_google_place_id]";
+
+const GOOGLE_OBSERVABILITY_FORBIDDEN_KEYS = new Set([
+  "display_name",
+  "displayName",
+  "name",
+  "formatted_address",
+  "formattedAddress",
+  "address",
+  "google_maps_uri",
+  "googleMapsUri",
+  "maps_uri",
+  "rating",
+  "hours",
+  "currentOpeningHours",
+  "regularOpeningHours",
+  "price",
+  "atmosphere",
+  "types",
+  "photos",
+  "raw_payload",
+  "rawPayload",
+  "generativeSummary",
+  "reviewSummary",
+  "summary",
+]);
+
+const GOOGLE_PLACE_ID_KEYS = new Set([
+  "place_id",
+  "placeId",
+  "google_place_id",
+  "googlePlaceId",
+]);
+
+function isStringInList<TValue extends string>(
+  value: unknown,
+  values: readonly TValue[],
+): value is TValue {
+  return typeof value === "string" && values.includes(value as TValue);
+}
+
+export function isGoogleOutcomeLabel(value: unknown): value is GoogleOutcomeLabel {
+  return isStringInList(value, GOOGLE_OUTCOME_LABELS);
+}
+
+export function isGoogleOperationalReceiptCode(
+  value: unknown,
+): value is GoogleOperationalReceiptCode {
+  return isStringInList(value, GOOGLE_OPERATIONAL_RECEIPT_CODES);
+}
+
+export function isGoogleReasonCode(value: unknown): value is GoogleReasonCode {
+  return isStringInList(value, GOOGLE_REASON_CODES);
+}
+
+export function assertGoogleReasonCode(value: unknown): GoogleReasonCode {
+  if (!isGoogleReasonCode(value)) {
+    throw new PlacesProxyInputError("reason_code must be controlled app-authored code");
+  }
+
+  return value;
+}
+
+export function redactGoogleObservabilityValue(
+  value: unknown,
+  options: GoogleObservabilityRedactionOptions = {},
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactGoogleObservabilityValue(item, options));
+  }
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const redacted: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (GOOGLE_OBSERVABILITY_FORBIDDEN_KEYS.has(key)) {
+      redacted[key] = GOOGLE_DISPLAY_CONTENT_REDACTION;
+      continue;
+    }
+    if (GOOGLE_PLACE_ID_KEYS.has(key) && !options.allowGooglePlaceIds) {
+      redacted[key] = GOOGLE_PLACE_ID_REDACTION;
+      continue;
+    }
+    redacted[key] = redactGoogleObservabilityValue(entryValue, options);
+  }
+
+  return redacted;
+}
+
+export function buildGoogleOverfetchTelemetry(input: {
+  committedRadiusMeters: number;
+  providerRadiusMeters: number;
+  beforeTrimCount: number;
+  afterTrimCount: number;
+  trimReasonCounts: Record<string, number>;
+}): {
+  committed_radius_meters: number;
+  provider_radius_meters: number;
+  overfetch_delta_meters: number;
+  before_trim_count: number;
+  after_trim_count: number;
+  trim_reason_counts: Record<string, number>;
+} {
+  return {
+    committed_radius_meters: input.committedRadiusMeters,
+    provider_radius_meters: input.providerRadiusMeters,
+    overfetch_delta_meters: Math.max(
+      0,
+      input.providerRadiusMeters - input.committedRadiusMeters,
+    ),
+    before_trim_count: input.beforeTrimCount,
+    after_trim_count: input.afterTrimCount,
+    trim_reason_counts: { ...input.trimReasonCounts },
+  };
+}
+
 type GoogleNearbySearchResponse = {
   places?: Array<{
     id?: unknown;
