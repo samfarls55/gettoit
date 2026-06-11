@@ -116,7 +116,8 @@ export async function handleRequest(
     throw e;
   }
 
-  if (!isGoogleQ5Input(body) && !deps.env.FOURSQUARE_API_KEY) {
+  const isGoogleQ5Request = isGoogleQ5Input(body);
+  if (!isGoogleQ5Request && !deps.env.FOURSQUARE_API_KEY) {
     console.error("FOURSQUARE_API_KEY is not set on the Edge Function");
     return jsonResponse({ error: "places_proxy_misconfigured" }, {
       status: 500,
@@ -126,16 +127,19 @@ export async function handleRequest(
 
   try {
     const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
-    const result = isGoogleQ5Input(body)
-      ? await handleGoogleQ5PlacesProxy(input, {
+    if (isGoogleQ5Request) {
+      const result = await handleGoogleQ5PlacesProxy(input, {
         fetch,
         googleApiKey: deps.env.GOOGLE_PLACES_API_KEY ?? "",
-      })
-      : await handlePlacesProxy(input, {
-        cache: deps.buildCacheAdapter(deps.env),
-        fetch,
-        apiKey: deps.env.FOURSQUARE_API_KEY ?? "",
       });
+      return jsonResponse(result, { headers: corsHeaders() });
+    }
+
+    const result = await handlePlacesProxy(input, {
+      cache: deps.buildCacheAdapter(deps.env),
+      fetch,
+      apiKey: deps.env.FOURSQUARE_API_KEY ?? "",
+    });
     return jsonResponse(result, { headers: corsHeaders() });
   } catch (e) {
     if (e instanceof GooglePlacesGuardrailError) {

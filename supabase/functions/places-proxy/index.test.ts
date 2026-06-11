@@ -2,11 +2,12 @@
 // Verifies method gating, auth gating, and config gating without
 // spinning up Deno.serve.
 
-import {
-  assertEquals,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { handleRequest } from "./handler.ts";
-import type { CacheAdapter } from "../_shared/places-proxy-core.ts";
+import {
+  type CacheAdapter,
+  GOOGLE_Q5_FIELD_MASK,
+} from "../_shared/places-proxy-core.ts";
 
 function memoryCache(): CacheAdapter {
   const store = new Map();
@@ -170,8 +171,9 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
   );
 
   assertEquals(res.status, 200);
+  assertEquals(fetchCalls.length, 1);
   const headers = fetchCalls[0].init?.headers as Record<string, string>;
-  assertEquals(headers["X-Goog-FieldMask"], "places.id,places.displayName");
+  assertEquals(headers["X-Goog-FieldMask"], GOOGLE_Q5_FIELD_MASK);
   const body = await res.json();
   assertEquals(body, {
     places: [{ place_id: "google-1", display_name: "Only Name" }],

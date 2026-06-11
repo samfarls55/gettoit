@@ -54,7 +54,6 @@ export interface ProxyDeps {
   cache: CacheAdapter;
   fetch: FetchFn;
   apiKey: string;
-  googleApiKey?: string;
   /** Time-source override for deterministic tests. */
   now?: () => Date;
   /** Hot-zone TTL â€” applied when the cached row has the
@@ -104,6 +103,11 @@ export interface GoogleAttributionPayload {
 export interface GoogleQ5Response {
   places: GoogleQ5Place[];
   attribution: GoogleAttributionPayload;
+}
+
+interface GoogleQ5ProxyDeps {
+  fetch: FetchFn;
+  googleApiKey: string;
 }
 
 export type PlacesProxyResponse = ProxyResponse | GoogleQ5Response;
@@ -305,7 +309,8 @@ export async function handlePlacesProxy(
   };
 }
 
-const GOOGLE_NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby";
+const GOOGLE_NEARBY_SEARCH_URL =
+  "https://places.googleapis.com/v1/places:searchNearby";
 export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
 export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName";
 export const GOOGLE_Q5_MAX_RESULTS = 20;
@@ -319,16 +324,21 @@ type GoogleNearbySearchResponse = {
 
 export async function handleGoogleQ5PlacesProxy(
   input: PlacesProxyInput,
-  deps: Pick<ProxyDeps, "fetch" | "googleApiKey">,
+  deps: GoogleQ5ProxyDeps,
 ): Promise<GoogleQ5Response> {
-  if (!deps.googleApiKey) {
+  const googleApiKey = deps.googleApiKey;
+  if (!googleApiKey) {
     throw new GooglePlacesGuardrailError(
       "google_places_misconfigured",
       "GOOGLE_PLACES_API_KEY is not set",
     );
   }
 
-  const response = await fetchGoogleNearbyWithRetry(input, deps);
+  const response = await fetchGoogleNearbyWithRetry(
+    input,
+    deps.fetch,
+    googleApiKey,
+  );
   if (!response.ok) {
     throw new GooglePlacesGuardrailError(
       `google_places_upstream_${response.status}`,
@@ -337,23 +347,8 @@ export async function handleGoogleQ5PlacesProxy(
   }
 
   const body = (await response.json()) as GoogleNearbySearchResponse;
-  const places = (body.places ?? [])
-    .map((place): GoogleQ5Place | null => {
-      if (
-        typeof place.id !== "string" ||
-        typeof place.displayName?.text !== "string"
-      ) {
-        return null;
-      }
-      return {
-        place_id: place.id,
-        display_name: place.displayName.text,
-      };
-    })
-    .filter((place): place is GoogleQ5Place => place !== null);
-
   return {
-    places,
+    places: shapeGoogleQ5Places(body),
     attribution: {
       provider: "google",
       render: "text",
@@ -364,14 +359,35 @@ export async function handleGoogleQ5PlacesProxy(
 
 async function fetchGoogleNearbyWithRetry(
   input: PlacesProxyInput,
-  deps: Pick<ProxyDeps, "fetch" | "googleApiKey">,
+  fetch: FetchFn,
+  googleApiKey: string,
 ): Promise<Response> {
-  const init = buildGoogleQ5Request(input, deps.googleApiKey ?? "");
-  let response = await deps.fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+  const init = buildGoogleQ5Request(input, googleApiKey);
+  let response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
   if (response.status === 429 || response.status >= 500) {
-    response = await deps.fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+    response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
   }
   return response;
+}
+
+function shapeGoogleQ5Places(
+  body: GoogleNearbySearchResponse,
+): GoogleQ5Place[] {
+  const places: GoogleQ5Place[] = [];
+  for (const place of body.places ?? []) {
+    if (
+      typeof place.id !== "string" ||
+      typeof place.displayName?.text !== "string"
+    ) {
+      continue;
+    }
+
+    places.push({
+      place_id: place.id,
+      display_name: place.displayName.text,
+    });
+  }
+  return places;
 }
 
 function buildGoogleQ5Request(
