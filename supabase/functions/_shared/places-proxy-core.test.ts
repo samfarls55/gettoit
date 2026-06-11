@@ -15,8 +15,6 @@ import {
   type CacheAdapter,
   type CacheRow,
   FoursquareUpstreamError,
-  googlePrimaryTypesForCuisineSelection,
-  GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT,
   GOOGLE_Q5_FIELD_MASK,
   GooglePlacesGuardrailError,
   handleGoogleQ5PlacesProxy,
@@ -190,7 +188,6 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
         {
           id: "google-place-1",
           displayName: { text: "Pico's" },
-          location: { latitude: 40.7128, longitude: -74.006 },
           formattedAddress: "1 Main St",
           rating: 4.8,
           regularOpeningHours: { openNow: true },
@@ -217,7 +214,7 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
   const requestBody = JSON.parse(calls[0].init?.body as string);
   assertEquals(requestBody.locationRestriction.circle.center.latitude, 40.7128);
   assertEquals(requestBody.locationRestriction.circle.center.longitude, -74.006);
-  assertEquals(requestBody.locationRestriction.circle.radius, 1840);
+  assertEquals(requestBody.locationRestriction.circle.radius, 1600);
 
   assertEquals(result, {
     places: [{ place_id: "google-place-1", display_name: "Pico's" }],
@@ -225,13 +222,6 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
       provider: "google",
       render: "text",
       text: "Powered by Google",
-    },
-    overfetch_telemetry: {
-      committed_radius_meters: 1600,
-      provider_radius_meters: 1840,
-      pre_trim_count: 1,
-      post_trim_count: 1,
-      trimmed_count: 0,
     },
   });
   const serialized = JSON.stringify(result);
@@ -246,133 +236,78 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
       "reviewSummary",
       "google-secret",
       "summary",
-      "location",
     ]
   ) {
     assertEquals(serialized.includes(forbidden), false, forbidden);
   }
 });
 
-Deno.test("google q5 — overfetches with a capped radius and trims to the committed Search area", async () => {
-  const calls: { url: string; init?: RequestInit }[] = [];
-  const fetch: ProxyDeps["fetch"] = (input, init) => {
-    calls.push({ url: String(input), init });
-    return Promise.resolve(new Response(JSON.stringify({
+Deno.test("google q5 — applies meal timing and service-mode eligibility before shaping", async () => {
+  const fetch: ProxyDeps["fetch"] = () =>
+    Promise.resolve(new Response(JSON.stringify({
       places: [
         {
-          id: "inside",
-          displayName: { text: "Inside" },
-          location: { latitude: 40.7128, longitude: -74.006 },
+          id: "current-open-dine-in",
+          displayName: { text: "Open Dine-In" },
+          currentOpeningHours: { openNow: true },
+          dineIn: true,
         },
         {
-          id: "outside",
-          displayName: { text: "Outside" },
-          location: { latitude: 40.72, longitude: -74.006 },
+          id: "current-closed",
+          displayName: { text: "Closed Now" },
+          currentOpeningHours: { openNow: false },
+          dineIn: true,
+        },
+        {
+          id: "missing-hours",
+          displayName: { text: "Missing Hours" },
+          dineIn: true,
+        },
+        {
+          id: "future-open-takeout-unknown",
+          displayName: { text: "Future Open" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+        },
+        {
+          id: "future-no-takeout",
+          displayName: { text: "No Takeout" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+          takeout: false,
         },
       ],
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
-  };
 
-  const result = await handleGoogleQ5PlacesProxy(
-    { lat: 40.7128, lng: -74.006, radius_meters: 100, filters: {} },
-    { fetch, googleApiKey: "google-secret" },
-  );
-
-  const requestBody = JSON.parse(calls[0].init?.body as string);
-  assertEquals(requestBody.locationRestriction.circle.radius, 115);
-  assertEquals(result.places, [{ place_id: "inside", display_name: "Inside" }]);
-  const serialized = JSON.stringify(result);
-  assertEquals(serialized.includes("location"), false);
-  assertEquals(serialized.includes("Outside"), false);
-});
-
-Deno.test("google q5 — overfetch expansion is capped at 805 meters", async () => {
-  const calls: { url: string; init?: RequestInit }[] = [];
-  const fetch: ProxyDeps["fetch"] = (input, init) => {
-    calls.push({ url: String(input), init });
-    return Promise.resolve(new Response(JSON.stringify({ places: [] }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }));
-  };
-
-  await handleGoogleQ5PlacesProxy(
-    { lat: 40.7128, lng: -74.006, radius_meters: 10_000, filters: {} },
-    { fetch, googleApiKey: "google-secret" },
-  );
-
-  const requestBody = JSON.parse(calls[0].init?.body as string);
-  assertEquals(requestBody.locationRestriction.circle.radius, 10_805);
-});
-
-Deno.test("google q5 — maps one Q1 cuisine chip to Google primary types", async () => {
-  const calls: { url: string; init?: RequestInit }[] = [];
-  const fetch: ProxyDeps["fetch"] = (input, init) => {
-    calls.push({ url: String(input), init });
-    return Promise.resolve(new Response(JSON.stringify({ places: [] }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }));
-  };
-
-  await handleGoogleQ5PlacesProxy({
+  const current = await handleGoogleQ5PlacesProxy({
     ...TYPICAL_INPUT,
-    filters: { ...TYPICAL_INPUT.filters, cuisine: "mexican" },
-  }, {
-    fetch,
-    googleApiKey: "google-secret",
-  });
+    filters: { service_shape: "dineIn" },
+  }, { fetch, googleApiKey: "google-secret" });
 
-  const requestBody = JSON.parse(calls[0].init?.body as string);
-  assertEquals(requestBody.includedPrimaryTypes, [
-    "mexican_restaurant",
-    "taco_restaurant",
-    "tex_mex_restaurant",
-    "burrito_restaurant",
+  assertEquals(current.places, [
+    { place_id: "current-open-dine-in", display_name: "Open Dine-In" },
   ]);
-});
 
-Deno.test("google q5 — No Preference maps to the Q1-selectable union only", async () => {
-  const calls: { url: string; init?: RequestInit }[] = [];
-  const fetch: ProxyDeps["fetch"] = (input, init) => {
-    calls.push({ url: String(input), init });
-    return Promise.resolve(new Response(JSON.stringify({ places: [] }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }));
-  };
+  const future = await handleGoogleQ5PlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { open_at: "3T1900", service_shape: "takeout" },
+  }, { fetch, googleApiKey: "google-secret" });
 
-  await handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
-    fetch,
-    googleApiKey: "google-secret",
-  });
-
-  const primaryTypeChunks = calls.map((call) =>
-    JSON.parse(call.init?.body as string).includedPrimaryTypes as string[]
-  );
-  for (const chunk of primaryTypeChunks) {
-    assert(
-      chunk.length <= GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT,
-      "each Google Nearby Search type restriction chunk must stay within provider limits",
-    );
-  }
-  assertEquals(primaryTypeChunks.flat(), googlePrimaryTypesForCuisineSelection([]));
-  assertEquals(primaryTypeChunks.flat().includes("food"), false);
-  assertEquals(primaryTypeChunks.flat().includes("vegan_restaurant"), false);
-  assertEquals(primaryTypeChunks.flat().includes("breakfast_restaurant"), false);
-});
-
-Deno.test("google q5 — multiple selected cuisines compile by union, not intersection", () => {
-  assertEquals(
-    googlePrimaryTypesForCuisineSelection(["mexican", "thai"]),
-    [
-      "mexican_restaurant",
-      "taco_restaurant",
-      "tex_mex_restaurant",
-      "burrito_restaurant",
-      "thai_restaurant",
-    ],
-  );
+  assertEquals(future.places, [
+    { place_id: "future-open-takeout-unknown", display_name: "Future Open" },
+  ]);
 });
 
 Deno.test("google q5 — retries one transient failure then fails closed", async () => {

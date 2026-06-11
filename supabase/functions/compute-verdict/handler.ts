@@ -39,6 +39,7 @@ import {
   computeVerdict,
   type HardVeto,
   type MemberVote,
+  type OpeningPeriod,
   type VerdictEngineOutput,
   type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
@@ -82,7 +83,11 @@ export interface ComputeVerdictDataAdapter {
    *  here and the Plan transition is skipped entirely. The supabase
    *  adapter selects `id, plan_id` so the field is always populated
    *  one-way-or-the-other. */
-  fetchRoom(room_id: string): Promise<{ id: string; plan_id?: string | null } | null>;
+  fetchRoom(room_id: string): Promise<{
+    id: string;
+    plan_id?: string | null;
+    session_params?: Record<string, unknown> | null;
+  } | null>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
@@ -216,6 +221,17 @@ export interface RoomOptionRow {
     /** TB-23 — Foursquare crowd-sourced `tastes` tag cloud. Read by the
      *  classifier for the vibe nudge. */
     tastes?: string[];
+    current_open_now?: boolean | null;
+    currentOpeningHours?: { openNow?: boolean | null } | null;
+    regular_open_now?: boolean | null;
+    regular_opening_periods?: OpeningPeriod[];
+    regularOpeningHours?: {
+      openNow?: boolean | null;
+      periods?: OpeningPeriod[];
+    } | null;
+    dine_in?: boolean | null;
+    dineIn?: boolean | null;
+    takeout?: boolean | null;
   };
 }
 
@@ -350,6 +366,71 @@ export function mergeHardVetoes(
     out.push(v);
   }
   return out;
+}
+
+function roomMealTiming(
+  sessionParams: Record<string, unknown> | null,
+): { open_at?: string | null } | undefined {
+  if (!sessionParams) return undefined;
+  const nested = sessionParams.meal_timing;
+  const nestedOpenAt = nested && typeof nested === "object"
+    ? (nested as Record<string, unknown>).open_at
+    : undefined;
+  const openAt = typeof nestedOpenAt === "string"
+    ? nestedOpenAt
+    : sessionParams.open_at;
+  return { open_at: typeof openAt === "string" ? openAt : null };
+}
+
+function isRoomServiceShape(value: unknown): value is "dineIn" | "takeout" {
+  return value === "dineIn" || value === "takeout";
+}
+
+function roomServiceShape(
+  sessionParams: Record<string, unknown> | null,
+): "dineIn" | "takeout" | null {
+  const serviceShape = sessionParams?.service_shape;
+  return isRoomServiceShape(serviceShape) ? serviceShape : null;
+}
+
+type OptionPayload = RoomOptionRow["payload"] | undefined;
+
+function optionCurrentOpenNow(payload: OptionPayload): boolean | null {
+  return payload?.current_open_now ??
+    payload?.currentOpeningHours?.openNow ??
+    payload?.regular_open_now ??
+    payload?.regularOpeningHours?.openNow ??
+    null;
+}
+
+function optionRegularOpeningPeriods(
+  payload: OptionPayload,
+): OpeningPeriod[] | undefined {
+  return payload?.regular_opening_periods ??
+    payload?.regularOpeningHours?.periods;
+}
+
+function toCandidateOption(row: RoomOptionRow): CandidateOption {
+  const { payload } = row;
+  return {
+    id: row.id,
+    name: payload?.name ?? "Unnamed",
+    price_tier: payload?.price_tier ?? null,
+    dietary_tags: payload?.dietary_tags ?? [],
+    categories: payload?.categories ?? [],
+    distance_meters: payload?.distance_meters ?? null,
+    // TB-23 — carry the Foursquare reputation / vibe signal so the
+    // server-side venue classifier can derive the preference axes. The
+    // engine itself never reads these fields.
+    rating: payload?.rating ?? null,
+    total_ratings: payload?.total_ratings ?? null,
+    date_created: payload?.date_created ?? null,
+    tastes: payload?.tastes ?? [],
+    current_open_now: optionCurrentOpenNow(payload),
+    regular_opening_periods: optionRegularOpeningPeriods(payload),
+    dine_in: payload?.dine_in ?? payload?.dineIn ?? null,
+    takeout: payload?.takeout ?? null,
+  };
 }
 
 export async function handleRequest(
@@ -526,21 +607,7 @@ export async function handleRequest(
 
   const startingRadius = (await data.fetchRoomRadius(roomId)) ?? null;
 
-  const candidates: CandidateOption[] = optionRows.map((row) => ({
-    id: row.id,
-    name: row.payload?.name ?? "Unnamed",
-    price_tier: row.payload?.price_tier ?? null,
-    dietary_tags: row.payload?.dietary_tags ?? [],
-    categories: row.payload?.categories ?? [],
-    distance_meters: row.payload?.distance_meters ?? null,
-    // TB-23 — carry the Foursquare reputation / vibe signal so the
-    // server-side venue classifier can derive the preference axes. The
-    // engine itself never reads these fields.
-    rating: row.payload?.rating ?? null,
-    total_ratings: row.payload?.total_ratings ?? null,
-    date_created: row.payload?.date_created ?? null,
-    tastes: row.payload?.tastes ?? [],
-  }));
+  const candidates: CandidateOption[] = optionRows.map(toCandidateOption);
 
   // TB-23 — classify the FULL candidate pool into per-venue
   // `Q5VenueProfile`s, ONCE. Reputation is pool-relative (its volume
@@ -637,6 +704,8 @@ export async function handleRequest(
     result = computeVerdict({
       candidates,
       votes,
+      meal_timing: roomMealTiming(room.session_params ?? null),
+      service_shape: roomServiceShape(room.session_params ?? null),
       method,
       radius_meters: startingRadius ?? undefined,
       excluded_option_ids: rerollState?.excluded_option_ids,

@@ -42,6 +42,10 @@ function makeCandidate(overrides: Partial<CandidateOption> = {}): CandidateOptio
     dietary_tags: overrides.dietary_tags ?? [],
     categories: overrides.categories ?? ["Restaurant"],
     distance_meters: overrides.distance_meters,
+    current_open_now: overrides.current_open_now,
+    regular_opening_periods: overrides.regular_opening_periods,
+    dine_in: overrides.dine_in,
+    takeout: overrides.takeout,
   };
 }
 
@@ -99,6 +103,85 @@ Deno.test("EBA prune — Q2 spend cap drops candidates over the MIN member cap",
   assert(
     out.cuts.some((c) => c.option_id === "pricey" && c.cut_reason === "budget"),
     "pricey should be cut for budget",
+  );
+});
+
+Deno.test("EBA prune — meal timing and service mode are room-level hard eligibility", () => {
+  const currentOpenDineIn = makeCandidate({
+    id: "current-open-dine-in",
+    name: "Open Dine-In",
+    current_open_now: true,
+    dine_in: true,
+  });
+  const currentClosed = makeCandidate({
+    id: "current-closed",
+    name: "Closed Now",
+    current_open_now: false,
+    dine_in: true,
+  });
+  const currentMissingHours = makeCandidate({
+    id: "current-missing-hours",
+    name: "Missing Hours",
+    dine_in: true,
+  });
+  const noDineIn = makeCandidate({
+    id: "no-dine-in",
+    name: "No Dine-In",
+    current_open_now: true,
+    dine_in: false,
+  });
+
+  const currentOut = run({
+    candidates: [currentOpenDineIn, currentClosed, currentMissingHours, noDineIn],
+    votes: [scoredVote("u1", {}, 5)],
+    service_shape: "dineIn",
+  });
+
+  assertEquals(currentOut.winning_option_id, "current-open-dine-in");
+  assert(
+    currentOut.cuts.some((c) => c.option_id === "current-closed" && c.cut_reason === "availability"),
+  );
+  assert(
+    currentOut.cuts.some((c) =>
+      c.option_id === "current-missing-hours" && c.cut_reason === "availability"
+    ),
+  );
+  assert(
+    currentOut.cuts.some((c) => c.option_id === "no-dine-in" && c.cut_reason === "availability"),
+  );
+
+  const futureOpenUnknownTakeout = makeCandidate({
+    id: "future-open-unknown-takeout",
+    name: "Future Open",
+    regular_opening_periods: [
+      {
+        open: { day: 3, hour: 18, minute: 0 },
+        close: { day: 3, hour: 22, minute: 0 },
+      },
+    ],
+  });
+  const explicitNoTakeout = makeCandidate({
+    id: "explicit-no-takeout",
+    name: "No Takeout",
+    takeout: false,
+    regular_opening_periods: [
+      {
+        open: { day: 3, hour: 18, minute: 0 },
+        close: { day: 3, hour: 22, minute: 0 },
+      },
+    ],
+  });
+
+  const futureOut = run({
+    candidates: [futureOpenUnknownTakeout, explicitNoTakeout],
+    votes: [scoredVote("u1", {}, 5)],
+    meal_timing: { open_at: "3T1900" },
+    service_shape: "takeout",
+  });
+
+  assertEquals(futureOut.winning_option_id, "future-open-unknown-takeout");
+  assert(
+    futureOut.cuts.some((c) => c.option_id === "explicit-no-takeout" && c.cut_reason === "availability"),
   );
 });
 

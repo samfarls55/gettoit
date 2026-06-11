@@ -94,14 +94,6 @@ export interface GoogleQ5Place {
   display_name: string;
 }
 
-export interface GoogleOverfetchTelemetry {
-  committed_radius_meters: number;
-  provider_radius_meters: number;
-  pre_trim_count: number;
-  post_trim_count: number;
-  trimmed_count: number;
-}
-
 export interface GoogleAttributionPayload {
   provider: "google";
   render: "text";
@@ -111,7 +103,6 @@ export interface GoogleAttributionPayload {
 export interface GoogleQ5Response {
   places: GoogleQ5Place[];
   attribution: GoogleAttributionPayload;
-  overfetch_telemetry: GoogleOverfetchTelemetry;
 }
 
 interface GoogleQ5ProxyDeps {
@@ -137,6 +128,10 @@ export class FoursquareUpstreamError extends Error {
   constructor(public status: number, message: string) {
     super(message);
   }
+}
+
+function isGoogleServiceShape(value: unknown): value is "dineIn" | "takeout" {
+  return value === "dineIn" || value === "takeout";
 }
 
 export function validateInput(raw: unknown): PlacesProxyInput {
@@ -191,9 +186,12 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const cuisine = typeof filters.cuisine === "string"
     ? filters.cuisine
     : undefined;
+  const service_shape = isGoogleServiceShape(filters.service_shape)
+    ? filters.service_shape
+    : undefined;
   return {
     lat, lng, radius_meters: radius,
-    filters: { dietary, price_tier, open_at, cuisine },
+    filters: { dietary, price_tier, open_at, cuisine, service_shape },
   };
 }
 
@@ -321,118 +319,42 @@ export async function handlePlacesProxy(
 const GOOGLE_NEARBY_SEARCH_URL =
   "https://places.googleapis.com/v1/places:searchNearby";
 export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
-export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName,places.location";
+export const GOOGLE_Q5_FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.currentOpeningHours",
+  "places.regularOpeningHours",
+  "places.dineIn",
+  "places.takeout",
+].join(",");
 export const GOOGLE_Q5_MAX_RESULTS = 20;
-export const GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT = 50;
-export const GOOGLE_OVERFETCH_CAP_METERS = 805;
-
-export const GOOGLE_Q1_CUISINE_PRIMARY_TYPES: Record<string, readonly string[]> = {
-  american: [
-    "american_restaurant",
-    "hamburger_restaurant",
-    "barbecue_restaurant",
-    "steak_house",
-    "diner",
-    "chicken_restaurant",
-    "chicken_wings_restaurant",
-    "hot_dog_restaurant",
-    "hot_dog_stand",
-    "soul_food_restaurant",
-    "southwestern_us_restaurant",
-  ],
-  mexican: [
-    "mexican_restaurant",
-    "taco_restaurant",
-    "tex_mex_restaurant",
-    "burrito_restaurant",
-  ],
-  italian: ["italian_restaurant", "pizza_restaurant"],
-  japanese: [
-    "japanese_restaurant",
-    "sushi_restaurant",
-    "ramen_restaurant",
-    "japanese_curry_restaurant",
-    "japanese_izakaya_restaurant",
-    "tonkatsu_restaurant",
-    "yakiniku_restaurant",
-    "yakitori_restaurant",
-  ],
-  chinese: [
-    "chinese_restaurant",
-    "chinese_noodle_restaurant",
-    "dim_sum_restaurant",
-    "cantonese_restaurant",
-  ],
-  thai: ["thai_restaurant"],
-  indian: [
-    "indian_restaurant",
-    "north_indian_restaurant",
-    "south_indian_restaurant",
-  ],
-  mediterranean: [
-    "mediterranean_restaurant",
-    "greek_restaurant",
-    "tapas_restaurant",
-  ],
-  middle_eastern: [
-    "middle_eastern_restaurant",
-    "lebanese_restaurant",
-    "falafel_restaurant",
-    "kebab_shop",
-    "shawarma_restaurant",
-    "persian_restaurant",
-    "israeli_restaurant",
-    "turkish_restaurant",
-    "afghani_restaurant",
-    "moroccan_restaurant",
-  ],
-  korean: ["korean_restaurant", "korean_barbecue_restaurant"],
-  vietnamese: ["vietnamese_restaurant"],
-  seafood: [
-    "seafood_restaurant",
-    "fish_and_chips_restaurant",
-    "oyster_bar_restaurant",
-  ],
-  comfort_food: [
-    "family_restaurant",
-    "fast_food_restaurant",
-    "buffet_restaurant",
-    "sandwich_shop",
-    "deli",
-    "food_court",
-    "cafeteria",
-    "bar_and_grill",
-    "gastropub",
-  ],
-};
-
-export function googlePrimaryTypesForCuisineSelection(
-  cuisines: readonly string[],
-): string[] {
-  const selected = cuisines.length === 0
-    ? Object.keys(GOOGLE_Q1_CUISINE_PRIMARY_TYPES)
-    : cuisines;
-  const types: string[] = [];
-  const seen = new Set<string>();
-
-  for (const cuisine of selected) {
-    for (const type of GOOGLE_Q1_CUISINE_PRIMARY_TYPES[cuisine] ?? []) {
-      if (seen.has(type)) continue;
-      seen.add(type);
-      types.push(type);
-    }
-  }
-
-  return types;
-}
 
 type GoogleNearbySearchResponse = {
   places?: Array<{
     id?: unknown;
     displayName?: { text?: unknown };
-    location?: { latitude?: unknown; longitude?: unknown };
+    currentOpeningHours?: GoogleOpeningHours;
+    regularOpeningHours?: GoogleOpeningHours;
+    dineIn?: unknown;
+    takeout?: unknown;
   }>;
 };
+
+interface GoogleOpeningHours {
+  openNow?: unknown;
+  periods?: GoogleOpeningPeriod[];
+}
+
+interface GoogleOpeningPeriod {
+  open?: GoogleOpeningPoint;
+  close?: GoogleOpeningPoint;
+}
+
+interface GoogleOpeningPoint {
+  day?: unknown;
+  hour?: unknown;
+  minute?: unknown;
+}
 
 export async function handleGoogleQ5PlacesProxy(
   input: PlacesProxyInput,
@@ -446,32 +368,26 @@ export async function handleGoogleQ5PlacesProxy(
     );
   }
 
-  const responses = await fetchGoogleNearbyWithRetry(
+  const response = await fetchGoogleNearbyWithRetry(
     input,
     deps.fetch,
     googleApiKey,
   );
-  const rawPlaces: NonNullable<GoogleNearbySearchResponse["places"]> = [];
-  for (const response of responses) {
-    if (!response.ok) {
-      throw new GooglePlacesGuardrailError(
-        `google_places_upstream_${response.status}`,
-        `Google Places returned ${response.status}`,
-      );
-    }
-    const body = (await response.json()) as GoogleNearbySearchResponse;
-    rawPlaces.push(...(body.places ?? []));
+  if (!response.ok) {
+    throw new GooglePlacesGuardrailError(
+      `google_places_upstream_${response.status}`,
+      `Google Places returned ${response.status}`,
+    );
   }
 
-  const shaped = shapeGoogleQ5Places({ places: rawPlaces }, input);
+  const body = (await response.json()) as GoogleNearbySearchResponse;
   return {
-    places: shaped.places,
+    places: shapeGoogleQ5Places(input, body),
     attribution: {
       provider: "google",
       render: "text",
       text: "Powered by Google",
     },
-    overfetch_telemetry: shaped.overfetchTelemetry,
   };
 }
 
@@ -479,72 +395,127 @@ async function fetchGoogleNearbyWithRetry(
   input: PlacesProxyInput,
   fetch: FetchFn,
   googleApiKey: string,
-): Promise<Response[]> {
-  const responses: Response[] = [];
-  for (const init of buildGoogleQ5Requests(input, googleApiKey)) {
-    let response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
-    if (response.status === 429 || response.status >= 500) {
-      response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
-    }
-    responses.push(response);
+): Promise<Response> {
+  const init = buildGoogleQ5Request(input, googleApiKey);
+  let response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+  if (response.status === 429 || response.status >= 500) {
+    response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
   }
-  return responses;
+  return response;
 }
 
 function shapeGoogleQ5Places(
-  body: GoogleNearbySearchResponse,
   input: PlacesProxyInput,
-): { places: GoogleQ5Place[]; overfetchTelemetry: GoogleOverfetchTelemetry } {
+  body: GoogleNearbySearchResponse,
+): GoogleQ5Place[] {
   const places: GoogleQ5Place[] = [];
-  const seenPlaceIds = new Set<string>();
-  const rawPlaces = body.places ?? [];
-  const providerRadiusMeters = googleProviderRadiusMeters(input.radius_meters);
-  for (const place of rawPlaces) {
+  for (const place of body.places ?? []) {
     if (
       typeof place.id !== "string" ||
-      typeof place.displayName?.text !== "string" ||
-      typeof place.location?.latitude !== "number" ||
-      typeof place.location?.longitude !== "number"
+      typeof place.displayName?.text !== "string"
     ) {
       continue;
     }
-    const distanceFromSearchCenter = distanceMeters(
-      input.lat,
-      input.lng,
-      place.location.latitude,
-      place.location.longitude,
-    );
-    if (distanceFromSearchCenter > input.radius_meters) {
+    if (!isGooglePlaceEligibleForTimingAndService(place, input)) {
       continue;
     }
-    if (seenPlaceIds.has(place.id)) {
-      continue;
-    }
-    seenPlaceIds.add(place.id);
 
     places.push({
       place_id: place.id,
       display_name: place.displayName.text,
     });
   }
+  return places;
+}
+
+function isGooglePlaceEligibleForTimingAndService(
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+  input: PlacesProxyInput,
+): boolean {
+  const openAt = input.filters?.open_at;
+  const serviceShape = input.filters?.service_shape;
+
+  if (openAt) {
+    if (!isOpenAtGoogleRegularTime(place.regularOpeningHours, openAt)) {
+      return false;
+    }
+  } else if (
+    place.currentOpeningHours?.openNow !== true &&
+    place.regularOpeningHours?.openNow !== true
+  ) {
+    return false;
+  }
+
+  if (serviceShape === "dineIn" && place.dineIn !== true) {
+    return false;
+  }
+  if (serviceShape === "takeout" && place.takeout === false) {
+    return false;
+  }
+  return true;
+}
+
+function isOpenAtGoogleRegularTime(
+  hours: GoogleOpeningHours | undefined,
+  openAt: string,
+): boolean {
+  const target = parseOpenAtToken(openAt);
+  if (!target || !Array.isArray(hours?.periods)) return false;
+  return hours.periods.some((period) => periodContainsGoogleMinute(period, target));
+}
+
+function parseOpenAtToken(
+  openAt: string,
+): { googleDay: number; minuteOfDay: number } | null {
+  const match = /^([1-7])T([0-2][0-9])([0-5][0-9])$/.exec(openAt);
+  if (!match) return null;
+  const foursquareDay = Number(match[1]);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  if (hour > 23) return null;
   return {
-    places,
-    overfetchTelemetry: {
-      committed_radius_meters: input.radius_meters,
-      provider_radius_meters: providerRadiusMeters,
-      pre_trim_count: rawPlaces.length,
-      post_trim_count: places.length,
-      trimmed_count: rawPlaces.length - places.length,
-    },
+    googleDay: foursquareDay === 7 ? 0 : foursquareDay,
+    minuteOfDay: hour * 60 + minute,
   };
 }
 
-function buildGoogleQ5Requests(
+function periodContainsGoogleMinute(
+  period: GoogleOpeningPeriod,
+  target: { googleDay: number; minuteOfDay: number },
+): boolean {
+  const open = googlePointMinuteOfWeek(period.open);
+  const close = googlePointMinuteOfWeek(period.close);
+  if (open === null || close === null) return false;
+  const targetMinute = target.googleDay * 24 * 60 + target.minuteOfDay;
+  if (close > open) {
+    return targetMinute >= open && targetMinute < close;
+  }
+  return targetMinute >= open || targetMinute < close;
+}
+
+function googlePointMinuteOfWeek(point: GoogleOpeningPoint | undefined): number | null {
+  if (!point) return null;
+  if (
+    typeof point.day !== "number" ||
+    typeof point.hour !== "number" ||
+    typeof point.minute !== "number" ||
+    point.day < 0 ||
+    point.day > 6 ||
+    point.hour < 0 ||
+    point.hour > 23 ||
+    point.minute < 0 ||
+    point.minute > 59
+  ) {
+    return null;
+  }
+  return point.day * 24 * 60 + point.hour * 60 + point.minute;
+}
+
+function buildGoogleQ5Request(
   input: PlacesProxyInput,
   apiKey: string,
-): RequestInit[] {
-  const primaryTypes = googlePrimaryTypesForInput(input);
-  return chunkGoogleIncludedPrimaryTypes(primaryTypes).map((includedPrimaryTypes) => ({
+): RequestInit {
+  return {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -552,7 +523,7 @@ function buildGoogleQ5Requests(
       "X-Goog-FieldMask": GOOGLE_Q5_FIELD_MASK,
     },
     body: JSON.stringify({
-      includedPrimaryTypes,
+      includedPrimaryTypes: ["restaurant"],
       maxResultCount: GOOGLE_Q5_MAX_RESULTS,
       locationRestriction: {
         circle: {
@@ -560,47 +531,9 @@ function buildGoogleQ5Requests(
             latitude: input.lat,
             longitude: input.lng,
           },
-          radius: googleProviderRadiusMeters(input.radius_meters),
+          radius: input.radius_meters,
         },
       },
     }),
-  }));
-}
-
-function googlePrimaryTypesForInput(input: PlacesProxyInput): string[] {
-  const cuisine = input.filters?.cuisine;
-  return googlePrimaryTypesForCuisineSelection(cuisine ? [cuisine] : []);
-}
-
-function chunkGoogleIncludedPrimaryTypes(types: string[]): string[][] {
-  const chunks: string[][] = [];
-  for (
-    let index = 0;
-    index < types.length;
-    index += GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT
-  ) {
-    chunks.push(types.slice(index, index + GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT));
-  }
-  return chunks;
-}
-
-function googleProviderRadiusMeters(committedRadiusMeters: number): number {
-  return committedRadiusMeters +
-    Math.min(committedRadiusMeters * 0.15, GOOGLE_OVERFETCH_CAP_METERS);
-}
-
-function distanceMeters(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-): number {
-  const earthRadiusMeters = 6_371_000;
-  const toRadians = (degrees: number) => degrees * Math.PI / 180;
-  const dLat = toRadians(lat2 - lat1);
-  const dLng = toRadians(lng2 - lng1);
-  const a = Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-      Math.sin(dLng / 2) ** 2;
-  return 2 * earthRadiusMeters * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
 }
