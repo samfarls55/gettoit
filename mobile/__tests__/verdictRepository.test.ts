@@ -1,6 +1,7 @@
 import {
   advanceVerdictSlate,
   createSupabaseVerdictRepository,
+  type GoogleVerdictDisplay,
   type SupabaseQueryResult,
   type VerdictSupabaseClient,
 } from "../src/verdict/verdictRepository";
@@ -74,23 +75,42 @@ function makeSupabaseClient(
   };
 }
 
+function googleDisplay({
+  formattedAddress,
+  mapsUri,
+  name,
+  placeId,
+}: {
+  formattedAddress?: string;
+  mapsUri: string;
+  name: string;
+  placeId: string;
+}): GoogleVerdictDisplay {
+  return {
+    place: {
+      place_id: placeId,
+      display_name: name,
+      google_maps_uri: mapsUri,
+      ...(formattedAddress ? { formatted_address: formattedAddress } : {}),
+    },
+    attribution: {
+      provider: "google",
+      render: "text",
+      text: "Powered by Google",
+    },
+  };
+}
+
 describe("verdictRepository", () => {
   it("maps a successful Supabase verdict response into a group live verdict view model", async () => {
     const calls: QueryCall[] = [];
     const invoke = jest.fn().mockResolvedValue({
-      data: {
-        place: {
-          place_id: "google-pico",
-          display_name: "Pico's Taqueria",
-          google_maps_uri: "https://maps.google.example/picos",
-          formatted_address: "1 Main St",
-        },
-        attribution: {
-          provider: "google",
-          render: "text",
-          text: "Powered by Google",
-        },
-      },
+      data: googleDisplay({
+        placeId: "google-pico",
+        name: "Pico's Taqueria",
+        mapsUri: "https://maps.google.example/picos",
+        formattedAddress: "1 Main St",
+      }),
       error: null,
     });
     const repository = createSupabaseVerdictRepository({
@@ -238,18 +258,11 @@ describe("verdictRepository", () => {
           error: null,
         },
       }, [], jest.fn().mockResolvedValue({
-        data: {
-          place: {
-            place_id: "google-solo",
-            display_name: "Solo Ramen",
-            google_maps_uri: "https://maps.google.example/solo",
-          },
-          attribution: {
-            provider: "google",
-            render: "text",
-            text: "Powered by Google",
-          },
-        },
+        data: googleDisplay({
+          placeId: "google-solo",
+          name: "Solo Ramen",
+          mapsUri: "https://maps.google.example/solo",
+        }),
         error: null,
       }), jest.fn()),
     });
@@ -336,18 +349,11 @@ describe("verdictRepository", () => {
     const refetch = jest
       .fn()
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        place: {
-          place_id: "google-3",
-          display_name: "Third Place",
-          google_maps_uri: "https://maps.google.example/third",
-        },
-        attribution: {
-          provider: "google",
-          render: "text",
-          text: "Powered by Google",
-        },
-      });
+      .mockResolvedValueOnce(googleDisplay({
+        placeId: "google-3",
+        name: "Third Place",
+        mapsUri: "https://maps.google.example/third",
+      }));
 
     await expect(
       advanceVerdictSlate({
@@ -377,18 +383,11 @@ describe("verdictRepository", () => {
         error: new Error("google_place_unavailable"),
       })
       .mockResolvedValueOnce({
-        data: {
-          place: {
-            place_id: "google-3",
-            display_name: "Third Place",
-            google_maps_uri: "https://maps.google.example/third",
-          },
-          attribution: {
-            provider: "google",
-            render: "text",
-            text: "Powered by Google",
-          },
-        },
+        data: googleDisplay({
+          placeId: "google-3",
+          name: "Third Place",
+          mapsUri: "https://maps.google.example/third",
+        }),
         error: null,
       });
     const rpc = jest.fn().mockResolvedValue({ data: { ok: true }, error: null });

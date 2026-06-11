@@ -112,6 +112,11 @@ type SupabaseVerdictSlateEntryRow = {
   google_place_id: string;
 };
 
+type LatestVerdictAndSlate = {
+  verdict: SupabaseVerdictRow;
+  slateRows: SupabaseVerdictSlateEntryRow[];
+};
+
 type SupabaseMemberRow = {
   user_id: string;
   display_name?: string | null;
@@ -297,6 +302,15 @@ function rerollStateFor(rerolls: SupabaseRerollRow[]): RerollViewModel {
   };
 }
 
+function mapSlateRowsToEntries(
+  rows: SupabaseVerdictSlateEntryRow[],
+): VerdictSlateEntry[] {
+  return rows.map((row) => ({
+    googlePlaceId: row.google_place_id,
+    rank: row.slate_rank,
+  }));
+}
+
 export async function advanceVerdictSlate({
   slate,
   currentGooglePlaceId,
@@ -366,11 +380,15 @@ export function createSupabaseVerdictRepository({
 }: {
   supabase: VerdictSupabaseClient;
 }): VerdictRepository {
-  const loadLatestVerdictAndSlate = async (roomId: string) => {
+  const loadLatestVerdictAndSlate = async (
+    roomId: string,
+  ): Promise<LatestVerdictAndSlate> => {
     const verdictRows = assertSupabaseRows(
       await supabase
         .from<SupabaseVerdictRow>("verdicts")
-        .select("id, room_id, option_id, winner_google_place_id, computed_at, method, rule_text")
+        .select(
+          "id, room_id, option_id, winner_google_place_id, computed_at, method, rule_text",
+        )
         .eq("room_id", roomId)
         .order("computed_at", { ascending: false }),
       "Verdict read",
@@ -381,16 +399,18 @@ export function createSupabaseVerdictRepository({
       throw new Error("Verdict read failed: no row returned");
     }
 
-    const slateRows = verdict.method === "no_survivor" || !verdict.option_id
-      ? []
-      : assertSupabaseRows(
-        await supabase
-          .from<SupabaseVerdictSlateEntryRow>("verdict_slate_entries")
-          .select("verdict_id, slate_rank, google_place_id")
-          .eq("verdict_id", verdict.id)
-          .order("slate_rank", { ascending: true }),
-        "Verdict slate read",
-      );
+    if (verdict.method === "no_survivor" || !verdict.option_id) {
+      return { verdict, slateRows: [] };
+    }
+
+    const slateRows = assertSupabaseRows(
+      await supabase
+        .from<SupabaseVerdictSlateEntryRow>("verdict_slate_entries")
+        .select("verdict_id, slate_rank, google_place_id")
+        .eq("verdict_id", verdict.id)
+        .order("slate_rank", { ascending: true }),
+      "Verdict slate read",
+    );
 
     return {
       verdict,
@@ -479,10 +499,7 @@ export function createSupabaseVerdictRepository({
         "Verdict rerolls read",
       );
       const advance = await advanceVerdictSlate({
-        slate: slateRows.map((row) => ({
-          googlePlaceId: row.google_place_id,
-          rank: row.slate_rank,
-        })),
+        slate: mapSlateRowsToEntries(slateRows),
         currentGooglePlaceId,
         burnsUsed: rerollRows.length,
         refetch: (googlePlaceId) =>

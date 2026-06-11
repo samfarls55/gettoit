@@ -117,7 +117,7 @@ export interface GoogleVerdictDisplayResponse {
   attribution: GoogleAttributionPayload;
 }
 
-interface GoogleQ5ProxyDeps {
+interface GooglePlacesProxyDeps {
   fetch: FetchFn;
   googleApiKey: string;
 }
@@ -393,7 +393,7 @@ interface GoogleOpeningPoint {
 
 export async function handleGoogleQ5PlacesProxy(
   input: PlacesProxyInput,
-  deps: GoogleQ5ProxyDeps,
+  deps: GooglePlacesProxyDeps,
 ): Promise<GoogleQ5Response> {
   const googleApiKey = deps.googleApiKey;
   if (!googleApiKey) {
@@ -428,7 +428,7 @@ export async function handleGoogleQ5PlacesProxy(
 
 export async function handleGoogleVerdictDisplayProxy(
   raw: unknown,
-  deps: GoogleQ5ProxyDeps,
+  deps: GooglePlacesProxyDeps,
 ): Promise<GoogleVerdictDisplayResponse> {
   const googleApiKey = deps.googleApiKey;
   if (!googleApiKey) {
