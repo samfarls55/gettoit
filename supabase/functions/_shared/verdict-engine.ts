@@ -2,9 +2,8 @@
 // VerdictEngine â€” worst-off-protecting verdict pipeline (TB-11).
 //
 // Pure functions. No network, no Supabase client, no clock, no
-// ambient randomness (the one source of randomness is injected via
-// `VerdictEngineOptions.random` so the verdict is reproducible). The
-// Edge Function `compute-verdict/index.ts` composes this with the live
+// ambient randomness. The Edge Function `compute-verdict/index.ts`
+// composes this with the live
 // database read of votes + options + members and the live write of
 // verdicts + option_cuts. Running server-side is load-bearing: the
 // verdict must be byte-identical for every member.
@@ -27,10 +26,10 @@
 //      anti-defection mechanic (0.1.0-quiz-amendments Â§4, the Kim 2023
 //      backfire avoidance).
 //   5. Final tiebreak â€” equal minimums break on the higher group sum,
-//      then on the injected random.
+//      then on app-owned stable identity.
 //   6. Empty-floor cascade â€” when no venue clears the floor the engine
-//      relaxes T downward, then widens the search radius, then emits a
-//      terminal `no_survivor` screen. Hard-veto cuts never recover.
+//      relaxes T downward, then emits a terminal `no_survivor` screen.
+//      Hard-veto cuts never recover.
 //
 // Why TypeScript rather than PL/pgSQL: the rule-text formatting is
 // verbose to express in SQL and harder to fixture-test in CI without a
@@ -68,9 +67,9 @@ export interface CandidateOption {
    *  for diagnostic rule text. */
   categories: string[];
   /** Distance from the room's search centre, in meters. Used by the
-   *  empty-floor cascade's radius-widen step. Optional â€” when the
-   *  caller pre-filtered the pool to the radius it can be omitted and
-   *  the radius gate is a no-op. */
+   *  committed Search area eligibility gate. Optional â€” when the caller
+   *  pre-filtered the pool to the radius it can be omitted and the
+   *  radius gate is a no-op. */
   distance_meters?: number | null;
   /** Foursquare 0..10 venue rating. The engine never reads it â€” it is
    *  carried so the TB-23 server-side venue classifier can derive the
@@ -191,12 +190,11 @@ export interface VerdictEngineInput {
    *  0.1.0-quiz-amendments Â§4). Tunable post-cohort. */
   satisficing_threshold?: number;
   /** Initial room radius in meters. When supplied (with candidate
-   *  `distance_meters`), the EBA prune gates on it and the empty-floor
-   *  cascade may widen it. Omitting it (and `radius_meters_cap`) turns
+   *  `distance_meters`), the EBA prune gates on it. Omitting it turns
    *  the radius gate off â€” the caller pre-filtered the pool. */
   radius_meters?: number;
-  /** Upper bound for the radius-widen cascade step. Defaults to 8047 m
-   *  (5.0 mi â€” the S01 slider ceiling). */
+  /** Retained for callers that still pass the old radius-widen cap.
+   *  Locked Search areas ignore it. */
   radius_meters_cap?: number;
   /** Option ids to remove from the candidate pool BEFORE pruning.
    *  Populated by `avail`-reason rerolls. */
@@ -246,7 +244,7 @@ export interface VerdictEngineOutput {
   cuts: OptionCut[];
   /** Per-member receipt chips, rendered live on S05 (not DB-persisted). */
   receipts: VoiceReceipt[];
-  /** True when the final tiebreak fell through to the injected random
+  /** True when the final tiebreak fell through to stable identity
    *  (survivors tied on both minimum score and group sum). */
   flat_tiebreak_fallback: boolean;
   /** Empty-floor cascade steps applied, in fire order. Empty when the
@@ -274,7 +272,7 @@ export interface VerdictSlateEntry {
 }
 
 export interface VerdictEngineOptions {
-  /** Override the source of randomness for deterministic tests. */
+  /** Retained for backward-compatible callers; tie-breaks are stable. */
   random?: () => number;
 }
 
@@ -292,12 +290,6 @@ const MIN_THRESHOLD = 1;
 
 /** Step the cascade relaxes T by on each iteration. */
 const THRESHOLD_RELAX_STEP = 1;
-
-/** Default radius cap when the caller omits it (5.0 mi â‰ˆ 8047 m). */
-const DEFAULT_RADIUS_CAP_METERS = 8047;
-
-/** Radius widen step â€” 0.5 mi â‰ˆ 805 m. */
-const RADIUS_WIDEN_STEP_METERS = 805;
 
 /** Defensive bound on the cascade loop. */
 const MAX_CASCADE_ITERS = 64;
@@ -349,10 +341,8 @@ function lookupRequirement(chip: string): DietaryRequirement | undefined {
 
 export function computeVerdict(
   input: VerdictEngineInput,
-  options: VerdictEngineOptions = {},
+  _options: VerdictEngineOptions = {},
 ): VerdictEngineOutput {
-  const random = options.random ?? Math.random;
-
   // `avail`-reason rerolls remove an option from the pool before
   // pruning â€” it never reaches the cuts surface (it was never a
   // candidate this run).
@@ -370,8 +360,6 @@ export function computeVerdict(
 
   const initialThreshold = input.satisficing_threshold ?? DEFAULT_SATISFICING_THRESHOLD;
   const initialRadius = input.radius_meters ?? null;
-  const radiusCap = input.radius_meters_cap ?? DEFAULT_RADIUS_CAP_METERS;
-
   // â”€â”€ Step 1 â€” EBA prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Hard vetoes never relax. The EBA pass is run once; its survivors
   // feed every cascade iteration.
@@ -412,7 +400,6 @@ export function computeVerdict(
 
   // â”€â”€ Steps 3-6 â€” satisficing floor + maximin + cascade â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   let threshold = initialThreshold;
-  let radius = initialRadius;
   const relaxChain: RelaxStep[] = [];
 
   for (let iter = 0; iter < MAX_CASCADE_ITERS; iter++) {
@@ -427,9 +414,8 @@ export function computeVerdict(
         votes,
         method: input.method ?? "manual",
         threshold,
-        radiusMetersUsed: radius,
+        radiusMetersUsed: initialRadius,
         relaxChain,
-        random,
         rerollReason: input.reroll_reason,
         previousWinnerName: input.previous_winner_name,
       });
@@ -449,7 +435,7 @@ export function computeVerdict(
   return buildNoSurvivorOutput({
     votes,
     relaxChainApplied: relaxChain,
-    radiusMetersUsed: radius,
+    radiusMetersUsed: initialRadius,
     thresholdUsed: null,
   });
 }
@@ -732,7 +718,6 @@ interface SeatWinnerArgs {
   threshold: number;
   radiusMetersUsed: number | null;
   relaxChain: RelaxStep[];
-  random: () => number;
   rerollReason?: RerollReason;
   previousWinnerName?: string;
 }

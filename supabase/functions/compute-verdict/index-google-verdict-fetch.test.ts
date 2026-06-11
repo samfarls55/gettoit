@@ -5,6 +5,7 @@ import {
 import {
   type ComputeVerdictDataAdapter,
   type GoogleVerdictCandidateRow,
+  type GoogleVerdictFetchContext,
   handleRequest,
   type MemberVoteRow,
   type OptionCutInsert,
@@ -71,7 +72,7 @@ interface AdapterState {
   insertedOptions: OptionInsertRow[];
   insertedVerdicts: VerdictInsert[];
   insertedSlate: VerdictSlateEntryInsert[];
-  fetchContexts: unknown[];
+  fetchContexts: GoogleVerdictFetchContext[];
   memberFetchReadCount: number;
 }
 
@@ -82,7 +83,7 @@ function adapterForGoogleVerdictFetch(
   const insertedOptions: OptionInsertRow[] = [];
   const insertedVerdicts: VerdictInsert[] = [];
   const insertedSlate: VerdictSlateEntryInsert[] = [];
-  const fetchContexts: unknown[] = [];
+  const fetchContexts: GoogleVerdictFetchContext[] = [];
   let memberFetchReadCount = 0;
 
   const adapter: ComputeVerdictDataAdapter = {
@@ -156,7 +157,7 @@ function adapterForGoogleVerdictFetch(
     get memberFetchReadCount() {
       return memberFetchReadCount;
     },
-  } as AdapterState;
+  };
 }
 
 Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deterministic slate", async () => {

@@ -62,12 +62,6 @@ export type { MemberFetchRow, OptionInsertRow };
 // `_shared/votes-schema.ts`.
 export type { MemberPreferenceInputs };
 
-/** Hard upper bound for `radius_meters_override`. S05's widen-radius
- *  slider exposes 1..10 mi (1609..16093 m); the handler clamps
- *  defensively against client tampering or accidental wild values. */
-const WIDEN_RADIUS_HARD_CAP_METERS = 16093;
-const WIDEN_RADIUS_HARD_MIN_METERS = 805;
-
 export interface ComputeVerdictEnv {
   /** Supabase project URL. */
   SUPABASE_URL?: string;
@@ -426,6 +420,49 @@ function dedupeGoogleVerdictCandidates(
   return out;
 }
 
+async function fetchGoogleVerdictOptionRows(
+  data: ComputeVerdictDataAdapter,
+  roomId: string,
+  activeMemberIds: string[] | null,
+  voteRows: MemberVoteRow[],
+): Promise<RoomOptionRow[] | null> {
+  if (!data.fetchGoogleVerdictCandidates) return null;
+
+  const googleCandidates = await data.fetchGoogleVerdictCandidates(roomId, {
+    active_member_ids: activeMemberIds ?? voteRows.map((row) => row.user_id),
+    votes: voteRows,
+  });
+  const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(googleCandidates);
+  if (dedupedGoogleCandidates.length === 0 || !data.insertOptions) return null;
+
+  await data.insertOptions(dedupedGoogleCandidates.map((candidate) => ({
+    room_id: roomId,
+    fsq_place_id: candidate.google_place_id,
+    google_place_id: candidate.google_place_id,
+    payload: candidate.payload,
+  })));
+
+  const optionIdByGooglePlaceId = buildGoogleOptionIdMap(
+    await data.fetchOptions(roomId),
+  );
+  return dedupedGoogleCandidates.map((candidate) => ({
+    id: optionIdByGooglePlaceId.get(candidate.google_place_id) ?? candidate.google_place_id,
+    google_place_id: candidate.google_place_id,
+    place_provider: "google",
+    payload: candidate.payload,
+  }));
+}
+
+function buildGoogleOptionIdMap(optionRows: readonly RoomOptionRow[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const row of optionRows) {
+    if (typeof row.google_place_id === "string") {
+      out.set(row.google_place_id, row.id);
+    }
+  }
+  return out;
+}
+
 export async function handleRequest(
   req: Request,
   deps: ComputeVerdictDeps,
@@ -486,32 +523,24 @@ export async function handleRequest(
     : "manual";
 
   // Optional widen-radius override (S05 no-survivor "Widen radius"
-  // CTA, TB-09). When supplied, the handler bypasses the standard
-  // idempotency check for prior `no_survivor` verdicts so the engine
-  // can re-run at the wider radius. Clamped to the 1..10 mi window
-  // exposed by the S05 slider.
+  // CTA, TB-09). Plan-backed Rooms now lock search area parameters,
+  // so a numeric override is rejected before any adapter calls.
   const rawWiden = (body as { radius_meters_override?: unknown })?.radius_meters_override;
-  let widenOverride: number | null = null;
   if (typeof rawWiden === "number" && Number.isFinite(rawWiden)) {
-    widenOverride = Math.max(
-      WIDEN_RADIUS_HARD_MIN_METERS,
-      Math.min(WIDEN_RADIUS_HARD_CAP_METERS, Math.round(rawWiden)),
-    );
-  } else if (rawWiden !== undefined) {
-    return jsonResponse({
-      error: "invalid_input",
-      detail: "radius_meters_override must be a number when supplied",
-    }, {
-      status: 400,
-      headers: corsHeaders(),
-    });
-  }
-  if (widenOverride !== null) {
     return jsonResponse({
       error: "search_area_locked",
       detail: "Room parameters are locked; start a new decision to change them.",
     }, {
       status: 409,
+      headers: corsHeaders(),
+    });
+  }
+  if (rawWiden !== undefined) {
+    return jsonResponse({
+      error: "invalid_input",
+      detail: "radius_meters_override must be a number when supplied",
+    }, {
+      status: 400,
       headers: corsHeaders(),
     });
   }
@@ -530,25 +559,17 @@ export async function handleRequest(
 
   // Idempotency — if a verdict already exists for this room, return it
   // with the cuts, 200. TB-07 will use ON CONFLICT to support trigger-
-  // retry. The widen-radius re-run path is the one exception: when
-  // the caller supplies `radius_meters_override` AND the existing
-  // verdict is a `no_survivor`, drop the old verdict (cascading the
-  // option_cuts) so the engine can write a fresh row. TB-10 widens
-  // the exception list — when `last_reroll_reason` is set on the
-  // room, the apply_reroll RPC already deleted the prior verdict;
-  // any verdict we see now is post-reroll and must NOT be re-returned
-  // as "already_computed."
+  // retry. TB-10's reroll run is the exception: when
+  // `last_reroll_reason` is set on the room, the apply_reroll RPC
+  // already deleted the prior verdict; any verdict we see now is
+  // post-reroll and must NOT be re-returned as "already_computed."
   const existing = await data.existingVerdict(roomId);
   if (existing && !isRerollRun) {
-    if (widenOverride !== null && existing.method === "no_survivor") {
-      await data.deleteVerdictForRoom(roomId);
-    } else {
-      return jsonResponse({
-        verdict: existing,
-        cuts: [],
-        already_computed: true,
-      }, { status: 200, headers: corsHeaders() });
-    }
+    return jsonResponse({
+      verdict: existing,
+      cuts: [],
+      already_computed: true,
+    }, { status: 200, headers: corsHeaders() });
   } else if (existing && isRerollRun) {
     // Race: a stale verdict slipped past the apply_reroll DELETE.
     // Drop it so the fresh engine run can write under the UNIQUE
@@ -600,32 +621,14 @@ export async function handleRequest(
   // whose pool was already populated (a prior fire, a reroll re-run)
   // is left untouched, so the union is idempotent across re-invokes.
   let optionRows = await data.fetchOptions(roomId);
-  const googleCandidates = data.fetchGoogleVerdictCandidates
-    ? await data.fetchGoogleVerdictCandidates(roomId, {
-      active_member_ids: activeMemberIds ?? voteRows.map((row) => row.user_id),
-      votes: voteRows,
-    })
-    : [];
-  const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(googleCandidates);
-  if (dedupedGoogleCandidates.length > 0 && data.insertOptions) {
-    await data.insertOptions(dedupedGoogleCandidates.map((candidate) => ({
-      room_id: roomId,
-      fsq_place_id: candidate.google_place_id,
-      google_place_id: candidate.google_place_id,
-      payload: candidate.payload,
-    })));
-    const persistedOptionRows = await data.fetchOptions(roomId);
-    const optionIdByGooglePlaceId = new Map(
-      persistedOptionRows
-        .filter((row) => typeof row.google_place_id === "string")
-        .map((row) => [row.google_place_id as string, row.id]),
-    );
-    optionRows = dedupedGoogleCandidates.map((candidate) => ({
-      id: optionIdByGooglePlaceId.get(candidate.google_place_id) ?? candidate.google_place_id,
-      google_place_id: candidate.google_place_id,
-      place_provider: "google",
-      payload: candidate.payload,
-    }));
+  const googleOptionRows = await fetchGoogleVerdictOptionRows(
+    data,
+    roomId,
+    activeMemberIds,
+    voteRows,
+  );
+  if (googleOptionRows) {
+    optionRows = googleOptionRows;
   } else if (
     optionRows.length === 0 &&
     data.fetchMemberFetches &&
@@ -651,17 +654,8 @@ export async function handleRequest(
   // landed, so the room stayed `firing` forever and iOS polled a
   // verdict that never resolved. The empty pool now flows through.
 
-  // Start with the override when supplied; fall back to the stored
-  // room radius for the standard fire path.
-  const startingRadius = widenOverride
-    ?? (await data.fetchRoomRadius(roomId))
-    ?? null;
-  // Widen-radius re-runs lift the cap to the requested override (so
-  // the engine doesn't itself widen past where the user asked). The
-  // standard fire path keeps the engine's default 5 mi cap.
-  const radiusCap = widenOverride !== null
-    ? widenOverride
-    : undefined;
+  // Use the committed room radius as the hard Search area boundary.
+  const startingRadius = (await data.fetchRoomRadius(roomId)) ?? null;
 
   const candidates: CandidateOption[] = optionRows.map((row) => ({
     id: row.id,
@@ -781,7 +775,6 @@ export async function handleRequest(
       votes,
       method,
       radius_meters: startingRadius ?? undefined,
-      radius_meters_cap: radiusCap,
       excluded_option_ids: rerollState?.excluded_option_ids,
       reroll_reason: rerollState?.last_reroll_reason ?? undefined,
       previous_winner_name: previousWinnerName,
