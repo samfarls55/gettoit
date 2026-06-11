@@ -511,6 +511,10 @@ function Q5Probe({
     );
   }
 
+  const attributionText = candidates.find(
+    (candidate) => candidate.attributionText,
+  )?.attributionText;
+
   return (
     <View style={styles.question}>
       <Text style={styles.eyebrow}>Q5</Text>
@@ -556,6 +560,9 @@ function Q5Probe({
           </View>
         ))}
       </View>
+      {attributionText ? (
+        <Text style={styles.q5Attribution}>{attributionText}</Text>
+      ) : null}
       <Pressable
         accessibilityRole="button"
         onPress={onSubmit}
@@ -638,6 +645,13 @@ const styles = StyleSheet.create({
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
     letterSpacing: 1.5,
+  },
+  q5Attribution: {
+    alignSelf: "center",
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontSize: mobileTokens.typography.eyebrow.size,
+    fontWeight: mobileTokens.typography.eyebrow.weight,
+    letterSpacing: 0,
   },
   ratingRow: {
     flexDirection: "row",

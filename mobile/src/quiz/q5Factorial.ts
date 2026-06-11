@@ -4,12 +4,14 @@ export type Q5VenueProfile = {
   cuisine: string | null;
   reputation: string;
   vibe: number;
+  vibeConfidence?: number;
 };
 
 export type Q5PoolVenue = {
   id: string;
   name: string;
   categories: string[];
+  attributionText?: string;
   priceTier?: number;
   walkMinutesEstimate?: number;
   profile: Q5VenueProfile;
@@ -30,80 +32,163 @@ export type Q5Candidate = {
   id: string;
   name: string;
   meta: string;
+  attributionText?: string;
   droppedAxis: Q5Axis;
 };
 
 type GenerateInput = {
   member: Q5MemberProfile;
+  memberId?: string;
   pool: Q5PoolVenue[];
+  q5CardSetId?: string;
 };
+
+type ReplacementInput = GenerateInput & {
+  currentCards: Q5FactorialCard[];
+  failedVenueId: string;
+  retryPool?: Q5PoolVenue[];
+  retryCardSetId?: string;
+};
+
+export type Q5ReplacementResult =
+  | { kind: "replaced"; cards: Q5FactorialCard[] }
+  | { kind: "retry"; cards: Q5FactorialCard[] }
+  | { kind: "no-results" };
 
 const noPreferenceReputation = "noPreference";
 
 export function generateQ5FactorialCards({
   member,
+  memberId,
   pool,
+  q5CardSetId,
 }: GenerateInput): Q5FactorialCard[] | null {
   const probedCuisines = selectProbedCuisines(member, pool);
   const reputationDropCuisine = probedCuisines[0] ?? null;
   const vibeDropCuisine = probedCuisines[1] ?? probedCuisines[0] ?? null;
-  const usedVenueIds = new Set<string>();
 
-  const cuisineDrop = pickVenue(pool, usedVenueIds, {
-    cuisine: (cuisine) => !cuisine || !member.cuisines.includes(cuisine),
-    reputation: (reputation) =>
-      member.reputation === noPreferenceReputation ||
-      reputation === member.reputation,
-    vibe: (vibe) => vibe === member.vibe,
-  });
+  for (const vibeTolerance of [0, 1, 2, 3, 4]) {
+    const usedVenueIds = new Set<string>();
+    const cuisineDrop = pickVenue(pool, usedVenueIds, {
+      cuisine: (cuisine) => !cuisine || !member.cuisines.includes(cuisine),
+      reputation: (reputation) =>
+        member.reputation === noPreferenceReputation ||
+        reputation === member.reputation,
+      vibe: (vibe) => Math.abs(vibe - member.vibe) <= vibeTolerance,
+    });
 
-  if (!cuisineDrop) {
-    return null;
+    if (!cuisineDrop) {
+      continue;
+    }
+
+    usedVenueIds.add(cuisineDrop.id);
+
+    const reputationDrop = pickVenue(pool, usedVenueIds, {
+      cuisine: (cuisine) =>
+        reputationDropCuisine === null || cuisine === reputationDropCuisine,
+      reputation: (reputation) =>
+        member.reputation === noPreferenceReputation ||
+        reputation !== member.reputation,
+      vibe: (vibe) => Math.abs(vibe - member.vibe) <= vibeTolerance,
+    });
+
+    if (!reputationDrop) {
+      continue;
+    }
+
+    usedVenueIds.add(reputationDrop.id);
+
+    const vibeDrop = pickVenue(pool, usedVenueIds, {
+      cuisine: (cuisine) => vibeDropCuisine === null || cuisine === vibeDropCuisine,
+      reputation: (reputation) =>
+        member.reputation === noPreferenceReputation ||
+        reputation === member.reputation,
+      vibe: (vibe) => Math.abs(vibe - member.vibe) > vibeTolerance,
+    });
+
+    if (!vibeDrop) {
+      continue;
+    }
+
+    const cards = [
+      { venue: cuisineDrop, droppedAxis: "cuisine" as const },
+      { venue: reputationDrop, droppedAxis: "reputation" as const },
+      { venue: vibeDrop, droppedAxis: "vibe" as const },
+    ];
+
+    return memberId && q5CardSetId
+      ? deterministicShuffle(cards, `${memberId}:${q5CardSetId}`)
+      : cards;
   }
 
-  usedVenueIds.add(cuisineDrop.id);
-
-  const reputationDrop = pickVenue(pool, usedVenueIds, {
-    cuisine: (cuisine) =>
-      reputationDropCuisine === null || cuisine === reputationDropCuisine,
-    reputation: (reputation) =>
-      member.reputation === noPreferenceReputation ||
-      reputation !== member.reputation,
-    vibe: (vibe) => vibe === member.vibe,
-  });
-
-  if (!reputationDrop) {
-    return null;
-  }
-
-  usedVenueIds.add(reputationDrop.id);
-
-  const vibeDrop = pickVenue(pool, usedVenueIds, {
-    cuisine: (cuisine) => vibeDropCuisine === null || cuisine === vibeDropCuisine,
-    reputation: (reputation) =>
-      member.reputation === noPreferenceReputation ||
-      reputation === member.reputation,
-    vibe: (vibe) => vibe !== member.vibe,
-  });
-
-  if (!vibeDrop) {
-    return null;
-  }
-
-  return [
-    { venue: cuisineDrop, droppedAxis: "cuisine" },
-    { venue: reputationDrop, droppedAxis: "reputation" },
-    { venue: vibeDrop, droppedAxis: "vibe" },
-  ];
+  return null;
 }
 
 export function q5CardsToCandidates(cards: Q5FactorialCard[]): Q5Candidate[] {
   return cards.map((card) => ({
     id: card.venue.id,
     name: card.venue.name,
-    meta: metaString(card.venue),
+    meta: card.venue.attributionText ? "" : metaString(card.venue),
+    ...(card.venue.attributionText
+      ? { attributionText: card.venue.attributionText }
+      : {}),
     droppedAxis: card.droppedAxis,
   }));
+}
+
+export function replaceQ5FactorialCard({
+  currentCards,
+  failedVenueId,
+  member,
+  memberId,
+  pool,
+  retryPool,
+  retryCardSetId,
+}: ReplacementInput): Q5ReplacementResult {
+  const failedIndex = currentCards.findIndex(
+    (card) => card.venue.id === failedVenueId,
+  );
+  if (failedIndex === -1) {
+    return { kind: "replaced", cards: currentCards };
+  }
+
+  const failedCard = currentCards[failedIndex];
+  const usedVenueIds = new Set([
+    failedVenueId,
+    ...currentCards
+      .filter((card) => card.venue.id !== failedVenueId)
+      .map((card) => card.venue.id),
+  ]);
+  const replacement = pickReplacementForAxis(
+    failedCard.droppedAxis,
+    member,
+    pool,
+    usedVenueIds,
+  );
+
+  if (replacement) {
+    const cards = [...currentCards];
+    cards[failedIndex] = {
+      venue: replacement,
+      droppedAxis: failedCard.droppedAxis,
+    };
+    return { kind: "replaced", cards };
+  }
+
+  const retryCards = retryCardSetId
+    ? generateQ5FactorialCards({
+      member,
+      memberId,
+      pool: (retryPool ?? pool).filter((venue) => venue.id !== failedVenueId),
+      q5CardSetId: retryCardSetId,
+    })
+    : null;
+
+  if (retryCards) {
+    return { kind: "retry", cards: retryCards };
+  }
+
+  return { kind: "no-results" };
 }
 
 export function selectProbedCuisines(
@@ -159,6 +244,82 @@ function pickVenue(
         rules.vibe(venue.profile.vibe),
     ) ?? null
   );
+}
+
+function pickReplacementForAxis(
+  axis: Q5Axis,
+  member: Q5MemberProfile,
+  pool: Q5PoolVenue[],
+  usedVenueIds: Set<string>,
+): Q5PoolVenue | null {
+  for (const vibeTolerance of [0, 1, 2, 3, 4]) {
+    const vibeMatches = (vibe: number) =>
+      Math.abs(vibe - member.vibe) <= vibeTolerance;
+    const vibeDiffers = (vibe: number) =>
+      Math.abs(vibe - member.vibe) > vibeTolerance;
+
+    const rules = axis === "cuisine"
+      ? {
+        cuisine: (cuisine: string | null) =>
+          !cuisine || !member.cuisines.includes(cuisine),
+        reputation: (reputation: string) =>
+          member.reputation === noPreferenceReputation ||
+          reputation === member.reputation,
+        vibe: vibeMatches,
+      }
+      : axis === "reputation"
+      ? {
+        cuisine: (cuisine: string | null) =>
+          member.cuisines.length === 0 ||
+          (cuisine !== null && member.cuisines.includes(cuisine)),
+        reputation: (reputation: string) =>
+          member.reputation === noPreferenceReputation ||
+          reputation !== member.reputation,
+        vibe: vibeMatches,
+      }
+      : {
+        cuisine: (cuisine: string | null) =>
+          member.cuisines.length === 0 ||
+          (cuisine !== null && member.cuisines.includes(cuisine)),
+        reputation: (reputation: string) =>
+          member.reputation === noPreferenceReputation ||
+          reputation === member.reputation,
+        vibe: vibeDiffers,
+      };
+    const replacement = pickVenue(pool, usedVenueIds, rules);
+    if (replacement) {
+      return replacement;
+    }
+  }
+
+  return null;
+}
+
+function deterministicShuffle<T>(items: T[], seed: string): T[] {
+  const shuffled = [...items];
+  let state = hashSeed(seed);
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    state = nextRandomState(state);
+    const swapIndex = state % (index + 1);
+    [shuffled[index], shuffled[swapIndex]] = [
+      shuffled[swapIndex],
+      shuffled[index],
+    ];
+  }
+  return shuffled;
+}
+
+function hashSeed(seed: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function nextRandomState(state: number): number {
+  return (Math.imul(state, 1664525) + 1013904223) >>> 0;
 }
 
 function metaString(venue: Q5PoolVenue): string {

@@ -215,4 +215,59 @@ describe("QuizScreen Q5", () => {
       expect(onSubmitted).toHaveBeenCalledTimes(1);
     });
   });
+
+  it("renders Google-backed Q5 cards as name-only with attribution", async () => {
+    render(
+      <QuizScreen
+        onExited={jest.fn()}
+        progressRepository={makeProgressRepository()}
+        q5CandidateRepository={makeCandidateRepository([
+          {
+            id: "google-thai",
+            name: "Thai Orchid",
+            categories: [],
+            attributionText: "Powered by Google",
+            priceTier: 2,
+            walkMinutesEstimate: 6,
+            profile: { cuisine: "thai", reputation: "popular", vibe: 2 },
+          },
+          {
+            id: "google-casa",
+            name: "Casa Lupita",
+            categories: [],
+            attributionText: "Powered by Google",
+            priceTier: 1,
+            walkMinutesEstimate: 9,
+            profile: { cuisine: "mexican", reputation: "hiddenGem", vibe: 2 },
+          },
+          {
+            id: "google-farol",
+            name: "El Farol",
+            categories: [],
+            attributionText: "Powered by Google",
+            priceTier: 3,
+            walkMinutesEstimate: 4,
+            profile: { cuisine: "mexican", reputation: "popular", vibe: 4 },
+          },
+        ])}
+        role="initiator"
+        roomId="room-q5"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Q4")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("SOCIAL"));
+    fireEvent.press(screen.getByText("Save vibe"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Thai Orchid")).toBeOnTheScreen();
+    });
+
+    expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
+    expect(screen.queryByText("$$ - 6 MIN")).toBeNull();
+    expect(screen.queryByText("THAI - $$ - 6 MIN")).toBeNull();
+  });
 });
