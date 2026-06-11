@@ -54,6 +54,25 @@ describe("generateQ5FactorialCards", () => {
     );
   });
 
+  it("uses two selected-cuisine keep cards and one contrast card for one cuisine", () => {
+    const cards = generateQ5FactorialCards({
+      member: mexicanSocialPopular,
+      pool: [
+        venue("contrast", "thai", "popular", 2),
+        venue("keep-reputation", "mexican", "hiddenGem", 2),
+        venue("keep-vibe", "mexican", "popular", 4),
+        venue("unused-perfect", "mexican", "popular", 2),
+      ],
+    });
+
+    expect(cards).not.toBeNull();
+    expect(cards?.map((card) => card.venue.profile.cuisine)).toEqual([
+      "thai",
+      "mexican",
+      "mexican",
+    ]);
+  });
+
   it("returns null for empty or invalid pools instead of placeholder venues", () => {
     expect(
       generateQ5FactorialCards({

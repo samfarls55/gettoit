@@ -314,6 +314,107 @@ const GOOGLE_NEARBY_SEARCH_URL =
 export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
 export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName";
 export const GOOGLE_Q5_MAX_RESULTS = 20;
+export const GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT = 50;
+
+export const GOOGLE_Q1_CUISINE_PRIMARY_TYPES: Record<string, readonly string[]> = {
+  american: [
+    "american_restaurant",
+    "hamburger_restaurant",
+    "barbecue_restaurant",
+    "steak_house",
+    "diner",
+    "chicken_restaurant",
+    "chicken_wings_restaurant",
+    "hot_dog_restaurant",
+    "hot_dog_stand",
+    "soul_food_restaurant",
+    "southwestern_us_restaurant",
+  ],
+  mexican: [
+    "mexican_restaurant",
+    "taco_restaurant",
+    "tex_mex_restaurant",
+    "burrito_restaurant",
+  ],
+  italian: ["italian_restaurant", "pizza_restaurant"],
+  japanese: [
+    "japanese_restaurant",
+    "sushi_restaurant",
+    "ramen_restaurant",
+    "japanese_curry_restaurant",
+    "japanese_izakaya_restaurant",
+    "tonkatsu_restaurant",
+    "yakiniku_restaurant",
+    "yakitori_restaurant",
+  ],
+  chinese: [
+    "chinese_restaurant",
+    "chinese_noodle_restaurant",
+    "dim_sum_restaurant",
+    "cantonese_restaurant",
+  ],
+  thai: ["thai_restaurant"],
+  indian: [
+    "indian_restaurant",
+    "north_indian_restaurant",
+    "south_indian_restaurant",
+  ],
+  mediterranean: [
+    "mediterranean_restaurant",
+    "greek_restaurant",
+    "tapas_restaurant",
+  ],
+  middle_eastern: [
+    "middle_eastern_restaurant",
+    "lebanese_restaurant",
+    "falafel_restaurant",
+    "kebab_shop",
+    "shawarma_restaurant",
+    "persian_restaurant",
+    "israeli_restaurant",
+    "turkish_restaurant",
+    "afghani_restaurant",
+    "moroccan_restaurant",
+  ],
+  korean: ["korean_restaurant", "korean_barbecue_restaurant"],
+  vietnamese: ["vietnamese_restaurant"],
+  seafood: [
+    "seafood_restaurant",
+    "fish_and_chips_restaurant",
+    "oyster_bar_restaurant",
+  ],
+  comfort_food: [
+    "family_restaurant",
+    "fast_food_restaurant",
+    "buffet_restaurant",
+    "sandwich_shop",
+    "deli",
+    "food_court",
+    "cafeteria",
+    "bar_and_grill",
+    "gastropub",
+  ],
+};
+
+export function googlePrimaryTypesForCuisineSelection(
+  cuisines: readonly string[],
+): string[] {
+  const selected = cuisines.length === 0
+    ? Object.keys(GOOGLE_Q1_CUISINE_PRIMARY_TYPES)
+    : cuisines;
+  const types: string[] = [];
+  const seen = new Set<string>();
+
+  for (const cuisine of selected) {
+    for (const type of GOOGLE_Q1_CUISINE_PRIMARY_TYPES[cuisine] ?? []) {
+      if (seen.has(type)) continue;
+      seen.add(type);
+      types.push(type);
+    }
+  }
+
+  return types;
+}
 
 type GoogleNearbySearchResponse = {
   places?: Array<{
@@ -334,21 +435,33 @@ export async function handleGoogleQ5PlacesProxy(
     );
   }
 
-  const response = await fetchGoogleNearbyWithRetry(
+  const responses = await fetchGoogleNearbyWithRetry(
     input,
     deps.fetch,
     googleApiKey,
   );
-  if (!response.ok) {
-    throw new GooglePlacesGuardrailError(
-      `google_places_upstream_${response.status}`,
-      `Google Places returned ${response.status}`,
-    );
+
+  const places: GoogleQ5Place[] = [];
+  const seenPlaceIds = new Set<string>();
+  for (const response of responses) {
+    if (!response.ok) {
+      throw new GooglePlacesGuardrailError(
+        `google_places_upstream_${response.status}`,
+        `Google Places returned ${response.status}`,
+      );
+    }
+
+    for (const place of shapeGoogleQ5Places(
+      (await response.json()) as GoogleNearbySearchResponse,
+    )) {
+      if (seenPlaceIds.has(place.place_id)) continue;
+      seenPlaceIds.add(place.place_id);
+      places.push(place);
+    }
   }
 
-  const body = (await response.json()) as GoogleNearbySearchResponse;
   return {
-    places: shapeGoogleQ5Places(body),
+    places,
     attribution: {
       provider: "google",
       render: "text",
@@ -361,13 +474,16 @@ async function fetchGoogleNearbyWithRetry(
   input: PlacesProxyInput,
   fetch: FetchFn,
   googleApiKey: string,
-): Promise<Response> {
-  const init = buildGoogleQ5Request(input, googleApiKey);
-  let response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
-  if (response.status === 429 || response.status >= 500) {
-    response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+): Promise<Response[]> {
+  const responses: Response[] = [];
+  for (const init of buildGoogleQ5Requests(input, googleApiKey)) {
+    let response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+    if (response.status === 429 || response.status >= 500) {
+      response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
+    }
+    responses.push(response);
   }
-  return response;
+  return responses;
 }
 
 function shapeGoogleQ5Places(
@@ -390,11 +506,14 @@ function shapeGoogleQ5Places(
   return places;
 }
 
-function buildGoogleQ5Request(
+function buildGoogleQ5Requests(
   input: PlacesProxyInput,
   apiKey: string,
-): RequestInit {
-  return {
+): RequestInit[] {
+  const cuisine = input.filters?.cuisine;
+  return chunkPrimaryTypes(
+    googlePrimaryTypesForCuisineSelection(cuisine ? [cuisine] : []),
+  ).map((includedPrimaryTypes) => ({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -402,7 +521,7 @@ function buildGoogleQ5Request(
       "X-Goog-FieldMask": GOOGLE_Q5_FIELD_MASK,
     },
     body: JSON.stringify({
-      includedPrimaryTypes: ["restaurant"],
+      includedPrimaryTypes,
       maxResultCount: GOOGLE_Q5_MAX_RESULTS,
       locationRestriction: {
         circle: {
@@ -414,5 +533,13 @@ function buildGoogleQ5Request(
         },
       },
     }),
-  };
+  }));
+}
+
+function chunkPrimaryTypes(types: string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let index = 0; index < types.length; index += GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT) {
+    chunks.push(types.slice(index, index + GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT));
+  }
+  return chunks;
 }

@@ -161,6 +161,7 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
         lat: 1.0,
         lng: 2.0,
         radius_meters: 100,
+        filters: { cuisine: "mexican" },
       }),
     }),
     {

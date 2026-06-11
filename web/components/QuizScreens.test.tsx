@@ -25,7 +25,7 @@ const FACTORIAL_CARDS: QuizCandidate[] = [
 ];
 
 describe("QuizQ1Cuisine", () => {
-  it("renders the eight cuisine chips plus No preference and toggles", () => {
+  it("renders the approved cuisine chips plus No preference and toggles", () => {
     const calls: string[] = [];
     render(
       <QuizQ1Cuisine
@@ -35,9 +35,26 @@ describe("QuizQ1Cuisine", () => {
         onAdvance={() => {}}
       />,
     );
-    for (const label of ["Mexican", "Italian", "Japanese", "No preference"]) {
+    for (const label of [
+      "American",
+      "Mexican",
+      "Italian",
+      "Japanese",
+      "Chinese",
+      "Thai",
+      "Indian",
+      "Mediterranean",
+      "Middle Eastern",
+      "Korean",
+      "Vietnamese",
+      "Seafood",
+      "Comfort Food",
+      "No preference",
+    ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
+    expect(screen.queryByText("Vegan")).toBeNull();
+    expect(screen.queryByText("Breakfast")).toBeNull();
     fireEvent.click(screen.getByText("Italian"));
     expect(calls).toEqual(["italian"]);
   });

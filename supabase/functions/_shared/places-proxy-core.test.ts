@@ -15,6 +15,8 @@ import {
   type CacheAdapter,
   type CacheRow,
   FoursquareUpstreamError,
+  googlePrimaryTypesForCuisineSelection,
+  GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT,
   GOOGLE_Q5_FIELD_MASK,
   GooglePlacesGuardrailError,
   handleGoogleQ5PlacesProxy,
@@ -200,7 +202,10 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
     }), { status: 200, headers: { "Content-Type": "application/json" } }));
   };
 
-  const result = await handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
+  const result = await handleGoogleQ5PlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { ...TYPICAL_INPUT.filters, cuisine: "mexican" },
+  }, {
     fetch,
     googleApiKey: "google-secret",
   });
@@ -212,6 +217,12 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
   assertEquals(headers["X-Goog-FieldMask"], GOOGLE_Q5_FIELD_MASK);
   assertEquals(headers["Content-Type"], "application/json");
   const requestBody = JSON.parse(calls[0].init?.body as string);
+  assertEquals(requestBody.includedPrimaryTypes, [
+    "mexican_restaurant",
+    "taco_restaurant",
+    "tex_mex_restaurant",
+    "burrito_restaurant",
+  ]);
   assertEquals(requestBody.locationRestriction.circle.center.latitude, 40.7128);
   assertEquals(requestBody.locationRestriction.circle.center.longitude, -74.006);
   assertEquals(requestBody.locationRestriction.circle.radius, 1600);
@@ -242,6 +253,79 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
   }
 });
 
+Deno.test("google q5 — maps one Q1 cuisine chip to Google primary types", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fetch: ProxyDeps["fetch"] = (input, init) => {
+    calls.push({ url: String(input), init });
+    return Promise.resolve(new Response(JSON.stringify({ places: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+  };
+
+  await handleGoogleQ5PlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { ...TYPICAL_INPUT.filters, cuisine: "mexican" },
+  }, {
+    fetch,
+    googleApiKey: "google-secret",
+  });
+
+  const requestBody = JSON.parse(calls[0].init?.body as string);
+  assertEquals(requestBody.includedPrimaryTypes, [
+    "mexican_restaurant",
+    "taco_restaurant",
+    "tex_mex_restaurant",
+    "burrito_restaurant",
+  ]);
+});
+
+Deno.test("google q5 — No Preference maps to the Q1-selectable union only", async () => {
+  const calls: { url: string; init?: RequestInit }[] = [];
+  const fetch: ProxyDeps["fetch"] = (input, init) => {
+    calls.push({ url: String(input), init });
+    return Promise.resolve(new Response(JSON.stringify({ places: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+  };
+
+  await handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
+    fetch,
+    googleApiKey: "google-secret",
+  });
+
+  const primaryTypeChunks = calls.map((call) =>
+    JSON.parse(call.init?.body as string).includedPrimaryTypes as string[]
+  );
+  for (const chunk of primaryTypeChunks) {
+    assert(
+      chunk.length <= GOOGLE_INCLUDED_PRIMARY_TYPES_LIMIT,
+      "each Google Nearby Search type restriction chunk must stay within provider limits",
+    );
+  }
+  assertEquals(
+    primaryTypeChunks.flat(),
+    googlePrimaryTypesForCuisineSelection([]),
+  );
+  assertEquals(primaryTypeChunks.flat().includes("food"), false);
+  assertEquals(primaryTypeChunks.flat().includes("vegan_restaurant"), false);
+  assertEquals(primaryTypeChunks.flat().includes("breakfast_restaurant"), false);
+});
+
+Deno.test("google q5 — multiple selected cuisines compile by union, not intersection", () => {
+  assertEquals(
+    googlePrimaryTypesForCuisineSelection(["mexican", "thai"]),
+    [
+      "mexican_restaurant",
+      "taco_restaurant",
+      "tex_mex_restaurant",
+      "burrito_restaurant",
+      "thai_restaurant",
+    ],
+  );
+});
+
 Deno.test("google q5 — retries one transient failure then fails closed", async () => {
   const calls: Response[] = [
     new Response("temporary", { status: 503 }),
@@ -252,7 +336,10 @@ Deno.test("google q5 — retries one transient failure then fails closed", async
 
   await assertRejects(
     () =>
-      handleGoogleQ5PlacesProxy(TYPICAL_INPUT, {
+      handleGoogleQ5PlacesProxy({
+        ...TYPICAL_INPUT,
+        filters: { ...TYPICAL_INPUT.filters, cuisine: "mexican" },
+      }, {
         fetch,
         googleApiKey: "google-secret",
       }),

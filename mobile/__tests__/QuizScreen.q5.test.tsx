@@ -56,6 +56,48 @@ const candidatePool = [
   },
 ];
 
+describe("QuizScreen Q1", () => {
+  it("renders the approved cuisine chips and excludes dietary or meal-time chips", async () => {
+    render(
+      <QuizScreen
+        onExited={jest.fn()}
+        progressRepository={{
+          loadProgress: jest.fn(async () => null),
+          saveProgress: jest.fn(async () => undefined),
+          exitPlan: jest.fn(async () => undefined),
+        }}
+        role="initiator"
+        roomId="room-q1"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Q1")).toBeOnTheScreen();
+    });
+
+    for (const label of [
+      "American",
+      "Mexican",
+      "Italian",
+      "Japanese",
+      "Chinese",
+      "Thai",
+      "Indian",
+      "Mediterranean",
+      "Middle Eastern",
+      "Korean",
+      "Vietnamese",
+      "Seafood",
+      "Comfort Food",
+      "No preference",
+    ]) {
+      expect(screen.getByText(label)).toBeOnTheScreen();
+    }
+    expect(screen.queryByText("Vegan")).toBeNull();
+    expect(screen.queryByText("Breakfast")).toBeNull();
+  });
+});
+
 describe("QuizScreen Q5", () => {
   it("loads real candidates after Q4 and renders the Q5 preference probe", async () => {
     const progressRepository = makeProgressRepository();

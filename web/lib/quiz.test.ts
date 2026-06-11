@@ -152,9 +152,24 @@ describe("schema invariants", () => {
     expect(VIBE_LABELS).toEqual(["QUIET", "CHILL", "SOCIAL", "LIVELY", "ROWDY"]);
   });
 
-  it("has the canonical 8 cuisine options", () => {
-    expect(CUISINE_OPTIONS).toHaveLength(8);
-    expect(CUISINE_OPTIONS.map((c) => c.id)).toContain("mexican");
+  it("has the canonical Google Q1 cuisine options", () => {
+    expect(CUISINE_OPTIONS.map((c) => c.label)).toEqual([
+      "American",
+      "Mexican",
+      "Italian",
+      "Japanese",
+      "Chinese",
+      "Thai",
+      "Indian",
+      "Mediterranean",
+      "Middle Eastern",
+      "Korean",
+      "Vietnamese",
+      "Seafood",
+      "Comfort Food",
+    ]);
+    expect(CUISINE_OPTIONS.map((c) => c.label)).not.toContain("Vegan");
+    expect(CUISINE_OPTIONS.map((c) => c.label)).not.toContain("Breakfast");
   });
 
   it("has the canonical 5 reputation chips including No preference", () => {

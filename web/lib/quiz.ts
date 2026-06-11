@@ -33,14 +33,19 @@ export const CUISINE_CAP = 3;
 /** Q1 cuisine options. The `id` is the stable engine wire value, the
  *  `label` is displayed copy. Display order matches mobile `QuizCuisine`. */
 export const CUISINE_OPTIONS: Array<{ id: string; label: string }> = [
+  { id: "american", label: "American" },
   { id: "mexican", label: "Mexican" },
   { id: "italian", label: "Italian" },
   { id: "japanese", label: "Japanese" },
   { id: "chinese", label: "Chinese" },
   { id: "thai", label: "Thai" },
   { id: "indian", label: "Indian" },
-  { id: "american", label: "American" },
   { id: "mediterranean", label: "Mediterranean" },
+  { id: "middle_eastern", label: "Middle Eastern" },
+  { id: "korean", label: "Korean" },
+  { id: "vietnamese", label: "Vietnamese" },
+  { id: "seafood", label: "Seafood" },
+  { id: "comfort_food", label: "Comfort Food" },
 ];
 
 // ───────────────────────────────────────────────────────────────────────
