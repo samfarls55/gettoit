@@ -130,6 +130,10 @@ export class FoursquareUpstreamError extends Error {
   }
 }
 
+function isGoogleServiceShape(value: unknown): value is "dineIn" | "takeout" {
+  return value === "dineIn" || value === "takeout";
+}
+
 export function validateInput(raw: unknown): PlacesProxyInput {
   if (!raw || typeof raw !== "object") {
     throw new PlacesProxyInputError("body must be a JSON object");
@@ -182,8 +186,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const cuisine = typeof filters.cuisine === "string"
     ? filters.cuisine
     : undefined;
-  const service_shape = filters.service_shape === "dineIn" ||
-      filters.service_shape === "takeout"
+  const service_shape = isGoogleServiceShape(filters.service_shape)
     ? filters.service_shape
     : undefined;
   return {

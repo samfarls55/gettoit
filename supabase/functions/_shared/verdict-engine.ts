@@ -451,6 +451,11 @@ interface EbaResult {
   cuts: OptionCut[];
 }
 
+interface RoomEligibility {
+  mealTiming?: { open_at?: string | null };
+  serviceShape?: "dineIn" | "takeout" | null;
+}
+
 /** Drop venues failing ANY member's hard vetoes. Three veto channels,
  *  all hard (none relax): Q2 spend cap, Q1-era dietary chips, and the
  *  generic `hard_vetoes` channel (TB-12 profile allergies / dietary /
@@ -458,10 +463,7 @@ interface EbaResult {
 function ebaPrune(
   candidates: CandidateOption[],
   votes: MemberVote[],
-  roomEligibility: {
-    mealTiming?: { open_at?: string | null };
-    serviceShape?: "dineIn" | "takeout" | null;
-  } = {},
+  roomEligibility: RoomEligibility = {},
 ): EbaResult {
   // Q2 cap â€” the binding cap is the MIN tier among members.
   const minBudget = votes.reduce(
@@ -500,10 +502,7 @@ function ebaPrune(
 
   const survivors: CandidateOption[] = [];
   const cuts: OptionCut[] = [];
-  const hasRoomEligibility =
-    !!roomEligibility.mealTiming ||
-    roomEligibility.serviceShape === "dineIn" ||
-    roomEligibility.serviceShape === "takeout";
+  const hasRoomEligibility = shouldApplyRoomEligibility(roomEligibility);
 
   for (const c of candidates) {
     if (hasRoomEligibility && !passesRoomEligibility(c, roomEligibility)) {
@@ -578,12 +577,15 @@ function ebaPrune(
   return { survivors, cuts };
 }
 
+function shouldApplyRoomEligibility(roomEligibility: RoomEligibility): boolean {
+  return !!roomEligibility.mealTiming ||
+    roomEligibility.serviceShape === "dineIn" ||
+    roomEligibility.serviceShape === "takeout";
+}
+
 function passesRoomEligibility(
   candidate: CandidateOption,
-  roomEligibility: {
-    mealTiming?: { open_at?: string | null };
-    serviceShape?: "dineIn" | "takeout" | null;
-  },
+  roomEligibility: RoomEligibility,
 ): boolean {
   const openAt = roomEligibility.mealTiming?.open_at ?? null;
   if (openAt) {
