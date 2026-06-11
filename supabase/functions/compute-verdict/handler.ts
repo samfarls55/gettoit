@@ -39,6 +39,7 @@ import {
   computeVerdict,
   type HardVeto,
   type MemberVote,
+  type OpeningPeriod,
   type VerdictEngineOutput,
   type VerdictMethod,
 } from "../_shared/verdict-engine.ts";
@@ -88,7 +89,11 @@ export interface ComputeVerdictDataAdapter {
    *  here and the Plan transition is skipped entirely. The supabase
    *  adapter selects `id, plan_id` so the field is always populated
    *  one-way-or-the-other. */
-  fetchRoom(room_id: string): Promise<{ id: string; plan_id?: string | null } | null>;
+  fetchRoom(room_id: string): Promise<{
+    id: string;
+    plan_id?: string | null;
+    session_params?: Record<string, unknown> | null;
+  } | null>;
   /** Fetch candidate options for the room. */
   fetchOptions(room_id: string): Promise<RoomOptionRow[]>;
   /** TB-21 — fetch every member's persisted raw Foursquare fetch for
@@ -222,6 +227,17 @@ export interface RoomOptionRow {
     /** TB-23 — Foursquare crowd-sourced `tastes` tag cloud. Read by the
      *  classifier for the vibe nudge. */
     tastes?: string[];
+    current_open_now?: boolean | null;
+    currentOpeningHours?: { openNow?: boolean | null } | null;
+    regular_open_now?: boolean | null;
+    regular_opening_periods?: OpeningPeriod[];
+    regularOpeningHours?: {
+      openNow?: boolean | null;
+      periods?: OpeningPeriod[];
+    } | null;
+    dine_in?: boolean | null;
+    dineIn?: boolean | null;
+    takeout?: boolean | null;
   };
 }
 
@@ -356,6 +372,29 @@ export function mergeHardVetoes(
     out.push(v);
   }
   return out;
+}
+
+function roomMealTiming(
+  sessionParams: Record<string, unknown> | null,
+): { open_at?: string | null } | undefined {
+  if (!sessionParams) return undefined;
+  const nested = sessionParams.meal_timing;
+  const nestedOpenAt = nested && typeof nested === "object"
+    ? (nested as Record<string, unknown>).open_at
+    : undefined;
+  const openAt = typeof nestedOpenAt === "string"
+    ? nestedOpenAt
+    : sessionParams.open_at;
+  return { open_at: typeof openAt === "string" ? openAt : null };
+}
+
+function roomServiceShape(
+  sessionParams: Record<string, unknown> | null,
+): "dineIn" | "takeout" | null {
+  const serviceShape = sessionParams?.service_shape;
+  return serviceShape === "dineIn" || serviceShape === "takeout"
+    ? serviceShape
+    : null;
 }
 
 export async function handleRequest(
@@ -564,6 +603,15 @@ export async function handleRequest(
     total_ratings: row.payload?.total_ratings ?? null,
     date_created: row.payload?.date_created ?? null,
     tastes: row.payload?.tastes ?? [],
+    current_open_now: row.payload?.current_open_now ??
+      row.payload?.currentOpeningHours?.openNow ??
+      row.payload?.regular_open_now ??
+      row.payload?.regularOpeningHours?.openNow ??
+      null,
+    regular_opening_periods: row.payload?.regular_opening_periods ??
+      row.payload?.regularOpeningHours?.periods,
+    dine_in: row.payload?.dine_in ?? row.payload?.dineIn ?? null,
+    takeout: row.payload?.takeout ?? null,
   }));
 
   // TB-23 — classify the FULL candidate pool into per-venue
@@ -661,6 +709,8 @@ export async function handleRequest(
     result = computeVerdict({
       candidates,
       votes,
+      meal_timing: roomMealTiming(room.session_params ?? null),
+      service_shape: roomServiceShape(room.session_params ?? null),
       method,
       radius_meters: startingRadius ?? undefined,
       radius_meters_cap: radiusCap,

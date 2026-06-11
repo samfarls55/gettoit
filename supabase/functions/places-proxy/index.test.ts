@@ -145,6 +145,7 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
       places: [{
         id: "google-1",
         displayName: { text: "Only Name" },
+        currentOpeningHours: { openNow: true },
         rating: 4.7,
         formattedAddress: "Hidden address",
       }],

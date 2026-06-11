@@ -182,9 +182,13 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const cuisine = typeof filters.cuisine === "string"
     ? filters.cuisine
     : undefined;
+  const service_shape = filters.service_shape === "dineIn" ||
+      filters.service_shape === "takeout"
+    ? filters.service_shape
+    : undefined;
   return {
     lat, lng, radius_meters: radius,
-    filters: { dietary, price_tier, open_at, cuisine },
+    filters: { dietary, price_tier, open_at, cuisine, service_shape },
   };
 }
 
@@ -312,15 +316,42 @@ export async function handlePlacesProxy(
 const GOOGLE_NEARBY_SEARCH_URL =
   "https://places.googleapis.com/v1/places:searchNearby";
 export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
-export const GOOGLE_Q5_FIELD_MASK = "places.id,places.displayName";
+export const GOOGLE_Q5_FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.currentOpeningHours",
+  "places.regularOpeningHours",
+  "places.dineIn",
+  "places.takeout",
+].join(",");
 export const GOOGLE_Q5_MAX_RESULTS = 20;
 
 type GoogleNearbySearchResponse = {
   places?: Array<{
     id?: unknown;
     displayName?: { text?: unknown };
+    currentOpeningHours?: GoogleOpeningHours;
+    regularOpeningHours?: GoogleOpeningHours;
+    dineIn?: unknown;
+    takeout?: unknown;
   }>;
 };
+
+interface GoogleOpeningHours {
+  openNow?: unknown;
+  periods?: GoogleOpeningPeriod[];
+}
+
+interface GoogleOpeningPeriod {
+  open?: GoogleOpeningPoint;
+  close?: GoogleOpeningPoint;
+}
+
+interface GoogleOpeningPoint {
+  day?: unknown;
+  hour?: unknown;
+  minute?: unknown;
+}
 
 export async function handleGoogleQ5PlacesProxy(
   input: PlacesProxyInput,
@@ -348,7 +379,7 @@ export async function handleGoogleQ5PlacesProxy(
 
   const body = (await response.json()) as GoogleNearbySearchResponse;
   return {
-    places: shapeGoogleQ5Places(body),
+    places: shapeGoogleQ5Places(input, body),
     attribution: {
       provider: "google",
       render: "text",
@@ -371,6 +402,7 @@ async function fetchGoogleNearbyWithRetry(
 }
 
 function shapeGoogleQ5Places(
+  input: PlacesProxyInput,
   body: GoogleNearbySearchResponse,
 ): GoogleQ5Place[] {
   const places: GoogleQ5Place[] = [];
@@ -381,6 +413,9 @@ function shapeGoogleQ5Places(
     ) {
       continue;
     }
+    if (!isGooglePlaceEligibleForTimingAndService(place, input)) {
+      continue;
+    }
 
     places.push({
       place_id: place.id,
@@ -388,6 +423,89 @@ function shapeGoogleQ5Places(
     });
   }
   return places;
+}
+
+function isGooglePlaceEligibleForTimingAndService(
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+  input: PlacesProxyInput,
+): boolean {
+  const openAt = input.filters?.open_at;
+  const serviceShape = input.filters?.service_shape;
+
+  if (openAt) {
+    if (!isOpenAtGoogleRegularTime(place.regularOpeningHours, openAt)) {
+      return false;
+    }
+  } else if (
+    place.currentOpeningHours?.openNow !== true &&
+    place.regularOpeningHours?.openNow !== true
+  ) {
+    return false;
+  }
+
+  if (serviceShape === "dineIn" && place.dineIn !== true) {
+    return false;
+  }
+  if (serviceShape === "takeout" && place.takeout === false) {
+    return false;
+  }
+  return true;
+}
+
+function isOpenAtGoogleRegularTime(
+  hours: GoogleOpeningHours | undefined,
+  openAt: string,
+): boolean {
+  const target = parseOpenAtToken(openAt);
+  if (!target || !Array.isArray(hours?.periods)) return false;
+  return hours.periods.some((period) => periodContainsGoogleMinute(period, target));
+}
+
+function parseOpenAtToken(
+  openAt: string,
+): { googleDay: number; minuteOfDay: number } | null {
+  const match = /^([1-7])T([0-2][0-9])([0-5][0-9])$/.exec(openAt);
+  if (!match) return null;
+  const foursquareDay = Number(match[1]);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  if (hour > 23) return null;
+  return {
+    googleDay: foursquareDay === 7 ? 0 : foursquareDay,
+    minuteOfDay: hour * 60 + minute,
+  };
+}
+
+function periodContainsGoogleMinute(
+  period: GoogleOpeningPeriod,
+  target: { googleDay: number; minuteOfDay: number },
+): boolean {
+  const open = googlePointMinuteOfWeek(period.open);
+  const close = googlePointMinuteOfWeek(period.close);
+  if (open === null || close === null) return false;
+  const targetMinute = target.googleDay * 24 * 60 + target.minuteOfDay;
+  if (close > open) {
+    return targetMinute >= open && targetMinute < close;
+  }
+  return targetMinute >= open || targetMinute < close;
+}
+
+function googlePointMinuteOfWeek(point: GoogleOpeningPoint | undefined): number | null {
+  if (!point) return null;
+  if (
+    typeof point.day !== "number" ||
+    typeof point.hour !== "number" ||
+    typeof point.minute !== "number" ||
+    point.day < 0 ||
+    point.day > 6 ||
+    point.hour < 0 ||
+    point.hour > 23 ||
+    point.minute < 0 ||
+    point.minute > 59
+  ) {
+    return null;
+  }
+  return point.day * 24 * 60 + point.hour * 60 + point.minute;
 }
 
 function buildGoogleQ5Request(

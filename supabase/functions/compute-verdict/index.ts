@@ -50,14 +50,18 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       // S01-created rooms); the handler treats a NULL as "no Plan."
       const { data, error } = await client
         .from("rooms")
-        .select("id, plan_id")
+        .select("id, plan_id, session_params")
         .eq("id", room_id)
         .maybeSingle();
       if (error) {
         console.warn("compute-verdict fetchRoom failed:", error.message);
         return null;
       }
-      return (data ?? null) as { id: string; plan_id: string | null } | null;
+      return (data ?? null) as {
+        id: string;
+        plan_id: string | null;
+        session_params: Record<string, unknown> | null;
+      } | null;
     },
     async fetchOptions(room_id): Promise<RoomOptionRow[]> {
       const { data, error } = await client

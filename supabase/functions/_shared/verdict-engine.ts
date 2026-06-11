@@ -85,6 +85,27 @@ export interface CandidateOption {
   /** Foursquare crowd-sourced `tastes` tag cloud. Carried for the
    *  TB-23 venue classifier's vibe nudge. The engine never reads it. */
   tastes?: string[];
+  /** Transient Google current-hours signal. Missing is ineligible for
+   *  immediate/current meal timing. */
+  current_open_now?: boolean | null;
+  /** Transient Google regular-hours periods. Missing is ineligible for
+   *  future/recurring meal timing. */
+  regular_opening_periods?: OpeningPeriod[];
+  /** Transient Google service-mode facts. Dine-in requires explicit
+   *  true; takeout only cuts explicit false. */
+  dine_in?: boolean | null;
+  takeout?: boolean | null;
+}
+
+export interface OpeningPeriod {
+  open?: OpeningPoint;
+  close?: OpeningPoint;
+}
+
+export interface OpeningPoint {
+  day?: number;
+  hour?: number;
+  minute?: number;
 }
 
 /** A generic, schema-driven hard veto. TB-12 profile vetoes
@@ -154,6 +175,10 @@ export type RerollReason = "cost" | "dist" | "mood" | "diet" | "avail";
 export interface VerdictEngineInput {
   candidates: CandidateOption[];
   votes: MemberVote[];
+  /** Shared Room meal timing Parameter. Absent means immediate/current. */
+  meal_timing?: { open_at?: string | null };
+  /** Shared Room service-mode Parameter. */
+  service_shape?: "dineIn" | "takeout" | null;
   /** Optional caller-supplied method; defaults to `manual`. The
    *  auto-fire dispatcher passes `quorum` / `deadline`. The engine
    *  overrides to `no_survivor` when the cascade is exhausted. */
@@ -338,7 +363,10 @@ export function computeVerdict(
   // â”€â”€ Step 1 â€” EBA prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Hard vetoes never relax. The EBA pass is run once; its survivors
   // feed every cascade iteration.
-  const ebaResult = ebaPrune(candidates, votes);
+  const ebaResult = ebaPrune(candidates, votes, {
+    mealTiming: input.meal_timing,
+    serviceShape: input.service_shape,
+  });
 
   // â”€â”€ Empty-pool / all-pruned short circuit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (ebaResult.survivors.length === 0) {
@@ -430,6 +458,10 @@ interface EbaResult {
 function ebaPrune(
   candidates: CandidateOption[],
   votes: MemberVote[],
+  roomEligibility: {
+    mealTiming?: { open_at?: string | null };
+    serviceShape?: "dineIn" | "takeout" | null;
+  } = {},
 ): EbaResult {
   // Q2 cap â€” the binding cap is the MIN tier among members.
   const minBudget = votes.reduce(
@@ -468,8 +500,21 @@ function ebaPrune(
 
   const survivors: CandidateOption[] = [];
   const cuts: OptionCut[] = [];
+  const hasRoomEligibility =
+    !!roomEligibility.mealTiming ||
+    roomEligibility.serviceShape === "dineIn" ||
+    roomEligibility.serviceShape === "takeout";
 
   for (const c of candidates) {
+    if (hasRoomEligibility && !passesRoomEligibility(c, roomEligibility)) {
+      cuts.push({
+        option_id: c.id,
+        cut_reason: "availability",
+        cut_text: "unavailable for this Plan",
+      });
+      continue;
+    }
+
     // Q2 spend cap.
     if (c.price_tier !== null && c.price_tier > minBudget) {
       cuts.push({
@@ -531,6 +576,87 @@ function ebaPrune(
   }
 
   return { survivors, cuts };
+}
+
+function passesRoomEligibility(
+  candidate: CandidateOption,
+  roomEligibility: {
+    mealTiming?: { open_at?: string | null };
+    serviceShape?: "dineIn" | "takeout" | null;
+  },
+): boolean {
+  const openAt = roomEligibility.mealTiming?.open_at ?? null;
+  if (openAt) {
+    if (!isOpenAtRegularTime(candidate.regular_opening_periods, openAt)) {
+      return false;
+    }
+  } else if (candidate.current_open_now !== true) {
+    return false;
+  }
+
+  if (roomEligibility.serviceShape === "dineIn" && candidate.dine_in !== true) {
+    return false;
+  }
+  if (roomEligibility.serviceShape === "takeout" && candidate.takeout === false) {
+    return false;
+  }
+  return true;
+}
+
+function isOpenAtRegularTime(
+  periods: OpeningPeriod[] | undefined,
+  openAt: string,
+): boolean {
+  const target = parseOpenAtToken(openAt);
+  if (!target || !Array.isArray(periods)) return false;
+  return periods.some((period) => periodContainsMinute(period, target));
+}
+
+function parseOpenAtToken(
+  openAt: string,
+): { googleDay: number; minuteOfDay: number } | null {
+  const match = /^([1-7])T([0-2][0-9])([0-5][0-9])$/.exec(openAt);
+  if (!match) return null;
+  const foursquareDay = Number(match[1]);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  if (hour > 23) return null;
+  return {
+    googleDay: foursquareDay === 7 ? 0 : foursquareDay,
+    minuteOfDay: hour * 60 + minute,
+  };
+}
+
+function periodContainsMinute(
+  period: OpeningPeriod,
+  target: { googleDay: number; minuteOfDay: number },
+): boolean {
+  const open = pointMinuteOfWeek(period.open);
+  const close = pointMinuteOfWeek(period.close);
+  if (open === null || close === null) return false;
+  const targetMinute = target.googleDay * 24 * 60 + target.minuteOfDay;
+  if (close > open) {
+    return targetMinute >= open && targetMinute < close;
+  }
+  return targetMinute >= open || targetMinute < close;
+}
+
+function pointMinuteOfWeek(point: OpeningPoint | undefined): number | null {
+  if (
+    !point ||
+    typeof point.day !== "number" ||
+    typeof point.hour !== "number" ||
+    typeof point.minute !== "number" ||
+    point.day < 0 ||
+    point.day > 6 ||
+    point.hour < 0 ||
+    point.hour > 23 ||
+    point.minute < 0 ||
+    point.minute > 59
+  ) {
+    return null;
+  }
+  return point.day * 24 * 60 + point.hour * 60 + point.minute;
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

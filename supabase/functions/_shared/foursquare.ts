@@ -58,6 +58,10 @@ export interface PlacesProxyFilters {
    *  category-scoped). An unknown / absent value degrades gracefully to
    *  the general query â€” no error. */
   cuisine?: string;
+  /** Shared Room service-mode parameter. Google candidate eligibility
+   *  treats dine-in as hard explicit true, while takeout only cuts an
+   *  explicit false. */
+  service_shape?: "dineIn" | "takeout";
 }
 
 /** Shape returned to the iOS / web clients. Matches the `options.payload`

@@ -242,6 +242,74 @@ Deno.test("google q5 — owns field mask and returns name-only places with attri
   }
 });
 
+Deno.test("google q5 — applies meal timing and service-mode eligibility before shaping", async () => {
+  const fetch: ProxyDeps["fetch"] = () =>
+    Promise.resolve(new Response(JSON.stringify({
+      places: [
+        {
+          id: "current-open-dine-in",
+          displayName: { text: "Open Dine-In" },
+          currentOpeningHours: { openNow: true },
+          dineIn: true,
+        },
+        {
+          id: "current-closed",
+          displayName: { text: "Closed Now" },
+          currentOpeningHours: { openNow: false },
+          dineIn: true,
+        },
+        {
+          id: "missing-hours",
+          displayName: { text: "Missing Hours" },
+          dineIn: true,
+        },
+        {
+          id: "future-open-takeout-unknown",
+          displayName: { text: "Future Open" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+        },
+        {
+          id: "future-no-takeout",
+          displayName: { text: "No Takeout" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+          takeout: false,
+        },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+  const current = await handleGoogleQ5PlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { service_shape: "dineIn" },
+  }, { fetch, googleApiKey: "google-secret" });
+
+  assertEquals(current.places, [
+    { place_id: "current-open-dine-in", display_name: "Open Dine-In" },
+  ]);
+
+  const future = await handleGoogleQ5PlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { open_at: "3T1900", service_shape: "takeout" },
+  }, { fetch, googleApiKey: "google-secret" });
+
+  assertEquals(future.places, [
+    { place_id: "future-open-takeout-unknown", display_name: "Future Open" },
+  ]);
+});
+
 Deno.test("google q5 — retries one transient failure then fails closed", async () => {
   const calls: Response[] = [
     new Response("temporary", { status: 503 }),
