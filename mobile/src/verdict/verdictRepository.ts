@@ -58,25 +58,27 @@ export type HistoryVerdictViewModel = {
   roomId: string;
   planName: string;
   decidedAtLabel: string;
-  display:
-    | {
-        status: "available";
-        placeName: string;
-        formattedAddress: string | null;
-        googleMapsUri: string;
-        attributionText: string;
-      }
-    | {
-        status: "unavailable";
-        placeName: "Place unavailable";
-        details: string;
-      };
+  display: HistoryVerdictDisplay;
 };
 
 export type VerdictViewModel =
   | LiveVerdictViewModel
   | NoSurvivorVerdictViewModel
   | HistoryVerdictViewModel;
+
+export type HistoryVerdictDisplay =
+  | {
+      status: "available";
+      placeName: string;
+      formattedAddress: string | null;
+      googleMapsUri: string;
+      attributionText: string;
+    }
+  | {
+      status: "unavailable";
+      placeName: "Place unavailable";
+      details: string;
+    };
 
 export type VerdictRepository = {
   loadVerdict: (input: {
@@ -363,6 +365,14 @@ function decidedAtLabel(isoTime: string | null): string {
   })}`;
 }
 
+function unavailableHistoryDisplay(): HistoryVerdictDisplay {
+  return {
+    status: "unavailable",
+    placeName: "Place unavailable",
+    details: "Unavailable details. Current place data could not be refetched.",
+  };
+}
+
 function mapSlateRowsToEntries(
   rows: SupabaseVerdictSlateEntryRow[],
 ): VerdictSlateEntry[] {
@@ -579,11 +589,7 @@ export function createSupabaseVerdictRepository({
       if (!googlePlaceId) {
         return {
           ...base,
-          display: {
-            status: "unavailable",
-            placeName: "Place unavailable",
-            details: "Unavailable details. Current place data could not be refetched.",
-          },
+          display: unavailableHistoryDisplay(),
         };
       }
 
@@ -603,11 +609,7 @@ export function createSupabaseVerdictRepository({
       } catch {
         return {
           ...base,
-          display: {
-            status: "unavailable",
-            placeName: "Place unavailable",
-            details: "Unavailable details. Current place data could not be refetched.",
-          },
+          display: unavailableHistoryDisplay(),
         };
       }
     },

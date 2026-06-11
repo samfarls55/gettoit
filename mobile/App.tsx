@@ -627,15 +627,18 @@ export function MobileAppShell({
     let isCurrent = true;
     setVerdict(null);
 
-    const loadVerdict =
+    const verdictRequest =
       route.name === "readOnlyVerdict"
-        ? verdictRepository.loadHistoryVerdict
-        : verdictRepository.loadVerdict;
+        ? verdictRepository.loadHistoryVerdict({
+            roomId: quizSession.roomId,
+            flavor: verdictFlavor,
+          })
+        : verdictRepository.loadVerdict({
+            roomId: quizSession.roomId,
+            flavor: verdictFlavor,
+          });
 
-    loadVerdict({
-      roomId: quizSession.roomId,
-      flavor: verdictFlavor,
-    })
+    verdictRequest
       .then((nextVerdict) => {
         if (isCurrent) {
           setVerdict(nextVerdict);

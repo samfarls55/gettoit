@@ -390,6 +390,12 @@ export type GoogleOutcomeLabel = typeof GOOGLE_OUTCOME_LABELS[number];
 export type GoogleOperationalReceiptCode =
   typeof GOOGLE_OPERATIONAL_RECEIPT_CODES[number];
 export type GoogleReasonCode = typeof GOOGLE_REASON_CODES[number];
+type GoogleObservabilityRedactionOptions = {
+  allowGooglePlaceIds?: boolean;
+};
+
+const GOOGLE_DISPLAY_CONTENT_REDACTION = "[redacted_google_display_content]";
+const GOOGLE_PLACE_ID_REDACTION = "[redacted_google_place_id]";
 
 const GOOGLE_OBSERVABILITY_FORBIDDEN_KEYS = new Set([
   "display_name",
@@ -454,7 +460,7 @@ export function assertGoogleReasonCode(value: unknown): GoogleReasonCode {
 
 export function redactGoogleObservabilityValue(
   value: unknown,
-  options: { allowGooglePlaceIds?: boolean } = {},
+  options: GoogleObservabilityRedactionOptions = {},
 ): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => redactGoogleObservabilityValue(item, options));
@@ -466,11 +472,11 @@ export function redactGoogleObservabilityValue(
   const redacted: Record<string, unknown> = {};
   for (const [key, entryValue] of Object.entries(value)) {
     if (GOOGLE_OBSERVABILITY_FORBIDDEN_KEYS.has(key)) {
-      redacted[key] = "[redacted_google_display_content]";
+      redacted[key] = GOOGLE_DISPLAY_CONTENT_REDACTION;
       continue;
     }
     if (GOOGLE_PLACE_ID_KEYS.has(key) && !options.allowGooglePlaceIds) {
-      redacted[key] = "[redacted_google_place_id]";
+      redacted[key] = GOOGLE_PLACE_ID_REDACTION;
       continue;
     }
     redacted[key] = redactGoogleObservabilityValue(entryValue, options);
