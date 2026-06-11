@@ -16,7 +16,6 @@
     ],
     "ios": {
       "bundleIdentifier": "app.gettoit.GetToIt",
-      "buildNumber": "1004",
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "associatedDomains": [

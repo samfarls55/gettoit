@@ -34,6 +34,17 @@ Active TestFlight shipping is owned by `.github/workflows/testflight.yml`.
 
 The workflow checks out the requested ref, installs `mobile/` dependencies, runs `npm run verify`, then runs `eas build` for iOS with `--wait` and JSON summary output. When submit mode is true, it uses EAS auto-submit with the production submit profile. Optional `/ship` notes are recorded in the GitHub run summary, not forwarded to EAS/TestFlight; EAS currently treats that field as an Enterprise-plan-only changelog parameter for this account.
 
+## Build number source of truth
+
+As of June 10, 2026, TestFlight build numbers are owned by EAS remote versioning, not `mobile/app.json`.
+
+- `mobile/eas.json` must keep `cli.appVersionSource` set to `remote`.
+- `mobile/eas.json` keeps `build.production.autoIncrement: true`.
+- `mobile/app.json` must not define `expo.ios.buildNumber`.
+- `.github/workflows/testflight.yml` fails before creating an EAS build if these invariants regress.
+
+Reason: local build numbers repeatedly drifted behind App Store Connect. A committed `buildNumber` of `1004` produced CI builds that auto-incremented only inside the runner to `1005`, colliding with an already-uploaded TestFlight build. EAS remote versioning makes the EAS server the durable counter so repeated CI dispatches keep incrementing.
+
 ## Manual fallback commands
 
 Run from `mobile/`:
@@ -48,8 +59,8 @@ If EAS asks to manage Apple credentials, choose automatic credential management 
 
 ## Agent-verifiable configuration
 
-- `mobile/app.json` carries bundle id `app.gettoit.GetToIt`, build number `1003`, Apple Sign-In, associated domain `applinks:gettoit.app`, location usage copy, and EAS project id.
-- `mobile/eas.json` uses a production store build profile, local app version source, auto-incremented build numbers, and App Store Connect app id `6769440299`.
+- `mobile/app.json` carries bundle id `app.gettoit.GetToIt`, Apple Sign-In, associated domain `applinks:gettoit.app`, location usage copy, and EAS project id. It intentionally does not carry `expo.ios.buildNumber`.
+- `mobile/eas.json` uses a production store build profile, remote app version source, auto-incremented build numbers, and App Store Connect app id `6769440299`.
 - `.github/workflows/ci.yml` verifies the active Expo mobile app with `npm run verify` in `mobile/`.
 - `.github/workflows/ci.yml` disables the legacy Swift `ios` and Swift TestFlight jobs; old Swift release upload is no longer an active CI path.
 

@@ -57,6 +57,24 @@ jobs:
       - run: npm ci
       - run: npm run verify
 
+      - name: Require remote EAS build numbering
+        run: |
+          set -euo pipefail
+          if [ "$(jq -r '.cli.appVersionSource // empty' eas.json)" != "remote" ]; then
+            echo "mobile/eas.json must use cli.appVersionSource=remote for TestFlight builds." >&2
+            echo "Local app.json build numbers have caused duplicate App Store Connect uploads." >&2
+            exit 1
+          fi
+          if [ "$(jq -r '.expo.ios | has("buildNumber")' app.json)" = "true" ]; then
+            echo "Remove expo.ios.buildNumber from mobile/app.json." >&2
+            echo "EAS remote versioning is the TestFlight build-number source of truth." >&2
+            exit 1
+          fi
+          npx --yes eas-cli@latest build:version:get \
+            --platform ios \
+            --profile production \
+            --json
+
       - name: Resolve release notes
         env:
           INPUT_GIT_REF: ${{ inputs.git_ref }}
