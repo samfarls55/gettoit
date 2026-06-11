@@ -346,6 +346,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       FOURSQUARE_API_KEY: ${{ secrets.FOURSQUARE_API_KEY }}
+      GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
       SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       # tb-WF-13 — the AES-GCM key the mint-claim-code function encrypts
@@ -399,6 +400,15 @@ jobs:
           supabase secrets set \
             --project-ref "$SUPABASE_PROJECT_REF" \
             FOURSQUARE_API_KEY="$FOURSQUARE_API_KEY"
+          if [ -n "${GOOGLE_PLACES_API_KEY:-}" ]; then
+            supabase secrets set \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              GOOGLE_PLACES_API_KEY="$GOOGLE_PLACES_API_KEY"
+          else
+            echo "GOOGLE_PLACES_API_KEY repo secret is not set -" >&2
+            echo "google-places-readiness requires it to already exist as" >&2
+            echo "a Supabase Edge Function secret." >&2
+          fi
           if [ -n "${CLAIM_CODE_ENC_KEY:-}" ]; then
             supabase secrets set \
               --project-ref "$SUPABASE_PROJECT_REF" \
@@ -418,7 +428,7 @@ jobs:
           set -euo pipefail
           supabase functions deploy places-proxy \
             --project-ref "$SUPABASE_PROJECT_REF"
-          for fn in apns-sender compute-verdict delete-user mint-claim-code redeem-claim-code; do
+          for fn in google-places-readiness apns-sender compute-verdict delete-user mint-claim-code redeem-claim-code; do
             echo "Deploying $fn"
             supabase functions deploy "$fn" \
               --project-ref "$SUPABASE_PROJECT_REF"
@@ -439,4 +449,6 @@ jobs:
       - name: deno test (places-proxy live integration)
         if: steps.gate.outputs.skip == 'false'
         working-directory: supabase/functions
-        run: deno test --allow-net --allow-env --allow-read places-proxy/live-integration.test.ts
+        run: |
+          deno test --allow-net --allow-env --allow-read places-proxy/live-integration.test.ts
+          deno test --allow-net --allow-env --allow-read google-places-readiness/live-integration.test.ts
