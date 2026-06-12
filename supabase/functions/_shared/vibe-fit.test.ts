@@ -4,6 +4,7 @@ import {
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
+  buildVibeFitCandidate,
   extractVibeEvidenceSpans,
   scoreVibeFitCandidate,
   VIBE_FIT_CONFIG,
@@ -28,8 +29,9 @@ Deno.test("TB-03: Vibe anchors are versioned across the five backend bands", () 
 
 Deno.test("TB-03: span assembly selects source spans and excludes non-vibe facts", () => {
   const spans = extractVibeEvidenceSpans({
-    sourceTexts: [
+    summaryTexts: [
       {
+        source: "reviewSummary",
         priority: 1,
         text:
           "Quiet corner booths make conversation easy. The steakhouse serves seafood towers, offers takeout, has gluten-free pasta, is expensive, highly rated, and popular.",
@@ -44,8 +46,9 @@ Deno.test("TB-03: span assembly selects source spans and excludes non-vibe facts
 
 Deno.test("TB-03: span assembly handles simple negation without confident keyword inversion", () => {
   const spans = extractVibeEvidenceSpans({
-    sourceTexts: [
+    summaryTexts: [
       {
+        source: "reviewSummary",
         priority: 1,
         text:
           "Not loud, not too crowded, and not quiet after 10pm, with a lively bar at dinner.",
@@ -67,8 +70,9 @@ Deno.test("TB-03: span assembly handles simple negation without confident keywor
 
 Deno.test("TB-03: span assembly caps deterministic evidence at five spans", () => {
   const spans = extractVibeEvidenceSpans({
-    sourceTexts: [
+    summaryTexts: [
       {
+        source: "reviewSummary",
         priority: 2,
         text:
           "Energetic room. Quiet patio. Cozy booths. Buzzy bar. Rowdy late night. Relaxed lounge. Social dining room.",
@@ -97,7 +101,7 @@ Deno.test("TB-03: projection maps synthetic atmosphere fixtures across all five 
   for (const [text, expectedPosition] of fixtures) {
     const signal = scoreVibeFitCandidate({
       candidateId: `fixture-${expectedPosition}`,
-      sourceTexts: [{ priority: 1, text }],
+      summaryTexts: [{ source: "reviewSummary", priority: 1, text }],
       embeddingMode: "fake",
     });
 
@@ -110,8 +114,9 @@ Deno.test("TB-03: projection maps synthetic atmosphere fixtures across all five 
 Deno.test("TB-03: synonym-heavy descriptors project semantically with fake embeddings", () => {
   const signal = scoreVibeFitCandidate({
     candidateId: "synonyms",
-    sourceTexts: [
+    summaryTexts: [
       {
+        source: "reviewSummary",
         priority: 1,
         text:
           "Intimate date-night room with mellow candlelit energy and calm conversation.",
@@ -129,8 +134,9 @@ Deno.test("TB-03: synonym-heavy descriptors project semantically with fake embed
 Deno.test("TB-03: type food service quality and crowd-only text stays neutral", () => {
   const signal = scoreVibeFitCandidate({
     candidateId: "neutral",
-    sourceTexts: [
+    summaryTexts: [
       {
+        source: "reviewSummary",
         priority: 1,
         text:
           "Italian restaurant with pizza, counter service, takeout, vegan options, cheap lunch specials, excellent reviews, and a 4.8 rating.",
@@ -150,8 +156,9 @@ Deno.test("TB-03: type food service quality and crowd-only text stays neutral", 
 Deno.test("TB-03: mixed quiet and rowdy evidence lowers confidence and records conflict", () => {
   const signal = scoreVibeFitCandidate({
     candidateId: "conflict",
-    sourceTexts: [
+    summaryTexts: [
       {
+        source: "reviewSummary",
         priority: 1,
         text:
           "Quiet intimate booths up front. Loud packed party bar after dinner.",
@@ -172,8 +179,9 @@ Deno.test("TB-03: mixed quiet and rowdy evidence lowers confidence and records c
 Deno.test("TB-03: complex negation and sarcasm lower confidence instead of producing high confidence", () => {
   const signal = scoreVibeFitCandidate({
     candidateId: "ambiguous",
-    sourceTexts: [
+    summaryTexts: [
       {
+        source: "reviewSummary",
         priority: 1,
         text:
           "Not exactly quiet if you enjoy shouting over the room; somehow 'relaxing' during the packed rush.",
@@ -184,4 +192,51 @@ Deno.test("TB-03: complex negation and sarcasm lower confidence instead of produ
 
   assert(signal.confidence < 0.45);
   assert(signal.receiptCodes.includes("vibe_low_confidence"));
+});
+
+Deno.test("TB-04: VibeFitCandidate DTO carries only approved summary text and weak hints", () => {
+  const candidate = buildVibeFitCandidate({
+    candidateId: "candidate-1",
+    googlePlaceId: "google-1",
+    reviewSummary: "Quiet booths and mellow dinner energy.",
+    generativeSummary: "A cozy room for easy conversation.",
+    weakStructuredHints: {
+      liveMusic: true,
+      goodForGroups: true,
+      goodForWatchingSports: false,
+      outdoorSeating: true,
+      // deno-lint-ignore no-explicit-any
+      priceLevel: true,
+    } as any,
+    embeddingMode: "fake",
+    // deno-lint-ignore no-explicit-any
+    displayName: "Must Not Be In DTO",
+  } as any);
+
+  assertEquals(candidate.summaryTexts.map((source) => source.source), [
+    "reviewSummary",
+    "generativeSummary",
+  ]);
+  assertEquals(candidate.weakStructuredHints, {
+    liveMusic: true,
+    goodForGroups: true,
+    goodForWatchingSports: false,
+    outdoorSeating: true,
+  });
+
+  const serialized = JSON.stringify(candidate);
+  for (
+    const forbidden of [
+      "displayName",
+      "formattedAddress",
+      "priceLevel",
+      "rating",
+      "types",
+      "reviews",
+      "editorialSummary",
+      "neighborhoodSummary",
+    ]
+  ) {
+    assertEquals(serialized.includes(forbidden), false, forbidden);
+  }
 });

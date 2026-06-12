@@ -1,8 +1,10 @@
 import {
   assert,
   assertEquals,
+  assertStringIncludes,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
+  buildEligibleVibeFitCandidatesForVerdict,
   type ComputeVerdictDataAdapter,
   type GoogleVerdictCandidateRow,
   type GoogleVerdictFetchContext,
@@ -14,6 +16,7 @@ import {
   type VerdictInsert,
   type VerdictSlateEntryInsert,
 } from "./handler.ts";
+import { buildVibeFitCandidate } from "../_shared/vibe-fit.ts";
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -211,4 +214,132 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
     true,
     "slate rows keep app-owned metadata only",
   );
+});
+
+Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scoring", () => {
+  const source = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
+
+  assertStringIncludes(source, "GOOGLE_VERDICT_FETCH_FIELD_MASK");
+  assertStringIncludes(source, "GOOGLE_VERDICT_SCORING_FIELD_MASK");
+  assertStringIncludes(source, '"places.reviewSummary"');
+  assertStringIncludes(source, '"places.generativeSummary"');
+  assertStringIncludes(source, "isVibeFitEnabled(env)");
+  assert(
+    source.indexOf('"places.reviewSummary"') >
+      source.indexOf("GOOGLE_VERDICT_SCORING_FIELD_MASK"),
+    "summary fields must belong to the internal scoring mask, not the base fetch/display masks",
+  );
+});
+
+Deno.test("TB-04: Vibe Fit summaries stay transient and are not inserted or returned", async () => {
+  const state = adapterForGoogleVerdictFetch([
+    {
+      ...googleCandidate("google-vibe", {
+        distance_meters: 100,
+        current_open_now: true,
+      }),
+      vibe_fit_candidate: buildVibeFitCandidate({
+        candidateId: "google-vibe",
+        googlePlaceId: "google-vibe",
+        reviewSummary: "Quiet booths and mellow dinner energy.",
+        generativeSummary: "A cozy room for easy conversation.",
+        embeddingMode: "fake",
+      }),
+    },
+  ]);
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => state.adapter },
+  );
+
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  const durable = JSON.stringify({
+    insertedOptions: state.insertedOptions,
+    insertedVerdicts: state.insertedVerdicts,
+    insertedSlate: state.insertedSlate,
+    response: body,
+  });
+  for (
+    const forbidden of [
+      "reviewSummary",
+      "generativeSummary",
+      "Quiet booths",
+      "cozy room",
+      "vibePosition",
+      "confidence",
+    ]
+  ) {
+    assertEquals(durable.includes(forbidden), false, forbidden);
+  }
+});
+
+Deno.test("TB-04: Vibe Fit candidates are built only after hard eligibility cuts", () => {
+  const eligible = {
+    id: "eligible",
+    google_place_id: "google-eligible",
+    place_provider: "google" as const,
+    payload: {
+      price_tier: 2,
+      rating: 4.2,
+      user_rating_count: 30,
+      categories: ["restaurant"],
+      dietary_tags: ["vegan_friendly"],
+      distance_meters: 100,
+      current_open_now: true,
+    },
+    vibe_fit_candidate: buildVibeFitCandidate({
+      candidateId: "google-eligible",
+      reviewSummary: "Quiet mellow room.",
+      embeddingMode: "fake",
+    }),
+  } satisfies RoomOptionRow;
+  const overBudget = {
+    ...eligible,
+    id: "over-budget",
+    google_place_id: "google-over-budget",
+    payload: { ...eligible.payload, price_tier: 4 },
+    vibe_fit_candidate: buildVibeFitCandidate({
+      candidateId: "google-over-budget",
+      reviewSummary: "Quiet mellow room.",
+      embeddingMode: "fake",
+    }),
+  } satisfies RoomOptionRow;
+  const lowCrowdFloor = {
+    ...eligible,
+    id: "low-crowd",
+    google_place_id: "google-low-crowd",
+    payload: { ...eligible.payload, rating: 3.6 },
+    vibe_fit_candidate: buildVibeFitCandidate({
+      candidateId: "google-low-crowd",
+      reviewSummary: "Quiet mellow room.",
+      embeddingMode: "fake",
+    }),
+  } satisfies RoomOptionRow;
+  const cuisineNever = {
+    ...eligible,
+    id: "cuisine-never",
+    google_place_id: "google-cuisine-never",
+    payload: { ...eligible.payload, categories: ["sushi restaurant"] },
+    vibe_fit_candidate: buildVibeFitCandidate({
+      candidateId: "google-cuisine-never",
+      reviewSummary: "Quiet mellow room.",
+      embeddingMode: "fake",
+    }),
+  } satisfies RoomOptionRow;
+
+  const candidates = buildEligibleVibeFitCandidatesForVerdict({
+    optionRows: [eligible, overBudget, lowCrowdFloor, cuisineNever],
+    radiusMeters: 200,
+    votes: [{
+      q1_vetoes: ["vegan"],
+      q2_budget: 2,
+      hard_vetoes: [{ kind: "cuisine_never", token: "sushi" }],
+    }],
+  });
+
+  assertEquals(candidates.map((candidate) => candidate.candidateId), [
+    "google-eligible",
+  ]);
 });

@@ -51,6 +51,11 @@ import {
 import { buildPreferenceFunction } from "../_shared/preference-function.ts";
 import { classifyVenuePool } from "../_shared/venue-classifier.ts";
 import type { MemberPreferenceInputs } from "../_shared/votes-schema.ts";
+import {
+  scoreVibeFitCandidate,
+  type VibeFitCandidate,
+  type VibeFitSignal,
+} from "../_shared/vibe-fit.ts";
 
 // TB-21 — re-export the union primitive's row types so the Edge entry
 // point (`index.ts`) and the handler tests can bind them without a
@@ -69,6 +74,8 @@ export interface ComputeVerdictEnv {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   /** Google Places API key for the server-owned verdict fetch. */
   GOOGLE_PLACES_API_KEY?: string;
+  /** Server-side kill switch for transient Vibe Fit summary scoring. */
+  VIBE_FIT_ENABLED?: string;
 }
 
 /** Read-side dependencies the handler needs. The Edge entry point
@@ -245,6 +252,7 @@ export interface RoomOptionRow {
     dine_in?: boolean | null;
     takeout?: boolean | null;
   };
+  vibe_fit_candidate?: VibeFitCandidate;
 }
 
 export interface GoogleVerdictFetchContext {
@@ -255,6 +263,7 @@ export interface GoogleVerdictFetchContext {
 export interface GoogleVerdictCandidateRow {
   google_place_id: string;
   payload: NonNullable<RoomOptionRow["payload"]>;
+  vibe_fit_candidate?: VibeFitCandidate;
 }
 
 export interface MemberVoteRow {
@@ -450,6 +459,7 @@ async function fetchGoogleVerdictOptionRows(
     google_place_id: candidate.google_place_id,
     place_provider: "google",
     payload: candidate.payload,
+    vibe_fit_candidate: candidate.vibe_fit_candidate,
   }));
 }
 
@@ -461,6 +471,134 @@ function buildGoogleOptionIdMap(optionRows: readonly RoomOptionRow[]): Map<strin
     }
   }
   return out;
+}
+
+interface HardEligibilityVote {
+  q1_vetoes: string[];
+  q2_budget: number;
+  hard_vetoes: HardVeto[];
+}
+
+export function buildEligibleVibeFitCandidatesForVerdict(input: {
+  optionRows: readonly RoomOptionRow[];
+  votes: readonly HardEligibilityVote[];
+  radiusMeters: number | null;
+}): VibeFitCandidate[] {
+  return input.optionRows
+    .filter((row) => row.vibe_fit_candidate)
+    .filter((row) =>
+      isCandidateHardEligibleForVibeFit(row, input.votes, input.radiusMeters)
+    )
+    .map((row) => row.vibe_fit_candidate as VibeFitCandidate);
+}
+
+function scoreEligibleVibeFitCandidates(
+  candidates: readonly VibeFitCandidate[],
+): Map<string, VibeFitSignal> {
+  const out = new Map<string, VibeFitSignal>();
+  for (const candidate of candidates) {
+    out.set(candidate.candidateId, scoreVibeFitCandidate(candidate));
+  }
+  return out;
+}
+
+function isCandidateHardEligibleForVibeFit(
+  row: RoomOptionRow,
+  votes: readonly HardEligibilityVote[],
+  radiusMeters: number | null,
+): boolean {
+  const payload = row.payload;
+  if (!payload) return false;
+  if (
+    radiusMeters !== null &&
+    typeof payload.distance_meters === "number" &&
+    payload.distance_meters > radiusMeters
+  ) {
+    return false;
+  }
+  if (!hasRequiredGoogleMetadata(payload)) return false;
+  if (payload.current_open_now !== true) return false;
+
+  const minBudget = votes.reduce(
+    (acc, vote) => Math.min(acc, vote.q2_budget),
+    Number.POSITIVE_INFINITY,
+  );
+  if (
+    typeof payload.price_tier === "number" &&
+    payload.price_tier > minBudget
+  ) {
+    return false;
+  }
+
+  const requiredDietaryTags = new Set<string>();
+  const requiredRawTags = new Set<string>();
+  const cuisineNevers = new Set<string>();
+  for (const vote of votes) {
+    for (const chip of vote.q1_vetoes) {
+      const tag = dietaryTagForVetoChip(chip);
+      if (tag) requiredDietaryTags.add(tag);
+    }
+    for (const veto of vote.hard_vetoes) {
+      if (veto.kind === "dietary") {
+        const tag = dietaryTagForVetoChip(veto.token);
+        if (tag) requiredDietaryTags.add(tag);
+      }
+      if (veto.kind === "tag") requiredRawTags.add(veto.token.trim());
+      if (veto.kind === "cuisine_never") {
+        const token = veto.token.trim().toLowerCase();
+        if (token) cuisineNevers.add(token);
+      }
+    }
+  }
+  for (const tag of requiredDietaryTags) {
+    if (!payload.dietary_tags?.includes(tag)) return false;
+  }
+  for (const tag of requiredRawTags) {
+    if (!payload.dietary_tags?.includes(tag)) return false;
+  }
+  const lowerCategories = (payload.categories ?? []).map((category) =>
+    category.toLowerCase()
+  );
+  for (const token of cuisineNevers) {
+    if (lowerCategories.some((category) => category.includes(token))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function hasRequiredGoogleMetadata(
+  payload: NonNullable<RoomOptionRow["payload"]>,
+): boolean {
+  return typeof payload.price_tier === "number" &&
+    typeof payload.rating === "number" &&
+    payload.rating >= 3.7 &&
+    typeof payload.user_rating_count === "number" &&
+    payload.user_rating_count >= 15;
+}
+
+function dietaryTagForVetoChip(chip: string): string | null {
+  switch (chip.trim().toLowerCase()) {
+    case "vegan":
+      return "vegan_friendly";
+    case "vegetarian":
+      return "vegetarian_friendly";
+    case "halal":
+      return "halal";
+    case "kosher":
+      return "kosher";
+    case "gluten":
+      return "gluten_free_options";
+    case "dairy":
+      return "no_dairy_unverified";
+    case "shellfish":
+      return "no_shellfish_unverified";
+    case "nuts":
+      return "no_nuts_unverified";
+    default:
+      return null;
+  }
 }
 
 export async function handleRequest(
@@ -694,6 +832,25 @@ export async function handleRequest(
   const profileVetoes: Record<string, HardVeto[]> = data.fetchProfileVetoes
     ? await data.fetchProfileVetoes(voteRows.map((r) => r.user_id))
     : {};
+
+  const hardEligibilityVotes: HardEligibilityVote[] = voteRows.map((row) => ({
+    q1_vetoes: mergeQ1Vetoes(row.q1_vetoes, row.q1_vetoes_extra),
+    q2_budget: rerollState?.budget_tier_override != null
+      ? Math.min(row.q2_budget, rerollState.budget_tier_override)
+      : row.q2_budget,
+    hard_vetoes: mergeHardVetoes(
+      row.hard_vetoes ?? [],
+      profileVetoes[row.user_id] ?? [],
+    ),
+  }));
+  const vibeFitSignalsByCandidateId = scoreEligibleVibeFitCandidates(
+    buildEligibleVibeFitCandidatesForVerdict({
+      optionRows,
+      votes: hardEligibilityVotes,
+      radiusMeters: startingRadius,
+    }),
+  );
+  void vibeFitSignalsByCandidateId;
 
   // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
   // the union of "original quiz answer" + "diet-reason reroll add."

@@ -30,6 +30,7 @@ import {
   type QuestionSlot,
   type VotesRow,
 } from "../_shared/votes-schema.ts";
+import { buildVibeFitCandidate } from "../_shared/vibe-fit.ts";
 // tb-WF-11 â€” resolves each member's name from the joined
 // `members.display_name`, falling back to the `m<uuid>` placeholder.
 import { resolveMemberDisplayName } from "./member-display-name.ts";
@@ -38,7 +39,8 @@ import { resolveMemberDisplayName } from "./member-display-name.ts";
 import type { HardVeto } from "../_shared/verdict-engine.ts";
 
 const GOOGLE_NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby";
-const GOOGLE_VERDICT_FETCH_FIELD_MASK = [
+export const GOOGLE_VERDICT_FETCH_FIELD_MASK_VERSION = "verdict_fetch_v1";
+export const GOOGLE_VERDICT_FETCH_FIELD_MASK = [
   "places.id",
   "places.displayName",
   "places.types",
@@ -50,6 +52,17 @@ const GOOGLE_VERDICT_FETCH_FIELD_MASK = [
   "places.regularOpeningHours.periods",
   "places.dineIn",
   "places.takeout",
+].join(",");
+export const GOOGLE_VERDICT_SCORING_FIELD_MASK_VERSION =
+  "verdict_scoring_vibe_fit_v1";
+export const GOOGLE_VERDICT_SCORING_FIELD_MASK = [
+  GOOGLE_VERDICT_FETCH_FIELD_MASK,
+  "places.reviewSummary",
+  "places.generativeSummary",
+  "places.liveMusic",
+  "places.goodForGroups",
+  "places.goodForWatchingSports",
+  "places.outdoorSeating",
 ].join(",");
 
 function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter {
@@ -124,7 +137,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         headers: {
           "Content-Type": "application/json",
           "X-Goog-Api-Key": googleApiKey,
-          "X-Goog-FieldMask": GOOGLE_VERDICT_FETCH_FIELD_MASK,
+          "X-Goog-FieldMask": googleVerdictFieldMask(env),
         },
         body: JSON.stringify({
           includedPrimaryTypes: ["restaurant"],
@@ -144,7 +157,9 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         console.warn(`compute-verdict Google verdict fetch failed: ${response.status}`);
         return [];
       }
-      return shapeGoogleVerdictCandidates(await response.json());
+      return shapeGoogleVerdictCandidates(await response.json(), {
+        includeVibeFit: isVibeFitEnabled(env),
+      });
     },
     async fetchActiveMemberIds(room_id): Promise<string[]> {
       const { data, error } = await client
@@ -524,7 +539,21 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
   };
 }
 
-function shapeGoogleVerdictCandidates(body: unknown): GoogleVerdictCandidateRow[] {
+function isVibeFitEnabled(env: ComputeVerdictEnv): boolean {
+  const raw = (env as { VIBE_FIT_ENABLED?: string }).VIBE_FIT_ENABLED;
+  return raw === "1" || raw?.toLowerCase() === "true";
+}
+
+function googleVerdictFieldMask(env: ComputeVerdictEnv): string {
+  return isVibeFitEnabled(env)
+    ? GOOGLE_VERDICT_SCORING_FIELD_MASK
+    : GOOGLE_VERDICT_FETCH_FIELD_MASK;
+}
+
+function shapeGoogleVerdictCandidates(
+  body: unknown,
+  options: { includeVibeFit: boolean } = { includeVibeFit: false },
+): GoogleVerdictCandidateRow[] {
   const places = (body && typeof body === "object" &&
       Array.isArray((body as { places?: unknown }).places))
     ? (body as { places: unknown[] }).places
@@ -539,8 +568,9 @@ function shapeGoogleVerdictCandidates(body: unknown): GoogleVerdictCandidateRow[
         typeof (place.displayName as { text?: unknown }).text === "string"
       ? (place.displayName as { text: string }).text
       : "Unnamed";
+    const googlePlaceId = place.id.trim();
     out.push({
-      google_place_id: place.id.trim(),
+      google_place_id: googlePlaceId,
       payload: {
         name: displayName,
         price_tier: googlePriceTier(place.priceLevel),
@@ -554,9 +584,48 @@ function shapeGoogleVerdictCandidates(body: unknown): GoogleVerdictCandidateRow[
         dine_in: typeof place.dineIn === "boolean" ? place.dineIn : null,
         takeout: typeof place.takeout === "boolean" ? place.takeout : null,
       },
+      ...(options.includeVibeFit
+        ? {
+          vibe_fit_candidate: buildVibeFitCandidate({
+            candidateId: googlePlaceId,
+            googlePlaceId,
+            reviewSummary: googleReviewSummary(place),
+            generativeSummary: googleGenerativeSummary(place),
+            weakStructuredHints: {
+              liveMusic: googleBooleanHint(place.liveMusic),
+              goodForGroups: googleBooleanHint(place.goodForGroups),
+              goodForWatchingSports: googleBooleanHint(
+                place.goodForWatchingSports,
+              ),
+              outdoorSeating: googleBooleanHint(place.outdoorSeating),
+            },
+            embeddingMode: "fake",
+          }),
+        }
+        : {}),
     });
   }
   return out;
+}
+
+function googleReviewSummary(place: Record<string, unknown>): string | null {
+  const summary = place.reviewSummary;
+  if (!summary || typeof summary !== "object") return null;
+  const text = (summary as { text?: unknown }).text;
+  return typeof text === "string" ? text : null;
+}
+
+function googleGenerativeSummary(place: Record<string, unknown>): string | null {
+  const summary = place.generativeSummary;
+  if (!summary || typeof summary !== "object") return null;
+  const overview = (summary as { overview?: unknown }).overview;
+  if (!overview || typeof overview !== "object") return null;
+  const text = (overview as { text?: unknown }).text;
+  return typeof text === "string" ? text : null;
+}
+
+function googleBooleanHint(value: unknown): boolean | undefined {
+  return typeof value === "boolean" ? value : undefined;
 }
 
 function googlePriceTier(value: unknown): number | null {
@@ -609,6 +678,7 @@ Deno.serve((req) =>
       SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
       SUPABASE_SERVICE_ROLE_KEY: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
       GOOGLE_PLACES_API_KEY: Deno.env.get("GOOGLE_PLACES_API_KEY"),
+      VIBE_FIT_ENABLED: Deno.env.get("VIBE_FIT_ENABLED"),
     },
     buildDataAdapter: buildSupabaseAdapter,
   })

@@ -13,14 +13,25 @@ export interface VibeAnchor {
   phrases: readonly string[];
 }
 
-export interface VibeFitSourceText {
+export type VibeFitSummarySource = "reviewSummary" | "generativeSummary";
+
+export interface VibeFitSummaryText {
+  source: VibeFitSummarySource;
   text: string;
   priority: number;
 }
 
+export type VibeFitWeakStructuredHint =
+  | "liveMusic"
+  | "goodForGroups"
+  | "goodForWatchingSports"
+  | "outdoorSeating";
+
 export interface VibeFitCandidate {
   candidateId: string;
-  sourceTexts: readonly VibeFitSourceText[];
+  googlePlaceId?: string;
+  summaryTexts: readonly VibeFitSummaryText[];
+  weakStructuredHints?: Partial<Record<VibeFitWeakStructuredHint, boolean>>;
   mealTimeContext?: string;
   embeddingMode?: "fake";
 }
@@ -138,6 +149,48 @@ export const VIBE_FIT_CONFIG = Object.freeze({
   ] satisfies readonly VibeAnchor[],
 });
 
+export function buildVibeFitCandidate(input: {
+  candidateId: string;
+  googlePlaceId?: string;
+  reviewSummary?: string | null;
+  generativeSummary?: string | null;
+  weakStructuredHints?: Partial<Record<VibeFitWeakStructuredHint, boolean>>;
+  mealTimeContext?: string;
+  embeddingMode?: "fake";
+}): VibeFitCandidate {
+  const summaryTexts: VibeFitSummaryText[] = [];
+  if (typeof input.reviewSummary === "string" && input.reviewSummary.trim()) {
+    summaryTexts.push({
+      source: "reviewSummary",
+      text: input.reviewSummary.trim(),
+      priority: 1,
+    });
+  }
+  if (
+    typeof input.generativeSummary === "string" &&
+    input.generativeSummary.trim()
+  ) {
+    summaryTexts.push({
+      source: "generativeSummary",
+      text: input.generativeSummary.trim(),
+      priority: 2,
+    });
+  }
+
+  const weakStructuredHints = filterWeakStructuredHints(input.weakStructuredHints);
+
+  return {
+    candidateId: input.candidateId,
+    ...(input.googlePlaceId ? { googlePlaceId: input.googlePlaceId } : {}),
+    summaryTexts,
+    ...(Object.keys(weakStructuredHints).length > 0
+      ? { weakStructuredHints }
+      : {}),
+    ...(input.mealTimeContext ? { mealTimeContext: input.mealTimeContext } : {}),
+    ...(input.embeddingMode ? { embeddingMode: input.embeddingMode } : {}),
+  };
+}
+
 const BAND_POSITIONS = new Map(
   VIBE_BANDS.map((band) => [band.id, band.position]),
 );
@@ -202,9 +255,9 @@ const SIMPLE_NEGATIONS: SimpleNegation[] = [
 ];
 
 export function extractVibeEvidenceSpans(
-  candidate: Pick<VibeFitCandidate, "sourceTexts" | "mealTimeContext">,
+  candidate: Pick<VibeFitCandidate, "summaryTexts" | "mealTimeContext">,
 ): VibeEvidenceSpan[] {
-  const spans = candidate.sourceTexts
+  const spans = candidate.summaryTexts
     .flatMap((source, sourceIndex) =>
       splitSourceText(source.text).map((text, chunkIndex) => ({
         text,
@@ -231,6 +284,26 @@ export function extractVibeEvidenceSpans(
     negatedBandId: span.negatedBandId,
     ambiguous: span.ambiguous,
   }));
+}
+
+function filterWeakStructuredHints(
+  hints: Partial<Record<VibeFitWeakStructuredHint, boolean>> | undefined,
+): Partial<Record<VibeFitWeakStructuredHint, boolean>> {
+  if (!hints) return {};
+  const out: Partial<Record<VibeFitWeakStructuredHint, boolean>> = {};
+  for (
+    const key of [
+      "liveMusic",
+      "goodForGroups",
+      "goodForWatchingSports",
+      "outdoorSeating",
+    ] as const
+  ) {
+    if (typeof hints[key] === "boolean") {
+      out[key] = hints[key];
+    }
+  }
+  return out;
 }
 
 export function scoreVibeFitCandidate(
