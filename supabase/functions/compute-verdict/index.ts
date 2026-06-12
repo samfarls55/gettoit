@@ -9,7 +9,10 @@
 //   * TB-06 ticket (gti-vault/15_issues/0.1.0/issues/tb-06-verdict-engine-clean-run.md)
 //   * Engine spec: supabase/functions/_shared/verdict-engine.ts
 
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.43.4";
+import {
+  createClient,
+  type SupabaseClient,
+} from "npm:@supabase/supabase-js@2.43.4";
 import {
   type ComputeVerdictDataAdapter,
   type ComputeVerdictEnv,
@@ -38,7 +41,8 @@ import { resolveMemberDisplayName } from "./member-display-name.ts";
 // below; import it so `deno check` resolves the type.
 import type { HardVeto } from "../_shared/verdict-engine.ts";
 
-const GOOGLE_NEARBY_SEARCH_URL = "https://places.googleapis.com/v1/places:searchNearby";
+const GOOGLE_NEARBY_SEARCH_URL =
+  "https://places.googleapis.com/v1/places:searchNearby";
 export const GOOGLE_VERDICT_FETCH_FIELD_MASK_VERSION = "verdict_fetch_v1";
 export const GOOGLE_VERDICT_FETCH_FIELD_MASK = [
   "places.id",
@@ -65,7 +69,9 @@ export const GOOGLE_VERDICT_SCORING_FIELD_MASK = [
   "places.outdoorSeating",
 ].join(",");
 
-function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter {
+function buildSupabaseAdapter(
+  env: ComputeVerdictEnv,
+): ComputeVerdictDataAdapter {
   const supabaseUrl = env.SUPABASE_URL ?? "";
   const serviceRoleKey = env.SUPABASE_SERVICE_ROLE_KEY ?? "";
   const client: SupabaseClient = createClient(supabaseUrl, serviceRoleKey, {
@@ -104,10 +110,14 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
       return (data ?? []) as RoomOptionRow[];
     },
-    async fetchGoogleVerdictCandidates(room_id): Promise<GoogleVerdictCandidateRow[]> {
+    async fetchGoogleVerdictCandidates(
+      room_id,
+    ): Promise<GoogleVerdictCandidateRow[]> {
       const googleApiKey = env.GOOGLE_PLACES_API_KEY ?? "";
       if (!googleApiKey) {
-        console.warn("compute-verdict Google verdict fetch skipped: GOOGLE_PLACES_API_KEY is not set");
+        console.warn(
+          "compute-verdict Google verdict fetch skipped: GOOGLE_PLACES_API_KEY is not set",
+        );
         return [];
       }
       const { data, error } = await client
@@ -116,7 +126,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .eq("id", room_id)
         .maybeSingle();
       if (error || !data) {
-        console.warn("compute-verdict Google verdict fetch room read failed:", error?.message ?? "no row");
+        console.warn(
+          "compute-verdict Google verdict fetch room read failed:",
+          error?.message ?? "no row",
+        );
         return [];
       }
       const room = data as {
@@ -129,7 +142,9 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         typeof room.location_lng !== "number" ||
         typeof room.radius_meters !== "number"
       ) {
-        console.warn("compute-verdict Google verdict fetch skipped: room search area is incomplete");
+        console.warn(
+          "compute-verdict Google verdict fetch skipped: room search area is incomplete",
+        );
         return [];
       }
       const response = await fetch(GOOGLE_NEARBY_SEARCH_URL, {
@@ -154,7 +169,9 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         }),
       });
       if (!response.ok) {
-        console.warn(`compute-verdict Google verdict fetch failed: ${response.status}`);
+        console.warn(
+          `compute-verdict Google verdict fetch failed: ${response.status}`,
+        );
         return [];
       }
       return shapeGoogleVerdictCandidates(await response.json(), {
@@ -167,10 +184,15 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .select("user_id")
         .eq("room_id", room_id);
       if (error) {
-        console.warn("compute-verdict fetchActiveMemberIds failed:", error.message);
+        console.warn(
+          "compute-verdict fetchActiveMemberIds failed:",
+          error.message,
+        );
         return [];
       }
-      return ((data ?? []) as Array<{ user_id: string }>).map((row) => row.user_id);
+      return ((data ?? []) as Array<{ user_id: string }>).map((row) =>
+        row.user_id
+      );
     },
     async fetchMemberFetches(room_id): Promise<MemberFetchRow[]> {
       // TB-21 â€” read every member's persisted raw Foursquare fetch for
@@ -183,7 +205,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .select("user_id, payload")
         .eq("room_id", room_id);
       if (error) {
-        console.warn("compute-verdict fetchMemberFetches failed:", error.message);
+        console.warn(
+          "compute-verdict fetchMemberFetches failed:",
+          error.message,
+        );
         return [];
       }
       return (data ?? []).map((row) => {
@@ -213,7 +238,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
             google_place_id: r.google_place_id ?? r.fsq_place_id,
             place_provider: "google",
           })),
-          { onConflict: "room_id,place_provider,google_place_id", ignoreDuplicates: true },
+          {
+            onConflict: "room_id,place_provider,google_place_id",
+            ignoreDuplicates: true,
+          },
         );
       if (error) {
         console.error("compute-verdict insertOptions failed:", error.message);
@@ -310,11 +338,16 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
     async fetchRoomRerollState(room_id) {
       const { data, error } = await client
         .from("rooms")
-        .select("excluded_option_ids, budget_tier_override, walk_minutes_override, last_reroll_reason")
+        .select(
+          "excluded_option_ids, budget_tier_override, walk_minutes_override, last_reroll_reason",
+        )
         .eq("id", room_id)
         .maybeSingle();
       if (error || !data) {
-        console.warn("compute-verdict fetchRoomRerollState failed:", error?.message ?? "no row");
+        console.warn(
+          "compute-verdict fetchRoomRerollState failed:",
+          error?.message ?? "no row",
+        );
         return {
           excluded_option_ids: [],
           budget_tier_override: null,
@@ -329,7 +362,13 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         last_reroll_reason: string | null;
       };
       const reason = row.last_reroll_reason;
-      const allowed: ReadonlySet<string> = new Set(["cost", "dist", "mood", "diet", "avail"]);
+      const allowed: ReadonlySet<string> = new Set([
+        "cost",
+        "dist",
+        "mood",
+        "diet",
+        "avail",
+      ]);
       return {
         excluded_option_ids: row.excluded_option_ids ?? [],
         budget_tier_override: row.budget_tier_override,
@@ -357,12 +396,17 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         // verdict. Logged + treated as "no profile vetoes" â€” the only
         // risk is surfacing a venue a member would have vetoed, which
         // the no-profile path already accepts pre-TB-12.
-        console.warn("compute-verdict fetchProfileVetoes failed:", error.message);
+        console.warn(
+          "compute-verdict fetchProfileVetoes failed:",
+          error.message,
+        );
         return out;
       }
-      for (const row of (data ?? []) as Array<
-        { user_id: string; profile_vetoes: unknown }
-      >) {
+      for (
+        const row of (data ?? []) as Array<
+          { user_id: string; profile_vetoes: unknown }
+        >
+      ) {
         const raw = row.profile_vetoes;
         if (!Array.isArray(raw)) continue;
         const vetoes: HardVeto[] = [];
@@ -371,7 +415,8 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
             const kind = (entry as Record<string, unknown>).kind;
             const token = (entry as Record<string, unknown>).token;
             if (
-              (kind === "dietary" || kind === "cuisine_never" || kind === "tag") &&
+              (kind === "dietary" || kind === "cuisine_never" ||
+                kind === "tag") &&
               typeof token === "string"
             ) {
               vetoes.push({ kind, token });
@@ -393,14 +438,16 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .select("option_id")
         .eq("room_id", room_id)
         .maybeSingle();
-      const optionId = (verdictRow as { option_id?: string | null } | null)?.option_id;
+      const optionId = (verdictRow as { option_id?: string | null } | null)
+        ?.option_id;
       if (!optionId) return null;
       const { data: optionRow } = await client
         .from("options")
         .select("payload")
         .eq("id", optionId)
         .maybeSingle();
-      const payload = (optionRow as { payload?: { name?: string } } | null)?.payload;
+      const payload = (optionRow as { payload?: { name?: string } } | null)
+        ?.payload;
       return payload?.name ?? null;
     },
     async fetchRoomRadius(room_id): Promise<number | null> {
@@ -410,7 +457,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .eq("id", room_id)
         .maybeSingle();
       if (error || !data) {
-        console.warn("compute-verdict fetchRoomRadius failed:", error?.message ?? "no row");
+        console.warn(
+          "compute-verdict fetchRoomRadius failed:",
+          error?.message ?? "no row",
+        );
         return null;
       }
       return (data as { radius_meters: number | null }).radius_meters ?? null;
@@ -422,7 +472,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         .delete()
         .eq("room_id", room_id);
       if (error) {
-        console.error("compute-verdict deleteVerdictForRoom failed:", error.message);
+        console.error(
+          "compute-verdict deleteVerdictForRoom failed:",
+          error.message,
+        );
         throw error;
       }
     },
@@ -438,11 +491,16 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       }
       return data as VerdictRow;
     },
-    async insertVerdictSlateEntries(rows: VerdictSlateEntryInsert[]): Promise<void> {
+    async insertVerdictSlateEntries(
+      rows: VerdictSlateEntryInsert[],
+    ): Promise<void> {
       if (rows.length === 0) return;
       const { error } = await client.from("verdict_slate_entries").insert(rows);
       if (error) {
-        console.error("compute-verdict insertVerdictSlateEntries failed:", error.message);
+        console.error(
+          "compute-verdict insertVerdictSlateEntries failed:",
+          error.message,
+        );
         throw error;
       }
     },
@@ -450,7 +508,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
       if (rows.length === 0) return;
       const { error } = await client.from("option_cuts").insert(rows);
       if (error) {
-        console.error("compute-verdict insertOptionCuts failed:", error.message);
+        console.error(
+          "compute-verdict insertOptionCuts failed:",
+          error.message,
+        );
         throw error;
       }
     },
@@ -479,7 +540,10 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
         // or `expired`.
         .in("status", ["open", "firing"]);
       if (error) {
-        console.warn("compute-verdict markRoomVerdictReady failed:", error.message);
+        console.warn(
+          "compute-verdict markRoomVerdictReady failed:",
+          error.message,
+        );
         throw error;
       }
     },
@@ -540,7 +604,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
 }
 
 function isVibeFitEnabled(env: ComputeVerdictEnv): boolean {
-  const raw = env.VIBE_FIT_ENABLED;
+  const raw = env.VIBE_EMBEDDINGS_ENABLED;
   return raw === "1" || raw?.toLowerCase() === "true";
 }
 
@@ -575,8 +639,12 @@ function shapeGoogleVerdictCandidates(
         name: displayName,
         price_tier: googlePriceTier(place.priceLevel),
         rating: typeof place.rating === "number" ? place.rating : null,
-        total_ratings: typeof place.userRatingCount === "number" ? place.userRatingCount : null,
-        user_rating_count: typeof place.userRatingCount === "number" ? place.userRatingCount : null,
+        total_ratings: typeof place.userRatingCount === "number"
+          ? place.userRatingCount
+          : null,
+        user_rating_count: typeof place.userRatingCount === "number"
+          ? place.userRatingCount
+          : null,
         categories: googleCategories(place),
         dietary_tags: [],
         current_open_now: googleOpenNow(place),
@@ -599,7 +667,6 @@ function shapeGoogleVerdictCandidates(
               ),
               outdoorSeating: googleBooleanHint(place.outdoorSeating),
             },
-            embeddingMode: "fake",
           }),
         }
         : {}),
@@ -615,7 +682,9 @@ function googleReviewSummary(place: Record<string, unknown>): string | null {
   return typeof text === "string" ? text : null;
 }
 
-function googleGenerativeSummary(place: Record<string, unknown>): string | null {
+function googleGenerativeSummary(
+  place: Record<string, unknown>,
+): string | null {
   const summary = place.generativeSummary;
   if (!summary || typeof summary !== "object") return null;
   const overview = (summary as { overview?: unknown }).overview;
@@ -663,7 +732,9 @@ function googleOpenNow(place: Record<string, unknown>): boolean | null {
   return typeof openNow === "boolean" ? openNow : null;
 }
 
-function googleOpeningPeriods(place: Record<string, unknown>): GoogleVerdictCandidateRow["payload"]["regular_opening_periods"] {
+function googleOpeningPeriods(
+  place: Record<string, unknown>,
+): GoogleVerdictCandidateRow["payload"]["regular_opening_periods"] {
   const hours = place.regularOpeningHours;
   if (!hours || typeof hours !== "object") return undefined;
   const periods = (hours as { periods?: unknown }).periods;
@@ -678,7 +749,8 @@ Deno.serve((req) =>
       SUPABASE_URL: Deno.env.get("SUPABASE_URL"),
       SUPABASE_SERVICE_ROLE_KEY: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"),
       GOOGLE_PLACES_API_KEY: Deno.env.get("GOOGLE_PLACES_API_KEY"),
-      VIBE_FIT_ENABLED: Deno.env.get("VIBE_FIT_ENABLED"),
+      VIBE_EMBEDDINGS_ENABLED: Deno.env.get("VIBE_EMBEDDINGS_ENABLED"),
+      VOYAGE_API_KEY: Deno.env.get("VOYAGE_API_KEY"),
     },
     buildDataAdapter: buildSupabaseAdapter,
   })

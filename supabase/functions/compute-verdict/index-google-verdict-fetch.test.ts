@@ -207,8 +207,16 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
   );
 
   assertEquals(res.status, 200);
-  assertEquals(state.fetchContexts.length, 1, "verdict uses one final Google fetch cycle");
-  assertEquals(state.memberFetchReadCount, 0, "Q5 member fetches are not reused");
+  assertEquals(
+    state.fetchContexts.length,
+    1,
+    "verdict uses one final Google fetch cycle",
+  );
+  assertEquals(
+    state.memberFetchReadCount,
+    0,
+    "Q5 member fetches are not reused",
+  );
   assertEquals(
     state.insertedOptions.map((row) => row.google_place_id),
     ["google-c", "google-a", "google-b", "google-d", "google-e"],
@@ -250,7 +258,8 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
   );
   assertEquals(
     state.insertedSlate.every((row) =>
-      !("display_name" in row) && !("rating" in row) && !("distance_meters" in row)
+      !("display_name" in row) && !("rating" in row) &&
+      !("distance_meters" in row)
     ),
     true,
     "slate rows keep app-owned metadata only",
@@ -280,7 +289,10 @@ Deno.test("TB-07: Vibe Fit member scoring degrades missing and low-confidence ev
 
   assertEquals(scoreVibeFitSignalForMember(undefined, 0), 3);
   assertEquals(
-    scoreVibeFitSignalForMember({ ...exactQuietLowConfidence, vibePosition: null }, 0),
+    scoreVibeFitSignalForMember({
+      ...exactQuietLowConfidence,
+      vibePosition: null,
+    }, 0),
     3,
   );
   assertAlmostEquals(
@@ -340,6 +352,20 @@ Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scorin
       source.indexOf("GOOGLE_VERDICT_SCORING_FIELD_MASK"),
     "summary fields must belong to the internal scoring mask, not the base fetch/display masks",
   );
+});
+
+Deno.test("TB-09: production Vibe Fit uses canonical embeddings flag and no fake embeddings", () => {
+  const source = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
+
+  assertStringIncludes(
+    source,
+    'VIBE_EMBEDDINGS_ENABLED: Deno.env.get("VIBE_EMBEDDINGS_ENABLED")',
+  );
+  assertStringIncludes(
+    source,
+    'VOYAGE_API_KEY: Deno.env.get("VOYAGE_API_KEY")',
+  );
+  assertEquals(source.includes('embeddingMode: "fake"'), false);
 });
 
 Deno.test("TB-08: production Google verdict storage omits summaries and provider facts", () => {

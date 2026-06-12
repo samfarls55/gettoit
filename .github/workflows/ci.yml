@@ -347,6 +347,8 @@ jobs:
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
       FOURSQUARE_API_KEY: ${{ secrets.FOURSQUARE_API_KEY }}
       GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
+      VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+      VIBE_EMBEDDINGS_ENABLED: ${{ secrets.VIBE_EMBEDDINGS_ENABLED }}
       SUPABASE_PROJECT_URL: ${{ secrets.SUPABASE_PROJECT_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       # tb-WF-13 — the AES-GCM key the mint-claim-code function encrypts
@@ -409,6 +411,18 @@ jobs:
             echo "google-places-readiness requires it to already exist as" >&2
             echo "a Supabase Edge Function secret." >&2
           fi
+          if [ -n "${VOYAGE_API_KEY:-}" ]; then
+            supabase secrets set \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              VOYAGE_API_KEY="$VOYAGE_API_KEY"
+          else
+            echo "VOYAGE_API_KEY repo secret is not set -" >&2
+            echo "vibe embeddings must remain disabled until the" >&2
+            echo "server-only Voyage credential is configured." >&2
+          fi
+          supabase secrets set \
+            --project-ref "$SUPABASE_PROJECT_REF" \
+            VIBE_EMBEDDINGS_ENABLED="${VIBE_EMBEDDINGS_ENABLED:-false}"
           if [ -n "${CLAIM_CODE_ENC_KEY:-}" ]; then
             supabase secrets set \
               --project-ref "$SUPABASE_PROJECT_REF" \

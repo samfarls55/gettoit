@@ -41,7 +41,9 @@ async function freshTestKeyPem(): Promise<string> {
     true,
     ["sign", "verify"],
   );
-  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey("pkcs8", kp.privateKey));
+  const pkcs8 = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", kp.privateKey),
+  );
   const b64 = btoa(String.fromCharCode(...pkcs8));
   const lines: string[] = [];
   for (let i = 0; i < b64.length; i += 64) lines.push(b64.slice(i, i + 64));
@@ -111,7 +113,9 @@ interface CapturedReq {
 /** Spin up a tiny HTTP listener on an ephemeral port that returns the
  *  controller and the list of captured requests. */
 async function startStubApns(
-  respondWith: (n: number) => { status: number; apnsId?: string; body?: string },
+  respondWith: (
+    n: number,
+  ) => { status: number; apnsId?: string; body?: string },
 ): Promise<{
   baseUrl: string;
   captured: CapturedReq[];
@@ -137,8 +141,11 @@ async function startStubApns(
     },
   );
   const addr = server.addr as Deno.NetAddr;
+  const host = addr.hostname === "::" || addr.hostname === "0.0.0.0"
+    ? "127.0.0.1"
+    : addr.hostname;
   return {
-    baseUrl: `http://${addr.hostname === "::" ? "127.0.0.1" : addr.hostname}:${addr.port}`,
+    baseUrl: `http://${host}:${addr.port}`,
     captured,
     close: async () => {
       ac.abort();

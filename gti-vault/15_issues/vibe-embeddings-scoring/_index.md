@@ -9,7 +9,7 @@ Implement transient backend embeddings for **Vibe fit signal** generation so Q5 
 
 ## PRD
 
-- [[PRD|Vibe Embeddings Scoring PRD]] - GH [#357](https://github.com/samfarls55/gettoit/issues/357)
+- [[PRD|Vibe Embeddings Scoring PRD]] - GH [#357](https://github.com/samfarls55/gettoit/issues/357) - done
 
 ## Source Of Truth
 
@@ -20,11 +20,11 @@ Implement transient backend embeddings for **Vibe fit signal** generation so Q5 
 ## Issues
 
 - [[issues/tb-01-voyage-secret-and-embedding-env-readiness|TB-01: Voyage Secret And Embedding Env Readiness]] - GH [#358](https://github.com/samfarls55/gettoit/issues/358) - done / HITL
-- [[issues/tb-02-google-scoring-seam-and-vibe-identity-baseline|TB-02: Google Scoring Seam And Vibe Identity Baseline]] - GH [#359](https://github.com/samfarls55/gettoit/issues/359) - ready-for-agent / AFK
-- [[issues/tb-03-pure-transient-vibe-fit-signal|TB-03: Pure Transient Vibe Fit Signal]] - GH [#360](https://github.com/samfarls55/gettoit/issues/360) - ready-for-agent / AFK
-- [[issues/tb-04-google-summary-mask-and-vibefitcandidate-path|TB-04: Google Summary Mask And VibeFitCandidate Path]] - GH [#361](https://github.com/samfarls55/gettoit/issues/361) - ready-for-agent / AFK
-- [[issues/tb-05-voyage-wrapper-budgets-kill-switch-and-degradation|TB-05: Voyage Wrapper, Budgets, Kill Switch, And Degradation]] - GH [#362](https://github.com/samfarls55/gettoit/issues/362) - ready-for-agent / AFK
-- [[issues/tb-06-q5-vibe-keep-drop-selection|TB-06: Q5 Vibe Keep/Drop Selection]] - GH [#363](https://github.com/samfarls55/gettoit/issues/363) - ready-for-agent / AFK
-- [[issues/tb-07-verdict-per-member-vibe-scoring|TB-07: Verdict Per-Member Vibe Scoring]] - GH [#364](https://github.com/samfarls55/gettoit/issues/364) - ready-for-agent / AFK
-- [[issues/tb-08-privacy-storage-and-observability-proof|TB-08: Privacy, Storage, And Observability Proof]] - GH [#365](https://github.com/samfarls55/gettoit/issues/365) - ready-for-agent / AFK
-- [[issues/tb-09-production-enablement-checklist|TB-09: Production Enablement Checklist]] - GH [#366](https://github.com/samfarls55/gettoit/issues/366) - ready-for-human / HITL
+- [[issues/tb-02-google-scoring-seam-and-vibe-identity-baseline|TB-02: Google Scoring Seam And Vibe Identity Baseline]] - GH [#359](https://github.com/samfarls55/gettoit/issues/359) - done / AFK
+- [[issues/tb-03-pure-transient-vibe-fit-signal|TB-03: Pure Transient Vibe Fit Signal]] - GH [#360](https://github.com/samfarls55/gettoit/issues/360) - done / AFK
+- [[issues/tb-04-google-summary-mask-and-vibefitcandidate-path|TB-04: Google Summary Mask And VibeFitCandidate Path]] - GH [#361](https://github.com/samfarls55/gettoit/issues/361) - done / AFK
+- [[issues/tb-05-voyage-wrapper-budgets-kill-switch-and-degradation|TB-05: Voyage Wrapper, Budgets, Kill Switch, And Degradation]] - GH [#362](https://github.com/samfarls55/gettoit/issues/362) - done / AFK
+- [[issues/tb-06-q5-vibe-keep-drop-selection|TB-06: Q5 Vibe Keep/Drop Selection]] - GH [#363](https://github.com/samfarls55/gettoit/issues/363) - done / AFK
+- [[issues/tb-07-verdict-per-member-vibe-scoring|TB-07: Verdict Per-Member Vibe Scoring]] - GH [#364](https://github.com/samfarls55/gettoit/issues/364) - done / AFK
+- [[issues/tb-08-privacy-storage-and-observability-proof|TB-08: Privacy, Storage, And Observability Proof]] - GH [#365](https://github.com/samfarls55/gettoit/issues/365) - done / AFK
+- [[issues/tb-09-production-enablement-checklist|TB-09: Production Enablement Checklist]] - GH [#366](https://github.com/samfarls55/gettoit/issues/366) - done / HITL

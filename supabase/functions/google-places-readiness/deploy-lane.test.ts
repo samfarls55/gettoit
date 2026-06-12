@@ -42,6 +42,21 @@ Deno.test("ci.yml - edge-deploy can push GOOGLE_PLACES_API_KEY when present", ()
   );
 });
 
+Deno.test("ci.yml - edge-deploy can push Voyage embedding secrets", () => {
+  const wf = loadWorkflow();
+  const text = jobStepsText(wf?.jobs?.["edge-deploy"]);
+  assertStringIncludes(
+    text,
+    "VOYAGE_API_KEY",
+    "edge-deploy should know about the server-only Voyage credential.",
+  );
+  assertStringIncludes(
+    text,
+    "VIBE_EMBEDDINGS_ENABLED",
+    "edge-deploy should push the server-side embedding kill switch.",
+  );
+});
+
 Deno.test("ci.yml - edge-deploy runs google-places-readiness live check", () => {
   const wf = loadWorkflow();
   const text = jobStepsText(wf?.jobs?.["edge-deploy"]);

@@ -39,9 +39,9 @@ import {
   computeVerdict,
   type HardVeto,
   type MemberVote,
-  type VerdictSlateEntry,
   type VerdictEngineOutput,
   type VerdictMethod,
+  type VerdictSlateEntry,
 } from "../_shared/verdict-engine.ts";
 import {
   type MemberFetchRow,
@@ -60,7 +60,9 @@ import { classifyVenuePool } from "../_shared/venue-classifier.ts";
 import type { MemberPreferenceInputs } from "../_shared/votes-schema.ts";
 import {
   scoreVibeFitCandidate,
+  scoreVibeFitCandidateFlow,
   VIBE_FIT_CONFIG,
+  type VibeEmbeddingFetch,
   type VibeFitCandidate,
   type VibeFitSignal,
 } from "../_shared/vibe-fit.ts";
@@ -82,8 +84,12 @@ export interface ComputeVerdictEnv {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   /** Google Places API key for the server-owned verdict fetch. */
   GOOGLE_PLACES_API_KEY?: string;
-  /** Server-side kill switch for transient Vibe Fit summary scoring. */
+  /** Server-side kill switch for transient Vibe Fit summary scoring. Legacy alias. */
   VIBE_FIT_ENABLED?: string;
+  /** Server-side kill switch for transient Vibe embeddings. */
+  VIBE_EMBEDDINGS_ENABLED?: string;
+  /** Voyage API key for transient server-side Vibe embeddings. */
+  VOYAGE_API_KEY?: string;
 }
 
 /** Read-side dependencies the handler needs. The Edge entry point
@@ -100,7 +106,9 @@ export interface ComputeVerdictDataAdapter {
    *  here and the Plan transition is skipped entirely. The supabase
    *  adapter selects `id, plan_id` so the field is always populated
    *  one-way-or-the-other. */
-  fetchRoom(room_id: string): Promise<{ id: string; plan_id?: string | null } | null>;
+  fetchRoom(
+    room_id: string,
+  ): Promise<{ id: string; plan_id?: string | null } | null>;
   /** Current active member user IDs for the room. Exited members have
    *  no `members` row and must not contribute fetches, votes, profile
    *  vetoes, budgets, or preference signals to the verdict. Optional
@@ -148,7 +156,10 @@ export interface ComputeVerdictDataAdapter {
   /** Emit a `verdict_ready` broadcast on `room:{room_id}` so iOS
    *  subscribers route into S05 within the Realtime window. Optional
    *  — production wires this to supabase-js Realtime, tests omit. */
-  emitVerdictReadyBroadcast?(room_id: string, verdict_id: string): Promise<void>;
+  emitVerdictReadyBroadcast?(
+    room_id: string,
+    verdict_id: string,
+  ): Promise<void>;
   /** Fetch the room's stored `radius_meters` so the engine can use it
    *  as the starting radius for the cascade. Returns null when the
    *  row doesn't carry the field (legacy / pre-TB-03 rooms). */
@@ -219,6 +230,7 @@ export interface RoomRerollState {
 export interface ComputeVerdictDeps {
   env: ComputeVerdictEnv;
   buildDataAdapter: (env: ComputeVerdictEnv) => ComputeVerdictDataAdapter;
+  vibeEmbeddingFetch?: VibeEmbeddingFetch;
 }
 
 export interface RoomOptionRow {
@@ -449,7 +461,9 @@ async function fetchGoogleVerdictOptionRows(
     active_member_ids: activeMemberIds ?? voteRows.map((row) => row.user_id),
     votes: voteRows,
   });
-  const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(googleCandidates);
+  const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(
+    googleCandidates,
+  );
   if (dedupedGoogleCandidates.length === 0 || !data.insertOptions) return null;
 
   await data.insertOptions(dedupedGoogleCandidates.map((candidate) => ({
@@ -463,7 +477,8 @@ async function fetchGoogleVerdictOptionRows(
     await data.fetchOptions(roomId),
   );
   return dedupedGoogleCandidates.map((candidate) => ({
-    id: optionIdByGooglePlaceId.get(candidate.google_place_id) ?? candidate.google_place_id,
+    id: optionIdByGooglePlaceId.get(candidate.google_place_id) ??
+      candidate.google_place_id,
     google_place_id: candidate.google_place_id,
     place_provider: "google",
     payload: candidate.payload,
@@ -471,7 +486,9 @@ async function fetchGoogleVerdictOptionRows(
   }));
 }
 
-function buildGoogleOptionIdMap(optionRows: readonly RoomOptionRow[]): Map<string, string> {
+function buildGoogleOptionIdMap(
+  optionRows: readonly RoomOptionRow[],
+): Map<string, string> {
   const out = new Map<string, string>();
   for (const row of optionRows) {
     if (typeof row.google_place_id === "string") {
@@ -495,6 +512,9 @@ type VibeFitScoringVenueProfile = Q5VenueProfile & {
 const VERDICT_SCORING_FORMULA_VERSION = "verdict-vibe-member-blend-v1";
 const Q5_GENERATION_RULES_VERSION = "q5-factorial-v1";
 const GOOGLE_SCORING_MASK_VERSION = "verdict_scoring_vibe_fit_v1";
+const VERDICT_VIBE_FIT_MAX_TEXTS_PER_FLOW =
+  (20 * VIBE_FIT_CONFIG.maxSpansPerCandidate +
+    VIBE_FIT_CONFIG.anchors.flatMap((anchor) => anchor.phrases).length) * 2;
 
 function clampLegacyVibeIndex(value: number): number {
   return Math.max(0, Math.min(VIBE_SCALE_STOPS - 1, Math.round(value)));
@@ -519,12 +539,28 @@ function hasVibeFitCandidate(
   return row.vibe_fit_candidate !== undefined;
 }
 
-function scoreEligibleVibeFitCandidates(
+async function scoreEligibleVibeFitCandidates(
   candidates: readonly VibeFitCandidate[],
-): Map<string, VibeFitSignal> {
+  env: ComputeVerdictEnv,
+  fetch?: VibeEmbeddingFetch,
+): Promise<Map<string, VibeFitSignal>> {
   const out = new Map<string, VibeFitSignal>();
-  for (const candidate of candidates) {
-    out.set(candidate.candidateId, scoreVibeFitCandidate(candidate));
+  if (candidates.length === 0) {
+    return out;
+  }
+  const signals =
+    candidates.every((candidate) => candidate.embeddingMode === "fake")
+      ? candidates.map((candidate) => scoreVibeFitCandidate(candidate))
+      : await scoreVibeFitCandidateFlow(candidates, {
+        env: {
+          VOYAGE_API_KEY: env.VOYAGE_API_KEY,
+          VIBE_EMBEDDINGS_ENABLED: env.VIBE_EMBEDDINGS_ENABLED,
+        },
+        budget: { maxTextsPerFlow: VERDICT_VIBE_FIT_MAX_TEXTS_PER_FLOW },
+        ...(fetch ? { fetch } : {}),
+      });
+  for (const signal of signals) {
+    out.set(signal.candidateId, signal);
   }
   return out;
 }
@@ -570,9 +606,11 @@ function vibeFitCandidateIdForVenue(
 function buildDurableVerdictScoringVersion(
   signals: Iterable<VibeFitSignal>,
 ): string {
-  const projectionVersions = [...new Set(
-    [...signals].map((signal) => signal.projectionVersion),
-  )].sort();
+  const projectionVersions = [
+    ...new Set(
+      [...signals].map((signal) => signal.projectionVersion),
+    ),
+  ].sort();
   const projectionVersion = projectionVersions.length > 0
     ? projectionVersions.join("+")
     : VIBE_FIT_CONFIG.voyageProjectionVersion;
@@ -731,7 +769,10 @@ export async function handleRequest(
 
   const roomId = (body as { room_id?: unknown })?.room_id;
   if (!isUuid(roomId)) {
-    return jsonResponse({ error: "invalid_input", detail: "room_id must be a uuid" }, {
+    return jsonResponse({
+      error: "invalid_input",
+      detail: "room_id must be a uuid",
+    }, {
       status: 400,
       headers: corsHeaders(),
     });
@@ -742,18 +783,19 @@ export async function handleRequest(
   // fire actually happened. Anything else falls back to `manual` (the
   // legacy TB-06 behavior).
   const rawMethod = (body as { method?: unknown })?.method;
-  const method: VerdictMethod = (rawMethod === "quorum" || rawMethod === "deadline")
-    ? rawMethod
-    : "manual";
+  const method: VerdictMethod =
+    (rawMethod === "quorum" || rawMethod === "deadline") ? rawMethod : "manual";
 
   // Optional widen-radius override (S05 no-survivor "Widen radius"
   // CTA, TB-09). Plan-backed Rooms now lock search area parameters,
   // so a numeric override is rejected before any adapter calls.
-  const rawWiden = (body as { radius_meters_override?: unknown })?.radius_meters_override;
+  const rawWiden = (body as { radius_meters_override?: unknown })
+    ?.radius_meters_override;
   if (typeof rawWiden === "number" && Number.isFinite(rawWiden)) {
     return jsonResponse({
       error: "search_area_locked",
-      detail: "Room parameters are locked; start a new decision to change them.",
+      detail:
+        "Room parameters are locked; start a new decision to change them.",
     }, {
       status: 409,
       headers: corsHeaders(),
@@ -812,7 +854,9 @@ export async function handleRequest(
     ? await data.fetchActiveMemberIds(roomId)
     : null;
   const activeMemberIdSet = activeMemberIds ? new Set(activeMemberIds) : null;
-  const filterToActiveMembers = <T extends { user_id: string }>(rows: T[]): T[] =>
+  const filterToActiveMembers = <T extends { user_id: string }>(
+    rows: T[],
+  ): T[] =>
     activeMemberIdSet
       ? rows.filter((row) => activeMemberIdSet.has(row.user_id))
       : rows;
@@ -932,13 +976,16 @@ export async function handleRequest(
       profileVetoes[row.user_id] ?? [],
     ),
   }));
-  const transientVibeFitSignalsByCandidateId = scoreEligibleVibeFitCandidates(
-    buildEligibleVibeFitCandidatesForVerdict({
-      optionRows,
-      votes: effectiveVoteInputs,
-      radiusMeters: startingRadius,
-    }),
-  );
+  const transientVibeFitSignalsByCandidateId =
+    await scoreEligibleVibeFitCandidates(
+      buildEligibleVibeFitCandidatesForVerdict({
+        optionRows,
+        votes: effectiveVoteInputs,
+        radiusMeters: startingRadius,
+      }),
+      deps.env,
+      deps.vibeEmbeddingFetch,
+    );
   const useVibeFitPreferenceScoring = optionRows.some(hasVibeFitCandidate);
   const vibeFitPreferenceOptions: PreferenceFunctionOptions =
     useVibeFitPreferenceScoring
@@ -1004,9 +1051,10 @@ export async function handleRequest(
 
   // TB-10 — fetch the previous winner's display name when this run is
   // a reroll. The aggregate-rule prefix reads "Cost reroll cut Pico's."
-  const previousWinnerName: string | undefined = (isRerollRun && data.fetchPreviousWinnerName)
-    ? ((await data.fetchPreviousWinnerName(roomId)) ?? undefined)
-    : undefined;
+  const previousWinnerName: string | undefined =
+    (isRerollRun && data.fetchPreviousWinnerName)
+      ? ((await data.fetchPreviousWinnerName(roomId)) ?? undefined)
+      : undefined;
 
   let result: VerdictEngineOutput;
   try {
