@@ -579,6 +579,8 @@ export function MobileAppShell({
   const [planListStatus, setPlanListStatus] =
     useState<PlanListStatus>("idle");
   const [verdict, setVerdict] = useState<VerdictViewModel | null>(null);
+  const [verdictLoadFailed, setVerdictLoadFailed] = useState(false);
+  const [verdictLoadAttempt, setVerdictLoadAttempt] = useState(0);
   const verdictFlavor: VerdictFlavor =
     quizSession.participantScope === "solo" ? "solo" : "group";
   const [deletedCreatedPlanIds, setDeletedCreatedPlanIds] = useState<
@@ -641,6 +643,7 @@ export function MobileAppShell({
 
     let isCurrent = true;
     setVerdict(null);
+    setVerdictLoadFailed(false);
 
     const verdictRequest =
       route.name === "readOnlyVerdict"
@@ -658,12 +661,23 @@ export function MobileAppShell({
         if (isCurrent) {
           setVerdict(nextVerdict);
         }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setVerdictLoadFailed(true);
+        }
       });
 
     return () => {
       isCurrent = false;
     };
-  }, [quizSession.roomId, route.name, verdictFlavor, verdictRepository]);
+  }, [
+    quizSession.roomId,
+    route.name,
+    verdictFlavor,
+    verdictLoadAttempt,
+    verdictRepository,
+  ]);
 
   if (route.name === "setup") {
     return (
@@ -735,6 +749,18 @@ export function MobileAppShell({
             onReroll={verdictRepository.reroll}
             verdict={verdict}
           />
+        ) : verdictLoadFailed ? (
+          <View style={styles.surface}>
+            <Text style={styles.routeTitle}>Verdict unavailable</Text>
+            <Text style={styles.subtitle}>Try again in a moment.</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setVerdictLoadAttempt((attempt) => attempt + 1)}
+              style={styles.secondaryButton}
+            >
+              <Text style={styles.secondaryButtonLabel}>Try again</Text>
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.surface}>
             <Text style={styles.routeTitle}>Loading verdict</Text>

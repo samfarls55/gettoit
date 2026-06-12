@@ -48,13 +48,17 @@ class TestQuery<T> implements PromiseLike<SupabaseQueryResult<T[]>> {
 }
 
 function makeSupabaseClient(
-  results: Record<string, SupabaseQueryResult<unknown[]>>,
+  results: Record<
+    string,
+    SupabaseQueryResult<unknown[]> | SupabaseQueryResult<unknown[]>[]
+  >,
   calls: QueryCall[] = [],
   invoke = jest.fn(),
   rpc = jest.fn(),
 ): VerdictSupabaseClient {
   return {
     from: <T,>(table: string) => {
+      const tableCallIndex = calls.filter((call) => call.table === table).length;
       const call: QueryCall = {
         table,
         filters: [],
@@ -62,10 +66,14 @@ function makeSupabaseClient(
         selectColumns: null,
       };
       calls.push(call);
+      const tableResults = results[table];
+      const result = Array.isArray(tableResults)
+        ? tableResults[Math.min(tableCallIndex, tableResults.length - 1)]
+        : tableResults;
 
       return new TestQuery<T>(
         call,
-        results[table] as SupabaseQueryResult<T[]>,
+        result as SupabaseQueryResult<T[]>,
       );
     },
     functions: {
@@ -280,6 +288,68 @@ describe("verdictRepository", () => {
       timeBadge: { time: "7:00 PM", audience: "" },
       primaryActionLabel: "Save taste profile",
     });
+  });
+
+  it("retries live verdict reads while compute-verdict is still committing", async () => {
+    const calls: QueryCall[] = [];
+    const invoke = jest.fn().mockResolvedValue({
+      data: googleDisplay({
+        placeId: "google-delayed",
+        name: "Delayed Noodles",
+        mapsUri: "https://maps.google.example/delayed",
+      }),
+      error: null,
+    });
+    const repository = createSupabaseVerdictRepository({
+      supabase: makeSupabaseClient(
+        {
+          verdicts: [
+            { data: [], error: null },
+            {
+              data: [
+                {
+                  id: "verdict-delayed",
+                  room_id: "room-1",
+                  option_id: "option-1",
+                  winner_google_place_id: "google-delayed",
+                  computed_at: "2026-06-04T19:00:00Z",
+                  method: "quorum",
+                  rule_text: "Best fit.",
+                },
+              ],
+              error: null,
+            },
+          ],
+          verdict_slate_entries: {
+            data: [],
+            error: null,
+          },
+          members: {
+            data: [{ user_id: "user-1", display_name: "You" }],
+            error: null,
+          },
+          votes: {
+            data: [{ user_id: "user-1", q4: { answer: { vibe: "cozy" } } }],
+            error: null,
+          },
+          rerolls: {
+            data: [],
+            error: null,
+          },
+        },
+        calls,
+        invoke,
+      ),
+    });
+
+    await expect(
+      repository.loadVerdict({ roomId: "room-1", flavor: "solo" }),
+    ).resolves.toMatchObject({
+      kind: "live",
+      placeName: "Delayed Noodles",
+    });
+
+    expect(calls.filter((call) => call.table === "verdicts")).toHaveLength(2);
   });
 
   it("maps no-survivor verdicts to the no-survivor screen model", async () => {

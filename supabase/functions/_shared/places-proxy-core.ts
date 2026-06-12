@@ -348,6 +348,7 @@ export const GOOGLE_Q5_FIELD_MASK = [
   "places.takeout",
 ].join(",");
 export const GOOGLE_Q5_MAX_RESULTS = 20;
+const GOOGLE_Q5_MIN_CARD_COUNT = 3;
 export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK_VERSION =
   "verdict_display_v1";
 export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK = [
@@ -523,6 +524,11 @@ type GoogleNearbySearchResponse = {
   }>;
 };
 
+type GoogleQ5ShapeResult = {
+  places: GoogleQ5Place[];
+  strictCount: number;
+};
+
 type GooglePlaceDetailsResponse = {
   id?: unknown;
   displayName?: { text?: unknown };
@@ -571,8 +577,19 @@ export async function handleGoogleQ5PlacesProxy(
   }
 
   const body = (await response.json()) as GoogleNearbySearchResponse;
+  const shaped = shapeGoogleQ5Places(input, body);
+  console.info("google_q5_shape", JSON.stringify({
+    raw_count: body.places?.length ?? 0,
+    strict_count: shaped.strictCount,
+    returned_count: shaped.places.length,
+    relaxed_service_used: shaped.places.length > shaped.strictCount,
+    has_open_at: Boolean(input.filters?.open_at),
+    service_shape: input.filters?.service_shape ?? null,
+    radius_meters: input.radius_meters,
+  }));
+
   return {
-    places: shapeGoogleQ5Places(input, body),
+    places: shaped.places,
     attribution: {
       provider: "google",
       render: "text",
@@ -699,6 +716,38 @@ async function fetchGoogleNearbyWithRetry(
 function shapeGoogleQ5Places(
   input: PlacesProxyInput,
   body: GoogleNearbySearchResponse,
+): GoogleQ5ShapeResult {
+  const strict = collectGoogleQ5Places(
+    input,
+    body,
+    isGooglePlaceEligibleForTimingAndService,
+  );
+  if (strict.length >= GOOGLE_Q5_MIN_CARD_COUNT) {
+    return {
+      places: strict,
+      strictCount: strict.length,
+    };
+  }
+
+  const relaxedService = collectGoogleQ5Places(
+    input,
+    body,
+    isGooglePlaceEligibleForTimingAndRelaxedService,
+  );
+
+  return {
+    places: relaxedService,
+    strictCount: strict.length,
+  };
+}
+
+function collectGoogleQ5Places(
+  input: PlacesProxyInput,
+  body: GoogleNearbySearchResponse,
+  isEligible: (
+    place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+    input: PlacesProxyInput,
+  ) => boolean,
 ): GoogleQ5Place[] {
   const places: GoogleQ5Place[] = [];
   for (const place of body.places ?? []) {
@@ -708,7 +757,7 @@ function shapeGoogleQ5Places(
     ) {
       continue;
     }
-    if (!isGooglePlaceEligibleForTimingAndService(place, input)) {
+    if (!isEligible(place, input)) {
       continue;
     }
 
@@ -724,17 +773,9 @@ function isGooglePlaceEligibleForTimingAndService(
   place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
   input: PlacesProxyInput,
 ): boolean {
-  const openAt = input.filters?.open_at;
   const serviceShape = input.filters?.service_shape;
 
-  if (openAt) {
-    if (!isOpenAtGoogleRegularTime(place.regularOpeningHours, openAt)) {
-      return false;
-    }
-  } else if (
-    place.currentOpeningHours?.openNow !== true &&
-    place.regularOpeningHours?.openNow !== true
-  ) {
+  if (!isGooglePlaceEligibleForTiming(place, input)) {
     return false;
   }
 
@@ -745,6 +786,39 @@ function isGooglePlaceEligibleForTimingAndService(
     return false;
   }
   return true;
+}
+
+function isGooglePlaceEligibleForTimingAndRelaxedService(
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+  input: PlacesProxyInput,
+): boolean {
+  const serviceShape = input.filters?.service_shape;
+
+  if (!isGooglePlaceEligibleForTiming(place, input)) {
+    return false;
+  }
+
+  if (serviceShape === "dineIn" && place.dineIn === false) {
+    return false;
+  }
+  if (serviceShape === "takeout" && place.takeout === false) {
+    return false;
+  }
+  return true;
+}
+
+function isGooglePlaceEligibleForTiming(
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+  input: PlacesProxyInput,
+): boolean {
+  const openAt = input.filters?.open_at;
+
+  if (openAt) {
+    return isOpenAtGoogleRegularTime(place.regularOpeningHours, openAt);
+  }
+
+  return place.currentOpeningHours?.openNow === true ||
+    place.regularOpeningHours?.openNow === true;
 }
 
 function isOpenAtGoogleRegularTime(

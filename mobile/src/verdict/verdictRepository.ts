@@ -2,6 +2,7 @@ export type VerdictFlavor = "group" | "solo";
 export type RerollReason = "cost" | "dist" | "mood" | "diet" | "avail";
 
 const MAX_REROLL_BURNS = 3;
+const LIVE_VERDICT_PENDING_RETRY_DELAYS_MS = [300, 700, 1200, 2000, 3000];
 
 export type RerollInput = {
   roomId: string;
@@ -172,6 +173,8 @@ type GoogleAttributionPayload = {
   text: "Powered by Google";
 };
 
+class VerdictPendingError extends Error {}
+
 export type GoogleVerdictDisplay = {
   place: {
     place_id: string;
@@ -317,6 +320,10 @@ function unavailableHistoryDisplay(): HistoryVerdictDisplay {
   };
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function mapSlateRowsToEntries(
   rows: SupabaseVerdictSlateEntryRow[],
 ): VerdictSlateEntry[] {
@@ -411,7 +418,7 @@ export function createSupabaseVerdictRepository({
     const verdict = latestVerdict(verdictRows);
 
     if (!verdict) {
-      throw new Error("Verdict read failed: no row returned");
+      throw new VerdictPendingError("Verdict read failed: no row returned");
     }
 
     if (verdict.method === "no_survivor" || !verdict.option_id) {
@@ -431,6 +438,26 @@ export function createSupabaseVerdictRepository({
       verdict,
       slateRows,
     };
+  };
+
+  const loadLiveLatestVerdictAndSlate = async (
+    roomId: string,
+  ): Promise<LatestVerdictAndSlate> => {
+    for (const retryDelayMs of [0, ...LIVE_VERDICT_PENDING_RETRY_DELAYS_MS]) {
+      if (retryDelayMs > 0) {
+        await delay(retryDelayMs);
+      }
+
+      try {
+        return await loadLatestVerdictAndSlate(roomId);
+      } catch (error) {
+        if (!(error instanceof VerdictPendingError)) {
+          throw error;
+        }
+      }
+    }
+
+    throw new VerdictPendingError("Verdict read failed: no row returned");
   };
 
   const loadPlanHistoryContext = async (
@@ -454,7 +481,7 @@ export function createSupabaseVerdictRepository({
 
   return {
     loadVerdict: async ({ roomId, flavor }) => {
-      const { verdict, slateRows } = await loadLatestVerdictAndSlate(roomId);
+      const { verdict, slateRows } = await loadLiveLatestVerdictAndSlate(roomId);
 
       if (verdict.method === "no_survivor" || !verdict.option_id) {
         return {

@@ -605,6 +605,57 @@ describe("App", () => {
     expect(screen.queryByText("PICO'S\nTAQUERIA")).toBeNull();
   });
 
+  it("shows a retry state when verdict loading fails", async () => {
+    const recoveredVerdict: VerdictViewModel = {
+      kind: "live",
+      roomId: "active-room",
+      flavor: "group",
+      placeName: "Recovered Dumplings",
+      formattedAddress: "10 Main St",
+      googleMapsUri: "https://maps.google.example/recovered",
+      attributionText: "Powered by Google",
+      ruleText: "Best fit.",
+      timeBadge: { time: "7:00 PM", audience: "All 2 of you" },
+      receipts: [],
+      primaryActionLabel: "I'm in",
+      reroll: {
+        burnsRemaining: 3,
+        ineligibleReason: null,
+        isEligible: true,
+        windowClosesAt: null,
+      },
+    };
+    const verdictRepository: VerdictRepository = {
+      loadVerdict: jest
+        .fn()
+        .mockRejectedValueOnce(new Error("verdict not ready"))
+        .mockResolvedValueOnce(recoveredVerdict),
+      loadHistoryVerdict: jest.fn(),
+      reroll: jest.fn(),
+    };
+
+    render(
+      <MobileAppShell
+        routerState={{
+          ...linkedApplePlanListState,
+          activePlanPhase: "verdict",
+        }}
+        verdictRepository={verdictRepository}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Verdict unavailable")).toBeOnTheScreen();
+    });
+
+    fireEvent.press(screen.getByText("Try again"));
+
+    await waitFor(() => {
+      expect(verdictRepository.loadVerdict).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("RECOVERED\nDUMPLINGS")).toBeOnTheScreen();
+    });
+  });
+
   it("renders injected Plan list buckets", async () => {
     render(
       <App

@@ -401,6 +401,54 @@ Deno.test("google q5 — applies meal timing and service-mode eligibility before
   ]);
 });
 
+Deno.test("google q5 - relaxes missing dine-in evidence when strict pool is thin", async () => {
+  const dinnerHours = {
+    periods: [
+      {
+        open: { day: 3, hour: 18, minute: 0 },
+        close: { day: 3, hour: 22, minute: 0 },
+      },
+    ],
+  };
+  const fetch: ProxyDeps["fetch"] = () =>
+    Promise.resolve(new Response(JSON.stringify({
+      places: [
+        {
+          id: "missing-dine-in-1",
+          displayName: { text: "First Unknown Dine-In" },
+          regularOpeningHours: dinnerHours,
+        },
+        {
+          id: "missing-dine-in-2",
+          displayName: { text: "Second Unknown Dine-In" },
+          regularOpeningHours: dinnerHours,
+        },
+        {
+          id: "missing-dine-in-3",
+          displayName: { text: "Third Unknown Dine-In" },
+          regularOpeningHours: dinnerHours,
+        },
+        {
+          id: "known-no-dine-in",
+          displayName: { text: "Known No Dine-In" },
+          regularOpeningHours: dinnerHours,
+          dineIn: false,
+        },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+  const result = await handleGoogleQ5PlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { open_at: "3T1900", service_shape: "dineIn" },
+  }, { fetch, googleApiKey: "google-secret" });
+
+  assertEquals(result.places, [
+    { place_id: "missing-dine-in-1", display_name: "First Unknown Dine-In" },
+    { place_id: "missing-dine-in-2", display_name: "Second Unknown Dine-In" },
+    { place_id: "missing-dine-in-3", display_name: "Third Unknown Dine-In" },
+  ]);
+});
+
 Deno.test("google q5 — retries one transient failure then fails closed", async () => {
   const calls: Response[] = [
     new Response("temporary", { status: 503 }),
