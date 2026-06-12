@@ -25,6 +25,7 @@ import {
   nativeAuthBoundary,
   nativeInviteBoundary,
   nativeLinkBoundary as runtimeNativeLinkBoundary,
+  nativeVerdictRepository,
 } from "./src/native/nativeRuntime";
 import {
   initialAppStateRouterState,
@@ -58,7 +59,6 @@ import type {
   VerdictRepository,
   VerdictViewModel,
 } from "./src/verdict/verdictRepository";
-import { fakeVerdictRepository } from "./src/verdict/verdictRepository";
 import { WaitingScreen } from "./src/waiting/WaitingScreen";
 import type { WaitingRepository } from "./src/waiting/waitingRepository";
 import { fakeWaitingRepository } from "./src/waiting/waitingRepository";
@@ -265,6 +265,21 @@ const defaultNativeLinkBoundary: NativeLinkBoundary = {
   subscribe: () => () => undefined,
 };
 
+const unconfiguredVerdictRepository: VerdictRepository = {
+  loadVerdict: async () => {
+    throw new Error("Verdict repository is not configured.");
+  },
+  loadHistoryVerdict: async () => {
+    throw new Error("Verdict repository is not configured.");
+  },
+  reroll: async () => {
+    throw new Error("Verdict repository is not configured.");
+  },
+  widenAndRerun: async () => {
+    throw new Error("Verdict repository is not configured.");
+  },
+};
+
 const runtimeAuthBoundary: AuthBoundary = {
   restoreSession: async () => {
     try {
@@ -351,7 +366,7 @@ export default function App({
   q5CandidateRepository = fakeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
   quizSubmissionRepository = fakeQuizSubmissionRepository,
-  verdictRepository = fakeVerdictRepository,
+  verdictRepository = nativeVerdictRepository,
   waitingRepository = fakeWaitingRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
@@ -554,7 +569,7 @@ export function MobileAppShell({
     role: "initiator",
   },
   setupPlan = defaultSetupPlan("group"),
-  verdictRepository = fakeVerdictRepository,
+  verdictRepository = unconfiguredVerdictRepository,
   waitingRepository = fakeWaitingRepository,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);

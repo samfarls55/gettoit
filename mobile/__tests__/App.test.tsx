@@ -21,6 +21,7 @@ import type {
   PlanRepository,
 } from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
+import { nativeVerdictRepository } from "../src/native/nativeRuntime";
 import type {
   QuizProgress,
   QuizProgressRepository,
@@ -361,7 +362,12 @@ describe("App", () => {
       visibleBody: "Delete my data",
     },
   ])("$name", async ({ state, visibleRoute, visibleBody }) => {
-    render(<MobileAppShell routerState={state} />);
+    render(
+      <MobileAppShell
+        routerState={state}
+        verdictRepository={makeVerdictRepository()}
+      />,
+    );
 
     if (state.activePlanPhase === "verdict") {
       await waitFor(() => {
@@ -418,6 +424,49 @@ describe("App", () => {
     expect(screen.getByText("Morgan's birthday")).toBeOnTheScreen();
     expect(screen.getByText("Date night fallback")).toBeOnTheScreen();
     expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
+  });
+
+  it("uses the native Verdict repository by default", async () => {
+    const loadVerdict = jest
+      .spyOn(nativeVerdictRepository, "loadVerdict")
+      .mockResolvedValue({
+        kind: "live",
+        roomId: "active-room",
+        flavor: "group",
+        placeName: "Runtime Dumpling House",
+        formattedAddress: "9 Real St",
+        googleMapsUri: "https://maps.google.example/runtime",
+        attributionText: "Powered by Google",
+        ruleText: "Best fit for the table.",
+        timeBadge: { time: "7:00 PM", audience: "All 2 of you" },
+        receipts: [{ id: "ava", name: "Ava", action: "wanted social" }],
+        primaryActionLabel: "I'm in",
+        reroll: {
+          burnsRemaining: 3,
+          ineligibleReason: null,
+          isEligible: true,
+          windowClosesAt: null,
+        },
+      });
+
+    render(
+      <App
+        initialRouterState={{
+          ...linkedApplePlanListState,
+          activePlanPhase: "verdict",
+        }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(loadVerdict).toHaveBeenCalledWith({
+        roomId: "active-room",
+        flavor: "group",
+      });
+      expect(screen.getByText("RUNTIME\nDUMPLING\nHOUSE")).toBeOnTheScreen();
+    });
+
+    expect(screen.queryByText("PICO'S\nTAQUERIA")).toBeNull();
   });
 
   it("deletes a Created Plan after confirmation and keeps joined Plans", async () => {

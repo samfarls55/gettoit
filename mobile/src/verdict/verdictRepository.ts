@@ -215,52 +215,6 @@ export type VerdictSlateAdvanceResult =
       skippedPlaceIds: string[];
     };
 
-export const fakeVerdictRepository: VerdictRepository = {
-  loadVerdict: async ({ roomId, flavor }) => ({
-    kind: "live",
-    roomId,
-    flavor,
-    placeName: "Pico's Taqueria",
-    formattedAddress: "1 Main St",
-    googleMapsUri: "https://maps.google.example/picos",
-    attributionText: "Powered by Google",
-    ruleText: "Best fit for the table.",
-    timeBadge: {
-      time: "7:00 PM",
-      audience: flavor === "solo" ? "" : "All 2 of you",
-    },
-    receipts:
-      flavor === "solo"
-        ? []
-        : [
-            { id: "ava", name: "Ava", action: "wanted social" },
-            { id: "morgan", name: "Morgan", action: "wanted calm" },
-          ],
-    primaryActionLabel: flavor === "solo" ? "Save taste profile" : "I'm in",
-    reroll: {
-      burnsRemaining: 3,
-      ineligibleReason: null,
-      isEligible: true,
-      windowClosesAt: null,
-    },
-  }),
-  loadHistoryVerdict: async ({ roomId }) => ({
-    kind: "history",
-    roomId,
-    planName: "Taco crawl",
-    decidedAtLabel: "Decided Jun 4",
-    display: {
-      status: "available",
-      placeName: "Pico's Taqueria",
-      formattedAddress: "1 Main St",
-      googleMapsUri: "https://maps.google.example/picos",
-      attributionText: "Powered by Google",
-    },
-  }),
-  reroll: async () => undefined,
-  widenAndRerun: async () => undefined,
-};
-
 function assertSupabaseRows<TRow>(
   result: SupabaseQueryResult<TRow[]>,
   queryName: string,

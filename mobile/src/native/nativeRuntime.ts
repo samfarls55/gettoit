@@ -7,6 +7,11 @@ import {
   createSupabaseAuthRepository,
 } from "../auth/authRepository";
 import { createGroupInviteUrl } from "../invites/inviteLinks";
+import {
+  createSupabaseVerdictRepository,
+  type VerdictRepository,
+  type VerdictSupabaseClient,
+} from "../verdict/verdictRepository";
 
 const defaultInviteBaseUrl = "https://gettoit.app";
 
@@ -52,6 +57,12 @@ function createRuntimeAuthRepository() {
   });
 }
 
+function createRuntimeVerdictRepository() {
+  return createSupabaseVerdictRepository({
+    supabase: createMobileSupabaseClient() as VerdictSupabaseClient,
+  });
+}
+
 export const nativeAuthBoundary = {
   restoreSession: async () => createRuntimeAuthRepository().restoreSession(),
   deleteCurrentAccount: async () =>
@@ -75,6 +86,16 @@ export const nativeInviteBoundary = {
   shareInviteLink: async (url: string) => {
     await Share.share({ url, message: url });
   },
+};
+
+export const nativeVerdictRepository: VerdictRepository = {
+  loadVerdict: async (input) =>
+    createRuntimeVerdictRepository().loadVerdict(input),
+  loadHistoryVerdict: async (input) =>
+    createRuntimeVerdictRepository().loadHistoryVerdict(input),
+  reroll: async (input) => createRuntimeVerdictRepository().reroll(input),
+  widenAndRerun: async (input) =>
+    createRuntimeVerdictRepository().widenAndRerun(input),
 };
 
 export const nativeLinkBoundary = {

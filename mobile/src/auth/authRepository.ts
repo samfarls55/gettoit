@@ -69,7 +69,12 @@ export type MobileSupabaseFunctionsClient = {
 
 export type MobileSupabaseClient = {
   auth: MobileSupabaseAuthClient;
+  from: <TRow>(table: string) => unknown;
   functions: MobileSupabaseFunctionsClient;
+  rpc: <TData>(
+    functionName: string,
+    args: Record<string, unknown>,
+  ) => Promise<SupabaseResult<TData>>;
 };
 
 export type MobileAuthRepositoryDependencies = {
@@ -223,6 +228,7 @@ export function createMobileSupabaseClient(
         return { data: {}, error };
       },
     },
+    from: (table) => client.from(table),
     functions: {
       invoke: async <TData,>(
         functionName: string,
@@ -235,6 +241,17 @@ export function createMobileSupabaseClient(
 
         return { data: data as TData, error };
       },
+    },
+    rpc: async <TData,>(
+      functionName: string,
+      args: Record<string, unknown>,
+    ) => {
+      const { data, error } = await client.rpc(functionName, args);
+
+      return {
+        data: data as TData,
+        error: error ? new Error(error.message) : null,
+      };
     },
   };
 }
