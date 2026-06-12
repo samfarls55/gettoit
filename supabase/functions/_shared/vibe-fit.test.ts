@@ -4,8 +4,10 @@ import {
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
+  embedTextsWithVoyage,
   extractVibeEvidenceSpans,
   scoreVibeFitCandidate,
+  scoreVibeFitCandidateFlow,
   VIBE_FIT_CONFIG,
 } from "./vibe-fit.ts";
 
@@ -185,3 +187,223 @@ Deno.test("TB-03: complex negation and sarcasm lower confidence instead of produ
   assert(signal.confidence < 0.45);
   assert(signal.receiptCodes.includes("vibe_low_confidence"));
 });
+
+Deno.test("TB-05: disabled embeddings skip Voyage and degrade to neutral low confidence", async () => {
+  let fetchCalls = 0;
+  const signals = await scoreVibeFitCandidateFlow(
+    [
+      {
+        candidateId: "disabled",
+        sourceTexts: [{
+          priority: 1,
+          text: "Quiet calm room for conversation.",
+        }],
+      },
+    ],
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "false" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: () => {
+        fetchCalls += 1;
+        return Promise.resolve(new Response("{}"));
+      },
+    },
+  );
+
+  assertEquals(fetchCalls, 0);
+  assertEquals(signals[0].vibePosition, 3);
+  assertEquals(signals[0].confidence, 0);
+  assertEquals(signals[0].receiptCodes, [
+    "vibe_embeddings_disabled",
+    "vibe_low_confidence",
+  ]);
+});
+
+Deno.test("TB-05: Voyage wrapper batches voyage-4-lite inputs and dedupes within one flow", async () => {
+  const requestedInputs: string[][] = [];
+  const signals = await scoreVibeFitCandidateFlow(
+    [
+      {
+        candidateId: "a",
+        sourceTexts: [{
+          priority: 1,
+          text: "Quiet calm room for conversation.",
+        }],
+      },
+      {
+        candidateId: "b",
+        sourceTexts: [{
+          priority: 1,
+          text: "Quiet calm room for conversation.",
+        }],
+      },
+    ],
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as {
+          model: string;
+          input: string[];
+        };
+        requestedInputs.push(body.input);
+        assertEquals(body.model, "voyage-4-lite");
+        assertEquals(
+          (init?.headers as Record<string, string>)["Authorization"],
+          "Bearer secret",
+        );
+        return Promise.resolve(jsonEmbeddingResponse(body.input));
+      },
+    },
+  );
+
+  assertEquals(requestedInputs.length, 1);
+  assertEquals(
+    requestedInputs[0].filter((text) =>
+      text === "Quiet calm room for conversation"
+    ).length,
+    1,
+  );
+  assertEquals(new Set(requestedInputs[0]).size, requestedInputs[0].length);
+  assert(signals.every((signal) => signal.confidence > 0));
+});
+
+Deno.test("TB-05: Voyage wrapper allows one bounded transient retry for a flow", async () => {
+  let calls = 0;
+  const result = await embedTextsWithVoyage(["quiet", "lively"], {
+    env: { VOYAGE_API_KEY: "secret" },
+    budget: { maxTextsPerFlow: 4 },
+    fetch: (_url, init) => {
+      calls += 1;
+      if (calls === 1) {
+        return Promise.resolve(new Response("rate", { status: 429 }));
+      }
+      const body = JSON.parse(String(init?.body)) as { input: string[] };
+      return Promise.resolve(jsonEmbeddingResponse(body.input));
+    },
+  });
+
+  assertEquals(calls, 2);
+  assert(result.ok);
+});
+
+Deno.test("TB-05: Voyage wrapper does not retry when retry would exceed budget", async () => {
+  let calls = 0;
+  const result = await embedTextsWithVoyage(["quiet", "lively"], {
+    env: { VOYAGE_API_KEY: "secret" },
+    budget: { maxTextsPerFlow: 2 },
+    fetch: () => {
+      calls += 1;
+      return Promise.resolve(new Response("rate", { status: 429 }));
+    },
+  });
+
+  assertEquals(calls, 1);
+  assertEquals(result, { ok: false, error: "provider_unavailable" });
+});
+
+Deno.test("TB-05: Voyage wrapper enforces a short per-flow timeout", async () => {
+  let sawAbortSignal = false;
+  const result = await embedTextsWithVoyage(["quiet"], {
+    env: { VOYAGE_API_KEY: "secret" },
+    timeoutMs: 1,
+    budget: { maxTextsPerFlow: 1 },
+    fetch: (_url, init) => {
+      const signal = init?.signal;
+      sawAbortSignal = signal instanceof AbortSignal;
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+    },
+  });
+
+  assert(sawAbortSignal);
+  assertEquals(result, { ok: false, error: "timeout" });
+});
+
+Deno.test("TB-05: budget exhaustion skips Voyage and returns controlled receipts", async () => {
+  let fetchCalls = 0;
+  const signals = await scoreVibeFitCandidateFlow(
+    [
+      {
+        candidateId: "budget",
+        sourceTexts: [{ priority: 1, text: "Buzzy lively energetic room." }],
+      },
+    ],
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+      budget: { maxTextsPerFlow: 1 },
+      fetch: () => {
+        fetchCalls += 1;
+        return Promise.resolve(new Response("{}"));
+      },
+    },
+  );
+
+  assertEquals(fetchCalls, 0);
+  assertEquals(signals[0].vibePosition, 3);
+  assertEquals(signals[0].receiptCodes, [
+    "vibe_embedding_budget_exhausted",
+    "vibe_low_confidence",
+  ]);
+});
+
+Deno.test("TB-05: provider failures degrade without leaking text vectors or API key", async () => {
+  const secret = "secret-token";
+  const result = await embedTextsWithVoyage(["Quiet private room"], {
+    env: { VOYAGE_API_KEY: secret },
+    budget: { maxTextsPerFlow: 2 },
+    fetch: () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            error: "Quiet private room failed",
+            embedding: [0.1, 0.2],
+            key: secret,
+          }),
+          { status: 500 },
+        ),
+      ),
+  });
+
+  assertEquals(result, { ok: false, error: "provider_unavailable" });
+  assertEquals(JSON.stringify(result).includes("Quiet private room"), false);
+  assertEquals(JSON.stringify(result).includes(secret), false);
+  assertEquals(JSON.stringify(result).includes("0.1"), false);
+});
+
+function jsonEmbeddingResponse(texts: readonly string[]): Response {
+  return new Response(
+    JSON.stringify({
+      data: texts.map((text) => ({ embedding: fakeVoyageEmbedding(text) })),
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
+}
+
+function fakeVoyageEmbedding(text: string): number[] {
+  const lower = text.toLowerCase();
+  if (/\b(quiet|calm|peaceful|conversation|intimate)\b/.test(lower)) {
+    return [1, 0, 0, 0, 0];
+  }
+  if (/\b(chill|mellow|cozy|relaxed|date-night|laid-back)\b/.test(lower)) {
+    return [0, 1, 0, 0, 0];
+  }
+  if (
+    /\b(social|balanced|casual|convivial|comfortable|group-friendly)\b/.test(
+      lower,
+    )
+  ) {
+    return [0, 0, 1, 0, 0];
+  }
+  if (/\b(lively|buzzy|energetic|upbeat|animated|busy)\b/.test(lower)) {
+    return [0, 0, 0, 1, 0];
+  }
+  if (/\b(rowdy|loud|packed|high-energy|party|hard to hear)\b/.test(lower)) {
+    return [0, 0, 0, 0, 1];
+  }
+  return [0, 0, 1, 0, 0];
+}
