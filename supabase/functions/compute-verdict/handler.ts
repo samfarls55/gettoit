@@ -50,14 +50,14 @@ import {
 } from "../_shared/member-fetch-union.ts";
 import {
   buildPreferenceFunction,
-  MATCH_SCORE,
+  type PreferenceFunctionOptions,
   type Q5VenueProfile,
   scoreVibeAxis,
   THRESHOLD_T,
+  VIBE_SCALE_STOPS,
 } from "../_shared/preference-function.ts";
 import { classifyVenuePool } from "../_shared/venue-classifier.ts";
 import type { MemberPreferenceInputs } from "../_shared/votes-schema.ts";
-import { vibePositionFromLegacyIndex } from "../_shared/vibe-band.ts";
 import {
   scoreVibeFitCandidate,
   VIBE_FIT_CONFIG,
@@ -496,6 +496,10 @@ const VERDICT_SCORING_FORMULA_VERSION = "verdict-vibe-member-blend-v1";
 const Q5_GENERATION_RULES_VERSION = "q5-factorial-v1";
 const GOOGLE_SCORING_MASK_VERSION = "verdict_scoring_vibe_fit_v1";
 
+function clampLegacyVibeIndex(value: number): number {
+  return Math.max(0, Math.min(VIBE_SCALE_STOPS - 1, Math.round(value)));
+}
+
 export function buildEligibleVibeFitCandidatesForVerdict(input: {
   optionRows: readonly RoomOptionRow[];
   votes: readonly HardEligibilityVote[];
@@ -531,19 +535,36 @@ export function scoreVibeFitSignalForMember(
 ): number {
   if (!signal || signal.vibePosition === null) return THRESHOLD_T;
   if (!Number.isFinite(statedLegacyVibe)) return THRESHOLD_T;
-  const statedPosition = vibePositionFromLegacyIndex(
-    Math.max(0, Math.min(4, Math.round(statedLegacyVibe))),
-  );
   const rawScore = scoreVibeAxis(
     signal.vibePosition - 1,
-    statedPosition - 1,
+    clampLegacyVibeIndex(statedLegacyVibe),
   );
   const confidence = Math.max(0, Math.min(1, signal.confidence));
-  const blended = THRESHOLD_T + (rawScore - THRESHOLD_T) * confidence;
-  const positiveCap = THRESHOLD_T + (MATCH_SCORE - THRESHOLD_T) * confidence;
-  return rawScore > THRESHOLD_T
-    ? Math.min(blended, positiveCap)
-    : blended;
+  return THRESHOLD_T + (rawScore - THRESHOLD_T) * confidence;
+}
+
+function buildVibeFitPreferenceOptions(
+  signalsByCandidateId: ReadonlyMap<string, VibeFitSignal>,
+): PreferenceFunctionOptions {
+  return {
+    scoreVibeAxis: (_venueVibe, statedVibe, venue) => {
+      const candidateId = vibeFitCandidateIdForVenue(venue);
+      if (!candidateId) return THRESHOLD_T;
+      return scoreVibeFitSignalForMember(
+        signalsByCandidateId.get(candidateId),
+        statedVibe,
+      );
+    },
+  };
+}
+
+function vibeFitCandidateIdForVenue(
+  venue: Q5VenueProfile,
+): string | undefined {
+  if (!("vibeFitCandidateId" in venue)) return undefined;
+  return typeof venue.vibeFitCandidateId === "string"
+    ? venue.vibeFitCandidateId
+    : undefined;
 }
 
 function buildDurableVerdictScoringVersion(
@@ -919,6 +940,10 @@ export async function handleRequest(
     }),
   );
   const useVibeFitPreferenceScoring = optionRows.some(hasVibeFitCandidate);
+  const vibeFitPreferenceOptions: PreferenceFunctionOptions =
+    useVibeFitPreferenceScoring
+      ? buildVibeFitPreferenceOptions(transientVibeFitSignalsByCandidateId)
+      : {};
 
   // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
   // the union of "original quiz answer" + "diet-reason reroll add."
@@ -950,20 +975,7 @@ export async function handleRequest(
       const built = buildPreferenceFunction(
         row.preference_inputs.member,
         row.preference_inputs.q5Ratings,
-        useVibeFitPreferenceScoring
-          ? {
-            scoreVibeAxis: (_venueVibe, statedVibe, venue) => {
-              const candidateId =
-                (venue as VibeFitScoringVenueProfile).vibeFitCandidateId;
-              return candidateId
-                ? scoreVibeFitSignalForMember(
-                  transientVibeFitSignalsByCandidateId.get(candidateId),
-                  statedVibe,
-                )
-                : THRESHOLD_T;
-            },
-          }
-          : {},
+        vibeFitPreferenceOptions,
       );
       prefFn = (candidate) => {
         // A candidate with no classified profile (it was not in the
