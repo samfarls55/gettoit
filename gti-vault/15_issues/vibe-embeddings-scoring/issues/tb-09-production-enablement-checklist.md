@@ -48,3 +48,7 @@ Validation:
 - Verification: `npx --yes deno test --allow-net --allow-env --allow-read` from `supabase/functions` passed with 542 passed, 0 failed, 3 ignored.
 
 Code note: the checklist found production wiring issues while validating. `compute-verdict` now reads the canonical `VIBE_EMBEDDINGS_ENABLED` flag, uses the live Voyage scoring flow only when enabled, keeps deterministic fake scoring for fake-mode tests, and the CI edge-deploy lane can push `VOYAGE_API_KEY` plus the disabled-by-default flag. This wiring does not enable product traffic.
+
+## Operational override - 2026-06-12
+
+Per direct operator request, transient Vibe embeddings were turned on after the original failed-calibration closeout. `VIBE_EMBEDDINGS_ENABLED` was set to `true` in the linked Supabase Edge Function secrets, the mirrored GitHub Actions secret, and local `.env`; `VOYAGE_API_KEY` remained present by name only and was not printed. This deliberately overrides the earlier "do not enable" decision above, so watch recommendation quality and be ready to set the flag back to `false` if the low-confidence calibration behavior shows up in product traffic.
