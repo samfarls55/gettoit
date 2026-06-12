@@ -15,10 +15,7 @@ import type {
   QuizProgressRepository,
   QuizQuestionId,
 } from "./quizProgressRepository";
-import {
-  fakeQuizSubmissionRepository,
-  type QuizSubmissionRepository,
-} from "./quizSubmissionRepository";
+import type { QuizSubmissionRepository } from "./quizSubmissionRepository";
 
 type QuizScreenProps = {
   progressRepository: QuizProgressRepository;
@@ -27,7 +24,7 @@ type QuizScreenProps = {
   roomId: string;
   onExited: () => void;
   onSubmitted?: () => void;
-  submissionRepository?: QuizSubmissionRepository;
+  submissionRepository: QuizSubmissionRepository;
 };
 
 type AnswerKey = keyof QuizAnswers;
@@ -203,7 +200,7 @@ export function QuizScreen({
   roomId,
   onExited,
   onSubmitted,
-  submissionRepository = fakeQuizSubmissionRepository,
+  submissionRepository,
 }: QuizScreenProps) {
   const [currentQuestionId, setCurrentQuestionId] =
     useState<QuizQuestionId>("q1");
@@ -302,6 +299,7 @@ export function QuizScreen({
     await submissionRepository.submitQuiz({
       roomId,
       answers: { ...answers, q5Ratings: ratings },
+      q5Candidates,
     });
     onSubmitted?.();
   };

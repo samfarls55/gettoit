@@ -263,6 +263,7 @@ describe("planRepository", () => {
       joined: [
         {
           id: "joined-plan",
+          roomId: "room-joined",
           title: "Morgan's birthday",
           subtitle: "Quiz in progress",
           badge: "Joined",

@@ -29,6 +29,12 @@ function makeCandidateRepository(
   };
 }
 
+function makeSubmissionRepository(): QuizSubmissionRepository {
+  return {
+    submitQuiz: jest.fn(async () => undefined),
+  };
+}
+
 const candidatePool = [
   {
     id: "google-katzs-delicatessen",
@@ -69,6 +75,7 @@ describe("QuizScreen Q1", () => {
         q5CandidateRepository={makeCandidateRepository([])}
         role="initiator"
         roomId="room-q1"
+        submissionRepository={makeSubmissionRepository()}
       />,
     );
 
@@ -111,6 +118,7 @@ describe("QuizScreen Q5", () => {
         q5CandidateRepository={q5CandidateRepository}
         role="initiator"
         roomId="room-q5"
+        submissionRepository={makeSubmissionRepository()}
       />,
     );
 
@@ -147,6 +155,7 @@ describe("QuizScreen Q5", () => {
         q5CandidateRepository={makeCandidateRepository([])}
         role="initiator"
         roomId="room-q5"
+        submissionRepository={makeSubmissionRepository()}
       />,
     );
 
@@ -211,6 +220,23 @@ describe("QuizScreen Q5", () => {
             "google-cosme": 3,
           },
         },
+        q5Candidates: [
+          expect.objectContaining({
+            droppedAxis: "cuisine",
+            id: "google-katzs-delicatessen",
+            name: "Katz's Delicatessen",
+          }),
+          expect.objectContaining({
+            droppedAxis: "reputation",
+            id: "google-los-tacos-no-1",
+            name: "Los Tacos No. 1",
+          }),
+          expect.objectContaining({
+            droppedAxis: "vibe",
+            id: "google-cosme",
+            name: "Cosme",
+          }),
+        ],
       });
       expect(onSubmitted).toHaveBeenCalledTimes(1);
     });
@@ -252,6 +278,7 @@ describe("QuizScreen Q5", () => {
         ])}
         role="initiator"
         roomId="room-q5"
+        submissionRepository={makeSubmissionRepository()}
       />,
     );
 

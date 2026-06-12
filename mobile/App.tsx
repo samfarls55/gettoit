@@ -11,11 +11,7 @@ import {
 } from "react-native";
 
 import { mobileTokens } from "./src/design/tokens";
-import {
-  createGroupInviteUrl,
-  resolveInviteLink,
-  type InviteRouteResolution,
-} from "./src/invites/inviteLinks";
+import type { InviteRouteResolution } from "./src/invites/inviteLinks";
 import type { MobileAuthState } from "./src/auth/authRepository";
 import type {
   AppRouteName,
@@ -25,8 +21,12 @@ import {
   nativeAuthBoundary,
   nativeInviteBoundary,
   nativeLinkBoundary as runtimeNativeLinkBoundary,
+  nativePlanRepository,
   nativeQ5CandidateRepository,
+  nativeQuizProgressRepository,
+  nativeQuizSubmissionRepository,
   nativeVerdictRepository,
+  nativeWaitingRepository,
 } from "./src/native/nativeRuntime";
 import {
   initialAppStateRouterState,
@@ -39,20 +39,17 @@ import type {
   PlanParticipantScope,
   PlanRepository,
   PlanSetup,
+  SavedPlanSetup,
+  LaunchedPlanSetup,
 } from "./src/plans/planRepository";
-import {
-  emptyPlanListSnapshot,
-  fakePlanRepository,
-} from "./src/plans/planRepository";
+import { emptyPlanListSnapshot } from "./src/plans/planRepository";
 import { VerdictBackdrop } from "./src/design/VerdictBackdrop";
 import { PlanListScreen } from "./src/plans/PlanListScreen";
 import { SetupScreen } from "./src/plans/SetupScreen";
 import { QuizScreen } from "./src/quiz/QuizScreen";
 import type { Q5CandidateRepository } from "./src/quiz/q5CandidateRepository";
 import type { QuizProgressRepository } from "./src/quiz/quizProgressRepository";
-import { fakeQuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import type { QuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
-import { fakeQuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
 import { VerdictScreen } from "./src/verdict/VerdictScreen";
 import type {
   VerdictFlavor,
@@ -61,7 +58,6 @@ import type {
 } from "./src/verdict/verdictRepository";
 import { WaitingScreen } from "./src/waiting/WaitingScreen";
 import type { WaitingRepository } from "./src/waiting/waitingRepository";
-import { fakeWaitingRepository } from "./src/waiting/waitingRepository";
 
 type AuthBoundary = {
   restoreSession?: () => Promise<MobileAuthState>;
@@ -71,10 +67,10 @@ type AuthBoundary = {
   signOut: () => Promise<unknown>;
 };
 
-type SavedPlanSetup = PlanSetup & { id: string };
-
 type InviteBoundary = {
-  createGroupInviteLink: (plan: SavedPlanSetup) => Promise<string>;
+  createGroupInviteLink: (
+    plan: SavedPlanSetup | LaunchedPlanSetup,
+  ) => Promise<string>;
   resolveInviteLink: (url: string) => Promise<InviteRouteResolution>;
   shareInviteLink: (url: string) => Promise<void>;
 };
@@ -190,36 +186,36 @@ const contentByRouteName: Record<AppRouteName, RouteContent> = {
     body: "Your Plans will appear here.",
   },
   join: {
-    title: "Join placeholder",
-    body: "Join this group Plan.",
+    title: "Join Plan",
+    body: "Opening this group Plan.",
   },
   setup: {
-    title: "Setup placeholder",
+    title: "Plan setup",
     body: "Plan setup starts here.",
   },
   quiz: {
-    title: "Quiz placeholder",
+    title: "Quiz",
     body: "Answer Plan questions here.",
   },
   waiting: {
-    title: "Waiting placeholder",
+    title: "Waiting",
     body: "Waiting for the group verdict.",
   },
   verdict: {
-    title: "Verdict placeholder",
+    title: "Verdict",
     body: "The Plan verdict appears here.",
   },
   readOnlyVerdict: {
-    title: "Read-only verdict placeholder",
+    title: "Closed verdict",
     body: "The closed Plan verdict appears here.",
   },
   settings: {
-    title: "Settings placeholder",
+    title: "Settings",
     body: "Account settings live here.",
   },
   deepLink: {
-    title: "Deep-link placeholder",
-    body: "Resolving invite link.",
+    title: "Resolving invite link",
+    body: "Checking this Plan link.",
   },
 };
 
@@ -231,38 +227,38 @@ const defaultAuthBoundary: AuthBoundary = {
   signOut: async () => undefined,
 };
 
-const defaultInviteBoundary: InviteBoundary = {
-  createGroupInviteLink: async (plan) =>
-    createGroupInviteUrl({
-      baseUrl: "https://gettoit.example",
-      roomId: plan.id,
-    }),
-  resolveInviteLink: async (url) =>
-    resolveInviteLink(url, async (roomId) => {
-      if (roomId.startsWith("quiz")) {
-        return { kind: "inProgress", roomId };
-      }
-
-      if (roomId.startsWith("waiting")) {
-        return { kind: "waiting", roomId };
-      }
-
-      if (roomId.startsWith("decided")) {
-        return { kind: "decided", roomId };
-      }
-
-      if (roomId.startsWith("stale")) {
-        return { kind: "stale", roomId };
-      }
-
-      return { kind: "open", roomId };
-    }),
-  shareInviteLink: async () => undefined,
-};
-
 const defaultNativeLinkBoundary: NativeLinkBoundary = {
   getInitialUrl: async () => null,
   subscribe: () => () => undefined,
+};
+
+const unconfiguredPlanRepository: PlanRepository = {
+  listPlans: async () => emptyPlanListSnapshot,
+  savePlan: async () => {
+    throw new Error("Plan repository is not configured.");
+  },
+  launchPlan: async () => {
+    throw new Error("Plan repository is not configured.");
+  },
+  deletePlan: async () => {
+    throw new Error("Plan repository is not configured.");
+  },
+};
+
+const unconfiguredQuizProgressRepository: QuizProgressRepository = {
+  loadProgress: async () => null,
+  saveProgress: async () => {
+    throw new Error("Quiz progress repository is not configured.");
+  },
+  exitPlan: async () => {
+    throw new Error("Quiz progress repository is not configured.");
+  },
+};
+
+const unconfiguredQuizSubmissionRepository: QuizSubmissionRepository = {
+  submitQuiz: async () => {
+    throw new Error("Quiz submission repository is not configured.");
+  },
 };
 
 const unconfiguredVerdictRepository: VerdictRepository = {
@@ -275,8 +271,16 @@ const unconfiguredVerdictRepository: VerdictRepository = {
   reroll: async () => {
     throw new Error("Verdict repository is not configured.");
   },
-  widenAndRerun: async () => {
-    throw new Error("Verdict repository is not configured.");
+};
+
+const unconfiguredWaitingRepository: WaitingRepository = {
+  loadSnapshot: async (roomId) => ({
+    roomId,
+    status: "waiting",
+    members: [],
+  }),
+  fireVerdict: async () => {
+    throw new Error("Waiting repository is not configured.");
   },
 };
 
@@ -356,18 +360,14 @@ function filterDeletedCreatedPlans(
 export default function App({
   authBoundary = runtimeAuthBoundary,
   initialRouterState,
-  inviteBoundary = {
-    ...defaultInviteBoundary,
-    createGroupInviteLink: nativeInviteBoundary.createGroupInviteLink,
-    shareInviteLink: nativeInviteBoundary.shareInviteLink,
-  },
+  inviteBoundary = nativeInviteBoundary,
   nativeLinkBoundary = runtimeNativeLinkBoundary,
-  planRepository = fakePlanRepository,
+  planRepository = nativePlanRepository,
   q5CandidateRepository = nativeQ5CandidateRepository,
-  quizProgressRepository = fakeQuizProgressRepository,
-  quizSubmissionRepository = fakeQuizSubmissionRepository,
+  quizProgressRepository = nativeQuizProgressRepository,
+  quizSubmissionRepository = nativeQuizSubmissionRepository,
   verdictRepository = nativeVerdictRepository,
-  waitingRepository = fakeWaitingRepository,
+  waitingRepository = nativeWaitingRepository,
 }: AppProps = {}) {
   const [routerState, dispatch] = useReducer(
     appStateRouterReducer,
@@ -485,9 +485,9 @@ export default function App({
         }
       }}
       onLaunchSetup={async (plan) => {
-        const savedPlan = await planRepository.savePlan(plan);
+        const launchedPlan = await planRepository.launchPlan(plan);
         setQuizSession({
-          roomId: savedPlan.id,
+          roomId: launchedPlan.roomId,
           participantScope: plan.participantScope,
           role: "initiator",
         });
@@ -498,7 +498,7 @@ export default function App({
         }
 
         const inviteUrl =
-          await inviteBoundary.createGroupInviteLink(savedPlan);
+          await inviteBoundary.createGroupInviteLink(launchedPlan);
         await inviteBoundary.shareInviteLink(inviteUrl);
         dispatch({ type: "waitForVerdict" });
       }}
@@ -557,11 +557,11 @@ export function MobileAppShell({
   onSessionEnded,
   onSignedOut,
   onVerdictReady,
-  planRepository = fakePlanRepository,
+  planRepository = unconfiguredPlanRepository,
   planListNotice = null,
   q5CandidateRepository = nativeQ5CandidateRepository,
-  quizProgressRepository = fakeQuizProgressRepository,
-  quizSubmissionRepository = fakeQuizSubmissionRepository,
+  quizProgressRepository = unconfiguredQuizProgressRepository,
+  quizSubmissionRepository = unconfiguredQuizSubmissionRepository,
   routerState,
   quizSession = {
     roomId: "active-room",
@@ -570,7 +570,7 @@ export function MobileAppShell({
   },
   setupPlan = defaultSetupPlan("group"),
   verdictRepository = unconfiguredVerdictRepository,
-  waitingRepository = fakeWaitingRepository,
+  waitingRepository = unconfiguredWaitingRepository,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
   const [planSnapshot, setPlanSnapshot] = useState<PlanListSnapshot>(
@@ -733,7 +733,6 @@ export function MobileAppShell({
           <VerdictScreen
             mode={route.name === "readOnlyVerdict" ? "readOnly" : "live"}
             onReroll={verdictRepository.reroll}
-            onWidenAndRerun={verdictRepository.widenAndRerun}
             verdict={verdict}
           />
         ) : (

@@ -64,9 +64,14 @@ export type PlanListSnapshot = {
   history: PlanListItem[];
 };
 
+export type SavedPlanSetup = PlanSetup & { id: string };
+
+export type LaunchedPlanSetup = SavedPlanSetup & { roomId: string };
+
 export type PlanRepository = {
   listPlans: () => Promise<PlanListSnapshot>;
-  savePlan: (plan: PlanSetup) => Promise<PlanSetup & { id: string }>;
+  savePlan: (plan: PlanSetup) => Promise<SavedPlanSetup>;
+  launchPlan: (plan: PlanSetup) => Promise<LaunchedPlanSetup>;
   deletePlan: (input: { planId: string }) => Promise<void>;
 };
 
@@ -97,7 +102,9 @@ export type PlanSupabaseMutation<TRow> = PromiseLike<
 
 export type PlanSupabaseTable<TRow> = PlanSupabaseQuery<TRow> & {
   delete: () => PlanSupabaseMutation<TRow>;
-  insert: (row: Record<string, unknown>) => PlanSupabaseMutation<TRow>;
+  insert: (
+    row: Record<string, unknown> | Array<Record<string, unknown>>,
+  ) => PlanSupabaseMutation<TRow>;
   update: (row: Record<string, unknown>) => PlanSupabaseMutation<TRow>;
 };
 
@@ -139,6 +146,12 @@ type SupabaseRoomRow = {
   plan_id: string | null;
 };
 
+type SupabaseRoomMemberRow = {
+  room_id: string;
+  user_id: string;
+  role: string;
+};
+
 export type SupabasePlanRepositoryDependencies = {
   supabase: PlanSupabaseClient;
   userId: string;
@@ -154,62 +167,6 @@ export const emptyPlanListSnapshot: PlanListSnapshot = {
 export function hasPlans(snapshot: PlanListSnapshot): boolean {
   return Object.values(snapshot).some((plans) => plans.length > 0);
 }
-
-export const fakePlanRepository: PlanRepository = {
-  listPlans: async () => ({
-    created: [
-      {
-        id: "created-thursday-dinner",
-        title: "Thursday dinner with the crew",
-        subtitle: "Pending setup - Search area missing",
-        badge: "Created",
-        routeTarget: "pending",
-        setup: {
-          id: "created-thursday-dinner",
-          name: "Thursday dinner with the crew",
-          participantScope: "group",
-          searchArea: null,
-          mealTime: "dinner",
-          serviceShape: "dineIn",
-        },
-      },
-    ],
-    joined: [
-      {
-        id: "joined-morgan-birthday",
-        title: "Morgan's birthday",
-        subtitle: "Quiz in progress - 2 people waiting",
-        badge: "Joined",
-        routeTarget: "joined",
-      },
-    ],
-    decided: [
-      {
-        id: "decided-date-night",
-        roomId: "room-decided-date-night",
-        title: "Date night fallback",
-        subtitle: "Live verdict - Reroll still open",
-        badge: "Decided",
-        routeTarget: "decided",
-      },
-    ],
-    history: [
-      {
-        id: "history-taco-crawl",
-        roomId: "room-history-taco-crawl",
-        title: "Taco crawl",
-        subtitle: "Closed verdict - Read-only",
-        badge: "History",
-        routeTarget: "history",
-      },
-    ],
-  }),
-  savePlan: async (plan) => ({
-    ...plan,
-    id: plan.id ?? "fake-saved-plan",
-  }),
-  deletePlan: async () => undefined,
-};
 
 function assertSupabaseRows<TRow>(
   result: SupabaseQueryResult<TRow[]>,
@@ -362,6 +319,34 @@ function planWriteRow(plan: PlanSetup, userId: string): Record<string, unknown> 
   return row;
 }
 
+function roomWriteRow(
+  plan: SavedPlanSetup,
+  userId: string,
+): Record<string, unknown> {
+  const row: Record<string, unknown> = {
+    creator_user_id: userId,
+    plan_id: plan.id,
+    status: "open",
+    radius_meters: plan.searchArea
+      ? milesToMeters(plan.searchArea.radiusMiles)
+      : defaultSearchRadiusMeters,
+    session_params: {
+      meal_time: plan.mealTime,
+      group_context: plan.participantScope,
+      service_shape: plan.serviceShape,
+    },
+  };
+
+  if (plan.searchArea) {
+    row.location_name = plan.searchArea.center.label;
+    row.location_lat = plan.searchArea.center.latitude;
+    row.location_lng = plan.searchArea.center.longitude;
+    row.location_source = "manual";
+  }
+
+  return row;
+}
+
 function pendingCreatedItem(plan: SupabasePlanRow): PlanListItem {
   return {
     id: plan.id,
@@ -373,9 +358,13 @@ function pendingCreatedItem(plan: SupabasePlanRow): PlanListItem {
   };
 }
 
-function pendingJoinedItem(plan: SupabasePlanRow): PlanListItem {
+function pendingJoinedItem(
+  plan: SupabasePlanRow,
+  roomId: string | undefined,
+): PlanListItem {
   return {
     id: plan.id,
+    ...(roomId ? { roomId } : {}),
     title: plan.name,
     subtitle: "Quiz in progress",
     badge: "Joined",
@@ -417,6 +406,76 @@ export function createSupabasePlanRepository({
   supabase,
   userId,
 }: SupabasePlanRepositoryDependencies): PlanRepository {
+  const savePlan = async (plan: PlanSetup): Promise<SavedPlanSetup> => {
+    const row = planWriteRow(plan, userId);
+    const mutation = plan.id
+      ? supabase.from<SupabasePlanRow>("plans").update(row).eq("id", plan.id)
+      : supabase.from<SupabasePlanRow>("plans").insert(row);
+    const result = await mutation
+      .select(
+        "id, creator_id, name, scope, location, session_params, distance_meters, status, created_at, verdict_fired_at, expired_at",
+      )
+      .single();
+
+    if (result.error) {
+      throw new Error(`Plan save failed: ${result.error.message}`);
+    }
+
+    if (!result.data) {
+      throw new Error("Plan save failed: no row returned");
+    }
+
+    return {
+      ...setupFromPlanRow(result.data),
+      id: result.data.id,
+    };
+  };
+
+  const roomIdForLaunchedPlan = async (
+    plan: SavedPlanSetup,
+  ): Promise<string> => {
+    const existingRoomResult = await supabase
+      .from<SupabaseRoomRow>("rooms")
+      .select("id, plan_id")
+      .eq("plan_id", plan.id);
+    const existingRoom = assertSupabaseRows(
+      existingRoomResult,
+      "Plan room read",
+    )[0];
+
+    if (existingRoom) {
+      return existingRoom.id;
+    }
+
+    const roomResult = await supabase
+      .from<SupabaseRoomRow>("rooms")
+      .insert(roomWriteRow(plan, userId))
+      .select("id, plan_id")
+      .single();
+
+    if (roomResult.error) {
+      throw new Error(`Plan room create failed: ${roomResult.error.message}`);
+    }
+
+    if (!roomResult.data) {
+      throw new Error("Plan room create failed: no row returned");
+    }
+
+    const memberResult = await supabase
+      .from<SupabaseRoomMemberRow>("members")
+      .insert({
+        room_id: roomResult.data.id,
+        user_id: userId,
+        role: "owner",
+      });
+
+    if (memberResult.error) {
+      throw new Error(`Plan owner membership failed: ${memberResult.error.message}`);
+    }
+
+    return roomResult.data.id;
+  };
+
   return {
     listPlans: async () => {
       const membersResult = await supabase
@@ -455,21 +514,27 @@ export function createSupabasePlanRepository({
       );
       const isJoinedByUser = (plan: SupabasePlanRow) =>
         joinedPlanIds.has(plan.id);
+      const isLaunchedByUser = (plan: SupabasePlanRow) =>
+        isPlanCreatedByUser(plan, userId) && roomsByPlanId.has(plan.id);
+      const isActiveForUser = (plan: SupabasePlanRow) =>
+        joinedPlanIds.has(plan.id) || isLaunchedByUser(plan);
 
       return {
         created: sortByNewest(
           plans.filter(
             (plan) =>
-              plan.status === "pending" && isPlanCreatedByUser(plan, userId),
+              plan.status === "pending" &&
+              isPlanCreatedByUser(plan, userId) &&
+              !roomsByPlanId.has(plan.id),
           ),
           (plan) => plan.created_at,
         ).map(pendingCreatedItem),
         joined: sortByNewest(
           plans.filter(
-            (plan) => plan.status === "pending" && joinedPlanIds.has(plan.id),
+            (plan) => plan.status === "pending" && isActiveForUser(plan),
           ),
           (plan) => plan.created_at,
-        ).map(pendingJoinedItem),
+        ).map((plan) => pendingJoinedItem(plan, roomsByPlanId.get(plan.id))),
         decided: sortByNewest(
           plans.filter((plan) => plan.status === "decided-active"),
           (plan) => plan.verdict_fired_at,
@@ -484,29 +549,12 @@ export function createSupabasePlanRepository({
         ),
       };
     },
-    savePlan: async (plan) => {
-      const row = planWriteRow(plan, userId);
-      const mutation = plan.id
-        ? supabase.from<SupabasePlanRow>("plans").update(row).eq("id", plan.id)
-        : supabase.from<SupabasePlanRow>("plans").insert(row);
-      const result = await mutation
-        .select(
-          "id, creator_id, name, scope, location, session_params, distance_meters, status, created_at, verdict_fired_at, expired_at",
-        )
-        .single();
+    savePlan,
+    launchPlan: async (plan) => {
+      const savedPlan = await savePlan(plan);
+      const roomId = await roomIdForLaunchedPlan(savedPlan);
 
-      if (result.error) {
-        throw new Error(`Plan save failed: ${result.error.message}`);
-      }
-
-      if (!result.data) {
-        throw new Error("Plan save failed: no row returned");
-      }
-
-      return {
-        ...setupFromPlanRow(result.data),
-        id: result.data.id,
-      };
+      return { ...savedPlan, roomId };
     },
     deletePlan: async ({ planId }) => {
       const result = await supabase

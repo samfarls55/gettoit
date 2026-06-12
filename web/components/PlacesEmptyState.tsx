@@ -57,13 +57,6 @@ const bodyStyle: CSSProperties = {
   margin: 0,
 };
 
-// wfr-31 — the fallback mentions the mobile app as the way out, so the
-// app phrase itself is the App Store link. Inline (rather than a dedicated
-// CTA) keeps "Try again" / "Start over" as the dominant action while
-// still making the mobile path reachable. The link inherits the body
-// color and underlines so it reads as a link without inventing new
-// chrome — consistent with the SessionRoom S04 web-fallback affordance
-// in `app-store.ts`.
 const appLinkStyle: CSSProperties = {
   color: "inherit",
   textDecoration: "underline",
@@ -97,18 +90,24 @@ export function PlacesEmptyState({ onRetry }: PlacesEmptyStateProps) {
       <p style={eyebrowStyle}>Nearby</p>
       <h1 style={headlineStyle}>Couldn&apos;t load options nearby.</h1>
       <p style={bodyStyle}>
-        We hit a snag pulling places from Foursquare. Try again in a moment —
-        or open the{" "}
-        <a
-          href={APP_STORE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={appLinkStyle}
-          data-testid="places-empty-app-link"
-        >
-          GetToIt mobile app
-        </a>
-        , which can fall back to Apple Maps.
+        We hit a snag pulling places from Foursquare. Try again in a moment
+        {APP_STORE_URL ? (
+          <>
+            {" "}
+            or open the{" "}
+            <a
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={appLinkStyle}
+              data-testid="places-empty-app-link"
+            >
+              GetToIt mobile app
+            </a>
+            , which can fall back to Apple Maps
+          </>
+        ) : null}
+        .
       </p>
       {onRetry ? (
         <button

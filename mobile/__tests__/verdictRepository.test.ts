@@ -306,10 +306,6 @@ describe("verdictRepository", () => {
     ).resolves.toEqual({
       kind: "noSurvivor",
       roomId: "room-1",
-      currentRadiusMiles: 2,
-      maxRadiusMiles: 5,
-      minRadiusMiles: 1,
-      stepMiles: 0.5,
     });
   });
 

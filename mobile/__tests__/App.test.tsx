@@ -22,8 +22,12 @@ import type {
 } from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
 import {
+  nativePlanRepository,
   nativeQ5CandidateRepository,
+  nativeQuizProgressRepository,
+  nativeQuizSubmissionRepository,
   nativeVerdictRepository,
+  nativeWaitingRepository,
 } from "../src/native/nativeRuntime";
 import type {
   QuizProgress,
@@ -118,6 +122,11 @@ function makeWritablePlanRepository(): PlanRepository {
       ...plan,
       id: plan.id ?? "saved-plan",
     })),
+    launchPlan: jest.fn(async (plan) => ({
+      ...plan,
+      id: plan.id ?? "saved-plan",
+      roomId: "saved-room",
+    })),
     deletePlan: jest.fn(async ({ planId }) => {
       snapshot = {
         ...snapshot,
@@ -127,10 +136,75 @@ function makeWritablePlanRepository(): PlanRepository {
   };
 }
 
+function makeRoutedPlanRepository(): PlanRepository {
+  return {
+    listPlans: async () => ({
+      ...emptyPlanListSnapshot,
+      created: [
+        {
+          id: "pending-brunch",
+          title: "Brunch plan",
+          subtitle: "Pending setup",
+          badge: "Created",
+          routeTarget: "pending",
+          setup: {
+            id: "pending-brunch",
+            name: "Brunch plan",
+            participantScope: "duo",
+            searchArea: committedSearchArea,
+            mealTime: "lunch",
+            serviceShape: "outdoor",
+          },
+        },
+      ],
+      joined: [
+        {
+          id: "joined-birthday",
+          title: "Birthday dinner",
+          subtitle: "Quiz in progress",
+          badge: "Joined",
+          routeTarget: "joined",
+        },
+      ],
+      decided: [
+        {
+          id: "decided-sushi",
+          roomId: "room-decided-sushi",
+          title: "Sushi night",
+          subtitle: "Live verdict",
+          badge: "Decided",
+          routeTarget: "decided",
+        },
+      ],
+      history: [
+        {
+          id: "history-noodles",
+          roomId: "room-history-noodles",
+          title: "Noodle crawl",
+          subtitle: "Closed verdict",
+          badge: "History",
+          routeTarget: "history",
+        },
+      ],
+    }),
+    savePlan: jest.fn(async (plan) => ({
+      ...plan,
+      id: plan.id ?? "saved-plan",
+    })),
+    launchPlan: jest.fn(async (plan) => ({
+      ...plan,
+      id: plan.id ?? "saved-plan",
+      roomId: "saved-room",
+    })),
+    deletePlan: jest.fn(async () => undefined),
+  };
+}
+
 function makeEmptyPlanRepository(): PlanRepository {
   return {
     listPlans: async () => emptyPlanListSnapshot,
     savePlan: jest.fn(),
+    launchPlan: jest.fn(),
     deletePlan: jest.fn(),
   };
 }
@@ -151,7 +225,7 @@ function makeInviteBoundary(
   return {
     createGroupInviteLink: jest
       .fn()
-      .mockResolvedValue("https://gettoit.example/join/saved-plan"),
+      .mockResolvedValue("https://gettoit.example/join/saved-room"),
     resolveInviteLink: jest.fn().mockResolvedValue(resolution),
     shareInviteLink: jest.fn().mockResolvedValue(undefined),
   };
@@ -256,15 +330,51 @@ function makeVerdictRepository(
       },
     })),
     reroll: jest.fn(async () => undefined),
-    widenAndRerun: jest.fn(async () => undefined),
   };
 }
 
 describe("App", () => {
   beforeEach(() => {
     jest
+      .spyOn(nativePlanRepository, "listPlans")
+      .mockResolvedValue(emptyPlanListSnapshot);
+    jest
+      .spyOn(nativePlanRepository, "savePlan")
+      .mockImplementation(async (plan) => ({
+        ...plan,
+        id: plan.id ?? "saved-plan",
+      }));
+    jest
+      .spyOn(nativePlanRepository, "launchPlan")
+      .mockImplementation(async (plan) => ({
+        ...plan,
+        id: plan.id ?? "saved-plan",
+        roomId: "saved-room",
+      }));
+    jest
+      .spyOn(nativePlanRepository, "deletePlan")
+      .mockResolvedValue(undefined);
+    jest
       .spyOn(nativeQ5CandidateRepository, "loadCandidates")
       .mockResolvedValue([]);
+    jest
+      .spyOn(nativeQuizProgressRepository, "loadProgress")
+      .mockResolvedValue(null);
+    jest
+      .spyOn(nativeQuizProgressRepository, "saveProgress")
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn(nativeQuizProgressRepository, "exitPlan")
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn(nativeQuizSubmissionRepository, "submitQuiz")
+      .mockResolvedValue(undefined);
+    jest
+      .spyOn(nativeWaitingRepository, "loadSnapshot")
+      .mockResolvedValue(waitingSnapshot);
+    jest
+      .spyOn(nativeWaitingRepository, "fireVerdict")
+      .mockResolvedValue({ ...waitingSnapshot, status: "verdictReady" });
   });
 
   afterEach(() => {
@@ -316,8 +426,8 @@ describe("App", () => {
         activePlanPhase: "quiz",
         settingsOpen: false,
       },
-      visibleRoute: "Deep-link placeholder",
-      visibleBody: "Resolving invite link.",
+      visibleRoute: "Resolving invite link",
+      visibleBody: "Checking this Plan link.",
     },
     {
       name: "setup Plans route to Setup",
@@ -403,7 +513,7 @@ describe("App", () => {
     expect(screen.getByText("Plans")).toBeOnTheScreen();
 
     fireEvent.press(screen.getByText("Open invite link"));
-    expect(screen.getByText("Deep-link placeholder")).toBeOnTheScreen();
+    expect(screen.getByText("Resolving invite link")).toBeOnTheScreen();
   });
 
   it("routes to the signed-in landing after a successful mocked Apple sign-in", async () => {
@@ -423,20 +533,27 @@ describe("App", () => {
     });
   });
 
-  it("renders fake Plan list buckets", async () => {
+  it("uses the native Plan repository by default", async () => {
+    jest.spyOn(nativePlanRepository, "listPlans").mockResolvedValue({
+      ...emptyPlanListSnapshot,
+      created: [
+        {
+          id: "runtime-plan",
+          title: "Runtime dinner",
+          subtitle: "Pending setup",
+          badge: "Created",
+          routeTarget: "pending",
+        },
+      ],
+    });
+
     render(<App initialRouterState={linkedApplePlanListState} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Thursday dinner with the crew")).toBeOnTheScreen();
+      expect(nativePlanRepository.listPlans).toHaveBeenCalledTimes(1);
+      expect(screen.getByText("Runtime dinner")).toBeOnTheScreen();
     });
 
-    expect(screen.getAllByText("Created")).toHaveLength(2);
-    expect(screen.getAllByText("Joined")).toHaveLength(2);
-    expect(screen.getAllByText("Decided")).toHaveLength(2);
-    expect(screen.getAllByText("History")).toHaveLength(2);
-    expect(screen.getByText("Morgan's birthday")).toBeOnTheScreen();
-    expect(screen.getByText("Date night fallback")).toBeOnTheScreen();
-    expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
   });
 
   it("uses the native Verdict repository by default", async () => {
@@ -480,6 +597,27 @@ describe("App", () => {
     });
 
     expect(screen.queryByText("PICO'S\nTAQUERIA")).toBeNull();
+  });
+
+  it("renders injected Plan list buckets", async () => {
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeRoutedPlanRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Brunch plan")).toBeOnTheScreen();
+    });
+
+    expect(screen.getAllByText("Created")).toHaveLength(2);
+    expect(screen.getAllByText("Joined")).toHaveLength(2);
+    expect(screen.getAllByText("Decided")).toHaveLength(2);
+    expect(screen.getAllByText("History")).toHaveLength(2);
+    expect(screen.getByText("Birthday dinner")).toBeOnTheScreen();
+    expect(screen.getByText("Sushi night")).toBeOnTheScreen();
+    expect(screen.getByText("Noodle crawl")).toBeOnTheScreen();
   });
 
   it("deletes a Created Plan after confirmation and keeps joined Plans", async () => {
@@ -586,14 +724,15 @@ describe("App", () => {
   });
 
   it.each([
-    ["Open Created Plan Thursday dinner with the crew", "Edit your plan"],
-    ["Open Joined Plan Morgan's birthday", "Q1"],
-    ["Open Decided Plan Date night fallback", "Live verdict"],
-    ["Open History Plan Taco crawl", "Verdict record"],
+    ["Open Created Plan Brunch plan", "Edit your plan"],
+    ["Open Joined Plan Birthday dinner", "Q1"],
+    ["Open Decided Plan Sushi night", "Live verdict"],
+    ["Open History Plan Noodle crawl", "Verdict record"],
   ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
     render(
       <App
         initialRouterState={linkedApplePlanListState}
+        planRepository={makeRoutedPlanRepository()}
         quizProgressRepository={makeQuizProgressRepository()}
         verdictRepository={makeVerdictRepository()}
       />,
@@ -616,19 +755,20 @@ describe("App", () => {
     render(
       <App
         initialRouterState={linkedApplePlanListState}
+        planRepository={makeRoutedPlanRepository()}
         verdictRepository={verdictRepository}
       />,
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Open History Plan Taco crawl")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Open History Plan Noodle crawl")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Open History Plan Taco crawl"));
+    fireEvent.press(screen.getByLabelText("Open History Plan Noodle crawl"));
 
     await waitFor(() => {
       expect(verdictRepository.loadHistoryVerdict).toHaveBeenCalledWith({
-        roomId: "room-history-taco-crawl",
+        roomId: "room-history-noodles",
         flavor: "group",
       });
       expect(screen.getByText("Verdict record")).toBeOnTheScreen();
@@ -721,6 +861,7 @@ describe("App", () => {
 
     expect(screen.getByText("Set search area before launch.")).toBeOnTheScreen();
     expect(repository.savePlan).not.toHaveBeenCalled();
+    expect(repository.launchPlan).not.toHaveBeenCalled();
   });
 
   it("saves a pending Plan and returns to the Plan list", async () => {
@@ -782,7 +923,7 @@ describe("App", () => {
     fireEvent.press(screen.getByText("Start the quiz"));
 
     await waitFor(() => {
-      expect(repository.savePlan).toHaveBeenCalledWith({
+      expect(repository.launchPlan).toHaveBeenCalledWith({
         id: "pending-brunch",
         name: "Brunch reset",
         participantScope: "solo",
@@ -821,7 +962,7 @@ describe("App", () => {
         expect.objectContaining({ id: "saved-plan", name: "Dinner crew" }),
       );
       expect(inviteBoundary.shareInviteLink).toHaveBeenCalledWith(
-        "https://gettoit.example/join/saved-plan",
+        "https://gettoit.example/join/saved-room",
       );
       expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
     });
@@ -893,15 +1034,15 @@ describe("App", () => {
         },
       });
       expect(screen.getByText("Q5")).toBeOnTheScreen();
-      expect(nativeQ5CandidateRepository.loadCandidates).toHaveBeenCalledWith({
-        roomId: "joined-morgan-birthday",
-        answers: {
-          q1CuisineCravings: ["italian", "mexican"],
-          q2SpendCap: "$$",
-          q3Reputation: "hiddenGem",
-          q4VibeEnergy: "social",
-        },
-      });
+    });
+    expect(nativeQ5CandidateRepository.loadCandidates).toHaveBeenCalledWith({
+      roomId: "joined-morgan-birthday",
+      answers: {
+        q1CuisineCravings: ["italian", "mexican"],
+        q2SpendCap: "$$",
+        q3Reputation: "hiddenGem",
+        q4VibeEnergy: "social",
+      },
     });
 
     fireEvent.press(screen.getByText("Leave"));
@@ -957,6 +1098,7 @@ describe("App", () => {
           q4VibeEnergy: "social",
           q5Ratings: {},
         },
+        q5Candidates: [],
       });
       expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
     });
@@ -1027,6 +1169,11 @@ describe("App", () => {
             ...plan,
             id: "solo-plan",
           })),
+          launchPlan: jest.fn(async (plan) => ({
+            ...plan,
+            id: "solo-plan",
+            roomId: "solo-room",
+          })),
           deletePlan: jest.fn(),
         }}
         q5CandidateRepository={{ loadCandidates: jest.fn(async () => []) }}
@@ -1063,7 +1210,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(verdictRepository.loadVerdict).toHaveBeenCalledWith({
-        roomId: "solo-plan",
+        roomId: "solo-room",
         flavor: "solo",
       });
       expect(screen.getByText("Solo verdict")).toBeOnTheScreen();
@@ -1072,14 +1219,10 @@ describe("App", () => {
     });
   });
 
-  it("routes no-survivor verdicts through the verdict surface and widen action", async () => {
+  it("routes no-survivor verdicts through the verdict surface", async () => {
     const verdictRepository = makeVerdictRepository({
       kind: "noSurvivor",
       roomId: "active-room",
-      currentRadiusMiles: 2,
-      maxRadiusMiles: 5,
-      minRadiusMiles: 1,
-      stepMiles: 0.5,
     });
 
     render(
@@ -1096,15 +1239,10 @@ describe("App", () => {
       expect(screen.getByText("No spot fits tonight")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Widen search area"));
-    fireEvent.press(screen.getByText("Re-run · 2.5 mi"));
-
-    await waitFor(() => {
-      expect(verdictRepository.widenAndRerun).toHaveBeenCalledWith({
-        roomId: "active-room",
-        radiusMiles: 2.5,
-      });
-    });
+    expect(
+      screen.getByText("Start a new Plan with a wider search area."),
+    ).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Widen search area")).toBeNull();
   });
 
   it("returns to Plans with feedback when Waiting sees a session-ended state", async () => {
@@ -1128,7 +1266,7 @@ describe("App", () => {
     });
   });
 
-  it("routes a cold-start invite link to the join placeholder", async () => {
+  it("routes a cold-start invite link to the join screen", async () => {
     const inviteBoundary = makeInviteBoundary({ kind: "join", roomId: "open-room" });
 
     render(
@@ -1149,7 +1287,7 @@ describe("App", () => {
       expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
         "https://gettoit.example/join/open-room",
       );
-      expect(screen.getByText("Join placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Join Plan")).toBeOnTheScreen();
     });
   });
 
@@ -1189,7 +1327,7 @@ describe("App", () => {
     });
   });
 
-  it("routes a warm invite link event to the waiting placeholder", async () => {
+  it("routes a warm invite link event to Waiting", async () => {
     const inviteBoundary = makeInviteBoundary({
       kind: "waiting",
       roomId: "waiting-room",
@@ -1259,7 +1397,7 @@ describe("App", () => {
     expect(screen.getByLabelText("Spend cap $$$ selected")).toBeOnTheScreen();
   });
 
-  it("routes a cold-start invite link to the join placeholder", async () => {
+  it("routes a cold-start invite link to the join screen", async () => {
     const inviteBoundary = makeInviteBoundary({ kind: "join", roomId: "open-room" });
 
     render(
@@ -1280,11 +1418,11 @@ describe("App", () => {
       expect(inviteBoundary.resolveInviteLink).toHaveBeenCalledWith(
         "https://gettoit.example/join/open-room",
       );
-      expect(screen.getByText("Join placeholder")).toBeOnTheScreen();
+      expect(screen.getByText("Join Plan")).toBeOnTheScreen();
     });
   });
 
-  it("routes a warm invite link event to the waiting placeholder", async () => {
+  it("routes a warm invite link event to Waiting", async () => {
     const inviteBoundary = makeInviteBoundary({
       kind: "waiting",
       roomId: "waiting-room",

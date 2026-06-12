@@ -22,14 +22,13 @@ export const dynamic = "force-dynamic";
 // unfurlers see a card. The roomId is opaque so we don't leak
 // any session content into the unfurl preview.
 //
-// bug-02 (quiz redesign) — the og:image is a static placeholder PNG served
+// bug-02 (quiz redesign) — the og:image is a static branded PNG served
 // from `web/public/og/invite.png`. Two deliberate choices here:
 //   1. The path has NO query string. Apple iMessage's rich-link
 //      cache is strict and prefers a clean static URL; query
 //      params can cause it to fall back to plain-text rendering.
-//   2. The image is intentionally generic (flat warm gray). The
-//      branded version is deferred to the pre-public-launch
-//      milestone — see bug-02 issue notes.
+//   2. The image is intentionally room-agnostic so invite previews do
+//      not leak Plan details.
 // Relative paths resolve against `metadata.metadataBase` (set in
 // `app/layout.tsx`) to a fully-qualified `https://gettoit.app/...`
 // URL, which iMessage requires.

@@ -1,16 +1,10 @@
-// GetToIt web fallback — placeholder landing surface.
-//
-// TB-01 walking skeleton. Real fallback (web invite + quiz + verdict)
-// lands in TB-15 against the same Sunset Pop tokens loaded in
-// `layout.tsx`. The styles below reference the generated CSS custom
-// flows here without code changes.
+// GetToIt web fallback — root surface.
 
 export default function Page() {
   return (
     <main
       style={{
-        position: "fixed",
-        inset: 0,
+        minHeight: "72vh",
         display: "grid",
         placeItems: "center",
         background:
@@ -21,7 +15,7 @@ export default function Page() {
         textAlign: "center",
       }}
     >
-      <div>
+      <div style={{ maxWidth: "34rem" }}>
         <p
           style={{
             fontFamily: "var(--ff-body)",
@@ -45,8 +39,21 @@ export default function Page() {
             margin: 0,
           }}
         >
-          Coming soon.
+          Decide where to eat together.
         </h1>
+        <p
+          style={{
+            fontFamily: "var(--ff-body)",
+            fontWeight: 500,
+            fontSize: "var(--fz-body)",
+            lineHeight: 1.45,
+            opacity: 0.86,
+            margin: "var(--sp-4) auto 0",
+          }}
+        >
+          Open a GetToIt invite link to vote with your group and see the
+          verdict when everyone is in.
+        </p>
       </div>
     </main>
   );

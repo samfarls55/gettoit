@@ -8,11 +8,6 @@ export type RerollInput = {
   reason: RerollReason;
 };
 
-export type WidenAndRerunInput = {
-  roomId: string;
-  radiusMiles: number;
-};
-
 export type LiveVerdictReceipt = {
   id: string;
   name: string;
@@ -47,10 +42,6 @@ export type LiveVerdictViewModel = {
 export type NoSurvivorVerdictViewModel = {
   kind: "noSurvivor";
   roomId: string;
-  currentRadiusMiles: number;
-  maxRadiusMiles: number;
-  minRadiusMiles: number;
-  stepMiles: number;
 };
 
 export type HistoryVerdictViewModel = {
@@ -90,7 +81,6 @@ export type VerdictRepository = {
     flavor: VerdictFlavor;
   }) => Promise<HistoryVerdictViewModel>;
   reroll: (input: RerollInput) => Promise<void>;
-  widenAndRerun: (input: WidenAndRerunInput) => Promise<void>;
 };
 
 export type SupabaseQueryResult<TData> = {
@@ -470,10 +460,6 @@ export function createSupabaseVerdictRepository({
         return {
           kind: "noSurvivor",
           roomId,
-          currentRadiusMiles: 2,
-          maxRadiusMiles: 5,
-          minRadiusMiles: 1,
-          stepMiles: 0.5,
         };
       }
 
@@ -605,6 +591,5 @@ export function createSupabaseVerdictRepository({
         throw new Error(`Verdict slate reroll failed: ${error.message}`);
       }
     },
-    widenAndRerun: async () => undefined,
   };
 }

@@ -816,18 +816,24 @@ export function SessionRoom({
   }
 
   if (phase.kind === "waiting") {
+    const appStoreUrl = APP_STORE_URL;
+
     return (
       <WaitingScreen
         members={memberViews}
         secondsRemaining={secondsRemaining}
         outstandingName={undefined}
         isAnonymous={true}
-        onDownloadApp={() => {
-          void emitDownloadCtaEvent({ roomId, userId });
-          if (typeof window !== "undefined") {
-            window.open(APP_STORE_URL, "_blank", "noopener,noreferrer");
-          }
-        }}
+        onDownloadApp={
+          appStoreUrl
+            ? () => {
+                void emitDownloadCtaEvent({ roomId, userId });
+                if (typeof window !== "undefined") {
+                  window.open(appStoreUrl, "_blank", "noopener,noreferrer");
+                }
+              }
+            : undefined
+        }
         // sg-WF-8 / tb-WF-13 — the "Getting the app?" claim-code mint
         // affordance. The web invitee on the Waiting screen has a real
         // membership + a stable anonymous identity worth carrying over;

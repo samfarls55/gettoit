@@ -117,61 +117,22 @@ describe("VerdictScreen", () => {
     });
   });
 
-  it("renders no-survivor widen controls and reruns through the repository action", async () => {
-    const onWidenAndRerun = jest.fn().mockResolvedValue(undefined);
-
+  it("renders no-survivor copy without dead rerun controls", () => {
     render(
       <VerdictScreen
-        onWidenAndRerun={onWidenAndRerun}
         verdict={{
           kind: "noSurvivor",
           roomId: "room-1",
-          currentRadiusMiles: 2,
-          maxRadiusMiles: 5,
-          minRadiusMiles: 1,
-          stepMiles: 0.5,
         }}
       />,
     );
 
     expect(screen.getByText("No spot fits tonight")).toBeOnTheScreen();
-    expect(screen.getByText("2.0 mi")).toBeOnTheScreen();
-
-    fireEvent.press(screen.getByLabelText("Widen search area"));
-    expect(screen.getByText("2.5 mi")).toBeOnTheScreen();
-
-    fireEvent.press(screen.getByText("Re-run · 2.5 mi"));
-
-    await waitFor(() => {
-      expect(onWidenAndRerun).toHaveBeenCalledWith({
-        roomId: "room-1",
-        radiusMiles: 2.5,
-      });
-    });
-  });
-
-  it("surfaces no-survivor rerun errors", async () => {
-    const onWidenAndRerun = jest.fn().mockRejectedValue(new Error("offline"));
-
-    render(
-      <VerdictScreen
-        onWidenAndRerun={onWidenAndRerun}
-        verdict={{
-          kind: "noSurvivor",
-          roomId: "room-1",
-          currentRadiusMiles: 2,
-          maxRadiusMiles: 5,
-          minRadiusMiles: 1,
-          stepMiles: 0.5,
-        }}
-      />,
-    );
-
-    fireEvent.press(screen.getByText("Re-run · 2.0 mi"));
-
-    await waitFor(() => {
-      expect(screen.getByText("Could not re-run. Try again.")).toBeOnTheScreen();
-    });
+    expect(
+      screen.getByText("Start a new Plan with a wider search area."),
+    ).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Widen search area")).toBeNull();
+    expect(screen.queryByText(/Re-run/)).toBeNull();
   });
 
   it("renders read-only verdict records without live-only actions", () => {

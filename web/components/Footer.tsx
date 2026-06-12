@@ -1,16 +1,7 @@
 // GetToIt web — global Footer.
 //
 // wfr-10. Renders on every web route via `app/layout.tsx`. Surfaces the
-// canonical Privacy + Terms legal links and a Help affordance so every
-// page (including terminal join states and the legal pages themselves)
-// has a discoverable escape to support material.
-//
-// Help affordance is a labelled placeholder: it is NOT yet wired to
-// `mailto:support@gettoit.app` because that mailbox does not exist
-// (v1 launch blocker tracked in TB-16). We render "Help (coming soon)"
-// so the affordance is discoverable and copy honest, without dropping
-// the user into a bounced inbox. When TB-16 ships the mailbox, swap
-// the span for an `<a href="mailto:support@gettoit.app">` element.
+// canonical Privacy + Terms legal links.
 
 import type { CSSProperties } from "react";
 
@@ -45,17 +36,9 @@ const linkStyle: CSSProperties = {
   textUnderlineOffset: "0.18em",
 };
 
-const helpStyle: CSSProperties = {
-  // Placeholder Help affordance — visually consistent with the links
-  // but explicitly non-interactive until the mailbox exists. Marked
-  // with `aria-disabled` so assistive tech surfaces the state.
-  color: "var(--paper)",
-  opacity: 0.6,
-};
-
 const separatorStyle: CSSProperties = {
   // Inline dot separator. Decorative — `aria-hidden` so screen readers
-  // hear "Privacy Terms Help" not "Privacy dot Terms dot Help".
+  // hear "Privacy Terms" not "Privacy dot Terms".
   opacity: 0.5,
 };
 
@@ -66,17 +49,11 @@ export function Footer() {
         Privacy
       </a>
       <span aria-hidden="true" style={separatorStyle}>
-        ·
+        {"\u00b7"}
       </span>
       <a href="/terms" style={linkStyle}>
         Terms
       </a>
-      <span aria-hidden="true" style={separatorStyle}>
-        ·
-      </span>
-      <span aria-disabled="true" style={helpStyle}>
-        Help (coming soon)
-      </span>
     </footer>
   );
 }
