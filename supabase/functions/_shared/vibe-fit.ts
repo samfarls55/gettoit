@@ -94,6 +94,32 @@ export interface Q5VibeSelectionInput {
   candidates: readonly VibeFitCandidate[];
 }
 
+export type VibeFitObservabilityStatus =
+  | "success"
+  | "disabled"
+  | "provider_unavailable"
+  | "timeout"
+  | "budget_exhausted"
+  | "no_evidence";
+
+export interface VibeFitObservabilityEvent {
+  event: "vibe_fit_flow";
+  status: VibeFitObservabilityStatus;
+  candidateCount: number;
+  embeddedTextCount: number;
+  noEvidenceCount: number;
+  lowConfidenceCount: number;
+  positionBuckets: {
+    quiet: number;
+    chill: number;
+    social: number;
+    lively: number;
+    rowdy: number;
+    unknown: number;
+  };
+  receiptCounts: Partial<Record<VibeReceiptCode, number>>;
+}
+
 export type Q5VibeSelectionResult =
   | {
     kind: "selected";
@@ -635,6 +661,47 @@ export async function embedTextsWithVoyage(
   return second.ok ? second : { ok: false, error: second.error };
 }
 
+export function buildVibeFitObservabilityEvent(input: {
+  status: VibeFitObservabilityStatus;
+  embeddedTextCount: number;
+  signals: readonly VibeFitSignal[];
+}): VibeFitObservabilityEvent {
+  const positionBuckets = {
+    quiet: 0,
+    chill: 0,
+    social: 0,
+    lively: 0,
+    rowdy: 0,
+    unknown: 0,
+  };
+  const receiptCounts: Partial<Record<VibeReceiptCode, number>> = {};
+  let noEvidenceCount = 0;
+  let lowConfidenceCount = 0;
+
+  for (const signal of input.signals) {
+    const bucket = positionBucket(signal.vibePosition);
+    positionBuckets[bucket] += 1;
+    if (signal.vibePosition === null) noEvidenceCount += 1;
+    if (signal.receiptCodes.includes("vibe_low_confidence")) {
+      lowConfidenceCount += 1;
+    }
+    for (const code of signal.receiptCodes) {
+      receiptCounts[code] = (receiptCounts[code] ?? 0) + 1;
+    }
+  }
+
+  return {
+    event: "vibe_fit_flow",
+    status: input.status,
+    candidateCount: input.signals.length,
+    embeddedTextCount: Math.max(0, Math.trunc(input.embeddedTextCount)),
+    noEvidenceCount,
+    lowConfidenceCount,
+    positionBuckets,
+    receiptCounts,
+  };
+}
+
 function neutralVibeFitSignal(
   candidateId: string,
   vibePosition: number | null,
@@ -839,6 +906,29 @@ function hasNumericConflict(scores: Record<VibeBandId, number>): boolean {
   if (activePositions.length < 2) return false;
   return Math.max(...activePositions) - Math.min(...activePositions) >=
     VIBE_FIT_CONFIG.conflictDistance;
+}
+
+function positionBucket(
+  vibePosition: number | null,
+): keyof VibeFitObservabilityEvent["positionBuckets"] {
+  if (vibePosition === null || !Number.isFinite(vibePosition)) {
+    return "unknown";
+  }
+  const rounded = Math.round(clamp(vibePosition, 1, 5));
+  switch (rounded) {
+    case 1:
+      return "quiet";
+    case 2:
+      return "chill";
+    case 3:
+      return "social";
+    case 4:
+      return "lively";
+    case 5:
+      return "rowdy";
+    default:
+      return "unknown";
+  }
 }
 
 async function voyageEmbeddingAttempt(

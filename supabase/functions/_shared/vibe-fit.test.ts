@@ -5,6 +5,7 @@ import {
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   buildVibeFitCandidate,
+  buildVibeFitObservabilityEvent,
   embedTextsWithVoyage,
   extractVibeEvidenceSpans,
   scoreVibeFitCandidate,
@@ -590,6 +591,102 @@ Deno.test("TB-06: Q5 vibe selection response does not expose summaries or embedd
   ) {
     assertEquals(serialized.includes(forbidden), false, forbidden);
   }
+});
+
+Deno.test("TB-08: Vibe Fit observability is aggregate and provider-content-free", async () => {
+  const signals = await scoreVibeFitCandidateFlow(
+    [
+      q5VibeCandidate(
+        "google-place-a",
+        "Quiet booths with calm conversation.",
+      ),
+      q5VibeCandidate(
+        "google-place-b",
+        "Buzzy lively room with high-energy music.",
+      ),
+      q5VibeCandidate("google-place-c", ""),
+    ],
+    q5EnabledEmbeddingDeps(),
+  );
+
+  const event = buildVibeFitObservabilityEvent({
+    status: "success",
+    embeddedTextCount: 2,
+    signals,
+  });
+
+  assertEquals(event, {
+    event: "vibe_fit_flow",
+    status: "success",
+    candidateCount: 3,
+    embeddedTextCount: 2,
+    noEvidenceCount: 1,
+    lowConfidenceCount: 1,
+    positionBuckets: {
+      quiet: 1,
+      chill: 0,
+      social: 0,
+      lively: 1,
+      rowdy: 0,
+      unknown: 1,
+    },
+    receiptCounts: {
+      vibe_no_evidence: 1,
+      vibe_low_confidence: 1,
+    },
+  });
+
+  const serialized = JSON.stringify(event);
+  for (
+    const forbidden of [
+      "Quiet booths",
+      "Buzzy lively",
+      "google-place-a",
+      "google-place-b",
+      "vibePosition",
+      '"confidence":',
+      "0.",
+      "[",
+    ]
+  ) {
+    assertEquals(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+Deno.test("TB-08: Voyage paths do not log request text response vectors or secrets", async () => {
+  const originalWarn = console.warn;
+  const originalError = console.error;
+  const logs: string[] = [];
+  console.warn = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+  console.error = (...args: unknown[]) => logs.push(args.map(String).join(" "));
+  try {
+    const secret = "secret-token";
+    const requestText = "Quiet private room";
+    const result = await embedTextsWithVoyage([requestText], {
+      env: { VOYAGE_API_KEY: secret },
+      budget: { maxTextsPerFlow: 2 },
+      fetch: () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: `${requestText} failed with ${secret}`,
+              embedding: [0.1, 0.2],
+            }),
+            { status: 500 },
+          ),
+        ),
+    });
+
+    assertEquals(result, { ok: false, error: "provider_unavailable" });
+  } finally {
+    console.warn = originalWarn;
+    console.error = originalError;
+  }
+
+  const serializedLogs = logs.join("\n");
+  assertEquals(serializedLogs.includes("Quiet private room"), false);
+  assertEquals(serializedLogs.includes("secret-token"), false);
+  assertEquals(serializedLogs.includes("0.1"), false);
 });
 
 function q5VibeCandidate(
