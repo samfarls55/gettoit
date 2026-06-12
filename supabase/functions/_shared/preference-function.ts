@@ -121,6 +121,14 @@ export interface Q5VenueProfile {
 /** A pure venue-scoring function â€” the result of `buildPreferenceFunction`. */
 export type PreferenceFn = (venue: Q5VenueProfile) => number;
 
+export interface PreferenceFunctionOptions {
+  scoreVibeAxis?: (
+    venueVibe: number,
+    statedVibe: number,
+    venue: Q5VenueProfile,
+  ) => number;
+}
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Axis scorers (PRD module E)
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -322,11 +330,13 @@ function resolveWeights(
 export function buildPreferenceFunction(
   member: Q5MemberProfile,
   q5Ratings: Q5Rating[],
+  options: PreferenceFunctionOptions = {},
 ): PreferenceFn {
   const weights = resolveWeights(member, q5Ratings);
   const craved = member.cuisines;
   const statedCrowdApproval = member.reputation;
   const statedVibe = member.vibe;
+  const vibeAxisScorer = options.scoreVibeAxis ?? scoreVibeAxis;
 
   return (venue: Q5VenueProfile): number => {
     // Per-axis 1â€¦5 match scores.
@@ -347,7 +357,7 @@ export function buildPreferenceFunction(
     if (weights.vibe > 0) {
       contributions.push({
         weight: weights.vibe,
-        score: scoreVibeAxis(venue.vibe, statedVibe),
+        score: vibeAxisScorer(venue.vibe, statedVibe, venue),
       });
     }
 
