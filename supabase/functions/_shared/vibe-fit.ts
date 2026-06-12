@@ -21,11 +21,15 @@ export interface VibeFitSummaryText {
   priority: number;
 }
 
+const VIBE_FIT_WEAK_STRUCTURED_HINTS = [
+  "liveMusic",
+  "goodForGroups",
+  "goodForWatchingSports",
+  "outdoorSeating",
+] as const;
+
 export type VibeFitWeakStructuredHint =
-  | "liveMusic"
-  | "goodForGroups"
-  | "goodForWatchingSports"
-  | "outdoorSeating";
+  typeof VIBE_FIT_WEAK_STRUCTURED_HINTS[number];
 
 export interface VibeFitCandidate {
   candidateId: string;
@@ -291,14 +295,7 @@ function filterWeakStructuredHints(
 ): Partial<Record<VibeFitWeakStructuredHint, boolean>> {
   if (!hints) return {};
   const out: Partial<Record<VibeFitWeakStructuredHint, boolean>> = {};
-  for (
-    const key of [
-      "liveMusic",
-      "goodForGroups",
-      "goodForWatchingSports",
-      "outdoorSeating",
-    ] as const
-  ) {
+  for (const key of VIBE_FIT_WEAK_STRUCTURED_HINTS) {
     if (typeof hints[key] === "boolean") {
       out[key] = hints[key];
     }

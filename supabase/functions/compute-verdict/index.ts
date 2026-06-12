@@ -540,7 +540,7 @@ function buildSupabaseAdapter(env: ComputeVerdictEnv): ComputeVerdictDataAdapter
 }
 
 function isVibeFitEnabled(env: ComputeVerdictEnv): boolean {
-  const raw = (env as { VIBE_FIT_ENABLED?: string }).VIBE_FIT_ENABLED;
+  const raw = env.VIBE_FIT_ENABLED;
   return raw === "1" || raw?.toLowerCase() === "true";
 }
 

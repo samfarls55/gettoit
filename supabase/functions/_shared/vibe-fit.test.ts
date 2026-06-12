@@ -195,7 +195,7 @@ Deno.test("TB-03: complex negation and sarcasm lower confidence instead of produ
 });
 
 Deno.test("TB-04: VibeFitCandidate DTO carries only approved summary text and weak hints", () => {
-  const candidate = buildVibeFitCandidate({
+  const dtoInput = {
     candidateId: "candidate-1",
     googlePlaceId: "google-1",
     reviewSummary: "Quiet booths and mellow dinner energy.",
@@ -205,13 +205,12 @@ Deno.test("TB-04: VibeFitCandidate DTO carries only approved summary text and we
       goodForGroups: true,
       goodForWatchingSports: false,
       outdoorSeating: true,
-      // deno-lint-ignore no-explicit-any
       priceLevel: true,
-    } as any,
-    embeddingMode: "fake",
-    // deno-lint-ignore no-explicit-any
+    },
+    embeddingMode: "fake" as const,
     displayName: "Must Not Be In DTO",
-  } as any);
+  };
+  const candidate = buildVibeFitCandidate(dtoInput);
 
   assertEquals(candidate.summaryTexts.map((source) => source.source), [
     "reviewSummary",

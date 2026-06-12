@@ -479,17 +479,25 @@ interface HardEligibilityVote {
   hard_vetoes: HardVeto[];
 }
 
+type EffectiveVoteInput = HardEligibilityVote & { row: MemberVoteRow };
+
 export function buildEligibleVibeFitCandidatesForVerdict(input: {
   optionRows: readonly RoomOptionRow[];
   votes: readonly HardEligibilityVote[];
   radiusMeters: number | null;
 }): VibeFitCandidate[] {
   return input.optionRows
-    .filter((row) => row.vibe_fit_candidate)
+    .filter(hasVibeFitCandidate)
     .filter((row) =>
       isCandidateHardEligibleForVibeFit(row, input.votes, input.radiusMeters)
     )
-    .map((row) => row.vibe_fit_candidate as VibeFitCandidate);
+    .map((row) => row.vibe_fit_candidate);
+}
+
+function hasVibeFitCandidate(
+  row: RoomOptionRow,
+): row is RoomOptionRow & { vibe_fit_candidate: VibeFitCandidate } {
+  return row.vibe_fit_candidate !== undefined;
 }
 
 function scoreEligibleVibeFitCandidates(
@@ -833,7 +841,10 @@ export async function handleRequest(
     ? await data.fetchProfileVetoes(voteRows.map((r) => r.user_id))
     : {};
 
-  const hardEligibilityVotes: HardEligibilityVote[] = voteRows.map((row) => ({
+  // Vibe Fit hard eligibility and the engine must see the same merged
+  // vetoes and reroll budget caps.
+  const effectiveVoteInputs: EffectiveVoteInput[] = voteRows.map((row) => ({
+    row,
     q1_vetoes: mergeQ1Vetoes(row.q1_vetoes, row.q1_vetoes_extra),
     q2_budget: rerollState?.budget_tier_override != null
       ? Math.min(row.q2_budget, rerollState.budget_tier_override)
@@ -843,41 +854,26 @@ export async function handleRequest(
       profileVetoes[row.user_id] ?? [],
     ),
   }));
-  const vibeFitSignalsByCandidateId = scoreEligibleVibeFitCandidates(
+  const transientVibeFitSignalsByCandidateId = scoreEligibleVibeFitCandidates(
     buildEligibleVibeFitCandidatesForVerdict({
       optionRows,
-      votes: hardEligibilityVotes,
+      votes: effectiveVoteInputs,
       radiusMeters: startingRadius,
     }),
   );
-  void vibeFitSignalsByCandidateId;
+  void transientVibeFitSignalsByCandidateId;
 
   // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
   // the union of "original quiz answer" + "diet-reason reroll add."
   // The engine itself doesn't need the split visible — its lookup
   // table is set-based and the dedupe in the engine handles duplicates
   // naturally.
-  const votes: MemberVote[] = voteRows.map((row) => {
-    const mergedVetoes = mergeQ1Vetoes(row.q1_vetoes, row.q1_vetoes_extra);
-    // TB-10 — apply the room-level budget override as an additional
-    // cap. Each member's effective cap is MIN(member, override). The
-    // walk override no longer applies: walk-minutes left the quiz (it
-    // moved to the parameters bucket in the v1.1 redesign), so a
-    // `dist`-reason reroll's effect is carried through the radius
-    // gate, not a per-member walk cap.
-    const effectiveBudget = rerollState?.budget_tier_override != null
-      ? Math.min(row.q2_budget, rerollState.budget_tier_override)
-      : row.q2_budget;
-    // TB-12 — union any session hard_vetoes (a `profile_veto` slot,
-    // were one ever written to the vote row) with the member's sticky
-    // profile vetoes. Order: session entries first, profile entries
-    // appended, deduped on (kind, token). The engine's lookup is
-    // set-based so duplicates are harmless — the dedupe just keeps the
-    // engine input tidy.
-    const hardVetoes = mergeHardVetoes(
-      row.hard_vetoes ?? [],
-      profileVetoes[row.user_id] ?? [],
-    );
+  const votes: MemberVote[] = effectiveVoteInputs.map(({
+    row,
+    q1_vetoes,
+    q2_budget,
+    hard_vetoes,
+  }) => {
     // TB-23 — server-side preference scoring. When the vote row carries
     // `preference_inputs` (the member's stated Q1/Q3/Q4 profile + their
     // three Q5 factorial ratings), build that member's `prefFn` and
@@ -911,9 +907,9 @@ export async function handleRequest(
     return {
       user_id: row.user_id,
       display_name: row.display_name,
-      q1_vetoes: mergedVetoes,
-      q2_budget: effectiveBudget,
-      hard_vetoes: hardVetoes,
+      q1_vetoes,
+      q2_budget,
+      hard_vetoes,
       scores: row.scores ?? {},
       prefFn,
     };
