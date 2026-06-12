@@ -98,6 +98,11 @@ interface NumericSpanVector {
   vector: readonly number[];
 }
 
+interface ExtractedVibeFitCandidate {
+  candidate: VibeFitCandidate;
+  spans: VibeEvidenceSpan[];
+}
+
 type VoyageEmbeddingError =
   | "invalid_credential"
   | "provider_unavailable"
@@ -354,34 +359,17 @@ export async function scoreVibeFitCandidateFlow(
   candidates: readonly VibeFitCandidate[],
   deps: VibeFitFlowDeps,
 ): Promise<VibeFitSignal[]> {
-  const extracted = candidates.map((candidate) => ({
-    candidate,
-    spans: extractVibeEvidenceSpans(candidate),
-  }));
+  const extracted = candidates.map(extractVibeFitCandidate);
   const evidenceCandidates = extracted.filter(({ spans }) => spans.length > 0);
 
   if (evidenceCandidates.length === 0) {
     return extracted.map(({ candidate }) =>
-      neutralVibeFitSignal(
-        candidate.candidateId,
-        null,
-        ["vibe_no_evidence", "vibe_low_confidence"],
-      )
+      noEvidenceVibeFitSignal(candidate.candidateId)
     );
   }
 
   if (deps.env.VIBE_EMBEDDINGS_ENABLED !== "true") {
-    return extracted.map(({ candidate, spans }) =>
-      spans.length === 0
-        ? neutralVibeFitSignal(candidate.candidateId, null, [
-          "vibe_no_evidence",
-          "vibe_low_confidence",
-        ])
-        : neutralVibeFitSignal(candidate.candidateId, 3, [
-          "vibe_embeddings_disabled",
-          "vibe_low_confidence",
-        ])
-    );
+    return fallbackVibeFitSignals(extracted, "vibe_embeddings_disabled");
   }
 
   const texts = dedupeTexts([
@@ -392,17 +380,7 @@ export async function scoreVibeFitCandidateFlow(
   ]);
 
   if (texts.length > deps.budget.maxTextsPerFlow) {
-    return extracted.map(({ candidate, spans }) =>
-      spans.length === 0
-        ? neutralVibeFitSignal(candidate.candidateId, null, [
-          "vibe_no_evidence",
-          "vibe_low_confidence",
-        ])
-        : neutralVibeFitSignal(candidate.candidateId, 3, [
-          "vibe_embedding_budget_exhausted",
-          "vibe_low_confidence",
-        ])
-    );
+    return fallbackVibeFitSignals(extracted, "vibe_embedding_budget_exhausted");
   }
 
   const embeddingResult = await embedTextsWithVoyage(texts, deps);
@@ -410,25 +388,13 @@ export async function scoreVibeFitCandidateFlow(
     const receipt = embeddingResult.error === "budget_exhausted"
       ? "vibe_embedding_budget_exhausted"
       : "vibe_embedding_unavailable";
-    return extracted.map(({ candidate, spans }) =>
-      spans.length === 0
-        ? neutralVibeFitSignal(candidate.candidateId, null, [
-          "vibe_no_evidence",
-          "vibe_low_confidence",
-        ])
-        : neutralVibeFitSignal(candidate.candidateId, 3, [
-          receipt,
-          "vibe_low_confidence",
-        ])
-    );
+    return fallbackVibeFitSignals(extracted, receipt);
   }
 
-  return extracted.map(({ candidate, spans }) => {
+  return extracted.map((extractedCandidate) => {
+    const { candidate, spans } = extractedCandidate;
     if (spans.length === 0) {
-      return neutralVibeFitSignal(candidate.candidateId, null, [
-        "vibe_no_evidence",
-        "vibe_low_confidence",
-      ]);
+      return noEvidenceVibeFitSignal(candidate.candidateId);
     }
 
     const signal = scoreSpansWithEmbeddings(
@@ -436,10 +402,8 @@ export async function scoreVibeFitCandidateFlow(
       spans,
       embeddingResult.embeddingsByText,
     );
-    return signal ?? neutralVibeFitSignal(candidate.candidateId, 3, [
-      "vibe_embedding_unavailable",
-      "vibe_low_confidence",
-    ]);
+    return signal ??
+      fallbackVibeFitSignal(extractedCandidate, "vibe_embedding_unavailable");
   });
 }
 
@@ -492,6 +456,45 @@ function neutralVibeFitSignal(
     confidence: 0,
     receiptCodes,
   };
+}
+
+function extractVibeFitCandidate(
+  candidate: VibeFitCandidate,
+): ExtractedVibeFitCandidate {
+  return {
+    candidate,
+    spans: extractVibeEvidenceSpans(candidate),
+  };
+}
+
+function noEvidenceVibeFitSignal(candidateId: string): VibeFitSignal {
+  return neutralVibeFitSignal(candidateId, null, [
+    "vibe_no_evidence",
+    "vibe_low_confidence",
+  ]);
+}
+
+function fallbackVibeFitSignals(
+  extractedCandidates: readonly ExtractedVibeFitCandidate[],
+  evidenceReceiptCode: VibeReceiptCode,
+): VibeFitSignal[] {
+  return extractedCandidates.map((extractedCandidate) =>
+    fallbackVibeFitSignal(extractedCandidate, evidenceReceiptCode)
+  );
+}
+
+function fallbackVibeFitSignal(
+  { candidate, spans }: ExtractedVibeFitCandidate,
+  evidenceReceiptCode: VibeReceiptCode,
+): VibeFitSignal {
+  if (spans.length === 0) {
+    return noEvidenceVibeFitSignal(candidate.candidateId);
+  }
+
+  return neutralVibeFitSignal(candidate.candidateId, 3, [
+    evidenceReceiptCode,
+    "vibe_low_confidence",
+  ]);
 }
 
 function scoreSpansWithEmbeddings(
