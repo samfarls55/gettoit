@@ -136,6 +136,18 @@ interface ExtractedVibeFitCandidate {
   spans: VibeEvidenceSpan[];
 }
 
+interface Q5VibeSelectionStage {
+  minConfidence: number;
+  keepDistance: number;
+  dropDistance: number;
+  receiptCodes: readonly VibeReceiptCode[];
+}
+
+interface Q5WeakHintPosition {
+  hint: VibeFitWeakStructuredHint;
+  position: number;
+}
+
 type VoyageEmbeddingError =
   | "invalid_credential"
   | "provider_unavailable"
@@ -227,6 +239,37 @@ export const VIBE_FIT_CONFIG = Object.freeze({
     },
   ] satisfies readonly VibeAnchor[],
 });
+
+const Q5_VIBE_SELECTION_STAGES: readonly Q5VibeSelectionStage[] = [
+  {
+    minConfidence: VIBE_FIT_CONFIG.q5StrictConfidenceThreshold,
+    keepDistance: VIBE_FIT_CONFIG.q5StrictKeepDistance,
+    dropDistance: VIBE_FIT_CONFIG.q5StrictDropDistance,
+    receiptCodes: [
+      "selected_vibe_high_confidence_keep",
+      "selected_vibe_high_confidence_drop",
+    ],
+  },
+  {
+    minConfidence: VIBE_FIT_CONFIG.q5RelaxedConfidenceThreshold,
+    keepDistance: VIBE_FIT_CONFIG.q5StrictKeepDistance,
+    dropDistance: VIBE_FIT_CONFIG.q5StrictDropDistance,
+    receiptCodes: ["selected_vibe_low_confidence_relaxed"],
+  },
+  {
+    minConfidence: VIBE_FIT_CONFIG.q5RelaxedConfidenceThreshold,
+    keepDistance: VIBE_FIT_CONFIG.q5RelaxedKeepDistance,
+    dropDistance: VIBE_FIT_CONFIG.q5RelaxedDropDistance,
+    receiptCodes: ["selected_vibe_contrast_relaxed"],
+  },
+];
+
+const Q5_WEAK_HINT_POSITIONS: readonly Q5WeakHintPosition[] = [
+  { hint: "liveMusic", position: 4.6 },
+  { hint: "goodForWatchingSports", position: 4.6 },
+  { hint: "goodForGroups", position: 3.7 },
+  { hint: "outdoorSeating", position: 2.8 },
+];
 
 export function buildVibeFitCandidate(input: {
   candidateId: string;
@@ -521,45 +564,21 @@ export async function selectQ5VibeKeepDropCandidates(
     )
   );
 
-  const stages = [
-    {
-      minConfidence: VIBE_FIT_CONFIG.q5StrictConfidenceThreshold,
-      keepDistance: VIBE_FIT_CONFIG.q5StrictKeepDistance,
-      dropDistance: VIBE_FIT_CONFIG.q5StrictDropDistance,
-      receiptCodes: [
-        "selected_vibe_high_confidence_keep",
-        "selected_vibe_high_confidence_drop",
-      ] satisfies VibeReceiptCode[],
-    },
-    {
-      minConfidence: VIBE_FIT_CONFIG.q5RelaxedConfidenceThreshold,
-      keepDistance: VIBE_FIT_CONFIG.q5StrictKeepDistance,
-      dropDistance: VIBE_FIT_CONFIG.q5StrictDropDistance,
-      receiptCodes: [
-        "selected_vibe_low_confidence_relaxed",
-      ] satisfies VibeReceiptCode[],
-    },
-    {
-      minConfidence: VIBE_FIT_CONFIG.q5RelaxedConfidenceThreshold,
-      keepDistance: VIBE_FIT_CONFIG.q5RelaxedKeepDistance,
-      dropDistance: VIBE_FIT_CONFIG.q5RelaxedDropDistance,
-      receiptCodes: [
-        "selected_vibe_contrast_relaxed",
-      ] satisfies VibeReceiptCode[],
-    },
-  ] as const;
-
   const target = clamp(input.targetVibePosition, 1, 5);
-  for (const stage of stages) {
+  for (const stage of Q5_VIBE_SELECTION_STAGES) {
     const keep = q5Signals.find((signal) =>
       isQ5VibeKeep(signal, target, stage.keepDistance, stage.minConfidence)
     );
+    if (!keep) {
+      continue;
+    }
+
     const drop = q5Signals.find((signal) =>
-      signal.candidateId !== keep?.candidateId &&
+      signal.candidateId !== keep.candidateId &&
       isQ5VibeDrop(signal, target, stage.dropDistance, stage.minConfidence)
     );
 
-    if (keep && drop) {
+    if (drop) {
       return {
         kind: "selected",
         keepCandidateId: keep.candidateId,
@@ -777,9 +796,11 @@ function q5WeakHintPosition(
   hints: Partial<Record<VibeFitWeakStructuredHint, boolean>> | undefined,
 ): number | null {
   if (!hints) return null;
-  if (hints.liveMusic || hints.goodForWatchingSports) return 4.6;
-  if (hints.goodForGroups) return 3.7;
-  if (hints.outdoorSeating) return 2.8;
+
+  for (const { hint, position } of Q5_WEAK_HINT_POSITIONS) {
+    if (hints[hint]) return position;
+  }
+
   return null;
 }
 

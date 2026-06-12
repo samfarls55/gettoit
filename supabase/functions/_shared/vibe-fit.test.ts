@@ -442,14 +442,7 @@ Deno.test("TB-06: Q5 vibe selection chooses high-confidence keep/drop contrast",
         q5VibeCandidate("drop", "Buzzy lively energetic room at dinner."),
       ],
     },
-    {
-      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
-      budget: { maxTextsPerFlow: 100 },
-      fetch: (_url, init) => {
-        const body = JSON.parse(String(init?.body)) as { input: string[] };
-        return Promise.resolve(jsonEmbeddingResponse(body.input));
-      },
-    },
+    q5EnabledEmbeddingDeps(),
   );
 
   assertEquals(result.kind, "selected");
@@ -473,14 +466,7 @@ Deno.test("TB-06: Q5 vibe selection relaxes confidence before contrast", async (
         q5VibeCandidate("drop", "Buzzy lively energetic room at dinner."),
       ],
     },
-    {
-      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
-      budget: { maxTextsPerFlow: 100 },
-      fetch: (_url, init) => {
-        const body = JSON.parse(String(init?.body)) as { input: string[] };
-        return Promise.resolve(jsonEmbeddingResponse(body.input));
-      },
-    },
+    q5EnabledEmbeddingDeps(),
   );
 
   assertEquals(confidenceRelaxed.kind, "selected");
@@ -509,14 +495,7 @@ Deno.test("TB-06: Q5 vibe selection relaxes confidence before contrast", async (
         ),
       ],
     },
-    {
-      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
-      budget: { maxTextsPerFlow: 100 },
-      fetch: (_url, init) => {
-        const body = JSON.parse(String(init?.body)) as { input: string[] };
-        return Promise.resolve(jsonEmbeddingResponse(body.input));
-      },
-    },
+    q5EnabledEmbeddingDeps(),
   );
 
   assertEquals(contrastRelaxed.kind, "selected");
@@ -596,14 +575,7 @@ Deno.test("TB-06: Q5 vibe selection response does not expose summaries or embedd
         q5VibeCandidate("drop", "Buzzy lively energetic room at dinner."),
       ],
     },
-    {
-      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
-      budget: { maxTextsPerFlow: 100 },
-      fetch: (_url, init) => {
-        const body = JSON.parse(String(init?.body)) as { input: string[] };
-        return Promise.resolve(jsonEmbeddingResponse(body.input));
-      },
-    },
+    q5EnabledEmbeddingDeps(),
   );
 
   const serialized = JSON.stringify(result);
@@ -630,6 +602,17 @@ function q5VibeCandidate(
     reviewSummary,
     weakStructuredHints,
   });
+}
+
+function q5EnabledEmbeddingDeps() {
+  return {
+    env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+    budget: { maxTextsPerFlow: 100 },
+    fetch: (_url: string | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { input: string[] };
+      return Promise.resolve(jsonEmbeddingResponse(body.input));
+    },
+  };
 }
 
 function jsonEmbeddingResponse(texts: readonly string[]): Response {
