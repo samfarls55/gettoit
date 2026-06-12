@@ -345,8 +345,19 @@ Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scorin
 Deno.test("TB-08: production Google verdict storage omits summaries and provider facts", () => {
   const source = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
   const insertOptionsStart = source.indexOf("async insertOptions");
-  const insertOptionsEnd = source.indexOf("async fetchVotes", insertOptionsStart);
-  const insertOptionsSource = source.slice(insertOptionsStart, insertOptionsEnd);
+  assert(insertOptionsStart >= 0, "insertOptions implementation must exist");
+  const insertOptionsEnd = source.indexOf(
+    "async fetchVotes",
+    insertOptionsStart,
+  );
+  assert(
+    insertOptionsEnd > insertOptionsStart,
+    "fetchVotes implementation must follow insertOptions",
+  );
+  const insertOptionsSource = source.slice(
+    insertOptionsStart,
+    insertOptionsEnd,
+  );
 
   assertStringIncludes(insertOptionsSource, "google_place_id");
   assertStringIncludes(insertOptionsSource, "place_provider");

@@ -102,6 +102,16 @@ export type VibeFitObservabilityStatus =
   | "budget_exhausted"
   | "no_evidence";
 
+export type VibeFitPositionBucket =
+  | "quiet"
+  | "chill"
+  | "social"
+  | "lively"
+  | "rowdy"
+  | "unknown";
+
+export type VibeFitPositionBuckets = Record<VibeFitPositionBucket, number>;
+
 export interface VibeFitObservabilityEvent {
   event: "vibe_fit_flow";
   status: VibeFitObservabilityStatus;
@@ -109,14 +119,7 @@ export interface VibeFitObservabilityEvent {
   embeddedTextCount: number;
   noEvidenceCount: number;
   lowConfidenceCount: number;
-  positionBuckets: {
-    quiet: number;
-    chill: number;
-    social: number;
-    lively: number;
-    rowdy: number;
-    unknown: number;
-  };
+  positionBuckets: VibeFitPositionBuckets;
   receiptCounts: Partial<Record<VibeReceiptCode, number>>;
 }
 
@@ -666,20 +669,13 @@ export function buildVibeFitObservabilityEvent(input: {
   embeddedTextCount: number;
   signals: readonly VibeFitSignal[];
 }): VibeFitObservabilityEvent {
-  const positionBuckets = {
-    quiet: 0,
-    chill: 0,
-    social: 0,
-    lively: 0,
-    rowdy: 0,
-    unknown: 0,
-  };
+  const positionBuckets = emptyVibeFitPositionBuckets();
   const receiptCounts: Partial<Record<VibeReceiptCode, number>> = {};
   let noEvidenceCount = 0;
   let lowConfidenceCount = 0;
 
   for (const signal of input.signals) {
-    const bucket = positionBucket(signal.vibePosition);
+    const bucket = vibeFitPositionBucket(signal.vibePosition);
     positionBuckets[bucket] += 1;
     if (signal.vibePosition === null) noEvidenceCount += 1;
     if (signal.receiptCodes.includes("vibe_low_confidence")) {
@@ -908,9 +904,20 @@ function hasNumericConflict(scores: Record<VibeBandId, number>): boolean {
     VIBE_FIT_CONFIG.conflictDistance;
 }
 
-function positionBucket(
+function emptyVibeFitPositionBuckets(): VibeFitPositionBuckets {
+  return {
+    quiet: 0,
+    chill: 0,
+    social: 0,
+    lively: 0,
+    rowdy: 0,
+    unknown: 0,
+  };
+}
+
+function vibeFitPositionBucket(
   vibePosition: number | null,
-): keyof VibeFitObservabilityEvent["positionBuckets"] {
+): VibeFitPositionBucket {
   if (vibePosition === null || !Number.isFinite(vibePosition)) {
     return "unknown";
   }
