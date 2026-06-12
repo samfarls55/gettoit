@@ -1,5 +1,6 @@
 import {
   assert,
+  assertAlmostEquals,
   assertEquals,
   assertStringIncludes,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
@@ -13,10 +14,14 @@ import {
   type OptionCutInsert,
   type OptionInsertRow,
   type RoomOptionRow,
+  scoreVibeFitSignalForMember,
   type VerdictInsert,
   type VerdictSlateEntryInsert,
 } from "./handler.ts";
-import { buildVibeFitCandidate } from "../_shared/vibe-fit.ts";
+import {
+  buildVibeFitCandidate,
+  type VibeFitSignal,
+} from "../_shared/vibe-fit.ts";
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -70,6 +75,26 @@ function vote(scores: Record<string, number>): MemberVoteRow {
   };
 }
 
+function preferenceVote(userId: string, vibe: number): MemberVoteRow {
+  return {
+    user_id: userId,
+    display_name: userId,
+    q1_vetoes: [],
+    q2_budget: 4,
+    hard_vetoes: [],
+    scores: {},
+    preference_inputs: {
+      user_id: userId,
+      member: {
+        cuisines: [],
+        reputation: "no_preference",
+        vibe,
+      },
+      q5Ratings: [],
+    },
+  };
+}
+
 interface AdapterState {
   adapter: ComputeVerdictDataAdapter;
   insertedOptions: OptionInsertRow[];
@@ -81,6 +106,15 @@ interface AdapterState {
 
 function adapterForGoogleVerdictFetch(
   googleCandidates: GoogleVerdictCandidateRow[],
+  votes: MemberVoteRow[] = [
+    vote({
+      option_b: 5,
+      option_a: 4,
+      option_c: 3,
+      option_d: 2,
+      option_e: 1,
+    }),
+  ],
 ): AdapterState {
   const optionsTable: RoomOptionRow[] = [];
   const insertedOptions: OptionInsertRow[] = [];
@@ -94,16 +128,10 @@ function adapterForGoogleVerdictFetch(
       return { id: VALID_ROOM_ID };
     },
     async fetchActiveMemberIds(_id) {
-      return ["u1"];
+      return votes.map((row) => row.user_id);
     },
     async fetchVotes(_id) {
-      return [vote({
-        option_b: 5,
-        option_a: 4,
-        option_c: 3,
-        option_d: 2,
-        option_e: 1,
-      })];
+      return votes;
     },
     async fetchGoogleVerdictCandidates(_roomId, context) {
       fetchContexts.push(context);
@@ -192,20 +220,33 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
   );
   assertEquals(state.insertedVerdicts[0].option_id, "option_b");
   assertEquals(state.insertedVerdicts[0].winner_google_place_id, "google-b");
-  assertEquals(state.insertedVerdicts[0].scoring_version, "verdict-fit-v1");
+  assertStringIncludes(
+    state.insertedVerdicts[0].scoring_version ?? "",
+    "verdict-fit-v2|google_mask=verdict_scoring_vibe_fit_v1",
+  );
+  assertStringIncludes(
+    state.insertedVerdicts[0].scoring_version ?? "",
+    "embedding=voyage:voyage-4-lite",
+  );
   assertEquals(state.insertedVerdicts[0].final_fit_score, 5.5);
   assertEquals(
     state.insertedSlate.map((row) => ({
       rank: row.slate_rank,
       google_place_id: row.google_place_id,
       score: row.final_fit_score,
-      scoring_version: row.scoring_version,
     })),
     [
-      { rank: 1, google_place_id: "google-b", score: 5.5, scoring_version: "verdict-fit-v1" },
-      { rank: 2, google_place_id: "google-a", score: 4.4, scoring_version: "verdict-fit-v1" },
-      { rank: 3, google_place_id: "google-c", score: 3.3, scoring_version: "verdict-fit-v1" },
+      { rank: 1, google_place_id: "google-b", score: 5.5 },
+      { rank: 2, google_place_id: "google-a", score: 4.4 },
+      { rank: 3, google_place_id: "google-c", score: 3.3 },
     ],
+  );
+  assert(
+    state.insertedSlate.every((row) =>
+      row.scoring_version.includes("vibe_anchor=vibe-anchors-v1") &&
+      row.scoring_version.includes("formula=verdict-vibe-member-blend-v1")
+    ),
+    "slate scoring version identifies Vibe Fit and verdict formula versions",
   );
   assertEquals(
     state.insertedSlate.every((row) =>
@@ -214,6 +255,76 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
     true,
     "slate rows keep app-owned metadata only",
   );
+});
+
+Deno.test("TB-07: Vibe Fit member scoring degrades missing and low-confidence evidence toward neutral", () => {
+  const exactQuietLowConfidence: VibeFitSignal = {
+    candidateId: "google-quiet",
+    anchorVersion: "vibe-anchors-v1",
+    spanAssemblerVersion: "vibe-span-assembler-v1",
+    projectionVersion: "vibe-projection-fake-v1",
+    vibePosition: 1,
+    confidence: 0.25,
+    receiptCodes: ["vibe_low_confidence"],
+  };
+  const exactQuietHighConfidence: VibeFitSignal = {
+    ...exactQuietLowConfidence,
+    confidence: 1,
+    receiptCodes: [],
+  };
+  const socialHighConfidence: VibeFitSignal = {
+    ...exactQuietHighConfidence,
+    candidateId: "google-social",
+    vibePosition: 3,
+  };
+
+  assertEquals(scoreVibeFitSignalForMember(undefined, 0), 3);
+  assertEquals(
+    scoreVibeFitSignalForMember({ ...exactQuietLowConfidence, vibePosition: null }, 0),
+    3,
+  );
+  assertAlmostEquals(
+    scoreVibeFitSignalForMember(exactQuietLowConfidence, 0),
+    3.5,
+  );
+  assertEquals(scoreVibeFitSignalForMember(exactQuietHighConfidence, 0), 5);
+  assertEquals(scoreVibeFitSignalForMember(socialHighConfidence, 0), 3);
+  assertEquals(scoreVibeFitSignalForMember(socialHighConfidence, 4), 3);
+});
+
+Deno.test("TB-07: Google verdict scoring keeps no-vibe-evidence candidates eligible", async () => {
+  const state = adapterForGoogleVerdictFetch([
+    {
+      ...googleCandidate("google-rowdy"),
+      vibe_fit_candidate: buildVibeFitCandidate({
+        candidateId: "google-rowdy",
+        googlePlaceId: "google-rowdy",
+        reviewSummary: "Packed loud rowdy party energy.",
+        generativeSummary: "A high-energy room with live music.",
+        embeddingMode: "fake",
+      }),
+    },
+    googleCandidate("google-no-evidence"),
+  ], [preferenceVote("u1", 0)]);
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => state.adapter },
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(
+    state.insertedVerdicts[0].winner_google_place_id,
+    "google-no-evidence",
+    "neutral missing vibe evidence can beat a strong opposite vibe",
+  );
+  const durable = JSON.stringify({
+    verdicts: state.insertedVerdicts,
+    slate: state.insertedSlate,
+  });
+  for (const forbidden of ["vibePosition", "confidence", "Packed loud"]) {
+    assertEquals(durable.includes(forbidden), false, forbidden);
+  }
 });
 
 Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scoring", () => {

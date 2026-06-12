@@ -48,11 +48,19 @@ import {
   type OptionInsertRow,
   unionMemberFetches,
 } from "../_shared/member-fetch-union.ts";
-import { buildPreferenceFunction } from "../_shared/preference-function.ts";
+import {
+  buildPreferenceFunction,
+  MATCH_SCORE,
+  type Q5VenueProfile,
+  scoreVibeAxis,
+  THRESHOLD_T,
+} from "../_shared/preference-function.ts";
 import { classifyVenuePool } from "../_shared/venue-classifier.ts";
 import type { MemberPreferenceInputs } from "../_shared/votes-schema.ts";
+import { vibePositionFromLegacyIndex } from "../_shared/vibe-band.ts";
 import {
   scoreVibeFitCandidate,
+  VIBE_FIT_CONFIG,
   type VibeFitCandidate,
   type VibeFitSignal,
 } from "../_shared/vibe-fit.ts";
@@ -480,6 +488,13 @@ interface HardEligibilityVote {
 }
 
 type EffectiveVoteInput = HardEligibilityVote & { row: MemberVoteRow };
+type VibeFitScoringVenueProfile = Q5VenueProfile & {
+  vibeFitCandidateId?: string;
+};
+
+const VERDICT_SCORING_FORMULA_VERSION = "verdict-vibe-member-blend-v1";
+const Q5_GENERATION_RULES_VERSION = "q5-factorial-v1";
+const GOOGLE_SCORING_MASK_VERSION = "verdict_scoring_vibe_fit_v1";
 
 export function buildEligibleVibeFitCandidatesForVerdict(input: {
   optionRows: readonly RoomOptionRow[];
@@ -508,6 +523,48 @@ function scoreEligibleVibeFitCandidates(
     out.set(candidate.candidateId, scoreVibeFitCandidate(candidate));
   }
   return out;
+}
+
+export function scoreVibeFitSignalForMember(
+  signal: VibeFitSignal | undefined,
+  statedLegacyVibe: number,
+): number {
+  if (!signal || signal.vibePosition === null) return THRESHOLD_T;
+  if (!Number.isFinite(statedLegacyVibe)) return THRESHOLD_T;
+  const statedPosition = vibePositionFromLegacyIndex(
+    Math.max(0, Math.min(4, Math.round(statedLegacyVibe))),
+  );
+  const rawScore = scoreVibeAxis(
+    signal.vibePosition - 1,
+    statedPosition - 1,
+  );
+  const confidence = Math.max(0, Math.min(1, signal.confidence));
+  const blended = THRESHOLD_T + (rawScore - THRESHOLD_T) * confidence;
+  const positiveCap = THRESHOLD_T + (MATCH_SCORE - THRESHOLD_T) * confidence;
+  return rawScore > THRESHOLD_T
+    ? Math.min(blended, positiveCap)
+    : blended;
+}
+
+function buildDurableVerdictScoringVersion(
+  signals: Iterable<VibeFitSignal>,
+): string {
+  const projectionVersions = [...new Set(
+    [...signals].map((signal) => signal.projectionVersion),
+  )].sort();
+  const projectionVersion = projectionVersions.length > 0
+    ? projectionVersions.join("+")
+    : VIBE_FIT_CONFIG.voyageProjectionVersion;
+  return [
+    "verdict-fit-v2",
+    `google_mask=${GOOGLE_SCORING_MASK_VERSION}`,
+    `vibe_anchor=${VIBE_FIT_CONFIG.anchorVersion}`,
+    `vibe_span=${VIBE_FIT_CONFIG.spanAssemblerVersion}`,
+    `embedding=voyage:${VIBE_FIT_CONFIG.voyageModel}`,
+    `projection=${projectionVersion}`,
+    `q5=${Q5_GENERATION_RULES_VERSION}`,
+    `formula=${VERDICT_SCORING_FORMULA_VERSION}`,
+  ].join("|");
 }
 
 function isCandidateHardEligibleForVibeFit(
@@ -861,7 +918,7 @@ export async function handleRequest(
       radiusMeters: startingRadius,
     }),
   );
-  void transientVibeFitSignalsByCandidateId;
+  const useVibeFitPreferenceScoring = optionRows.some(hasVibeFitCandidate);
 
   // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
   // the union of "original quiz answer" + "diet-reason reroll add."
@@ -893,6 +950,20 @@ export async function handleRequest(
       const built = buildPreferenceFunction(
         row.preference_inputs.member,
         row.preference_inputs.q5Ratings,
+        useVibeFitPreferenceScoring
+          ? {
+            scoreVibeAxis: (_venueVibe, statedVibe, venue) => {
+              const candidateId =
+                (venue as VibeFitScoringVenueProfile).vibeFitCandidateId;
+              return candidateId
+                ? scoreVibeFitSignalForMember(
+                  transientVibeFitSignalsByCandidateId.get(candidateId),
+                  statedVibe,
+                )
+                : THRESHOLD_T;
+            },
+          }
+          : {},
       );
       prefFn = (candidate) => {
         // A candidate with no classified profile (it was not in the
@@ -901,7 +972,11 @@ export async function handleRequest(
         // benefit-of-the-doubt the engine gives a no-signal candidate.
         const profile = venueProfiles.get(candidate.id);
         if (!profile) return 5;
-        return built(profile);
+        const scoringProfile: VibeFitScoringVenueProfile = {
+          ...profile,
+          vibeFitCandidateId: candidate.google_place_id ?? candidate.id,
+        };
+        return built(scoringProfile);
       };
     }
     return {
@@ -939,6 +1014,18 @@ export async function handleRequest(
       status: 500,
       headers: corsHeaders(),
     });
+  }
+  if (optionRows.some((row) => row.google_place_id)) {
+    const durableScoringVersion = buildDurableVerdictScoringVersion(
+      transientVibeFitSignalsByCandidateId.values(),
+    );
+    result = {
+      ...result,
+      slate: result.slate.map((entry) => ({
+        ...entry,
+        scoring_version: durableScoringVersion,
+      })),
+    };
   }
 
   // Persist — the no_survivor row carries `option_id = null` and no

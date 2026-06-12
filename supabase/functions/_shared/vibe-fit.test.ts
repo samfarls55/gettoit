@@ -248,6 +248,7 @@ Deno.test("TB-05: disabled embeddings skip Voyage and degrade to neutral low con
       {
         candidateId: "disabled",
         summaryTexts: [{
+          source: "reviewSummary",
           priority: 1,
           text: "Quiet calm room for conversation.",
         }],
@@ -279,6 +280,7 @@ Deno.test("TB-05: Voyage wrapper batches voyage-4-lite inputs and dedupes within
       {
         candidateId: "a",
         summaryTexts: [{
+          source: "reviewSummary",
           priority: 1,
           text: "Quiet calm room for conversation.",
         }],
@@ -286,6 +288,7 @@ Deno.test("TB-05: Voyage wrapper batches voyage-4-lite inputs and dedupes within
       {
         candidateId: "b",
         summaryTexts: [{
+          source: "reviewSummary",
           priority: 1,
           text: "Quiet calm room for conversation.",
         }],
@@ -380,7 +383,11 @@ Deno.test("TB-05: budget exhaustion skips Voyage and returns controlled receipts
     [
       {
         candidateId: "budget",
-        summaryTexts: [{ priority: 1, text: "Buzzy lively energetic room." }],
+        summaryTexts: [{
+          source: "reviewSummary",
+          priority: 1,
+          text: "Buzzy lively energetic room.",
+        }],
       },
     ],
     {
