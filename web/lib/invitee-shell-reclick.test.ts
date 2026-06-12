@@ -19,7 +19,7 @@
 // filters) is pinned without a live Postgres. This slice adds NO new
 // schema and NO new server code — every server piece already exists.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   leaveMembership,
@@ -27,6 +27,10 @@ import {
   readRoomPlanState,
   writeQuizProgress,
 } from "./invitee-shell";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ── Fake supabase client ───────────────────────────────────────────
 //
@@ -126,11 +130,16 @@ describe("readQuizProgress", () => {
   });
 
   it("degrades to a fresh start when the read errors", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const { client } = fakeClient({
       tables: { members: { data: null, error: { message: "rls denied" } } },
     });
     const progress = await readQuizProgress(client as never, "room-1", "u1");
     expect(progress.lastIndex).toBe(1);
+    expect(warn).toHaveBeenCalledWith(
+      "invitee-shell readQuizProgress failed:",
+      "rls denied",
+    );
   });
 });
 
@@ -161,6 +170,7 @@ describe("writeQuizProgress", () => {
   });
 
   it("swallows an RPC error — progress is a best-effort convenience", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const { client } = fakeClient({
       rpcs: {
         members_progress_upsert: { data: null, error: { message: "boom" } },
@@ -176,6 +186,10 @@ describe("writeQuizProgress", () => {
         vibe: 2,
       }),
     ).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      "invitee-shell writeQuizProgress failed:",
+      "boom",
+    );
   });
 });
 
@@ -260,11 +274,16 @@ describe("readRoomPlanState", () => {
   });
 
   it("returns 'unresolved' when the rooms read errors", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const { client } = fakeClient({
       tables: { rooms: { data: null, error: { message: "rls denied" } } },
     });
     const state = await readRoomPlanState(client as never, "room-1", "u1");
     expect(state.kind).toBe("unresolved");
+    expect(warn).toHaveBeenCalledWith(
+      "invitee-shell readRoomPlanState rooms read failed:",
+      "rls denied",
+    );
   });
 });
 

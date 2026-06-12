@@ -38,6 +38,7 @@ import {
   assert,
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 const PROJECT_URL = Deno.env.get("SUPABASE_PROJECT_URL");
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
@@ -76,10 +77,12 @@ Deno.test({
     // deno-lint-ignore no-explicit-any
     const b = body as any;
 
-    console.log(
-      "places-proxy live response:",
-      JSON.stringify(body, null, 2),
-    );
+    await withMutedConsole(["log"], () => {
+      console.log(
+        "places-proxy live response:",
+        JSON.stringify(body, null, 2),
+      );
+    });
 
     // A deployed, configured function answers 200. A 404 means the
     // function was never deployed (the tb-14 root cause); a 500 with
@@ -164,33 +167,39 @@ Deno.test({
     }
 
     if (problems.length > 0) {
-      console.warn(
-        "⚠️  tb-14 DIAGNOSTIC — Foursquare data is NOT flowing through " +
-          "the deployed places-proxy:\n  - " + problems.join("\n  - ") +
-          "\n  The deploy + secrets fix landed; this is a separate " +
-          "Foursquare-integration follow-up (see the tb-14 issue note).",
-      );
+      await withMutedConsole(["warn"], () => {
+        console.warn(
+          "⚠️  tb-14 DIAGNOSTIC — Foursquare data is NOT flowing through " +
+            "the deployed places-proxy:\n  - " + problems.join("\n  - ") +
+            "\n  The deploy + secrets fix landed; this is a separate " +
+            "Foursquare-integration follow-up (see the tb-14 issue note).",
+        );
+      });
     } else {
-      console.log(
-        "✅ tb-14 — places-proxy returned Foursquare-sourced rows " +
-          `(${places.length} places, is_thin=${b.is_thin}).`,
-      );
+      await withMutedConsole(["log"], () => {
+        console.log(
+          "✅ tb-14 — places-proxy returned Foursquare-sourced rows " +
+            `(${places.length} places, is_thin=${b.is_thin}).`,
+        );
+      });
     }
     // Always passes — this tier is observability, not a gate.
     assertEquals(typeof places.length, "number");
   },
 });
 
-Deno.test("places-proxy (live) — credential gate is wired", () => {
-  // Documents the gate so a future reader knows the live test above
-  // is intentionally skipped, not silently broken, when secrets are
-  // absent. Always runs.
-  if (!credsPresent) {
-    console.log(
-      "places-proxy live integration test skipped — " +
-        "SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY not set in this " +
-        "environment. The live assertion runs where the secrets exist.",
-    );
-  }
-  assertEquals(typeof credsPresent, "boolean");
+Deno.test("places-proxy (live) — credential gate is wired", async () => {
+  await withMutedConsole(["log"], () => {
+    // Documents the gate so a future reader knows the live test above
+    // is intentionally skipped, not silently broken, when secrets are
+    // absent. Always runs.
+    if (!credsPresent) {
+      console.log(
+        "places-proxy live integration test skipped — " +
+          "SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY not set in this " +
+          "environment. The live assertion runs where the secrets exist.",
+      );
+    }
+    assertEquals(typeof credsPresent, "boolean");
+  });
 });

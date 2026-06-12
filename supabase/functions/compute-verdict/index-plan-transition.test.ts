@@ -35,6 +35,7 @@ import {
   type VerdictRow,
 } from "./handler.ts";
 import type { HardVeto } from "../_shared/verdict-engine.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
 const PLAN_ID = "22222222-2222-2222-2222-222222222222";
@@ -265,40 +266,49 @@ Deno.test(
 Deno.test(
   "tb-WF-1 — setPlanDecidedActive failure does NOT fail the verdict response",
   async () => {
-    // The transition is best-effort, same pattern as
-    // markRoomVerdictReady and emitVerdictReadyBroadcast. A failure
-    // is logged but the user-facing 200 still resolves — the verdict
-    // surface is already navigable from the broadcast, and a retry
-    // path will reconcile the Plan on the next verdict-state read.
-    const state = planAwareAdapter({
-      room: { id: VALID_ROOM_ID, plan_id: PLAN_ID },
-      options: [
-        { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
-      ],
-      votes: [
-        {
-          user_id: "u1", display_name: "you",
-          q1_vetoes: [], q2_budget: 4, hard_vetoes: [],
-          scores: { "opt-pico": 5 },
-        },
-      ],
-      failPlanTransition: true,
+    await withMutedConsole(["warn"], async () => {
+      // The transition is best-effort, same pattern as
+      // markRoomVerdictReady and emitVerdictReadyBroadcast. A failure
+      // is logged but the user-facing 200 still resolves — the verdict
+      // surface is already navigable from the broadcast, and a retry
+      // path will reconcile the Plan on the next verdict-state read.
+      const state = planAwareAdapter({
+        room: { id: VALID_ROOM_ID, plan_id: PLAN_ID },
+        options: [
+          { id: "opt-pico", payload: { name: "Pico's", price_tier: 2 } },
+        ],
+        votes: [
+          {
+            user_id: "u1",
+            display_name: "you",
+            q1_vetoes: [],
+            q2_budget: 4,
+            hard_vetoes: [],
+            scores: { "opt-pico": 5 },
+          },
+        ],
+        failPlanTransition: true,
+      });
+
+      const res = await handleRequest(
+        authedPost({ room_id: VALID_ROOM_ID }),
+        { env: envOk(), buildDataAdapter: () => state.adapter },
+      );
+
+      assertEquals(
+        res.status,
+        200,
+        "a failing plan transition must not propagate; verdict still resolves 200",
+      );
+      assertEquals(
+        state.inserts.length,
+        1,
+        "verdict still writes through the failure",
+      );
+      assert(
+        state.broadcasts.length === 1,
+        "broadcast still emits — independent of the plan transition",
+      );
     });
-
-    const res = await handleRequest(
-      authedPost({ room_id: VALID_ROOM_ID }),
-      { env: envOk(), buildDataAdapter: () => state.adapter },
-    );
-
-    assertEquals(
-      res.status,
-      200,
-      "a failing plan transition must not propagate; verdict still resolves 200",
-    );
-    assertEquals(state.inserts.length, 1, "verdict still writes through the failure");
-    assert(
-      state.broadcasts.length === 1,
-      "broadcast still emits — independent of the plan transition",
-    );
   },
 );

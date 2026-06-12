@@ -30,6 +30,7 @@ import {
   type RedeemClaimCodeEnv,
 } from "./handler.ts";
 import { encryptToken } from "../_shared/claim-code.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 // A valid 32-byte base64 AES-GCM key for the test env. Same fixture
 // key the mint-claim-code tests use.
@@ -123,31 +124,35 @@ Deno.test("GET returns 405 method_not_allowed", async () => {
 // ── Config gating ──────────────────────────────────────────────────
 
 Deno.test("missing service-role env returns 500 misconfigured", async () => {
-  const res = await handleRequest(
-    redeemRequest(),
-    depsOk(await makeRow(), {
-      env: {
-        SUPABASE_URL: "https://example.supabase.co",
-        CLAIM_CODE_ENC_KEY: TEST_ENC_KEY,
-      },
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "redeem_claim_code_misconfigured");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      redeemRequest(),
+      depsOk(await makeRow(), {
+        env: {
+          SUPABASE_URL: "https://example.supabase.co",
+          CLAIM_CODE_ENC_KEY: TEST_ENC_KEY,
+        },
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "redeem_claim_code_misconfigured");
+  });
 });
 
 Deno.test("missing encryption key returns 500 misconfigured", async () => {
-  const res = await handleRequest(
-    redeemRequest(),
-    depsOk(await makeRow(), {
-      env: {
-        SUPABASE_URL: "https://example.supabase.co",
-        SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
-      },
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "redeem_claim_code_misconfigured");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      redeemRequest(),
+      depsOk(await makeRow(), {
+        env: {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
+        },
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "redeem_claim_code_misconfigured");
+  });
 });
 
 // ── Body validation ────────────────────────────────────────────────
@@ -384,46 +389,52 @@ Deno.test("a 429 response carries a Retry-After header", async () => {
 // ── Decryption failure ─────────────────────────────────────────────
 
 Deno.test("a row whose token cannot be decrypted returns 500 redeem_claim_code_failed", async () => {
-  // The stored ciphertext was encrypted under a DIFFERENT key — the
-  // GCM auth tag fails to verify and `decryptToken` throws.
-  const wrongKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-  const row: ClaimCodeRow = {
-    code: VALID_CODE,
-    encryptedToken: await encryptToken("v1.rt_x", wrongKey),
-    userId: CALLER_ID,
-    expiresAt: new Date(FIXED_NOW + 30 * 60 * 1000).toISOString(),
-    redeemedAt: null,
-  };
-  const res = await handleRequest(
-    redeemRequest(),
-    depsOk(row),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "redeem_claim_code_failed");
+  await withMutedConsole(["error"], async () => {
+    // The stored ciphertext was encrypted under a DIFFERENT key — the
+    // GCM auth tag fails to verify and `decryptToken` throws.
+    const wrongKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    const row: ClaimCodeRow = {
+      code: VALID_CODE,
+      encryptedToken: await encryptToken("v1.rt_x", wrongKey),
+      userId: CALLER_ID,
+      expiresAt: new Date(FIXED_NOW + 30 * 60 * 1000).toISOString(),
+      redeemedAt: null,
+    };
+    const res = await handleRequest(
+      redeemRequest(),
+      depsOk(row),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "redeem_claim_code_failed");
+  });
 });
 
 // ── Transport-failure handling ─────────────────────────────────────
 
 Deno.test("a lookup transport failure returns 500 redeem_claim_code_failed", async () => {
-  const res = await handleRequest(
-    redeemRequest(),
-    depsOk(await makeRow(), {
-      lookupCode: () => Promise.reject(new Error("db unreachable")),
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "redeem_claim_code_failed");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      redeemRequest(),
+      depsOk(await makeRow(), {
+        lookupCode: () => Promise.reject(new Error("db unreachable")),
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "redeem_claim_code_failed");
+  });
 });
 
 Deno.test("a burn transport failure returns 500 redeem_claim_code_failed", async () => {
-  const res = await handleRequest(
-    redeemRequest(),
-    depsOk(await makeRow(), {
-      burnCode: () => Promise.reject(new Error("db unreachable")),
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "redeem_claim_code_failed");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      redeemRequest(),
+      depsOk(await makeRow(), {
+        burnCode: () => Promise.reject(new Error("db unreachable")),
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "redeem_claim_code_failed");
+  });
 });
 
 Deno.test("invalid JSON body returns 400 invalid_request_body", async () => {

@@ -39,6 +39,7 @@ import {
   type PlacesProxyInput,
   THIN_RESULTS_THRESHOLD,
 } from "./foursquare.ts";
+import { withMutedConsole } from "./test-console.ts";
 
 /** The sorted, comma-joined candidate-pool floor (tb-25 / ADR 0012) â€”
  *  the wire value of `fsq_category_ids` on any call whose category set
@@ -788,17 +789,19 @@ Deno.test("thin-results â€” fewer than THIN_RESULTS_THRESHOLD rows sets is_
 });
 
 Deno.test("thin-results â€” Foursquare 5xx returns is_thin=true (graceful fallback)", async () => {
-  const cache = new MemoryCache();
-  const stub = stubFetch(new Response("upstream down", { status: 503 }));
-  const result = await handlePlacesProxy(TYPICAL_INPUT, {
-    cache,
-    fetch: stub.fetch,
-    apiKey: "test-api-key",
-    now: () => new Date("2026-05-13T12:00:00Z"),
+  await withMutedConsole(["error"], async () => {
+    const cache = new MemoryCache();
+    const stub = stubFetch(new Response("upstream down", { status: 503 }));
+    const result = await handlePlacesProxy(TYPICAL_INPUT, {
+      cache,
+      fetch: stub.fetch,
+      apiKey: "test-api-key",
+      now: () => new Date("2026-05-13T12:00:00Z"),
+    });
+    assertEquals(result.is_thin, true);
+    assertEquals(result.places.length, 0);
+    assertEquals(result.error, "foursquare_upstream_503");
   });
-  assertEquals(result.is_thin, true);
-  assertEquals(result.places.length, 0);
-  assertEquals(result.error, "foursquare_upstream_503");
 });
 
 Deno.test("upstream 4xx â€” surfaces a soft error, not a silent empty 200", async () => {
@@ -807,19 +810,21 @@ Deno.test("upstream 4xx â€” surfaces a soft error, not a silent empty 200",
   // diagnostic need a named error to tell "no credits" apart from
   // "genuinely no venues nearby". Regression guard for the 2026-05-16
   // empty-places incident.
-  const cache = new MemoryCache();
-  const stub = stubFetch(
-    new Response("no API credits remaining", { status: 429 }),
-  );
-  const result = await handlePlacesProxy(TYPICAL_INPUT, {
-    cache,
-    fetch: stub.fetch,
-    apiKey: "test-api-key",
-    now: () => new Date("2026-05-13T12:00:00Z"),
+  await withMutedConsole(["error"], async () => {
+    const cache = new MemoryCache();
+    const stub = stubFetch(
+      new Response("no API credits remaining", { status: 429 }),
+    );
+    const result = await handlePlacesProxy(TYPICAL_INPUT, {
+      cache,
+      fetch: stub.fetch,
+      apiKey: "test-api-key",
+      now: () => new Date("2026-05-13T12:00:00Z"),
+    });
+    assertEquals(result.is_thin, true);
+    assertEquals(result.places.length, 0);
+    assertEquals(result.error, "foursquare_upstream_429");
   });
-  assertEquals(result.is_thin, true);
-  assertEquals(result.places.length, 0);
-  assertEquals(result.error, "foursquare_upstream_429");
 });
 
 Deno.test("thin-results â€” Foursquare 410 fails loud (version pin slipped)", async () => {

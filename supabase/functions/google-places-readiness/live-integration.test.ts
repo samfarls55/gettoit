@@ -2,6 +2,7 @@ import {
   assert,
   assertEquals,
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 const PROJECT_URL = Deno.env.get("SUPABASE_PROJECT_URL");
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
@@ -44,12 +45,14 @@ Deno.test({
   },
 });
 
-Deno.test("google-places-readiness (live) - credential gate is wired", () => {
-  if (!credsPresent) {
-    console.log(
-      "google-places-readiness live integration test skipped - " +
-        "SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY not set.",
-    );
-  }
-  assertEquals(typeof credsPresent, "boolean");
+Deno.test("google-places-readiness (live) - credential gate is wired", async () => {
+  await withMutedConsole(["log"], () => {
+    if (!credsPresent) {
+      console.log(
+        "google-places-readiness live integration test skipped - " +
+          "SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY not set.",
+      );
+    }
+    assertEquals(typeof credsPresent, "boolean");
+  });
 });

@@ -9,6 +9,7 @@ import {
   GOOGLE_Q5_FIELD_MASK,
   GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
 } from "../_shared/places-proxy-core.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 function memoryCache(): CacheAdapter {
   const store = new Map();
@@ -61,20 +62,25 @@ Deno.test("handleRequest — missing Authorization returns 401", async () => {
 });
 
 Deno.test("handleRequest — missing Foursquare key returns 500", async () => {
-  const res = await handleRequest(
-    new Request("https://example/places-proxy", {
-      method: "POST",
-      headers: { Authorization: "Bearer test-jwt", "Content-Type": "application/json" },
-      body: JSON.stringify({ lat: 0, lng: 0, radius_meters: 100 }),
-    }),
-    {
-      env: { ...envOk(), FOURSQUARE_API_KEY: "" },
-      buildCacheAdapter: memoryCache,
-    },
-  );
-  assertEquals(res.status, 500);
-  const body = await res.json();
-  assertEquals(body.error, "places_proxy_misconfigured");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      new Request("https://example/places-proxy", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-jwt",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ lat: 0, lng: 0, radius_meters: 100 }),
+      }),
+      {
+        env: { ...envOk(), FOURSQUARE_API_KEY: "" },
+        buildCacheAdapter: memoryCache,
+      },
+    );
+    assertEquals(res.status, 500);
+    const body = await res.json();
+    assertEquals(body.error, "places_proxy_misconfigured");
+  });
 });
 
 Deno.test("handleRequest — invalid JSON body returns 400", async () => {

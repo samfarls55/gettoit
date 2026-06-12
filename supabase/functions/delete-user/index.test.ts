@@ -13,6 +13,7 @@ import {
   type DeleteUserEnv,
   handleRequest,
 } from "./handler.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 function envOk(): DeleteUserEnv {
   return {
@@ -80,16 +81,18 @@ Deno.test("empty Bearer token returns 401", async () => {
 });
 
 Deno.test("missing service-role env returns 500 misconfigured", async () => {
-  const res = await handleRequest(
-    new Request("https://example/delete-user", {
-      method: "POST",
-      headers: { Authorization: "Bearer jwt-x" },
-    }),
-    depsOk({ env: { SUPABASE_URL: "https://example.supabase.co" } }),
-  );
-  assertEquals(res.status, 500);
-  const body = await res.json();
-  assertEquals(body.error, "delete_user_misconfigured");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      new Request("https://example/delete-user", {
+        method: "POST",
+        headers: { Authorization: "Bearer jwt-x" },
+      }),
+      depsOk({ env: { SUPABASE_URL: "https://example.supabase.co" } }),
+    );
+    assertEquals(res.status, 500);
+    const body = await res.json();
+    assertEquals(body.error, "delete_user_misconfigured");
+  });
 });
 
 Deno.test("resolveCaller returning null returns 401 unauthorized", async () => {
@@ -104,16 +107,18 @@ Deno.test("resolveCaller returning null returns 401 unauthorized", async () => {
 });
 
 Deno.test("resolveCaller throwing returns 401 unauthorized", async () => {
-  const res = await handleRequest(
-    new Request("https://example/delete-user", {
-      method: "POST",
-      headers: { Authorization: "Bearer expired-jwt" },
-    }),
-    depsOk({
-      resolveCaller: () => Promise.reject(new Error("expired")),
-    }),
-  );
-  assertEquals(res.status, 401);
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      new Request("https://example/delete-user", {
+        method: "POST",
+        headers: { Authorization: "Bearer expired-jwt" },
+      }),
+      depsOk({
+        resolveCaller: () => Promise.reject(new Error("expired")),
+      }),
+    );
+    assertEquals(res.status, 401);
+  });
 });
 
 Deno.test("happy path returns 200 with the validated user_id", async () => {
@@ -156,18 +161,20 @@ Deno.test("happy path forwards existed=false when admin reports user_not_found",
 });
 
 Deno.test("admin delete throwing returns 500 delete_user_failed", async () => {
-  const res = await handleRequest(
-    new Request("https://example/delete-user", {
-      method: "POST",
-      headers: { Authorization: "Bearer valid-jwt" },
-    }),
-    depsOk({
-      deleteUser: () => Promise.reject(new Error("auth service down")),
-    }),
-  );
-  assertEquals(res.status, 500);
-  const body = await res.json();
-  assertEquals(body.error, "delete_user_failed");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      new Request("https://example/delete-user", {
+        method: "POST",
+        headers: { Authorization: "Bearer valid-jwt" },
+      }),
+      depsOk({
+        deleteUser: () => Promise.reject(new Error("auth service down")),
+      }),
+    );
+    assertEquals(res.status, 500);
+    const body = await res.json();
+    assertEquals(body.error, "delete_user_failed");
+  });
 });
 
 // Security invariant: a body-supplied user_id MUST be ignored. The

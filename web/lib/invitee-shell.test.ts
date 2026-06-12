@@ -11,9 +11,13 @@
 // against a hand-rolled fake client so the wire shape (table, columns,
 // filters, the `display_name` write) is pinned without a live Postgres.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMembership, findMembership } from "./invitee-shell";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 // ── Fake supabase client ───────────────────────────────────────────
 //
@@ -89,11 +93,16 @@ describe("findMembership", () => {
   });
 
   it("returns null (degrades gracefully) when the read errors", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const { client } = fakeClient({
       selectResult: { data: null, error: { message: "rls denied" } },
     });
     const row = await findMembership(client as never, "room-1", "u1");
     expect(row).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      "invitee-shell findMembership failed:",
+      "rls denied",
+    );
   });
 });
 

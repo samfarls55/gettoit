@@ -26,6 +26,7 @@ import {
   CLAIM_CODE_LENGTH,
   decryptToken,
 } from "../_shared/claim-code.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 // A valid 32-byte base64 AES-GCM key for the test env.
 const TEST_ENC_KEY = "tra6MS8XlmiBodn9NKnRdgEI1ohXtHTkbgnDJZkeaik=";
@@ -136,43 +137,49 @@ Deno.test("resolveCaller returning null (expired/invalid JWT) returns 401 — no
 });
 
 Deno.test("resolveCaller throwing returns 401 unauthorized", async () => {
-  const res = await handleRequest(
-    mintRequest(),
-    depsOk({
-      resolveCaller: () => Promise.reject(new Error("auth service down")),
-    }),
-  );
-  assertEquals(res.status, 401);
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      mintRequest(),
+      depsOk({
+        resolveCaller: () => Promise.reject(new Error("auth service down")),
+      }),
+    );
+    assertEquals(res.status, 401);
+  });
 });
 
 // ── Config gating ──────────────────────────────────────────────────
 
 Deno.test("missing service-role env returns 500 misconfigured", async () => {
-  const res = await handleRequest(
-    mintRequest(),
-    depsOk({
-      env: {
-        SUPABASE_URL: "https://example.supabase.co",
-        CLAIM_CODE_ENC_KEY: TEST_ENC_KEY,
-      },
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "mint_claim_code_misconfigured");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      mintRequest(),
+      depsOk({
+        env: {
+          SUPABASE_URL: "https://example.supabase.co",
+          CLAIM_CODE_ENC_KEY: TEST_ENC_KEY,
+        },
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "mint_claim_code_misconfigured");
+  });
 });
 
 Deno.test("missing encryption key returns 500 misconfigured", async () => {
-  const res = await handleRequest(
-    mintRequest(),
-    depsOk({
-      env: {
-        SUPABASE_URL: "https://example.supabase.co",
-        SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
-      },
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "mint_claim_code_misconfigured");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      mintRequest(),
+      depsOk({
+        env: {
+          SUPABASE_URL: "https://example.supabase.co",
+          SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
+        },
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "mint_claim_code_misconfigured");
+  });
 });
 
 // ── Body validation ────────────────────────────────────────────────
@@ -309,20 +316,22 @@ Deno.test("a PK collision on the first attempt is retried with a fresh code", as
 });
 
 Deno.test("persistent PK collisions exhaust the retry budget and return 500", async () => {
-  let attempts = 0;
-  const res = await handleRequest(
-    mintRequest(),
-    depsOk({
-      insertCode: () => {
-        attempts++;
-        return Promise.resolve<InsertResult>({ ok: false, collision: true });
-      },
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "mint_claim_code_failed");
-  // The handler retried several times before giving up.
-  assert(attempts >= 5, `expected >= 5 attempts, got ${attempts}`);
+  await withMutedConsole(["error"], async () => {
+    let attempts = 0;
+    const res = await handleRequest(
+      mintRequest(),
+      depsOk({
+        insertCode: () => {
+          attempts++;
+          return Promise.resolve<InsertResult>({ ok: false, collision: true });
+        },
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "mint_claim_code_failed");
+    // The handler retried several times before giving up.
+    assert(attempts >= 5, `expected >= 5 attempts, got ${attempts}`);
+  });
 });
 
 Deno.test("two successive mints from the same caller yield distinct codes (re-mintable)", async () => {
@@ -338,14 +347,16 @@ Deno.test("two successive mints from the same caller yield distinct codes (re-mi
 // ── Transport-failure handling ─────────────────────────────────────
 
 Deno.test("an insert transport failure returns 500 mint_claim_code_failed", async () => {
-  const res = await handleRequest(
-    mintRequest(),
-    depsOk({
-      insertCode: () => Promise.reject(new Error("db unreachable")),
-    }),
-  );
-  assertEquals(res.status, 500);
-  assertEquals((await res.json()).error, "mint_claim_code_failed");
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      mintRequest(),
+      depsOk({
+        insertCode: () => Promise.reject(new Error("db unreachable")),
+      }),
+    );
+    assertEquals(res.status, 500);
+    assertEquals((await res.json()).error, "mint_claim_code_failed");
+  });
 });
 
 Deno.test("response sets Content-Type application/json", async () => {

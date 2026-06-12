@@ -489,6 +489,7 @@ describe("App", () => {
       <MobileAppShell
         routerState={state}
         verdictRepository={makeVerdictRepository()}
+        waitingRepository={makeWaitingRepository()}
       />,
     );
 
@@ -502,6 +503,11 @@ describe("App", () => {
 
     expect(screen.getByText(visibleRoute)).toBeOnTheScreen();
     expect(screen.getByText(visibleBody)).toBeOnTheScreen();
+    if (state.activePlanPhase === "waiting") {
+      await waitFor(() => {
+        expect(screen.getByText("Ava")).toBeOnTheScreen();
+      });
+    }
   });
 
   it("routes visible auth and deep-link event outcomes", () => {
@@ -965,6 +971,7 @@ describe("App", () => {
         "https://gettoit.example/join/saved-room",
       );
       expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
+      expect(screen.getByText("Ava")).toBeOnTheScreen();
     });
   });
 
@@ -1101,6 +1108,7 @@ describe("App", () => {
         q5Candidates: [],
       });
       expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
+      expect(screen.getByText("Ava")).toBeOnTheScreen();
     });
   });
 
@@ -1363,6 +1371,7 @@ describe("App", () => {
         "https://gettoit.example/join/waiting-room",
       );
       expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
+      expect(screen.getByText("Ava")).toBeOnTheScreen();
     });
   });
 
@@ -1458,6 +1467,7 @@ describe("App", () => {
         "https://gettoit.example/join/waiting-room",
       );
       expect(screen.getByText("Waiting for the group")).toBeOnTheScreen();
+      expect(screen.getByText("Ava")).toBeOnTheScreen();
     });
   });
 

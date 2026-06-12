@@ -1,5 +1,6 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { handleRequest } from "./handler.ts";
+import { withMutedConsole } from "../_shared/test-console.ts";
 
 const NOW = new Date("2026-06-11T12:00:00.000Z");
 
@@ -43,41 +44,47 @@ Deno.test("google-places-readiness - rejects missing Authorization", async () =>
 });
 
 Deno.test("google-places-readiness - missing credential fails closed without fetch", async () => {
-  let called = false;
-  const res = await handleRequest(authedRequest(), {
-    env: {},
-    now: () => NOW,
-    fetch: (() => {
-      called = true;
-      return Promise.resolve(new Response("{}"));
-    }) as typeof fetch,
+  await withMutedConsole(["warn"], async () => {
+    let called = false;
+    const res = await handleRequest(authedRequest(), {
+      env: {},
+      now: () => NOW,
+      fetch: (() => {
+        called = true;
+        return Promise.resolve(new Response("{}"));
+      }) as typeof fetch,
+    });
+    assertEquals(called, false);
+    assertEquals(res.status, 503);
+    const body = await res.json();
+    assertEquals(body.provider, "google_places");
+    assertEquals(body.readiness, "missing_credential");
+    assertEquals(body.error, "google_places_not_configured");
   });
-  assertEquals(called, false);
-  assertEquals(res.status, 503);
-  const body = await res.json();
-  assertEquals(body.provider, "google_places");
-  assertEquals(body.readiness, "missing_credential");
-  assertEquals(body.error, "google_places_not_configured");
 });
 
 Deno.test("google-places-readiness - invalid credential is classified without leaking body", async () => {
-  const res = await handleRequest(authedRequest(), {
-    env: { GOOGLE_PLACES_API_KEY: "test-key" },
-    now: () => NOW,
-    fetch: ((_url, _init) =>
-      Promise.resolve(
-        new Response(
-          JSON.stringify({ error: { message: "API key not valid: test-key" } }),
-          { status: 403, headers: { "Content-Type": "application/json" } },
-        ),
-      )) as typeof fetch,
+  await withMutedConsole(["warn"], async () => {
+    const res = await handleRequest(authedRequest(), {
+      env: { GOOGLE_PLACES_API_KEY: "test-key" },
+      now: () => NOW,
+      fetch: ((_url, _init) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              error: { message: "API key not valid: test-key" },
+            }),
+            { status: 403, headers: { "Content-Type": "application/json" } },
+          ),
+        )) as typeof fetch,
+    });
+    assertEquals(res.status, 503);
+    const body = await res.json();
+    assertEquals(body.readiness, "invalid_credential");
+    assertEquals(body.error, "google_places_invalid_credential");
+    assertEquals(JSON.stringify(body).includes("test-key"), false);
+    assertEquals(JSON.stringify(body).includes("API key not valid"), false);
   });
-  assertEquals(res.status, 503);
-  const body = await res.json();
-  assertEquals(body.readiness, "invalid_credential");
-  assertEquals(body.error, "google_places_invalid_credential");
-  assertEquals(JSON.stringify(body).includes("test-key"), false);
-  assertEquals(JSON.stringify(body).includes("API key not valid"), false);
 });
 
 Deno.test("google-places-readiness - configured credential returns safe configured state", async () => {
@@ -110,13 +117,15 @@ Deno.test("google-places-readiness - configured credential returns safe configur
 });
 
 Deno.test("google-places-readiness - network failures fail closed", async () => {
-  const res = await handleRequest(authedRequest(), {
-    env: { GOOGLE_PLACES_API_KEY: "test-key" },
-    now: () => NOW,
-    fetch: (() => Promise.reject(new Error("network down"))) as typeof fetch,
+  await withMutedConsole(["warn"], async () => {
+    const res = await handleRequest(authedRequest(), {
+      env: { GOOGLE_PLACES_API_KEY: "test-key" },
+      now: () => NOW,
+      fetch: (() => Promise.reject(new Error("network down"))) as typeof fetch,
+    });
+    assertEquals(res.status, 503);
+    const body = await res.json();
+    assertEquals(body.readiness, "provider_unavailable");
+    assertEquals(body.error, "google_places_provider_unavailable");
   });
-  assertEquals(res.status, 503);
-  const body = await res.json();
-  assertEquals(body.readiness, "provider_unavailable");
-  assertEquals(body.error, "google_places_provider_unavailable");
 });
