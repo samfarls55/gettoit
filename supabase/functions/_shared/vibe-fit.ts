@@ -8,7 +8,11 @@ export type VibeReceiptCode =
   | "vibe_mealtime_weighted"
   | "vibe_embedding_unavailable"
   | "vibe_embedding_budget_exhausted"
-  | "vibe_embeddings_disabled";
+  | "vibe_embeddings_disabled"
+  | "selected_vibe_low_confidence_relaxed"
+  | "selected_vibe_contrast_relaxed"
+  | "selected_vibe_high_confidence_keep"
+  | "selected_vibe_high_confidence_drop";
 
 export interface VibeAnchor {
   bandId: VibeBandId;
@@ -85,6 +89,20 @@ export interface VibeFitSignal {
   receiptCodes: VibeReceiptCode[];
 }
 
+export interface Q5VibeSelectionInput {
+  targetVibePosition: number;
+  candidates: readonly VibeFitCandidate[];
+}
+
+export type Q5VibeSelectionResult =
+  | {
+    kind: "selected";
+    keepCandidateId: string;
+    dropCandidateId: string;
+    receiptCodes: VibeReceiptCode[];
+  }
+  | { kind: "no-results"; receiptCodes: VibeReceiptCode[] };
+
 interface SourceTextChunk {
   text: string;
   sourcePriority: number;
@@ -139,6 +157,12 @@ export const VIBE_FIT_CONFIG = Object.freeze({
   embeddingTimeoutMs: 1_500,
   maxSpansPerCandidate: 5,
   lowConfidenceThreshold: 0.5,
+  q5StrictConfidenceThreshold: 0.62,
+  q5RelaxedConfidenceThreshold: 0,
+  q5StrictKeepDistance: 0.65,
+  q5RelaxedKeepDistance: 0.9,
+  q5StrictDropDistance: 1.5,
+  q5RelaxedDropDistance: 0.7,
   conflictDistance: 2.5,
   anchors: [
     {
@@ -232,7 +256,9 @@ export function buildVibeFitCandidate(input: {
     });
   }
 
-  const weakStructuredHints = filterWeakStructuredHints(input.weakStructuredHints);
+  const weakStructuredHints = filterWeakStructuredHints(
+    input.weakStructuredHints,
+  );
 
   return {
     candidateId: input.candidateId,
@@ -241,7 +267,9 @@ export function buildVibeFitCandidate(input: {
     ...(Object.keys(weakStructuredHints).length > 0
       ? { weakStructuredHints }
       : {}),
-    ...(input.mealTimeContext ? { mealTimeContext: input.mealTimeContext } : {}),
+    ...(input.mealTimeContext
+      ? { mealTimeContext: input.mealTimeContext }
+      : {}),
     ...(input.embeddingMode ? { embeddingMode: input.embeddingMode } : {}),
   };
 }
@@ -477,6 +505,82 @@ export async function scoreVibeFitCandidateFlow(
   });
 }
 
+export async function selectQ5VibeKeepDropCandidates(
+  input: Q5VibeSelectionInput,
+  deps: VibeFitFlowDeps,
+): Promise<Q5VibeSelectionResult> {
+  const baseSignals = await scoreVibeFitCandidateFlow(input.candidates, deps);
+  const signalsByCandidateId = new Map(
+    baseSignals.map((signal) => [signal.candidateId, signal]),
+  );
+  const q5Signals = input.candidates.map((candidate) =>
+    q5SignalWithWeakHints(
+      signalsByCandidateId.get(candidate.candidateId) ??
+        noEvidenceVibeFitSignal(candidate.candidateId),
+      candidate,
+    )
+  );
+
+  const stages = [
+    {
+      minConfidence: VIBE_FIT_CONFIG.q5StrictConfidenceThreshold,
+      keepDistance: VIBE_FIT_CONFIG.q5StrictKeepDistance,
+      dropDistance: VIBE_FIT_CONFIG.q5StrictDropDistance,
+      receiptCodes: [
+        "selected_vibe_high_confidence_keep",
+        "selected_vibe_high_confidence_drop",
+      ] satisfies VibeReceiptCode[],
+    },
+    {
+      minConfidence: VIBE_FIT_CONFIG.q5RelaxedConfidenceThreshold,
+      keepDistance: VIBE_FIT_CONFIG.q5StrictKeepDistance,
+      dropDistance: VIBE_FIT_CONFIG.q5StrictDropDistance,
+      receiptCodes: [
+        "selected_vibe_low_confidence_relaxed",
+      ] satisfies VibeReceiptCode[],
+    },
+    {
+      minConfidence: VIBE_FIT_CONFIG.q5RelaxedConfidenceThreshold,
+      keepDistance: VIBE_FIT_CONFIG.q5RelaxedKeepDistance,
+      dropDistance: VIBE_FIT_CONFIG.q5RelaxedDropDistance,
+      receiptCodes: [
+        "selected_vibe_contrast_relaxed",
+      ] satisfies VibeReceiptCode[],
+    },
+  ] as const;
+
+  const target = clamp(input.targetVibePosition, 1, 5);
+  for (const stage of stages) {
+    const keep = q5Signals.find((signal) =>
+      isQ5VibeKeep(signal, target, stage.keepDistance, stage.minConfidence)
+    );
+    const drop = q5Signals.find((signal) =>
+      signal.candidateId !== keep?.candidateId &&
+      isQ5VibeDrop(signal, target, stage.dropDistance, stage.minConfidence)
+    );
+
+    if (keep && drop) {
+      return {
+        kind: "selected",
+        keepCandidateId: keep.candidateId,
+        dropCandidateId: drop.candidateId,
+        receiptCodes: dedupeReceiptCodes([
+          ...keep.receiptCodes,
+          ...drop.receiptCodes,
+          ...stage.receiptCodes,
+        ]),
+      };
+    }
+  }
+
+  return {
+    kind: "no-results",
+    receiptCodes: dedupeReceiptCodes(
+      q5Signals.flatMap((signal) => signal.receiptCodes),
+    ),
+  };
+}
+
 export async function embedTextsWithVoyage(
   texts: readonly string[],
   deps: VoyageEmbeddingDeps,
@@ -647,6 +751,64 @@ function scoreSpansWithEmbeddings(
     confidence,
     receiptCodes,
   };
+}
+
+function q5SignalWithWeakHints(
+  signal: VibeFitSignal,
+  candidate: VibeFitCandidate,
+): VibeFitSignal {
+  if (signal.vibePosition !== null) {
+    return signal;
+  }
+
+  const hintedPosition = q5WeakHintPosition(candidate.weakStructuredHints);
+  if (hintedPosition === null) {
+    return signal;
+  }
+
+  return {
+    ...signal,
+    vibePosition: hintedPosition,
+    confidence: Math.max(signal.confidence, 0),
+  };
+}
+
+function q5WeakHintPosition(
+  hints: Partial<Record<VibeFitWeakStructuredHint, boolean>> | undefined,
+): number | null {
+  if (!hints) return null;
+  if (hints.liveMusic || hints.goodForWatchingSports) return 4.6;
+  if (hints.goodForGroups) return 3.7;
+  if (hints.outdoorSeating) return 2.8;
+  return null;
+}
+
+function isQ5VibeKeep(
+  signal: VibeFitSignal,
+  target: number,
+  keepDistance: number,
+  minConfidence: number,
+): boolean {
+  return signal.vibePosition !== null &&
+    signal.confidence >= minConfidence &&
+    Math.abs(signal.vibePosition - target) <= keepDistance;
+}
+
+function isQ5VibeDrop(
+  signal: VibeFitSignal,
+  target: number,
+  dropDistance: number,
+  minConfidence: number,
+): boolean {
+  return signal.vibePosition !== null &&
+    signal.confidence >= minConfidence &&
+    Math.abs(signal.vibePosition - target) >= dropDistance;
+}
+
+function dedupeReceiptCodes(
+  receiptCodes: readonly VibeReceiptCode[],
+): VibeReceiptCode[] {
+  return [...new Set(receiptCodes)];
 }
 
 function hasNumericConflict(scores: Record<VibeBandId, number>): boolean {

@@ -9,6 +9,7 @@ import {
   extractVibeEvidenceSpans,
   scoreVibeFitCandidate,
   scoreVibeFitCandidateFlow,
+  selectQ5VibeKeepDropCandidates,
   VIBE_FIT_CONFIG,
 } from "./vibe-fit.ts";
 
@@ -248,6 +249,7 @@ Deno.test("TB-05: disabled embeddings skip Voyage and degrade to neutral low con
       {
         candidateId: "disabled",
         summaryTexts: [{
+          source: "reviewSummary",
           priority: 1,
           text: "Quiet calm room for conversation.",
         }],
@@ -279,6 +281,7 @@ Deno.test("TB-05: Voyage wrapper batches voyage-4-lite inputs and dedupes within
       {
         candidateId: "a",
         summaryTexts: [{
+          source: "reviewSummary",
           priority: 1,
           text: "Quiet calm room for conversation.",
         }],
@@ -286,6 +289,7 @@ Deno.test("TB-05: Voyage wrapper batches voyage-4-lite inputs and dedupes within
       {
         candidateId: "b",
         summaryTexts: [{
+          source: "reviewSummary",
           priority: 1,
           text: "Quiet calm room for conversation.",
         }],
@@ -380,7 +384,11 @@ Deno.test("TB-05: budget exhaustion skips Voyage and returns controlled receipts
     [
       {
         candidateId: "budget",
-        summaryTexts: [{ priority: 1, text: "Buzzy lively energetic room." }],
+        summaryTexts: [{
+          source: "reviewSummary",
+          priority: 1,
+          text: "Buzzy lively energetic room.",
+        }],
       },
     ],
     {
@@ -424,6 +432,205 @@ Deno.test("TB-05: provider failures degrade without leaking text vectors or API 
   assertEquals(JSON.stringify(result).includes(secret), false);
   assertEquals(JSON.stringify(result).includes("0.1"), false);
 });
+
+Deno.test("TB-06: Q5 vibe selection chooses high-confidence keep/drop contrast", async () => {
+  const result = await selectQ5VibeKeepDropCandidates(
+    {
+      targetVibePosition: 2,
+      candidates: [
+        q5VibeCandidate("keep", "Mellow cozy lounge with relaxed booths."),
+        q5VibeCandidate("drop", "Buzzy lively energetic room at dinner."),
+      ],
+    },
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as { input: string[] };
+        return Promise.resolve(jsonEmbeddingResponse(body.input));
+      },
+    },
+  );
+
+  assertEquals(result.kind, "selected");
+  if (result.kind === "selected") {
+    assertEquals(result.keepCandidateId, "keep");
+    assertEquals(result.dropCandidateId, "drop");
+    assert(result.receiptCodes.includes("selected_vibe_high_confidence_keep"));
+    assert(result.receiptCodes.includes("selected_vibe_high_confidence_drop"));
+  }
+});
+
+Deno.test("TB-06: Q5 vibe selection relaxes confidence before contrast", async () => {
+  const confidenceRelaxed = await selectQ5VibeKeepDropCandidates(
+    {
+      targetVibePosition: 2,
+      candidates: [
+        q5VibeCandidate(
+          "weak-keep",
+          "Kind of mellow cozy lounge with relaxed booths.",
+        ),
+        q5VibeCandidate("drop", "Buzzy lively energetic room at dinner."),
+      ],
+    },
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as { input: string[] };
+        return Promise.resolve(jsonEmbeddingResponse(body.input));
+      },
+    },
+  );
+
+  assertEquals(confidenceRelaxed.kind, "selected");
+  if (confidenceRelaxed.kind === "selected") {
+    assertEquals(confidenceRelaxed.keepCandidateId, "weak-keep");
+    assertEquals(
+      confidenceRelaxed.receiptCodes.includes(
+        "selected_vibe_low_confidence_relaxed",
+      ),
+      true,
+    );
+    assertEquals(
+      confidenceRelaxed.receiptCodes.includes("selected_vibe_contrast_relaxed"),
+      false,
+    );
+  }
+
+  const contrastRelaxed = await selectQ5VibeKeepDropCandidates(
+    {
+      targetVibePosition: 2,
+      candidates: [
+        q5VibeCandidate("keep", "Mellow cozy lounge with relaxed booths."),
+        q5VibeCandidate(
+          "near-drop",
+          "Casual social dining room with balanced energy.",
+        ),
+      ],
+    },
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as { input: string[] };
+        return Promise.resolve(jsonEmbeddingResponse(body.input));
+      },
+    },
+  );
+
+  assertEquals(contrastRelaxed.kind, "selected");
+  if (contrastRelaxed.kind === "selected") {
+    assertEquals(contrastRelaxed.dropCandidateId, "near-drop");
+    assertEquals(
+      contrastRelaxed.receiptCodes.includes(
+        "selected_vibe_low_confidence_relaxed",
+      ),
+      false,
+    );
+    assertEquals(
+      contrastRelaxed.receiptCodes.includes("selected_vibe_contrast_relaxed"),
+      true,
+    );
+  }
+});
+
+Deno.test("TB-06: Q5 disabled embeddings can preserve vibe-axis shape with weak hints", async () => {
+  let fetchCalls = 0;
+  const result = await selectQ5VibeKeepDropCandidates(
+    {
+      targetVibePosition: 3,
+      candidates: [
+        q5VibeCandidate("neutral-keep", "Comfortable social room.", {}),
+        q5VibeCandidate("hint-drop", "", { liveMusic: true }),
+      ],
+    },
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "false" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: () => {
+        fetchCalls += 1;
+        return Promise.resolve(new Response("{}"));
+      },
+    },
+  );
+
+  assertEquals(fetchCalls, 0);
+  assertEquals(result.kind, "selected");
+  if (result.kind === "selected") {
+    assertEquals(result.keepCandidateId, "neutral-keep");
+    assertEquals(result.dropCandidateId, "hint-drop");
+    assert(result.receiptCodes.includes("vibe_embeddings_disabled"));
+    assert(
+      result.receiptCodes.includes("selected_vibe_low_confidence_relaxed"),
+    );
+  }
+});
+
+Deno.test("TB-06: Q5 provider failure fails cleanly when no useful vibe card can be formed", async () => {
+  const result = await selectQ5VibeKeepDropCandidates(
+    {
+      targetVibePosition: 2,
+      candidates: [
+        q5VibeCandidate("one", "Mellow cozy lounge with relaxed booths."),
+        q5VibeCandidate("two", "Buzzy lively energetic room at dinner."),
+      ],
+    },
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: () => Promise.resolve(new Response("nope", { status: 500 })),
+    },
+  );
+
+  assertEquals(result.kind, "no-results");
+  assert(result.receiptCodes.includes("vibe_embedding_unavailable"));
+});
+
+Deno.test("TB-06: Q5 vibe selection response does not expose summaries or embeddings", async () => {
+  const result = await selectQ5VibeKeepDropCandidates(
+    {
+      targetVibePosition: 2,
+      candidates: [
+        q5VibeCandidate("keep", "Mellow cozy lounge with relaxed booths."),
+        q5VibeCandidate("drop", "Buzzy lively energetic room at dinner."),
+      ],
+    },
+    {
+      env: { VOYAGE_API_KEY: "secret", VIBE_EMBEDDINGS_ENABLED: "true" },
+      budget: { maxTextsPerFlow: 100 },
+      fetch: (_url, init) => {
+        const body = JSON.parse(String(init?.body)) as { input: string[] };
+        return Promise.resolve(jsonEmbeddingResponse(body.input));
+      },
+    },
+  );
+
+  const serialized = JSON.stringify(result);
+  for (
+    const forbidden of [
+      "Mellow cozy lounge",
+      "Buzzy lively",
+      "embedding",
+      "vibePosition",
+      "secret",
+    ]
+  ) {
+    assertEquals(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+function q5VibeCandidate(
+  candidateId: string,
+  reviewSummary: string,
+  weakStructuredHints: Record<string, boolean> = {},
+) {
+  return buildVibeFitCandidate({
+    candidateId,
+    reviewSummary,
+    weakStructuredHints,
+  });
+}
 
 function jsonEmbeddingResponse(texts: readonly string[]): Response {
   return new Response(
