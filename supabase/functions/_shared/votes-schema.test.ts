@@ -321,7 +321,7 @@ Deno.test("buildVotesSlotsFromLegacyAnswers round-trips through the mapper", () 
     q4_vibe: 1,
     q5_ratings: [
       { droppedAxis: "cuisine" as const, score: 4 },
-      { droppedAxis: "reputation" as const, score: 2 },
+      { droppedAxis: "crowd_approval" as const, score: 2 },
       { droppedAxis: "vibe" as const, score: 5 },
     ],
   };
@@ -356,7 +356,7 @@ Deno.test("buildVotesSlotsFromLegacyAnswers emits the Q5 regret slot as answer.r
     q4_vibe: 3,
     q5_ratings: [
       { droppedAxis: "cuisine", score: 5 },
-      { droppedAxis: "reputation", score: 1 },
+      { droppedAxis: "crowd_approval", score: 1 },
       { droppedAxis: "vibe", score: 4 },
     ],
   });
@@ -366,7 +366,7 @@ Deno.test("buildVotesSlotsFromLegacyAnswers emits the Q5 regret slot as answer.r
   assertEquals(slots.q5.meta.question_kind, "regret");
   assertEquals(slots.q5.answer.ratings, [
     { droppedAxis: "cuisine", score: 5 },
-    { droppedAxis: "reputation", score: 1 },
+    { droppedAxis: "crowd_approval", score: 1 },
     { droppedAxis: "vibe", score: 4 },
   ]);
   // The pre-TB-23 per-venue `scores` map is gone — the producer emits
@@ -386,7 +386,7 @@ Deno.test("buildVotesSlotsFromLegacyAnswers Q5 ratings feed a non-empty preferen
     q4_vibe: 2,
     q5_ratings: [
       { droppedAxis: "cuisine", score: 2 },
-      { droppedAxis: "reputation", score: 5 },
+      { droppedAxis: "crowd_approval", score: 5 },
       { droppedAxis: "vibe", score: 3 },
     ],
   });
@@ -401,7 +401,7 @@ Deno.test("buildVotesSlotsFromLegacyAnswers Q5 ratings feed a non-empty preferen
   });
   assertEquals(inputs.q5Ratings, [
     { droppedAxis: "cuisine", score: 2 },
-    { droppedAxis: "reputation", score: 5 },
+    { droppedAxis: "crowd_approval", score: 5 },
     { droppedAxis: "vibe", score: 3 },
   ]);
 });

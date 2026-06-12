@@ -50,6 +50,7 @@ import type { Q5MemberProfile } from "./preference-function.ts";
 // not web-portable.
 import {
   buildVotesSlotsFromLegacyAnswers,
+  normalizeQ5Axis,
   QUESTION_KINDS,
 } from "./votes-wire.ts";
 import type {
@@ -338,8 +339,6 @@ const NO_PREFERENCE_MEMBER: Q5MemberProfile = Object.freeze({
   vibe: 2,
 });
 
-const Q5_AXES: ReadonlySet<string> = new Set(["cuisine", "reputation", "vibe"]);
-
 /** Read the three Q5 card ratings from a `regret`-kind answer payload.
  *  The canonical quiz-redesign shape is `answer.ratings: [{ droppedAxis, score
  *  }]`. Entries with an unknown axis or a non-numeric score are
@@ -351,11 +350,12 @@ function readQ5Ratings(raw: unknown): Q5Rating[] {
     if (!entry || typeof entry !== "object") continue;
     const axis = (entry as Record<string, unknown>).droppedAxis;
     const score = (entry as Record<string, unknown>).score;
+    const normalizedAxis = normalizeQ5Axis(axis);
     if (
-      typeof axis === "string" && Q5_AXES.has(axis) &&
+      normalizedAxis !== null &&
       typeof score === "number" && Number.isFinite(score)
     ) {
-      out.push({ droppedAxis: axis as Axis, score });
+      out.push({ droppedAxis: normalizedAxis as Axis, score });
     }
   }
   return out;

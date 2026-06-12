@@ -74,7 +74,7 @@ const mexicanSocialPopular: Q5MemberProfile = {
 function flatRatings(score: number): Q5Rating[] {
   return [
     { droppedAxis: "cuisine", score },
-    { droppedAxis: "reputation", score },
+    { droppedAxis: "crowd_approval", score },
     { droppedAxis: "vibe", score },
   ];
 }
@@ -163,7 +163,7 @@ Deno.test("no-preference axis weight redistributes to survivors", () => {
 Deno.test("soft re-weight lifts a high-marginal axis", () => {
   const highCuisineWeight = buildPreferenceFunction(mexicanSocialPopular, [
     { droppedAxis: "cuisine", score: 1 },
-    { droppedAxis: "reputation", score: 3 },
+    { droppedAxis: "crowd_approval", score: 3 },
     { droppedAxis: "vibe", score: 3 },
   ]);
   const flatWeight = buildPreferenceFunction(
@@ -177,7 +177,7 @@ Deno.test("soft re-weight lifts a high-marginal axis", () => {
 Deno.test("soft re-weight is partial, not full replacement", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, [
     { droppedAxis: "cuisine", score: 1 },
-    { droppedAxis: "reputation", score: 3 },
+    { droppedAxis: "crowd_approval", score: 3 },
     { droppedAxis: "vibe", score: 3 },
   ]);
   const missCuisineOnly = venue(CUISINE_THAI, REP_POPULAR, 2);
@@ -198,7 +198,7 @@ Deno.test("flat ratings leave weights at prior", () => {
 Deno.test("hard-contradiction override fires on strict trigger", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, [
     { droppedAxis: "cuisine", score: 2 },
-    { droppedAxis: "reputation", score: 5 },
+    { droppedAxis: "crowd_approval", score: 5 },
     { droppedAxis: "vibe", score: 2 },
   ]);
   // Override demotes reputation to no-preference: a venue that misses
@@ -210,7 +210,7 @@ Deno.test("hard-contradiction override fires on strict trigger", () => {
 Deno.test("hard-contradiction override demotes, never inverts", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, [
     { droppedAxis: "cuisine", score: 2 },
-    { droppedAxis: "reputation", score: 5 },
+    { droppedAxis: "crowd_approval", score: 5 },
     { droppedAxis: "vibe", score: 2 },
   ]);
   const statedRep = venue(CUISINE_MEXICAN, REP_POPULAR, 2);
@@ -221,7 +221,7 @@ Deno.test("hard-contradiction override demotes, never inverts", () => {
 Deno.test("single odd rating does not fire override", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, [
     { droppedAxis: "cuisine", score: 2 }, // a rep-keep card, below drop
-    { droppedAxis: "reputation", score: 5 }, // the rep-drop card
+    { droppedAxis: "crowd_approval", score: 5 }, // the rep-drop card
     { droppedAxis: "vibe", score: 5 }, // a rep-keep card, NOT below drop
   ]);
   const missRep = venue(CUISINE_MEXICAN, REP_HIDDEN_GEM, 2);
@@ -232,7 +232,7 @@ Deno.test("single odd rating does not fire override", () => {
 Deno.test("override does not fire when drop card rated below four", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, [
     { droppedAxis: "cuisine", score: 1 },
-    { droppedAxis: "reputation", score: 3 },
+    { droppedAxis: "crowd_approval", score: 3 },
     { droppedAxis: "vibe", score: 2 },
   ]);
   const missRep = venue(CUISINE_MEXICAN, REP_HIDDEN_GEM, 2);
@@ -248,7 +248,7 @@ Deno.test("override on multi-pick cuisine demotes the whole set", () => {
   };
   const prefFn = buildPreferenceFunction(member, [
     { droppedAxis: "cuisine", score: 5 }, // cuisine-drop, excited
-    { droppedAxis: "reputation", score: 2 }, // cuisine-keep
+    { droppedAxis: "crowd_approval", score: 2 }, // cuisine-keep
     { droppedAxis: "vibe", score: 2 }, // cuisine-keep
   ]);
   const v = venue(CUISINE_CHINESE, REP_POPULAR, 2);
@@ -419,7 +419,7 @@ const SCORE_VECTORS: ScoreVector[] = [
     member: mexicanSocialPopular,
     q5Ratings: [
       { droppedAxis: "cuisine", score: 1 },
-      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "crowd_approval", score: 3 },
       { droppedAxis: "vibe", score: 3 },
     ],
     venue: venue(CUISINE_MEXICAN, REP_HIDDEN_GEM, 4),
@@ -434,7 +434,7 @@ const SCORE_VECTORS: ScoreVector[] = [
     member: mexicanSocialPopular,
     q5Ratings: [
       { droppedAxis: "cuisine", score: 1 },
-      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "crowd_approval", score: 3 },
       { droppedAxis: "vibe", score: 3 },
     ],
     venue: venue(CUISINE_THAI, REP_POPULAR, 2),
@@ -456,7 +456,7 @@ const SCORE_VECTORS: ScoreVector[] = [
     member: mexicanSocialPopular,
     q5Ratings: [
       { droppedAxis: "cuisine", score: 2 },
-      { droppedAxis: "reputation", score: 5 },
+      { droppedAxis: "crowd_approval", score: 5 },
       { droppedAxis: "vibe", score: 2 },
     ],
     venue: venue(CUISINE_MEXICAN, REP_HIDDEN_GEM, 2),
@@ -474,7 +474,7 @@ const SCORE_VECTORS: ScoreVector[] = [
     member: { cuisines: [], reputation: REP_NO_PREFERENCE, vibe: 2 },
     q5Ratings: [
       { droppedAxis: "cuisine", score: 1 },
-      { droppedAxis: "reputation", score: 1 },
+      { droppedAxis: "crowd_approval", score: 1 },
       { droppedAxis: "vibe", score: 5 },
     ],
     venue: venue(CUISINE_THAI, REP_HIDDEN_GEM, 4),

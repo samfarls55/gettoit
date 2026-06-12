@@ -91,7 +91,7 @@ export const REPUTATION_NO_PREFERENCE = "no_preference";
 export type { Axis, Q5Rating } from "./votes-wire.ts";
 import type { Axis, Q5Rating } from "./votes-wire.ts";
 
-const ALL_AXES: readonly Axis[] = ["cuisine", "reputation", "vibe"];
+const ALL_AXES: readonly Axis[] = ["cuisine", "crowd_approval", "vibe"];
 
 /** A member's stated Q1â€“Q4 profile. Mirrors the Swift
  *  `Q5MemberProfile` struct. */
@@ -155,6 +155,8 @@ export function scoreReputationAxis(
     : SOFT_NON_MATCH_SCORE;
 }
 
+export const scoreCrowdApprovalAxis = scoreReputationAxis;
+
 /** Vibe axis â€” the one *graded* axis. Vibe is a cardinal 0â€¦4 energy
  *  scale (Quietâ€¦Rowdy); the score is graded by distance: 5 at an exact
  *  match, descending linearly toward the bottom of the 1â€¦5 scale at the
@@ -175,7 +177,7 @@ export function scoreVibeAxis(venueVibe: number, statedVibe: number): number {
  *  post-override. A zeroed axis drops out of the weighted average. */
 interface AxisWeights {
   cuisine: number;
-  reputation: number;
+  crowd_approval: number;
   vibe: number;
 }
 
@@ -262,7 +264,7 @@ function resolveWeights(
   // "No preference" is a genuine zero-weight signal.
   const active = new Set<Axis>();
   if (member.cuisines.length > 0) active.add("cuisine");
-  if (member.reputation !== REPUTATION_NO_PREFERENCE) active.add("reputation");
+  if (member.reputation !== REPUTATION_NO_PREFERENCE) active.add("crowd_approval");
   // Vibe is always a stated answer (the Q4 scale has no "no preference"
   // stop) â€” it is always active at init.
   active.add("vibe");
@@ -278,7 +280,7 @@ function resolveWeights(
 
   // Equal-weight prior over the surviving (active) axes.
   if (active.size === 0) {
-    return { cuisine: 0, reputation: 0, vibe: 0 };
+    return { cuisine: 0, crowd_approval: 0, vibe: 0 };
   }
   const priorEach = 1.0 / active.size;
   const prior = new Map<Axis, number>();
@@ -296,7 +298,7 @@ function resolveWeights(
 
   return {
     cuisine: final.get("cuisine") ?? 0,
-    reputation: final.get("reputation") ?? 0,
+    crowd_approval: final.get("crowd_approval") ?? 0,
     vibe: final.get("vibe") ?? 0,
   };
 }
@@ -333,10 +335,10 @@ export function buildPreferenceFunction(
         score: scoreCuisineAxis(venue.cuisine, craved),
       });
     }
-    if (weights.reputation > 0) {
+    if (weights.crowd_approval > 0) {
       contributions.push({
-        weight: weights.reputation,
-        score: scoreReputationAxis(venue.reputation, statedReputation),
+        weight: weights.crowd_approval,
+        score: scoreCrowdApprovalAxis(venue.reputation, statedReputation),
       });
     }
     if (weights.vibe > 0) {

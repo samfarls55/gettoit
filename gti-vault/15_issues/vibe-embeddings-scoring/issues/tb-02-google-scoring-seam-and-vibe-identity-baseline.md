@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 359
 ---
@@ -20,13 +20,25 @@ The output is a small, tested baseline that future slices can import: stable Vib
 
 ## Acceptance criteria
 
-- [ ] The current five visible Vibe labels are inventoried and mapped to stable backend IDs and 1.0-5.0 positions.
-- [ ] Any 0-4 Vibe representation remains a legacy adapter only at module boundaries.
-- [ ] The active Google-backed Q5 candidate generation seam is identified and covered by tests.
-- [ ] The active Google-backed final verdict scoring seam is identified and covered by tests.
-- [ ] Active Q5 axes are aligned to `cuisine`, `crowd_approval`, and `vibe`; legacy `reputation` language is not extended.
-- [ ] No summaries, embeddings, vectors, `vibe_position`, or numeric confidence are persisted.
-- [ ] Tests prove existing Q5/verdict behavior remains unchanged except for intentional terminology/identity adapters.
+- [x] The current five visible Vibe labels are inventoried and mapped to stable backend IDs and 1.0-5.0 positions.
+- [x] Any 0-4 Vibe representation remains a legacy adapter only at module boundaries.
+- [x] The active Google-backed Q5 candidate generation seam is identified and covered by tests.
+- [x] The active Google-backed final verdict scoring seam is identified and covered by tests.
+- [x] Active Q5 axes are aligned to `cuisine`, `crowd_approval`, and `vibe`; legacy `reputation` language is not extended.
+- [x] No summaries, embeddings, vectors, `vibe_position`, or numeric confidence are persisted.
+- [x] Tests prove existing Q5/verdict behavior remains unchanged except for intentional terminology/identity adapters.
+
+## Implementation Notes
+
+- Added `_shared/vibe-band.ts` as the stable backend Vibe band identity baseline: `quiet`, `chill`, `social`, `lively`, `rowdy`, visible labels `QUIET` through `ROWDY`, legacy indices `0..4`, and canonical positions `1.0..5.0`.
+- Added `_shared/google-scoring-seams.ts` to document the active Google Q5 and final verdict scoring seams future embedding slices should attach to.
+- Changed the active Q5 rating axis contract to `cuisine`, `crowd_approval`, and `vibe`. Legacy persisted or caller-supplied `droppedAxis: "reputation"` normalizes to `crowd_approval` in the vote reader.
+- The existing Q3 answer/provider bucket field remains named `reputation` as a legacy boundary value; no display/UI behavior changed.
+- No schema fields, summaries, embeddings, vectors, `vibe_position`, confidence values, or provider-derived vibe storage were added.
+
+## Verification
+
+- `PATH=/home/agent/.deno/bin:/usr/local/bin:/usr/bin:/bin npm run verify:edge` passed on 2026-06-12: 510 passed, 0 failed, 3 ignored.
 
 ## Blocked by
 

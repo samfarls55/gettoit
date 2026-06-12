@@ -86,7 +86,7 @@ function canonicalRow(overrides: Partial<VotesRow> = {}): VotesRow {
     q4: "q4" in overrides ? overrides.q4! : vibeSlot(2),
     q5: "q5" in overrides ? overrides.q5! : regretSlot([
       { droppedAxis: "cuisine", score: 3 },
-      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "crowd_approval", score: 3 },
       { droppedAxis: "vibe", score: 3 },
     ]),
   };
@@ -103,7 +103,7 @@ Deno.test("maps a canonical quiz-redesign row to a Q5MemberProfile + ratings", (
     q4: vibeSlot(3),
     q5: regretSlot([
       { droppedAxis: "cuisine", score: 5 },
-      { droppedAxis: "reputation", score: 2 },
+      { droppedAxis: "crowd_approval", score: 2 },
       { droppedAxis: "vibe", score: 4 },
     ]),
   });
@@ -115,7 +115,7 @@ Deno.test("maps a canonical quiz-redesign row to a Q5MemberProfile + ratings", (
   assertEquals(inputs.member.vibe, 3);
   assertEquals(inputs.q5Ratings, [
     { droppedAxis: "cuisine", score: 5 },
-    { droppedAxis: "reputation", score: 2 },
+    { droppedAxis: "crowd_approval", score: 2 },
     { droppedAxis: "vibe", score: 4 },
   ]);
 });
@@ -131,7 +131,7 @@ Deno.test("dispatch is on question_kind â€” slots can be reordered", () => 
     q1: vibeSlot(4),
     q2: regretSlot([
       { droppedAxis: "cuisine", score: 1 },
-      { droppedAxis: "reputation", score: 5 },
+      { droppedAxis: "crowd_approval", score: 5 },
       { droppedAxis: "vibe", score: 5 },
     ]),
     q3: cuisineSlot(["italian"]),
@@ -186,7 +186,7 @@ Deno.test("malformed Q5 rating entries are dropped, valid ones kept", () => {
           { droppedAxis: "cuisine", score: 4 },
           { droppedAxis: "garbage", score: 3 }, // unknown axis dropped
           { droppedAxis: "vibe", score: "x" }, // non-numeric dropped
-          { droppedAxis: "reputation", score: 2 },
+          { droppedAxis: "crowd_approval", score: 2 },
         ],
       },
     },
@@ -194,7 +194,28 @@ Deno.test("malformed Q5 rating entries are dropped, valid ones kept", () => {
   const inputs = mapVotesRowToPreferenceInputs(row);
   assertEquals(inputs.q5Ratings, [
     { droppedAxis: "cuisine", score: 4 },
-    { droppedAxis: "reputation", score: 2 },
+    { droppedAxis: "crowd_approval", score: 2 },
+  ]);
+});
+
+Deno.test("legacy Q5 reputation axis ratings normalize to crowd approval", () => {
+  const row = canonicalRow({
+    q5: {
+      meta: { question_kind: "regret" },
+      answer: {
+        ratings: [
+          { droppedAxis: "cuisine", score: 4 },
+          { droppedAxis: "reputation", score: 2 },
+          { droppedAxis: "vibe", score: 5 },
+        ],
+      },
+    },
+  });
+  const inputs = mapVotesRowToPreferenceInputs(row);
+  assertEquals(inputs.q5Ratings, [
+    { droppedAxis: "cuisine", score: 4 },
+    { droppedAxis: "crowd_approval", score: 2 },
+    { droppedAxis: "vibe", score: 5 },
   ]);
 });
 
@@ -241,7 +262,7 @@ Deno.test(
     const emptyProbeFn = buildPreferenceFunction(inputs.member, inputs.q5Ratings);
     const flatProbeFn = buildPreferenceFunction(inputs.member, [
       { droppedAxis: "cuisine", score: 3 },
-      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "crowd_approval", score: 3 },
       { droppedAxis: "vibe", score: 3 },
     ]);
 

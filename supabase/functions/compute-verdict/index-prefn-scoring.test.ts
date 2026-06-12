@@ -178,7 +178,7 @@ Deno.test("AC1/AC2 — a solo session preference-scored over the full pool write
         vibe: 2,
       }, [
         { droppedAxis: "cuisine", score: 1 },
-        { droppedAxis: "reputation", score: 5 },
+        { droppedAxis: "crowd_approval", score: 5 },
         { droppedAxis: "vibe", score: 5 },
       ]),
     ],
@@ -229,7 +229,7 @@ Deno.test("AC3 — the verdict winner can be a venue shown to no member at Q5", 
         vibe: 2,
       }, [
         { droppedAxis: "cuisine", score: 1 },
-        { droppedAxis: "reputation", score: 5 },
+        { droppedAxis: "crowd_approval", score: 5 },
         { droppedAxis: "vibe", score: 5 },
       ]),
     ],
@@ -285,7 +285,7 @@ Deno.test("AC4 — a 2-member room is preference-scored over the shared union (m
         vibe: 2,
       }, [
         { droppedAxis: "cuisine", score: 1 },
-        { droppedAxis: "reputation", score: 5 },
+        { droppedAxis: "crowd_approval", score: 5 },
         { droppedAxis: "vibe", score: 5 },
       ]),
       prefVote("u2", {
@@ -294,7 +294,7 @@ Deno.test("AC4 — a 2-member room is preference-scored over the shared union (m
         vibe: 2,
       }, [
         { droppedAxis: "cuisine", score: 1 },
-        { droppedAxis: "reputation", score: 5 },
+        { droppedAxis: "crowd_approval", score: 5 },
         { droppedAxis: "vibe", score: 5 },
       ]),
     ],
@@ -350,7 +350,7 @@ Deno.test("AC5 — the verdict does not depend on votes.q5.answer.scores as cand
         vibe: 2,
       }, [
         { droppedAxis: "cuisine", score: 1 },
-        { droppedAxis: "reputation", score: 5 },
+        { droppedAxis: "crowd_approval", score: 5 },
         { droppedAxis: "vibe", score: 5 },
       ]),
     ],

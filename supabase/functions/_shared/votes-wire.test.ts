@@ -11,9 +11,17 @@ import {
 } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import {
   buildVotesSlotsFromLegacyAnswers,
+  normalizeQ5Axis,
+  Q5_AXES,
   QUESTION_KINDS,
   type Q5Rating,
 } from "./votes-wire.ts";
+
+Deno.test("TB-02: active Q5 axes use Google-era crowd approval language", () => {
+  assertEquals(Q5_AXES, ["cuisine", "crowd_approval", "vibe"]);
+  assertEquals(normalizeQ5Axis("reputation"), "crowd_approval");
+  assertEquals(normalizeQ5Axis("garbage"), null);
+});
 
 Deno.test("buildVotesSlotsFromLegacyAnswers wraps the five typed answers in slots", () => {
   const slots = buildVotesSlotsFromLegacyAnswers({
@@ -24,7 +32,7 @@ Deno.test("buildVotesSlotsFromLegacyAnswers wraps the five typed answers in slot
     q4_vibe: 1,
     q5_ratings: [
       { droppedAxis: "cuisine", score: 4 },
-      { droppedAxis: "reputation", score: 2 },
+      { droppedAxis: "crowd_approval", score: 2 },
       { droppedAxis: "vibe", score: 5 },
     ],
   });
@@ -43,7 +51,7 @@ Deno.test("buildVotesSlotsFromLegacyAnswers wraps the five typed answers in slot
 Deno.test("the Q5 regret slot emits answer.ratings, never a per-venue scores map", () => {
   const ratings: Q5Rating[] = [
     { droppedAxis: "cuisine", score: 5 },
-    { droppedAxis: "reputation", score: 1 },
+    { droppedAxis: "crowd_approval", score: 1 },
     { droppedAxis: "vibe", score: 4 },
   ];
   const slots = buildVotesSlotsFromLegacyAnswers({

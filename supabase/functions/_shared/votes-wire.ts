@@ -37,9 +37,21 @@
 // from this module so the engine has one canonical definition while
 // `votes-wire.ts` stays a relative-import-free leaf (ADR 0014).
 
-/** The three preference axes the Q5 factorial probes. Mirrors the Swift
- *  `Q5FactorialCard.Axis` enum. */
-export type Axis = "cuisine" | "reputation" | "vibe";
+/** The three active preference axes the Q5 factorial probes. */
+export type Axis = "cuisine" | "crowd_approval" | "vibe";
+
+export type LegacyAxis = Axis | "reputation";
+
+export const Q5_AXES: readonly Axis[] = [
+  "cuisine",
+  "crowd_approval",
+  "vibe",
+] as const;
+
+export function normalizeQ5Axis(axis: unknown): Axis | null {
+  if (axis === "reputation") return "crowd_approval";
+  return Q5_AXES.includes(axis as Axis) ? axis as Axis : null;
+}
 
 /** One Q5 factorial card's excitement rating, tagged with the axis that
  *  card deviates on. The Q5 factorial emits exactly three cards â€” one
