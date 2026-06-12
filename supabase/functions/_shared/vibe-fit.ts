@@ -44,6 +44,29 @@ export interface VibeFitSignal {
   receiptCodes: VibeReceiptCode[];
 }
 
+interface SourceTextChunk {
+  text: string;
+  sourcePriority: number;
+  sourceIndex: number;
+  chunkIndex: number;
+}
+
+interface SortableVibeEvidenceSpan extends VibeEvidenceSpan {
+  sourceIndex: number;
+  chunkIndex: number;
+}
+
+interface SimpleNegation {
+  pattern: RegExp;
+  negatedBandId: VibeBandId;
+  oppositeBandId: VibeBandId;
+}
+
+interface SpanVector {
+  span: VibeEvidenceSpan;
+  vector: Record<VibeBandId, number>;
+}
+
 export const VIBE_FIT_CONFIG = Object.freeze({
   anchorVersion: "vibe-anchors-v1",
   spanAssemblerVersion: "vibe-span-assembler-v1",
@@ -144,6 +167,8 @@ const VIBE_TERMS: Record<VibeBandId, readonly string[]> = {
   ],
 };
 
+const VIBE_BAND_IDS = Object.keys(VIBE_TERMS) as VibeBandId[];
+
 const AMBIGUOUS_SCOPE_TERMS = [
   "not exactly",
   "if you enjoy",
@@ -155,11 +180,10 @@ const AMBIGUOUS_SCOPE_TERMS = [
   '"',
 ];
 
-const SIMPLE_NEGATIONS: Array<{
-  pattern: RegExp;
-  negatedBandId: VibeBandId;
-  oppositeBandId: VibeBandId;
-}> = [
+const MEAL_TIME_PATTERN =
+  /\b(brunch|breakfast|lunch|dinner|late night|after 10pm)\b/i;
+
+const SIMPLE_NEGATIONS: SimpleNegation[] = [
   {
     pattern: /\bnot\s+(?:too\s+)?loud\b/i,
     negatedBandId: "rowdy",
@@ -192,9 +216,7 @@ export function extractVibeEvidenceSpans(
     .map((span) => buildEvidenceSpan(span, candidate.mealTimeContext))
     .filter((
       span,
-    ): span is VibeEvidenceSpan & { sourceIndex: number; chunkIndex: number } =>
-      span !== null
-    )
+    ): span is SortableVibeEvidenceSpan => span !== null)
     .sort((a, b) =>
       a.sourcePriority - b.sourcePriority ||
       a.sourceIndex - b.sourceIndex ||
@@ -227,19 +249,20 @@ export function scoreVibeFitCandidate(
     };
   }
 
-  const spanVectors = spans.map((span) => ({
+  const spanVectors: SpanVector[] = spans.map((span) => ({
     span,
     vector: fakeEmbeddingForSpan(span),
   }));
   const bandScores = centroidBandScores(spanVectors);
-  const scoreTotal = Object.values(bandScores).reduce(
-    (sum, score) => sum + score,
+  const scoreTotal = VIBE_BAND_IDS.reduce(
+    (sum, bandId) => sum + bandScores[bandId],
     0,
   );
+  const weightedPositionTotal = VIBE_BAND_IDS.reduce((sum, bandId) => {
+    return sum + (BAND_POSITIONS.get(bandId) ?? 3) * bandScores[bandId];
+  }, 0);
   const vibePosition = scoreTotal === 0 ? null : clamp(
-    Object.entries(bandScores).reduce((sum, [bandId, score]) => {
-      return sum + (BAND_POSITIONS.get(bandId as VibeBandId) ?? 3) * score;
-    }, 0) / scoreTotal,
+    weightedPositionTotal / scoreTotal,
     1,
     5,
   );
@@ -291,20 +314,11 @@ function splitSourceText(text: string): string[] {
 }
 
 function buildEvidenceSpan(
-  span: {
-    text: string;
-    sourcePriority: number;
-    sourceIndex: number;
-    chunkIndex: number;
-  },
+  span: SourceTextChunk,
   mealTimeContext?: string,
-):
-  | (VibeEvidenceSpan & { sourceIndex: number; chunkIndex: number })
-  | null {
+): SortableVibeEvidenceSpan | null {
   const lower = span.text.toLowerCase();
-  const negation = SIMPLE_NEGATIONS.find((entry) =>
-    entry.pattern.test(span.text)
-  );
+  const negation = findSimpleNegation(span.text);
   const matchedBands = matchedVibeBands(lower);
   if (!negation && matchedBands.length === 0) {
     return null;
@@ -324,19 +338,14 @@ function buildEvidenceSpan(
     sourceIndex: span.sourceIndex,
     chunkIndex: span.chunkIndex,
     signalStrength,
-    mealTimeRelevant: mealTimeContext
-      ? lower.includes(mealTimeContext.toLowerCase()) ||
-        /\b(brunch|breakfast|lunch|dinner|late night|after 10pm)\b/i.test(
-          span.text,
-        )
-      : false,
+    mealTimeRelevant: hasMealTimeSignal(span.text, lower, mealTimeContext),
     negatedBandId: negation?.negatedBandId,
     ambiguous: AMBIGUOUS_SCOPE_TERMS.some((term) => lower.includes(term)),
   };
 }
 
 function matchedVibeBands(text: string): VibeBandId[] {
-  return (Object.keys(VIBE_TERMS) as VibeBandId[]).filter((bandId) =>
+  return VIBE_BAND_IDS.filter((bandId) =>
     VIBE_TERMS[bandId].some((term) => containsTerm(text, term))
   );
 }
@@ -346,15 +355,13 @@ function fakeEmbeddingForSpan(
 ): Record<VibeBandId, number> {
   const lower = span.text.toLowerCase();
   const vector = zeroVector();
-  const negation = SIMPLE_NEGATIONS.find((entry) =>
-    entry.pattern.test(span.text)
-  );
+  const negation = findSimpleNegation(span.text);
 
   if (negation) {
     vector[negation.oppositeBandId] += 1.2;
   }
 
-  for (const bandId of Object.keys(VIBE_TERMS) as VibeBandId[]) {
+  for (const bandId of VIBE_BAND_IDS) {
     for (const term of VIBE_TERMS[bandId]) {
       if (containsTerm(lower, term)) {
         vector[bandId] += 1;
@@ -362,7 +369,7 @@ function fakeEmbeddingForSpan(
     }
   }
 
-  for (const bandId of Object.keys(vector) as VibeBandId[]) {
+  for (const bandId of VIBE_BAND_IDS) {
     vector[bandId] *= span.mealTimeRelevant ? 1.15 : 1;
   }
 
@@ -370,22 +377,18 @@ function fakeEmbeddingForSpan(
 }
 
 function centroidBandScores(
-  spanVectors: Array<
-    { span: VibeEvidenceSpan; vector: Record<VibeBandId, number> }
-  >,
+  spanVectors: SpanVector[],
 ): Record<VibeBandId, number> {
   const scores = zeroVector();
   for (const { span, vector } of spanVectors) {
-    for (const bandId of Object.keys(scores) as VibeBandId[]) {
+    for (const bandId of VIBE_BAND_IDS) {
       scores[bandId] += vector[bandId] * Math.max(1, span.signalStrength);
     }
   }
   return scores;
 }
 
-function hasConflict(
-  spanVectors: Array<{ vector: Record<VibeBandId, number> }>,
-): boolean {
+function hasConflict(spanVectors: SpanVector[]): boolean {
   const strongestPositions = spanVectors
     .map(({ vector }) => strongestBandPosition(vector))
     .filter((position): position is number => position !== null);
@@ -399,7 +402,7 @@ function strongestBandPosition(
 ): number | null {
   let bestBand: VibeBandId | null = null;
   let bestScore = 0;
-  for (const bandId of Object.keys(vector) as VibeBandId[]) {
+  for (const bandId of VIBE_BAND_IDS) {
     if (vector[bandId] > bestScore) {
       bestBand = bandId;
       bestScore = vector[bandId];
@@ -416,6 +419,21 @@ function anchorClarity(scores: Record<VibeBandId, number>): number {
 
 function termHits(text: string, terms: readonly string[]): number {
   return terms.filter((term) => containsTerm(text, term)).length;
+}
+
+function findSimpleNegation(text: string): SimpleNegation | undefined {
+  return SIMPLE_NEGATIONS.find((entry) => entry.pattern.test(text));
+}
+
+function hasMealTimeSignal(
+  text: string,
+  lowerText: string,
+  mealTimeContext?: string,
+): boolean {
+  if (!mealTimeContext) return false;
+
+  return lowerText.includes(mealTimeContext.toLowerCase()) ||
+    MEAL_TIME_PATTERN.test(text);
 }
 
 function containsTerm(text: string, term: string): boolean {
