@@ -24,7 +24,10 @@
 // factorial-usable pool the result is an EMPTY candidate list with the
 // `no-results` source. The web quiz never renders a fictitious venue.
 
-import type { Q5Rating } from "../../supabase/functions/_shared/votes-wire";
+import type {
+  Axis,
+  Q5Rating,
+} from "../../supabase/functions/_shared/votes-wire";
 
 // -----------------------------------------------------------------------
 // Wire types — the slice of `places-proxy`'s `ShapedPlace` this path
@@ -73,11 +76,10 @@ export interface PlacesProxyRequest {
 }
 
 // -----------------------------------------------------------------------
-// Q5 factorial axis types — mirror legacy Swift `Q5FactorialCard.Axis` etc.
+// Q5 factorial axis types — use the shared wire tokens.
 // -----------------------------------------------------------------------
 
-export type Axis = "cuisine" | "reputation" | "vibe";
-const ALL_AXES: readonly Axis[] = ["cuisine", "reputation", "vibe"];
+const ALL_AXES: readonly Axis[] = ["cuisine", "crowd_approval", "vibe"];
 
 /** A venue's position on the three Q5 axes. */
 export interface VenueProfile {
@@ -514,7 +516,7 @@ export function generateFactorialCards(
 
   return [
     toCandidate(cuisineDrop, "cuisine"),
-    toCandidate(reputationDrop, "reputation"),
+    toCandidate(reputationDrop, "crowd_approval"),
     toCandidate(vibeDrop, "vibe"),
   ];
 }

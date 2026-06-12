@@ -20,7 +20,7 @@ import {
 
 const FACTORIAL_CARDS: QuizCandidate[] = [
   { id: "v-cuisine", name: "Pico's Taqueria", meta: "Mexican · $$ · 8 min", droppedAxis: "cuisine" },
-  { id: "v-reputation", name: "Ren Soba House", meta: "Japanese · $$ · 12 min", droppedAxis: "reputation" },
+  { id: "v-reputation", name: "Ren Soba House", meta: "Japanese · $$ · 12 min", droppedAxis: "crowd_approval" },
   { id: "v-vibe", name: "Bar Pastoral", meta: "Italian · $$ · 5 min", droppedAxis: "vibe" },
 ];
 

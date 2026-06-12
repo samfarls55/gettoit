@@ -196,8 +196,8 @@ describe("generateFactorialCards", () => {
     const cards = generateFactorialCards(member, wellStockedPool());
     expect(cards).not.toBeNull();
     expect(cards!.map((c) => c.droppedAxis).sort()).toEqual([
+      "crowd_approval",
       "cuisine",
-      "reputation",
       "vibe",
     ]);
   });
@@ -322,13 +322,18 @@ describe("buildQ5Ratings", () => {
   it("joins venue-keyed ratings to each card's droppedAxis", () => {
     const cards = [
       { id: "a", name: "A", meta: "", droppedAxis: "cuisine" as const },
-      { id: "b", name: "B", meta: "", droppedAxis: "reputation" as const },
+      {
+        id: "b",
+        name: "B",
+        meta: "",
+        droppedAxis: "crowd_approval" as const,
+      },
       { id: "c", name: "C", meta: "", droppedAxis: "vibe" as const },
     ];
     const ratings = buildQ5Ratings(cards, { a: 5, b: 2, c: 4 });
     expect(ratings).toEqual([
       { droppedAxis: "cuisine", score: 5 },
-      { droppedAxis: "reputation", score: 2 },
+      { droppedAxis: "crowd_approval", score: 2 },
       { droppedAxis: "vibe", score: 4 },
     ]);
   });

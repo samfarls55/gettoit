@@ -33,7 +33,7 @@ describe("web-invitee vote round → compute-verdict-readable row", () => {
       vibe: 3,
       q5Ratings: [
         { droppedAxis: "cuisine", score: 5 },
-        { droppedAxis: "reputation", score: 2 },
+        { droppedAxis: "crowd_approval", score: 2 },
         { droppedAxis: "vibe", score: 4 },
       ],
     });
@@ -66,7 +66,7 @@ describe("web-invitee vote round → compute-verdict-readable row", () => {
     expect(row.q5.meta.question_kind).toBe("regret");
     expect(row.q5.answer.ratings).toEqual([
       { droppedAxis: "cuisine", score: 5 },
-      { droppedAxis: "reputation", score: 2 },
+      { droppedAxis: "crowd_approval", score: 2 },
       { droppedAxis: "vibe", score: 4 },
     ]);
   });
@@ -75,7 +75,7 @@ describe("web-invitee vote round → compute-verdict-readable row", () => {
     // The three strict-factorial cards the per-member fetch produced.
     const cards: QuizCandidate[] = [
       { id: "fsq-a", name: "A", meta: "", droppedAxis: "cuisine" },
-      { id: "fsq-b", name: "B", meta: "", droppedAxis: "reputation" },
+      { id: "fsq-b", name: "B", meta: "", droppedAxis: "crowd_approval" },
       { id: "fsq-c", name: "C", meta: "", droppedAxis: "vibe" },
     ];
     // The member rated each card (venue-keyed in the UI).
@@ -97,7 +97,7 @@ describe("web-invitee vote round → compute-verdict-readable row", () => {
     // the shape `readQ5Ratings` consumes to build the prefFn re-weight.
     expect(row.q5.answer.ratings).toEqual([
       { droppedAxis: "cuisine", score: 4 },
-      { droppedAxis: "reputation", score: 1 },
+      { droppedAxis: "crowd_approval", score: 1 },
       { droppedAxis: "vibe", score: 5 },
     ]);
   });

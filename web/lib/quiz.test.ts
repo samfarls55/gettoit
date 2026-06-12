@@ -107,7 +107,7 @@ describe("buildVoteRow", () => {
       vibe: 3,
       q5Ratings: [
         { droppedAxis: "cuisine", score: 5 },
-        { droppedAxis: "reputation", score: 2 },
+        { droppedAxis: "crowd_approval", score: 2 },
         { droppedAxis: "vibe", score: 4 },
       ],
     });

@@ -44,7 +44,7 @@ describe("mixed-platform room — web + mobile vote wire", () => {
     vibe: 3, // wanted lively
     q5Ratings: [
       { droppedAxis: "cuisine", score: 5 },
-      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "crowd_approval", score: 3 },
       { droppedAxis: "vibe", score: 3 },
     ],
   });
@@ -64,7 +64,7 @@ describe("mixed-platform room — web + mobile vote wire", () => {
     expect(webVoteRow.q5.meta.question_kind).toBe("regret");
     expect(webVoteRow.q5.answer.ratings).toEqual([
       { droppedAxis: "cuisine", score: 5 },
-      { droppedAxis: "reputation", score: 3 },
+      { droppedAxis: "crowd_approval", score: 3 },
       { droppedAxis: "vibe", score: 3 },
     ]);
   });
