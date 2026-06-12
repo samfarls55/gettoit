@@ -36,6 +36,9 @@ export const searchAreaRadiusStopsMiles = [
   0.25, 0.5, 1, 1.5, 2, 3.5, 5, 7.5, 10,
 ] as const;
 
+const metersPerMile = 1609.344;
+const milesPerLatitudeDegree = 69;
+
 export const defaultSearchArea: SearchArea = {
   center: {
     latitude: 37.7749,
@@ -60,6 +63,32 @@ export function clampRadiusMiles(radiusMiles: number): number {
   const max = searchAreaRadiusStopsMiles[searchAreaRadiusStopsMiles.length - 1];
 
   return Math.min(max, Math.max(min, radiusMiles));
+}
+
+export function milesToMeters(miles: number): number {
+  return miles * metersPerMile;
+}
+
+export function radiusMilesFromCameraDeltas(
+  latitudeDelta: number,
+  longitudeDelta: number,
+  latitude: number,
+): number {
+  const latitudeMiles = Math.abs(latitudeDelta) * milesPerLatitudeDegree;
+  const longitudeMiles =
+    Math.abs(longitudeDelta) *
+    milesPerLatitudeDegree *
+    Math.max(Math.cos((latitude * Math.PI) / 180), 0.01);
+  const nearestEdgeMiles = Math.min(latitudeMiles, longitudeMiles) / 2;
+
+  return clampRadiusMiles(nearestEdgeMiles);
+}
+
+export function zoomForRadiusMiles(radiusMiles: number): number {
+  const clampedRadiusMiles = clampRadiusMiles(radiusMiles);
+  const latitudeDelta = Math.max((clampedRadiusMiles * 2) / milesPerLatitudeDegree, 0.001);
+
+  return Math.min(18, Math.max(4, Math.log2(360 / latitudeDelta)));
 }
 
 function nearestRadiusStopIndex(radiusMiles: number): number {

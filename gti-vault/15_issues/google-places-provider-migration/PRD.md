@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: done
 github_issue: 344
 ---
 

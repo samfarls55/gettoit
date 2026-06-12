@@ -1,5 +1,5 @@
 ﻿---
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 335
 ---

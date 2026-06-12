@@ -12,7 +12,14 @@
     ],
     "plugins": [
       "expo-apple-authentication",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "So we can line up restaurants close enough to walk to, instead of asking your neighborhood every time."
+        }
+      ],
+      "expo-maps"
     ],
     "ios": {
       "bundleIdentifier": "app.gettoit.GetToIt",

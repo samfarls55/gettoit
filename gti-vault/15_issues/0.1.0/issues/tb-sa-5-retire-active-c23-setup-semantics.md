@@ -1,7 +1,7 @@
 ---
 issue: tb-SA-5
 title: Retire active C-23 Setup semantics
-status: ready-for-agent
+status: done
 type: AFK
 feature: 0.1.0
 artifact: tracer-bullet

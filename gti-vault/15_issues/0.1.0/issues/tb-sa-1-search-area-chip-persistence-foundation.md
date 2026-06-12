@@ -1,7 +1,7 @@
 ---
 issue: tb-SA-1
 title: Search area chip + persistence foundation
-status: ready-for-agent
+status: done
 type: AFK
 feature: 0.1.0
 artifact: tracer-bullet

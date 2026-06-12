@@ -1,5 +1,5 @@
 ---
-status: implemented
+status: done
 type: AFK
 github_issue: 334
 ---

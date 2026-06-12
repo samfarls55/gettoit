@@ -1,7 +1,7 @@
 ---
 issue: tb-SA-2
 title: Map viewport selection editor
-status: ready-for-agent
+status: done
 type: AFK
 feature: 0.1.0
 artifact: tracer-bullet
@@ -45,3 +45,11 @@ Map changes update draft state only. `USE THIS AREA` commits draft state back to
 ## Blocked by
 
 - [[tb-sa-1-search-area-chip-persistence-foundation|tb-SA-1 - Search area chip + persistence foundation]] (GH [#318](https://github.com/samfarls55/gettoit/issues/318))
+
+## 2026-06-12 diagnosis note
+
+- The broken selector was still using the mock preview surface and deterministic adapter, so it had no native MapKit layer, no foreground location permission path, and no real geocoding/current-location source.
+- Adding `expo-maps` directly to shared picker code white-screened the Expo web bundle because Metro tried to resolve native `expo-maps` internals on web. The fix splits the map view into platform files: iOS imports `expo-maps`; other platforms render a harmless fallback.
+- Implementation now uses Apple MapKit on iOS, `expo-location` for current location and typed-place geocoding, viewport-derived radius math, selected-radius circle rendering, and programmatic camera sync for radius/current-location/place jumps.
+- `expo-maps` does not provide Local Search / POI density lookup in this surface. Density pins remain adapter-driven and the native adapter returns `[]` until tb-SA-4 adds a native Local Search source.
+- Verification: `npm run mobile:verify` passed locally. Playwright reproduced the blank web screen before the platform split and confirmed the app no longer white-screens after it. This Windows environment cannot run an iOS Simulator, so real Apple MapKit tile rendering still needs iOS device/simulator verification.

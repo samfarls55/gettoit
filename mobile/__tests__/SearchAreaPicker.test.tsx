@@ -11,7 +11,9 @@ import {
   createSearchAreaDraft,
   isSearchAreaDraftDirty,
   radiusLabel,
+  radiusMilesFromCameraDeltas,
   searchAreaDraftReducer,
+  zoomForRadiusMiles,
 } from "../src/searchArea/searchArea";
 
 const center: SearchAreaCoordinate = {
@@ -82,6 +84,12 @@ describe("Search area state", () => {
     expect(steppedDown.radiusMiles).toBe(2);
     expect(tooWide.radiusMiles).toBe(10);
   });
+
+  it("derives Search area radius from nearest visible map edge", () => {
+    expect(radiusMilesFromCameraDeltas(0.1, 0.1, 0)).toBeCloseTo(3.45);
+    expect(radiusMilesFromCameraDeltas(2, 2, 40)).toBe(10);
+    expect(zoomForRadiusMiles(2)).toBeGreaterThan(12);
+  });
 });
 
 describe("SearchAreaPickerPreview", () => {
@@ -115,8 +123,8 @@ describe("SearchAreaPickerPreview", () => {
 
     await waitFor(() => expect(adapter.searchPlace).toHaveBeenCalledWith("Brooklyn"));
     await waitFor(() => expect(screen.getByText("Brooklyn")).toBeOnTheScreen());
-    expect(adapter.fetchDensityPreviewPins).toHaveBeenCalled();
-    expect(screen.getByText("Preview pins: 2")).toBeOnTheScreen();
+    await waitFor(() => expect(adapter.fetchDensityPreviewPins).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText("Preview pins: 2")).toBeOnTheScreen());
 
     fireEvent.press(screen.getByText("USE THIS AREA"));
 
