@@ -45,6 +45,14 @@ As of June 10, 2026, TestFlight build numbers are owned by EAS remote versioning
 
 Reason: local build numbers repeatedly drifted behind App Store Connect. A committed `buildNumber` of `1004` produced CI builds that auto-incremented only inside the runner to `1005`, colliding with an already-uploaded TestFlight build. EAS remote versioning makes the EAS server the durable counter so repeated CI dispatches keep incrementing.
 
+## Build 1012 native map hotfix
+
+On June 12, 2026, App Store Connect accepted build `1012` but sent ITMS-90863 for Apple silicon Mac support, listing missing `ExpoModulesCore` Swift symbols. Build `1012` was built from `c13d8d1` and was the first submitted build after `6e160f4`, which introduced `expo-maps`.
+
+Working diagnosis: `expo-maps` added an Apple native SwiftUI/MapKit module that depends on `ExpoModulesCore`, correlating with both the Apple silicon Mac symbol warning and the reported mobile launch crash. The EAS production environment for build `1012` did include `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY`, so the launch crash was not explained by missing Supabase public env vars.
+
+Hotfix direction: remove `expo-maps` from the production binary, keep the existing non-native search-area preview, keep `expo-location` geocoding/current-location support, and update Expo SDK 56 patch dependencies so `expo-doctor` and `expo install --check` pass before uploading the next binary.
+
 ## Manual fallback commands
 
 Run from `mobile/`:

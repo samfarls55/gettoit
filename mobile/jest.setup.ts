@@ -23,26 +23,3 @@ jest.mock("expo-location", () => ({
   requestForegroundPermissionsAsync: jest.fn(),
   reverseGeocodeAsync: jest.fn(),
 }));
-
-jest.mock("expo-maps", () => {
-  const React = require("react");
-  const { View } = require("react-native");
-
-  return {
-    AppleMaps: {
-      MapType: {
-        STANDARD: "STANDARD",
-      },
-      View: React.forwardRef((props: Record<string, unknown>, ref: unknown) => {
-        React.useImperativeHandle(ref, () => ({
-          setCameraPosition: jest.fn(),
-        }));
-
-        return React.createElement(View, {
-          ...props,
-          testID: "apple-mapkit-view",
-        });
-      }),
-    },
-  };
-});
