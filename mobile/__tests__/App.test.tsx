@@ -21,7 +21,10 @@ import type {
   PlanRepository,
 } from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
-import { nativeVerdictRepository } from "../src/native/nativeRuntime";
+import {
+  nativeQ5CandidateRepository,
+  nativeVerdictRepository,
+} from "../src/native/nativeRuntime";
 import type {
   QuizProgress,
   QuizProgressRepository,
@@ -258,6 +261,16 @@ function makeVerdictRepository(
 }
 
 describe("App", () => {
+  beforeEach(() => {
+    jest
+      .spyOn(nativeQ5CandidateRepository, "loadCandidates")
+      .mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it.each<AppStateRouterState["auth"]>(["idle", "anonymous"])(
     "routes %s auth launches to the sign-in gate",
     (auth) => {
@@ -880,6 +893,15 @@ describe("App", () => {
         },
       });
       expect(screen.getByText("Q5")).toBeOnTheScreen();
+      expect(nativeQ5CandidateRepository.loadCandidates).toHaveBeenCalledWith({
+        roomId: "joined-morgan-birthday",
+        answers: {
+          q1CuisineCravings: ["italian", "mexican"],
+          q2SpendCap: "$$",
+          q3Reputation: "hiddenGem",
+          q4VibeEnergy: "social",
+        },
+      });
     });
 
     fireEvent.press(screen.getByText("Leave"));

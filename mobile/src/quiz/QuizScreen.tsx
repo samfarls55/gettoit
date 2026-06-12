@@ -3,7 +3,6 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
 import type { Q5CandidateRepository } from "./q5CandidateRepository";
-import { fakeQ5CandidateRepository } from "./q5CandidateRepository";
 import {
   generateQ5FactorialCards,
   q5CardsToCandidates,
@@ -23,7 +22,7 @@ import {
 
 type QuizScreenProps = {
   progressRepository: QuizProgressRepository;
-  q5CandidateRepository?: Q5CandidateRepository;
+  q5CandidateRepository: Q5CandidateRepository;
   role: "initiator" | "joiner";
   roomId: string;
   onExited: () => void;
@@ -199,7 +198,7 @@ function nextMultiSelectValues(
 
 export function QuizScreen({
   progressRepository,
-  q5CandidateRepository = fakeQ5CandidateRepository,
+  q5CandidateRepository,
   role,
   roomId,
   onExited,

@@ -25,6 +25,7 @@ import {
   nativeAuthBoundary,
   nativeInviteBoundary,
   nativeLinkBoundary as runtimeNativeLinkBoundary,
+  nativeQ5CandidateRepository,
   nativeVerdictRepository,
 } from "./src/native/nativeRuntime";
 import {
@@ -48,7 +49,6 @@ import { PlanListScreen } from "./src/plans/PlanListScreen";
 import { SetupScreen } from "./src/plans/SetupScreen";
 import { QuizScreen } from "./src/quiz/QuizScreen";
 import type { Q5CandidateRepository } from "./src/quiz/q5CandidateRepository";
-import { fakeQ5CandidateRepository } from "./src/quiz/q5CandidateRepository";
 import type { QuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import { fakeQuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import type { QuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
@@ -363,7 +363,7 @@ export default function App({
   },
   nativeLinkBoundary = runtimeNativeLinkBoundary,
   planRepository = fakePlanRepository,
-  q5CandidateRepository = fakeQ5CandidateRepository,
+  q5CandidateRepository = nativeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
   quizSubmissionRepository = fakeQuizSubmissionRepository,
   verdictRepository = nativeVerdictRepository,
@@ -559,7 +559,7 @@ export function MobileAppShell({
   onVerdictReady,
   planRepository = fakePlanRepository,
   planListNotice = null,
-  q5CandidateRepository = fakeQ5CandidateRepository,
+  q5CandidateRepository = nativeQ5CandidateRepository,
   quizProgressRepository = fakeQuizProgressRepository,
   quizSubmissionRepository = fakeQuizSubmissionRepository,
   routerState,

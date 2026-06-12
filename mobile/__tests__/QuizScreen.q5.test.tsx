@@ -31,26 +31,26 @@ function makeCandidateRepository(
 
 const candidatePool = [
   {
-    id: "fsq-thai",
-    name: "Thai Orchid",
-    categories: ["Thai"],
+    id: "google-katzs-delicatessen",
+    name: "Katz's Delicatessen",
+    categories: ["Deli"],
     priceTier: 2,
     walkMinutesEstimate: 6,
-    profile: { cuisine: "thai", reputation: "popular", vibe: 2 },
+    profile: { cuisine: "american", reputation: "popular", vibe: 2 },
   },
   {
-    id: "fsq-casa",
-    name: "Casa Lupita",
+    id: "google-los-tacos-no-1",
+    name: "Los Tacos No. 1",
     categories: ["Mexican"],
-    priceTier: 1,
+    priceTier: 2,
     walkMinutesEstimate: 9,
     profile: { cuisine: "mexican", reputation: "hiddenGem", vibe: 2 },
   },
   {
-    id: "fsq-farol",
-    name: "El Farol",
+    id: "google-cosme",
+    name: "Cosme",
     categories: ["Mexican"],
-    priceTier: 3,
+    priceTier: 4,
     walkMinutesEstimate: 4,
     profile: { cuisine: "mexican", reputation: "popular", vibe: 4 },
   },
@@ -66,6 +66,7 @@ describe("QuizScreen Q1", () => {
           saveProgress: jest.fn(async () => undefined),
           exitPlan: jest.fn(async () => undefined),
         }}
+        q5CandidateRepository={makeCandidateRepository([])}
         role="initiator"
         roomId="room-q1"
       />,
@@ -133,10 +134,9 @@ describe("QuizScreen Q5", () => {
       expect(screen.getByText("How excited does each of these make you?")).toBeOnTheScreen();
     });
 
-    expect(screen.getByText("Thai Orchid")).toBeOnTheScreen();
-    expect(screen.getByText("THAI - $$ - 6 MIN")).toBeOnTheScreen();
-    expect(screen.queryByText("dummy-placeholder")).toBeNull();
-    expect(screen.getByLabelText("Rate 5 for Thai Orchid")).toBeOnTheScreen();
+    expect(screen.getByText("Katz's Delicatessen")).toBeOnTheScreen();
+    expect(screen.getByText("DELI - $$ - 6 MIN")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Rate 5 for Katz's Delicatessen")).toBeOnTheScreen();
   });
 
   it("renders Q5 no-results when candidates cannot produce usable cards", async () => {
@@ -191,10 +191,10 @@ describe("QuizScreen Q5", () => {
     fireEvent.press(screen.getByText("Save vibe"));
 
     await waitFor(() => {
-      expect(screen.getByText("Thai Orchid")).toBeOnTheScreen();
+      expect(screen.getByText("Katz's Delicatessen")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Rate 5 for Thai Orchid"));
+    fireEvent.press(screen.getByLabelText("Rate 5 for Katz's Delicatessen"));
     fireEvent.press(screen.getByText("Drop the verdict"));
 
     await waitFor(() => {
@@ -206,9 +206,9 @@ describe("QuizScreen Q5", () => {
           q3Reputation: "popular",
           q4VibeEnergy: "social",
           q5Ratings: {
-            "fsq-thai": 5,
-            "fsq-casa": 3,
-            "fsq-farol": 3,
+            "google-katzs-delicatessen": 5,
+            "google-los-tacos-no-1": 3,
+            "google-cosme": 3,
           },
         },
       });
@@ -223,29 +223,29 @@ describe("QuizScreen Q5", () => {
         progressRepository={makeProgressRepository()}
         q5CandidateRepository={makeCandidateRepository([
           {
-            id: "google-thai",
-            name: "Thai Orchid",
+            id: "google-katzs-delicatessen",
+            name: "Katz's Delicatessen",
             categories: [],
             attributionText: "Powered by Google",
             priceTier: 2,
             walkMinutesEstimate: 6,
-            profile: { cuisine: "thai", reputation: "popular", vibe: 2 },
+            profile: { cuisine: "american", reputation: "popular", vibe: 2 },
           },
           {
-            id: "google-casa",
-            name: "Casa Lupita",
+            id: "google-los-tacos-no-1",
+            name: "Los Tacos No. 1",
             categories: [],
             attributionText: "Powered by Google",
-            priceTier: 1,
+            priceTier: 2,
             walkMinutesEstimate: 9,
             profile: { cuisine: "mexican", reputation: "hiddenGem", vibe: 2 },
           },
           {
-            id: "google-farol",
-            name: "El Farol",
+            id: "google-cosme",
+            name: "Cosme",
             categories: [],
             attributionText: "Powered by Google",
-            priceTier: 3,
+            priceTier: 4,
             walkMinutesEstimate: 4,
             profile: { cuisine: "mexican", reputation: "popular", vibe: 4 },
           },
@@ -263,7 +263,7 @@ describe("QuizScreen Q5", () => {
     fireEvent.press(screen.getByText("Save vibe"));
 
     await waitFor(() => {
-      expect(screen.getByText("Thai Orchid")).toBeOnTheScreen();
+      expect(screen.getByText("Katz's Delicatessen")).toBeOnTheScreen();
     });
 
     expect(screen.getByText("Powered by Google")).toBeOnTheScreen();

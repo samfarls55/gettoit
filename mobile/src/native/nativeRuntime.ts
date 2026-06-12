@@ -8,6 +8,11 @@ import {
 } from "../auth/authRepository";
 import { createGroupInviteUrl } from "../invites/inviteLinks";
 import {
+  createSupabaseQ5CandidateRepository,
+  type Q5CandidateRepository,
+  type Q5SupabaseClient,
+} from "../quiz/q5CandidateRepository";
+import {
   createSupabaseVerdictRepository,
   type VerdictRepository,
   type VerdictSupabaseClient,
@@ -63,6 +68,12 @@ function createRuntimeVerdictRepository() {
   });
 }
 
+function createRuntimeQ5CandidateRepository() {
+  return createSupabaseQ5CandidateRepository({
+    supabase: createMobileSupabaseClient() as Q5SupabaseClient,
+  });
+}
+
 export const nativeAuthBoundary = {
   restoreSession: async () => createRuntimeAuthRepository().restoreSession(),
   deleteCurrentAccount: async () =>
@@ -86,6 +97,11 @@ export const nativeInviteBoundary = {
   shareInviteLink: async (url: string) => {
     await Share.share({ url, message: url });
   },
+};
+
+export const nativeQ5CandidateRepository: Q5CandidateRepository = {
+  loadCandidates: async (input) =>
+    createRuntimeQ5CandidateRepository().loadCandidates(input),
 };
 
 export const nativeVerdictRepository: VerdictRepository = {
