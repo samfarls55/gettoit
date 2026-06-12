@@ -234,7 +234,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
             const review = await sandbox.run({
               name: "reviewer",
               maxIterations: 1,
-              agent: codexAgent("gpt-5.5", { effort: "high" }),
+              agent: codexAgent("gpt-5.5", { effort: "xhigh" }),
               promptFile: "./.sandcastle/review-prompt.md",
               promptArgs: {
                 BRANCH: issue.branch,

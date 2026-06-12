@@ -20,6 +20,8 @@ See `docs/agents/issue-tracker.md` and `docs/agents/triage-labels.md` for the fu
 
 ## Cycles
 
+- [[vibe-embeddings-scoring/_index|vibe-embeddings-scoring]] - Transient backend embeddings for Vibe fit signal generation, governed by [[../60_engineering/adr/0023-transient-vibe-embeddings-in-scoring|ADR 0023]] and ADR 0022's Google Places retention boundary.
+
 - [[google-places-provider-migration/_index|google-places-provider-migration]] - Google Places API replacement for Foursquare / MapKit provider behavior, governed by [[../60_engineering/adr/0022-google-places-primary-provider|ADR 0022]].
 
 - [[expo-mobile-rewrite/_index|expo-mobile-rewrite]] - full pre-launch migration of the mobile iOS client to Expo managed React Native + TypeScript.

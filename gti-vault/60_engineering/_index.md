@@ -29,6 +29,7 @@ Architecture, conventions, runbooks, ADRs.
 - [[ratification-push-hardclose|ratification-push-hardclose.md]] â€” TB-08's "I'm in" ratification, push permission prompt (once per session), correctability window + S06 hard-close shutter motion, APNsSender Edge Function with ES256 JWT signing.
 - [[checkin-telemetry|checkin-telemetry.md]] â€” TB-14's next-day check-in (S08), CheckinScheduler pg_cron + exactly-once `checkin_dispatches` table, 3-day-no-signal sweeper, TelemetryWriter module + event vocabulary, and the three SQL metric views (`metric_follow_through_pct`, `metric_time_to_verdict_p50`, `metric_invite_acceptance`).
 - [[github-actions-secrets|github-actions-secrets.md]] â€” Secret roster for CI, TestFlight upload, Supabase deploys, and live smoke tests; replaces the retired devcontainer setup note.
+- [[vibe-embeddings-runtime-secrets|vibe-embeddings-runtime-secrets.md]] - Server-only Supabase Edge Function secret names for the transient Vibe fit embedding path.
 - [[apple-keys-setup|apple-keys-setup.md]] â€” Runbook for obtaining and wiring the Apple credentials 0.1.0 needs (App Store Connect API key â†’ CI, Sign in with Apple key â†’ Supabase; MapKit JS skipped).
 - [[supabase-setup|supabase-setup.md]] â€” Runbook for provisioning the 0.1.0 Supabase project (Pro plan, extensions postgis/pg_cron/pgmq, anonymous auth, CLI link, GH Actions secret mirror).
 - [[ios-ci-setup|ios-ci-setup.md]] â€” Runbook for the iOS CI lane (XcodeGen-driven project generation, macOS-14 runner, Xcode 15.4 pin, Supabase env injection, no-local-Xcode constraint).

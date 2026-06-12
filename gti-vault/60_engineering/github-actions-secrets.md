@@ -28,6 +28,8 @@ GitHub Issues and CI are remote; Codex runs in its own sandbox and does not need
 | `SUPABASE_ANON_KEY` | iOS tests, Edge live integration tests | Supabase project API settings |
 | `SUPABASE_SERVICE_ROLE_KEY` | CI seeds private `app_config` rows | Supabase project API settings |
 | `FOURSQUARE_API_KEY` | `places-proxy` Edge Function runtime secret push | Foursquare developer dashboard |
+| `VOYAGE_API_KEY` | Future Vibe embedding smoke/deploy gates; mirrors the Supabase Edge secret without exposing it to clients | Voyage AI dashboard |
+| `VIBE_EMBEDDINGS_ENABLED` | Future Vibe embedding kill switch; default `false` until TB-09 production enablement | App-owned config value |
 | `CLAIM_CODE_ENC_KEY` | Claim-code Edge Functions | `openssl rand -base64 32` |
 | `EXPO_TOKEN` | Expo EAS TestFlight workflow for `mobile/` | Expo account access token |
 | `APP_STORE_CONNECT_API_KEY_ID` | TestFlight archive/export/upload | App Store Connect API key |
@@ -46,6 +48,8 @@ gh secret set SUPABASE_PROJECT_URL --body "$SUPABASE_PROJECT_URL"
 gh secret set SUPABASE_ANON_KEY --body "$SUPABASE_ANON_KEY"
 gh secret set SUPABASE_SERVICE_ROLE_KEY --body "$SUPABASE_SERVICE_ROLE_KEY"
 gh secret set FOURSQUARE_API_KEY --body "$FOURSQUARE_API_KEY"
+gh secret set VOYAGE_API_KEY --body "$VOYAGE_API_KEY"
+gh secret set VIBE_EMBEDDINGS_ENABLED --body "false"
 gh secret set CLAIM_CODE_ENC_KEY --body "$CLAIM_CODE_ENC_KEY"
 gh secret set EXPO_TOKEN --body "$EXPO_TOKEN"
 gh secret set APP_STORE_CONNECT_API_KEY_ID --body "$APP_STORE_CONNECT_API_KEY_ID"
@@ -78,6 +82,8 @@ Secrets are write-only in GitHub. To prove they are populated, run the relevant 
 ## Notes
 
 - `SUPABASE_SERVICE_ROLE_KEY` must never ship to a client.
+- `VOYAGE_API_KEY` must remain server-only. Do not prefix it with `NEXT_PUBLIC_` or `EXPO_PUBLIC_`.
+- `VIBE_EMBEDDINGS_ENABLED` starts as `false`; enabling embeddings is gated by the Vibe embeddings production checklist, not by this setup note.
 - `EXPO_TOKEN` is the active Expo mobile release secret. The legacy App Store Connect secrets are historical Swift/TestFlight release material unless a human explicitly reopens that path.
 - Supabase Edge Function runtime secrets that are not pushed by CI, such as APNs secrets, should be set in Supabase directly.
 - If `GH_TOKEN` or `GITHUB_TOKEN` is set locally, `gh` may use that token instead of the browser-authenticated account. If `gh secret set` returns a permissions error, unset those variables and retry from the trusted shell.
