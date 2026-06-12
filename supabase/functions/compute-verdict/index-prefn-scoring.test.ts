@@ -277,8 +277,8 @@ Deno.test("AC4 — a 2-member room is preference-scored over the shared union (m
     ],
     votes: [
       // Both members: cuisine is the ONLY axis that matters (its Q5
-      // drop card scored 1, reputation + vibe keeps scored 5). vibe +
-      // reputation weights collapse toward zero.
+      // drop card scored 1, crowd approval + vibe keeps scored 5). vibe +
+      // crowd approval weights collapse toward zero.
       prefVote("u1", {
         cuisines: ["mexican"],
         reputation: "no_preference",

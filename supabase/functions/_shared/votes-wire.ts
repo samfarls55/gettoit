@@ -42,15 +42,23 @@ export type Axis = "cuisine" | "crowd_approval" | "vibe";
 
 export type LegacyAxis = Axis | "reputation";
 
-export const Q5_AXES: readonly Axis[] = [
+export const Q5_AXES: readonly Axis[] = Object.freeze([
   "cuisine",
   "crowd_approval",
   "vibe",
-] as const;
+]);
 
 export function normalizeQ5Axis(axis: unknown): Axis | null {
-  if (axis === "reputation") return "crowd_approval";
-  return Q5_AXES.includes(axis as Axis) ? axis as Axis : null;
+  switch (axis) {
+    case "cuisine":
+    case "crowd_approval":
+    case "vibe":
+      return axis;
+    case "reputation":
+      return "crowd_approval";
+    default:
+      return null;
+  }
 }
 
 /** One Q5 factorial card's excitement rating, tagged with the axis that
@@ -133,7 +141,7 @@ export interface LegacyTypedAnswers {
   /** Q4 vibe energy index 0..4. Soft preference. */
   q4_vibe?: number;
   /** Q5 factorial preference probe â€” one `{ droppedAxis, score }` entry
-   *  per factorial card (cuisine-drop / reputation-drop / vibe-drop).
+   *  per factorial card (cuisine-drop / crowd approval-drop / vibe-drop).
    *  `compute-verdict` reads this via `mapVotesRowToPreferenceInputs` to
    *  re-weight each member's preference function. */
   q5_ratings: Q5Rating[];

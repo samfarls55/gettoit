@@ -355,7 +355,7 @@ function readQ5Ratings(raw: unknown): Q5Rating[] {
       normalizedAxis !== null &&
       typeof score === "number" && Number.isFinite(score)
     ) {
-      out.push({ droppedAxis: normalizedAxis as Axis, score });
+      out.push({ droppedAxis: normalizedAxis, score });
     }
   }
   return out;

@@ -84,14 +84,13 @@ export const REPUTATION_NO_PREFERENCE = "no_preference";
 // Public types
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-// `Axis` and `Q5Rating` are the tiny wire-contract types. ADR 0014
-// makes `votes-wire.ts` the single, leaf-module home for them so the
-// web app can import the same definitions; this module re-exports them
-// so existing engine-side consumers keep importing from here unchanged.
+// `Axis`, `Q5Rating`, and `Q5_AXES` are the tiny wire-contract values.
+// ADR 0014 makes `votes-wire.ts` their single, leaf-module home so the
+// web app can import the same definitions; this module re-exports the
+// types so existing engine-side consumers keep importing from here unchanged.
 export type { Axis, Q5Rating } from "./votes-wire.ts";
+import { Q5_AXES } from "./votes-wire.ts";
 import type { Axis, Q5Rating } from "./votes-wire.ts";
-
-const ALL_AXES: readonly Axis[] = ["cuisine", "crowd_approval", "vibe"];
 
 /** A member's stated Q1â€“Q4 profile. Mirrors the Swift
  *  `Q5MemberProfile` struct. */
@@ -155,6 +154,8 @@ export function scoreReputationAxis(
     : SOFT_NON_MATCH_SCORE;
 }
 
+// Active Q5 language calls this axis crowd approval; the stored/provider
+// bucket remains the legacy reputation value at this boundary.
 export const scoreCrowdApprovalAxis = scoreReputationAxis;
 
 /** Vibe axis â€” the one *graded* axis. Vibe is a cardinal 0â€¦4 energy
@@ -264,7 +265,9 @@ function resolveWeights(
   // "No preference" is a genuine zero-weight signal.
   const active = new Set<Axis>();
   if (member.cuisines.length > 0) active.add("cuisine");
-  if (member.reputation !== REPUTATION_NO_PREFERENCE) active.add("crowd_approval");
+  if (member.reputation !== REPUTATION_NO_PREFERENCE) {
+    active.add("crowd_approval");
+  }
   // Vibe is always a stated answer (the Q4 scale has no "no preference"
   // stop) â€” it is always active at init.
   active.add("vibe");
@@ -272,7 +275,7 @@ function resolveWeights(
   // Hard-contradiction override â€” demote any axis whose strict
   // two-condition trigger fires. A demoted axis joins the no-preference
   // set: weight zeroed.
-  for (const axis of ALL_AXES) {
+  for (const axis of Q5_AXES) {
     if (active.has(axis) && overrideFires(axis, q5Ratings)) {
       active.delete(axis);
     }
@@ -322,7 +325,7 @@ export function buildPreferenceFunction(
 ): PreferenceFn {
   const weights = resolveWeights(member, q5Ratings);
   const craved = member.cuisines;
-  const statedReputation = member.reputation;
+  const statedCrowdApproval = member.reputation;
   const statedVibe = member.vibe;
 
   return (venue: Q5VenueProfile): number => {
@@ -338,7 +341,7 @@ export function buildPreferenceFunction(
     if (weights.crowd_approval > 0) {
       contributions.push({
         weight: weights.crowd_approval,
-        score: scoreCrowdApprovalAxis(venue.reputation, statedReputation),
+        score: scoreCrowdApprovalAxis(venue.reputation, statedCrowdApproval),
       });
     }
     if (weights.vibe > 0) {

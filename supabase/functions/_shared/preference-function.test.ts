@@ -201,8 +201,8 @@ Deno.test("hard-contradiction override fires on strict trigger", () => {
     { droppedAxis: "crowd_approval", score: 5 },
     { droppedAxis: "vibe", score: 2 },
   ]);
-  // Override demotes reputation to no-preference: a venue that misses
-  // reputation but matches cuisine + vibe now scores a perfect 5.
+  // Override demotes crowd approval to no-preference: a venue that misses
+  // that bucket but matches cuisine + vibe now scores a perfect 5.
   const v = venue(CUISINE_MEXICAN, REP_HIDDEN_GEM, 2);
   assertAlmostEquals(prefFn(v), 5.0, 0.001);
 });
@@ -220,9 +220,9 @@ Deno.test("hard-contradiction override demotes, never inverts", () => {
 
 Deno.test("single odd rating does not fire override", () => {
   const prefFn = buildPreferenceFunction(mexicanSocialPopular, [
-    { droppedAxis: "cuisine", score: 2 }, // a rep-keep card, below drop
-    { droppedAxis: "crowd_approval", score: 5 }, // the rep-drop card
-    { droppedAxis: "vibe", score: 5 }, // a rep-keep card, NOT below drop
+    { droppedAxis: "cuisine", score: 2 }, // a crowd-approval keep card, below drop
+    { droppedAxis: "crowd_approval", score: 5 }, // the crowd-approval drop card
+    { droppedAxis: "vibe", score: 5 }, // a crowd-approval keep card, NOT below drop
   ]);
   const missRep = venue(CUISINE_MEXICAN, REP_HIDDEN_GEM, 2);
   const perfect = venue(CUISINE_MEXICAN, REP_POPULAR, 2);
@@ -400,16 +400,16 @@ const SCORE_VECTORS: ScoreVector[] = [
   },
   // Soft re-weight: cuisine-drop rated 1, keeps rated 3 each ->
   //   cuisine marginal = avg(3,3) - 1 = 2.
-  //   reputation marginal = avg(cuisine=1, vibe=3) - rep-drop(3)
+  //   crowd approval marginal = avg(cuisine=1, vibe=3) - crowd approval-drop(3)
   //                       = 2 - 3 = -1 -> floored 0.
-  //   vibe marginal = avg(cuisine=1, reputation=3) - vibe-drop(3)
+  //   vibe marginal = avg(cuisine=1, crowd approval=3) - vibe-drop(3)
   //                 = 2 - 3 = -1 -> floored 0.
-  //   total marginal = 2 -> revealed cuisine=1, reputation=0, vibe=0.
+  //   total marginal = 2 -> revealed cuisine=1, crowd approval=0, vibe=0.
   //   prior each = 1/3. final (alpha 0.5):
   //     cuisine    = 0.5*(1/3) + 0.5*1   = 1/6 + 1/2 = 2/3
-  //     reputation = 0.5*(1/3) + 0.5*0   = 1/6
+  //     crowd approval = 0.5*(1/3) + 0.5*0 = 1/6
   //     vibe       = 0.5*(1/3) + 0.5*0   = 1/6
-  //   venue: cuisine match (5), reputation miss (2),
+  //   venue: cuisine match (5), crowd approval miss (2),
   //          vibe dist |4-2|=2 -> 3.
   //   weighted = (2/3)*5 + (1/6)*2 + (1/6)*3
   //            = 10/3 + 2/6 + 3/6 = 10/3 + 5/6 = 25/6.
@@ -426,7 +426,7 @@ const SCORE_VECTORS: ScoreVector[] = [
     expected: 25 / 6,
   },
   // Same re-weighted member, venue misses cuisine but matches the
-  // other two: cuisine miss (2), reputation match (5), vibe dist 0 (5).
+  // other two: cuisine miss (2), crowd approval match (5), vibe dist 0 (5).
   //   weighted = (2/3)*2 + (1/6)*5 + (1/6)*5
   //            = 4/3 + 5/6 + 5/6 = 4/3 + 10/6 = 4/3 + 5/3 = 3.
   {
@@ -440,13 +440,13 @@ const SCORE_VECTORS: ScoreVector[] = [
     venue: venue(CUISINE_THAI, REP_POPULAR, 2),
     expected: 3.0,
   },
-  // Hard-contradiction override on reputation (cuisine-keep 2,
-  // vibe-keep 2, reputation-drop 5 -> both keeps < 5, drop >= 4 ->
-  // fires). Reputation demoted. Cuisine + vibe active.
+  // Hard-contradiction override on crowd approval (cuisine-keep 2,
+  // vibe-keep 2, crowd approval-drop 5 -> both keeps < 5, drop >= 4 ->
+  // fires). Crowd approval demoted. Cuisine + vibe active.
   //   Surviving marginals computed over {cuisine, vibe}:
-  //     cuisine marginal  = avg(rep=5, vibe=2) - cuisine-drop(2)
+  //     cuisine marginal  = avg(crowd approval=5, vibe=2) - cuisine-drop(2)
   //                       = 3.5 - 2 = 1.5
-  //     vibe marginal     = avg(cuisine=2, rep=5) - vibe-drop(2)
+  //     vibe marginal     = avg(cuisine=2, crowd approval=5) - vibe-drop(2)
   //                       = 3.5 - 2 = 1.5
   //     total = 3 -> revealed cuisine=0.5, vibe=0.5.
   //   prior each = 1/2. final = 0.5*(1/2)+0.5*(0.5) = 0.5 each.
