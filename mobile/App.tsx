@@ -3,6 +3,7 @@ import { type Dispatch, useEffect, useReducer, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -59,10 +60,24 @@ import type {
 import { WaitingScreen } from "./src/waiting/WaitingScreen";
 import type { WaitingRepository } from "./src/waiting/waitingRepository";
 
+type ExpoProcess = {
+  env: Record<string, string | undefined>;
+};
+
+declare const process: ExpoProcess;
+
+type DevPasswordCredentials = {
+  email: string;
+  password: string;
+};
+
 type AuthBoundary = {
   restoreSession?: () => Promise<MobileAuthState>;
   deleteCurrentAccount: () => Promise<unknown>;
   signInWithApple: () => Promise<unknown>;
+  signInWithDevPassword?: (
+    credentials: DevPasswordCredentials,
+  ) => Promise<unknown>;
   redeemClaimCode: (code: string) => Promise<unknown>;
   signOut: () => Promise<unknown>;
 };
@@ -232,6 +247,13 @@ const defaultNativeLinkBoundary: NativeLinkBoundary = {
   subscribe: () => () => undefined,
 };
 
+function isWebDevLoginEnabled(): boolean {
+  return (
+    Platform.OS === "web" &&
+    process.env.EXPO_PUBLIC_ENABLE_WEB_DEV_LOGIN === "1"
+  );
+}
+
 const unconfiguredPlanRepository: PlanRepository = {
   listPlans: async () => emptyPlanListSnapshot,
   savePlan: async () => {
@@ -294,6 +316,7 @@ const runtimeAuthBoundary: AuthBoundary = {
   },
   deleteCurrentAccount: nativeAuthBoundary.deleteCurrentAccount,
   signInWithApple: nativeAuthBoundary.signInWithApple,
+  signInWithDevPassword: nativeAuthBoundary.signInWithDevPassword,
   redeemClaimCode: nativeAuthBoundary.redeemClaimCode,
   signOut: nativeAuthBoundary.signOut,
 };
@@ -979,9 +1002,17 @@ function SignInGate({
   const [isClaimPanelOpen, setIsClaimPanelOpen] = useState(false);
   const [claimRedeemed, setClaimRedeemed] = useState(false);
   const [appleSignInFailed, setAppleSignInFailed] = useState(false);
+  const [devEmail, setDevEmail] = useState("");
+  const [devPassword, setDevPassword] = useState("");
+  const [devSignInFailed, setDevSignInFailed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const trimmedClaimCode = claimCode.trim();
+  const trimmedDevEmail = devEmail.trim();
   const isClaimRedeemDisabled = !trimmedClaimCode || isSubmitting;
+  const isDevSignInDisabled =
+    !trimmedDevEmail || !devPassword || isSubmitting;
+  const canUseWebDevLogin =
+    isWebDevLoginEnabled() && Boolean(authBoundary.signInWithDevPassword);
   const heroIntro = useRef(new Animated.Value(0)).current;
   const actionIntro = useRef(new Animated.Value(0)).current;
 
@@ -1030,6 +1061,31 @@ function SignInGate({
       onClaimCodeRedeemed?.();
     } catch {
       setClaimRedeemFailed(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDevSignInPress = async () => {
+    if (
+      !authBoundary.signInWithDevPassword ||
+      !trimmedDevEmail ||
+      !devPassword
+    ) {
+      return;
+    }
+
+    setDevSignInFailed(false);
+    setIsSubmitting(true);
+
+    try {
+      await authBoundary.signInWithDevPassword({
+        email: trimmedDevEmail,
+        password: devPassword,
+      });
+      onAppleSignInSucceeded?.();
+    } catch {
+      setDevSignInFailed(true);
     } finally {
       setIsSubmitting(false);
     }
@@ -1103,6 +1159,53 @@ function SignInGate({
             <Text style={styles.appleSignInLogo}>{"\uF8FF"}</Text>
             <Text style={styles.appleSignInLabel}>Continue with Apple</Text>
           </Pressable>
+          {canUseWebDevLogin ? (
+            <View style={styles.devLoginPanel}>
+              <TextInput
+                accessibilityLabel="Dev login email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                inputMode="email"
+                onChangeText={setDevEmail}
+                placeholder="Dev email"
+                placeholderTextColor={mobileTokens.color.textTertiaryOnGradient}
+                style={styles.claimInput}
+                textContentType="username"
+                value={devEmail}
+              />
+              <TextInput
+                accessibilityLabel="Dev login password"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={setDevPassword}
+                placeholder="Dev password"
+                placeholderTextColor={mobileTokens.color.textTertiaryOnGradient}
+                secureTextEntry
+                style={styles.claimInput}
+                textContentType="password"
+                value={devPassword}
+              />
+              {devSignInFailed ? (
+                <Text accessibilityRole="alert" style={styles.inlineError}>
+                  Dev login failed. Check email and password.
+                </Text>
+              ) : null}
+              <Pressable
+                accessibilityLabel="Sign in for web testing"
+                accessibilityRole="button"
+                disabled={isDevSignInDisabled}
+                onPress={handleDevSignInPress}
+                style={[
+                  styles.secondaryButton,
+                  isDevSignInDisabled && styles.disabledButton,
+                ]}
+              >
+                <Text style={styles.secondaryButtonLabel}>
+                  Sign in for web testing
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
           {isClaimPanelOpen ? (
             <View style={styles.claimPanel}>
               <Text style={styles.claimTeaching}>
@@ -1238,6 +1341,10 @@ const styles = StyleSheet.create({
     color: mobileTokens.color.textSecondaryOnGradient,
     fontSize: 14,
     fontWeight: "700",
+  },
+  devLoginPanel: {
+    gap: mobileTokens.spacing[3],
+    marginTop: mobileTokens.spacing[3],
   },
   signInInlineError: {
     color: mobileTokens.color.textSecondaryOnGradient,

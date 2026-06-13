@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as aesjs from "aes-js";
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import "react-native-get-random-values";
 
 export type MobileAuthState =
@@ -44,6 +45,11 @@ type AppleLinkRequest = AppleTokenRequest & {
   currentUserId: string;
 };
 
+type PasswordSignInRequest = {
+  email: string;
+  password: string;
+};
+
 export type MobileSupabaseAuthClient = {
   getSession: () => Promise<
     SupabaseResult<{ session: SupabaseAuthSession | null }>
@@ -57,6 +63,9 @@ export type MobileSupabaseAuthClient = {
   refreshSession: (request: {
     refresh_token: string;
   }) => Promise<SupabaseResult<{ session: SupabaseAuthSession | null }>>;
+  signInWithPassword: (
+    request: PasswordSignInRequest,
+  ) => Promise<SupabaseResult<{ session: SupabaseAuthSession | null }>>;
   signOut: () => Promise<SupabaseResult<Record<string, never>>>;
 };
 
@@ -86,6 +95,9 @@ export type MobileAuthRepository = {
   restoreSession: () => Promise<MobileAuthState>;
   getCurrentAuthState: () => Promise<MobileAuthState>;
   signInWithApple: () => Promise<MobileAuthState>;
+  signInWithDevPassword: (
+    request: PasswordSignInRequest,
+  ) => Promise<MobileAuthState>;
   redeemClaimCode: (code: string) => Promise<MobileAuthState>;
   signOut: () => Promise<MobileAuthState>;
   deleteCurrentAccount: () => Promise<MobileAuthState>;
@@ -174,7 +186,14 @@ class LargeSecureStore implements MobileSupabaseSessionStorage {
   }
 }
 
-const mobileSupabaseSessionStorage = new LargeSecureStore();
+const webSupabaseSessionStorage: MobileSupabaseSessionStorage = {
+  getItem: (key) => AsyncStorage.getItem(key),
+  setItem: (key, value) => AsyncStorage.setItem(key, value),
+  removeItem: (key) => AsyncStorage.removeItem(key),
+};
+
+const mobileSupabaseSessionStorage =
+  Platform.OS === "web" ? webSupabaseSessionStorage : new LargeSecureStore();
 
 export function getMobileSupabaseConfig(
   env: Record<string, string | undefined> = expoPublicEnv(),
@@ -222,6 +241,7 @@ export function createMobileSupabaseClient(
         return result;
       },
       refreshSession: (request) => client.auth.refreshSession(request),
+      signInWithPassword: (request) => client.auth.signInWithPassword(request),
       signOut: async () => {
         const { error } = await client.auth.signOut();
 
@@ -338,6 +358,29 @@ export function createSupabaseAuthRepository({
 
       if (nextState.kind !== "linkedApple") {
         throw new Error("Apple sign-in did not return a Linked-Apple session");
+      }
+
+      return nextState;
+    },
+    signInWithDevPassword: async ({ email, password }) => {
+      const result = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      const nextState = mapRequiredSession(
+        result.data.session,
+        "Dev password sign-in",
+      );
+
+      if (nextState.kind !== "linkedApple") {
+        throw new Error(
+          "Dev password sign-in did not return a signed-in session",
+        );
       }
 
       return nextState;

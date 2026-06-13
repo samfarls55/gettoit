@@ -37,6 +37,8 @@ Architecture, conventions, runbooks, ADRs.
 - [[codex-migration-readiness-audit|codex-migration-readiness-audit.md]] â€” 2026-06-02 completed audit/cleanup for Codex-readable instructions, retired Claude devcontainer setup, migrated skill paths, GitHub issue-tracker contract, and verification runbooks.
 - [[codex-project-memory|codex-project-memory.md]] â€” Migrated Claude-era project and working-style memories for Codex sessions; quick orientation only, with current repo docs as authority.
 - [[auth-apple-link-testing|auth-apple-link-testing.md]] â€” TB-12 testing split: what CI's state-machine + DB-integration tests cover vs. what only TestFlight (TB-17) can verify against a real Apple Sign-in round-trip.
+- [[expo-web-dev-testing|expo-web-dev-testing.md]] - Expo web smoke testing on Windows, including guarded dev-only password auth.
+- [[expo-windows-iteration-workflow|expo-windows-iteration-workflow.md]] - Windows-first Expo iteration workflow: web, Expo Go, dev builds, EAS Update, and TestFlight build triggers.
 - [[web-fallback-setup|web-fallback-setup.md]] â€” TB-15 operational notes: Vercel `NEXT_PUBLIC_*` env vars, Realtime channel contract, accepted web-side gaps per ADR 0003 / 0007.
 - [[asc-privacy-labels|asc-privacy-labels.md]] â€” TB-16 final HITL gate: line-by-line answers for App Store Connect's App Privacy nutrition-labels form, derived from the deployed Privacy Policy + ADR 0006.
 - [[swift-to-expo-vault-audit-2026-06-05|swift-to-expo-vault-audit-2026-06-05.md]] - audit of vault docs/issues that still treat the legacy Swift `ios/` app as active after `mobile/` became the active Expo React Native client.

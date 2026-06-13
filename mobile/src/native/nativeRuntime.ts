@@ -239,6 +239,10 @@ export const nativeAuthBoundary = {
     createRuntimeAuthRepository().deleteCurrentAccount(),
   signInWithApple: async () =>
     createRuntimeAuthRepository().signInWithApple(),
+  signInWithDevPassword: async (request: {
+    email: string;
+    password: string;
+  }) => createRuntimeAuthRepository().signInWithDevPassword(request),
   redeemClaimCode: async (code: string) =>
     createRuntimeAuthRepository().redeemClaimCode(code),
   signOut: async () => createRuntimeAuthRepository().signOut(),

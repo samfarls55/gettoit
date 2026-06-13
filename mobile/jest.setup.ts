@@ -23,3 +23,38 @@ jest.mock("expo-location", () => ({
   requestForegroundPermissionsAsync: jest.fn(),
   reverseGeocodeAsync: jest.fn(),
 }));
+
+jest.mock("react-native-maps", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+
+  const MockMapView = React.forwardRef(
+    (
+      {
+        children,
+        ...props
+      }: { children?: React.ReactNode; [key: string]: unknown },
+      ref: React.Ref<unknown>,
+    ) => {
+      React.useImperativeHandle(ref, () => ({
+        animateToRegion: jest.fn(),
+      }));
+
+      return React.createElement(View, props, children);
+    },
+  );
+  const MockMapChild = ({
+    children,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    [key: string]: unknown;
+  }) => React.createElement(View, props, children);
+
+  return {
+    __esModule: true,
+    Circle: MockMapChild,
+    default: MockMapView,
+    Marker: MockMapChild,
+  };
+});

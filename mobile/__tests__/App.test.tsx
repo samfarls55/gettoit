@@ -1,5 +1,5 @@
 import { useReducer } from "react";
-import { Button, View } from "react-native";
+import { Button, Platform, View } from "react-native";
 import {
   act,
   fireEvent,
@@ -213,6 +213,7 @@ function makeAuthBoundary(overrides = {}) {
   return {
     deleteCurrentAccount: jest.fn().mockResolvedValue(undefined),
     signInWithApple: jest.fn().mockResolvedValue(undefined),
+    signInWithDevPassword: jest.fn().mockResolvedValue(undefined),
     redeemClaimCode: jest.fn().mockResolvedValue(undefined),
     signOut: jest.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -537,6 +538,54 @@ describe("App", () => {
       expect(signInWithApple).toHaveBeenCalledTimes(1);
       expect(screen.getByText("Plans")).toBeOnTheScreen();
     });
+  });
+
+  it("enables flagged Expo web dev password sign-in", async () => {
+    const originalFlag = process.env.EXPO_PUBLIC_ENABLE_WEB_DEV_LOGIN;
+    const originalPlatform = Platform.OS;
+    const signInWithDevPassword = jest.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(Platform, "OS", {
+      configurable: true,
+      value: "web",
+    });
+    process.env.EXPO_PUBLIC_ENABLE_WEB_DEV_LOGIN = "1";
+
+    try {
+      render(
+        <App
+          authBoundary={makeAuthBoundary({ signInWithDevPassword })}
+        />,
+      );
+
+      fireEvent.changeText(
+        screen.getByLabelText("Dev login email"),
+        "dev@example.com",
+      );
+      fireEvent.changeText(
+        screen.getByLabelText("Dev login password"),
+        "test-password",
+      );
+      fireEvent.press(screen.getByLabelText("Sign in for web testing"));
+
+      await waitFor(() => {
+        expect(signInWithDevPassword).toHaveBeenCalledWith({
+          email: "dev@example.com",
+          password: "test-password",
+        });
+        expect(screen.getByText("Plans")).toBeOnTheScreen();
+      });
+    } finally {
+      Object.defineProperty(Platform, "OS", {
+        configurable: true,
+        value: originalPlatform,
+      });
+      if (originalFlag === undefined) {
+        delete process.env.EXPO_PUBLIC_ENABLE_WEB_DEV_LOGIN;
+      } else {
+        process.env.EXPO_PUBLIC_ENABLE_WEB_DEV_LOGIN = originalFlag;
+      }
+    }
   });
 
   it("uses the native Plan repository by default", async () => {

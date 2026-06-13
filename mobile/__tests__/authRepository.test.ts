@@ -15,6 +15,7 @@ jest.mock("@supabase/supabase-js", () => ({
       getSession: jest.fn(),
       refreshSession: jest.fn(),
       signInWithIdToken: jest.fn(),
+      signInWithPassword: jest.fn(),
       signOut: jest.fn(),
     },
     functions: {
@@ -64,6 +65,10 @@ function makeDeps(
         }),
         refreshSession: jest.fn().mockResolvedValue({
           data: { session: session("claimed-user", true) },
+          error: null,
+        }),
+        signInWithPassword: jest.fn().mockResolvedValue({
+          data: { session: session("dev-user", false) },
           error: null,
         }),
         signOut: jest
@@ -214,6 +219,26 @@ describe("authRepository", () => {
       provider: "apple",
       token: "apple-id-token",
       nonce: "apple-nonce",
+    });
+  });
+
+  it("supports a dev password sign-in for Expo web smoke testing", async () => {
+    const deps = makeDepsWithSession(null);
+    const repository = createSupabaseAuthRepository(deps);
+
+    await expect(
+      repository.signInWithDevPassword({
+        email: " dev@example.com ",
+        password: "test-password",
+      }),
+    ).resolves.toEqual({
+      kind: "linkedApple",
+      userId: "dev-user",
+    });
+
+    expect(deps.supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "dev@example.com",
+      password: "test-password",
     });
   });
 
