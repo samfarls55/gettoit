@@ -42,9 +42,9 @@ describe("generateQ5FactorialCards", () => {
     });
 
     expect(cards).not.toBeNull();
-    expect(cards?.map((card) => card.droppedAxis).sort()).toEqual([
+    expect(cards?.map((card) => card.droppedAxis)).toEqual([
       "cuisine",
-      "reputation",
+      "crowd_approval",
       "vibe",
     ]);
     expect(cards?.map((card) => card.venue.id)).not.toContain(
@@ -141,7 +141,7 @@ describe("generateQ5FactorialCards", () => {
       }),
       expect.objectContaining({
         id: "google-reputation",
-        droppedAxis: "reputation",
+        droppedAxis: "crowd_approval",
       }),
       expect.objectContaining({
         id: "google-vibe",
@@ -197,9 +197,9 @@ describe("generateQ5FactorialCards", () => {
     });
 
     expect(cards).not.toBeNull();
-    expect(cards?.map((card) => card.droppedAxis).sort()).toEqual([
+    expect(cards?.map((card) => card.droppedAxis)).toEqual([
       "cuisine",
-      "reputation",
+      "crowd_approval",
       "vibe",
     ]);
   });
@@ -354,7 +354,7 @@ describe("generateQ5FactorialCards", () => {
         name: "Los Tacos No. 1",
         meta: "",
         attributionText: "Powered by Google",
-        droppedAxis: "reputation",
+        droppedAxis: "crowd_approval",
       },
       {
         id: "google-vibe",

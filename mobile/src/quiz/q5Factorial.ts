@@ -1,4 +1,4 @@
-export type Q5Axis = "cuisine" | "crowd_approval" | "reputation" | "vibe";
+export type Q5Axis = "cuisine" | "crowd_approval" | "vibe";
 
 export type Q5VenueProfile = {
   cuisine: string | null;
@@ -124,7 +124,7 @@ export function generateQ5FactorialCards({
 
     const cards = [
       { venue: cuisineDrop, droppedAxis: "cuisine" as const },
-      { venue: reputationDrop, droppedAxis: "reputation" as const },
+      { venue: reputationDrop, droppedAxis: "crowd_approval" as const },
       { venue: vibeDrop, droppedAxis: "vibe" as const },
     ];
 
@@ -301,7 +301,6 @@ function replacementRulesForAxis(
         vibe: vibeMatches,
       };
     case "crowd_approval":
-    case "reputation":
       return {
         cuisine: selectedCuisine,
         reputation: (reputation) =>

@@ -178,6 +178,66 @@ describe("quizSubmissionRepository", () => {
     });
   });
 
+  it("submits canonical Q5 axes and translates the vibe answer once", async () => {
+    const { insertedVotes, supabase } = makeSupabaseClient([
+      { id: "room-1", plan_id: "plan-1" },
+    ]);
+    const repository = createSupabaseQuizSubmissionRepository({
+      supabase,
+      userId: "user-1",
+    });
+
+    await repository.submitQuiz({
+      roomId: "plan-1",
+      answers: {
+        q1CuisineCravings: ["mexican"],
+        q2SpendCap: "$$",
+        q3Reputation: "popular",
+        q4VibeEnergy: "lively",
+        q5Ratings: {
+          "candidate-cuisine": 2,
+          "candidate-crowd": 5,
+          "candidate-vibe": 3,
+        },
+      },
+      q5Candidates: [
+        {
+          id: "candidate-cuisine",
+          name: "Cuisine",
+          meta: "",
+          droppedAxis: "cuisine",
+        },
+        {
+          id: "candidate-crowd",
+          name: "Crowd",
+          meta: "",
+          droppedAxis: "crowd_approval",
+        },
+        {
+          id: "candidate-vibe",
+          name: "Vibe",
+          meta: "",
+          droppedAxis: "vibe",
+        },
+      ],
+    });
+
+    expect(insertedVotes[0]).toMatchObject({
+      q4: {
+        answer: { level: 3 },
+      },
+      q5: {
+        answer: {
+          ratings: [
+            { droppedAxis: "cuisine", score: 2 },
+            { droppedAxis: "crowd_approval", score: 5 },
+            { droppedAxis: "vibe", score: 3 },
+          ],
+        },
+      },
+    });
+  });
+
   it("fails before insert when no joined room is visible", async () => {
     const { insertedVotes, supabase } = makeSupabaseClient([]);
     const repository = createSupabaseQuizSubmissionRepository({

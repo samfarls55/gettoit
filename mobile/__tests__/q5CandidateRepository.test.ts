@@ -100,6 +100,38 @@ describe("q5CandidateRepository", () => {
     ]);
   });
 
+  it("normalizes legacy reputation receipts when reading old assigned card sets", async () => {
+    const repository = createSupabaseQ5CandidateRepository({
+      supabase: makeSupabaseClient(jest.fn().mockResolvedValue({
+        data: {
+          status: "assigned",
+          cards: [
+            {
+              googlePlaceId: "google-legacy",
+              displayName: "Legacy Card",
+              axisReceipt: { droppedAxis: "reputation" },
+            },
+          ],
+        },
+        error: null,
+      })),
+    });
+
+    await expect(
+      repository.loadCandidates({
+        roomId: "room-1",
+        answers: {},
+      }),
+    ).resolves.toEqual([
+      {
+        id: "google-legacy",
+        name: "Legacy Card",
+        meta: "",
+        droppedAxis: "crowd_approval",
+      },
+    ]);
+  });
+
   it("returns no Q5 cards when the assigned card set has no results", async () => {
     const repository = createSupabaseQ5CandidateRepository({
       supabase: makeSupabaseClient(jest.fn().mockResolvedValue({
