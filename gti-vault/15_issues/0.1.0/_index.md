@@ -41,6 +41,20 @@ Decomposed from [[search-area-picker-prd|Search area picker PRD]] on 2026-06-03 
 | tb-SA-4 | [[issues/tb-sa-4-density-preview-pins|Density preview pins]] | AFK | [#321](https://github.com/samfarls55/gettoit/issues/321) | tb-SA-2 |
 | tb-SA-5 | [[issues/tb-sa-5-retire-active-c23-setup-semantics|Retire active C-23 Setup semantics]] | AFK | [#322](https://github.com/samfarls55/gettoit/issues/322) | tb-SA-1, tb-SA-2, tb-SA-3, tb-SA-4 |
 
+## Architecture deepening issues
+
+Decomposed from the 2026-06-17 architecture review after comparing active code against [[../../60_engineering/adr/0022-google-places-primary-provider|ADR 0022]], [[../../60_engineering/adr/0023-transient-vibe-embeddings-in-scoring|ADR 0023]], and the Q5/Verdict domain language in [[../../../CONTEXT|CONTEXT]].
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| tb-27 | [[issues/tb-27-server-assigned-q5-card-sets|Server-assigned Q5 card sets]] | AFK | [#367](https://github.com/samfarls55/gettoit/issues/367) | None |
+| tb-28 | [[issues/tb-28-move-web-mobile-q5-to-assigned-card-sets|Move web and mobile Q5 onto assigned card sets]] | AFK | [#368](https://github.com/samfarls55/gettoit/issues/368) | tb-27 |
+| tb-29 | [[issues/tb-29-canonical-q5-axis-language|Make active Q5 axis language canonical]] | AFK | [#369](https://github.com/samfarls55/gettoit/issues/369) | tb-28 |
+| tb-30 | [[issues/tb-30-centralize-google-provider-runtime-policy|Centralize Google provider runtime policy]] | AFK | [#370](https://github.com/samfarls55/gettoit/issues/370) | None |
+| tb-31 | [[issues/tb-31-remove-active-foursquare-display-payload-compat|Remove active Foursquare and display payload compatibility]] | AFK | [#371](https://github.com/samfarls55/gettoit/issues/371) | tb-30 |
+| tb-32 | [[issues/tb-32-shared-hard-eligibility-core|Share hard eligibility between Vibe Fit and Verdict]] | AFK | [#372](https://github.com/samfarls55/gettoit/issues/372) | None |
+| tb-33 | [[issues/tb-33-deepen-verdict-run-execution|Deepen Verdict Run execution]] | AFK | [#373](https://github.com/samfarls55/gettoit/issues/373) | tb-32 |
+
 ## Founder pre-launch HITL bucket
 
 Founder-flagged pre-launch must-addresses captured 2026-05-26. All `status: needs-triage`, `type: HITL`, deferred to future grills.
