@@ -24,7 +24,6 @@ import {
   buildGoogleProviderNearbySearchRequest,
   buildGoogleProviderPlaceDetailsRequest,
   fetchGoogleProviderWithRetry,
-  GOOGLE_PLACE_DETAILS_URL_PREFIX,
   GOOGLE_PROVIDER_ATTRIBUTION,
   GOOGLE_PROVIDER_FIELD_MASKS,
 } from "./google-provider-runtime.ts";
@@ -624,14 +623,12 @@ async function fetchGooglePlaceDetailsWithRetry(
   fetch: FetchFn,
   googleApiKey: string,
 ): Promise<Response> {
-  const init = buildGoogleProviderPlaceDetailsRequest({
+  const request = buildGoogleProviderPlaceDetailsRequest({
     apiKey: googleApiKey,
     fieldMask: "verdict_display",
+    placeId,
   });
-  const url = `${GOOGLE_PLACE_DETAILS_URL_PREFIX}${
-    encodeURIComponent(placeId)
-  }`;
-  return fetchGoogleProviderWithRetry(fetch, url, init);
+  return fetchGoogleProviderWithRetry(fetch, request.url, request.init);
 }
 
 async function fetchGoogleNearbyWithRetry(

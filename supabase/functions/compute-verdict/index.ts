@@ -38,7 +38,7 @@ import {
   buildGoogleProviderNearbySearchRequest,
   fetchGoogleProviderWithRetry,
   GOOGLE_PROVIDER_FIELD_MASKS,
-  type GoogleProviderFieldMaskName,
+  type GoogleProviderNearbyFieldMaskName,
 } from "../_shared/google-provider-runtime.ts";
 // tb-WF-11 â€” resolves each member's name from the joined
 // `members.display_name`, falling back to the `m<uuid>` placeholder.
@@ -55,6 +55,10 @@ export const GOOGLE_VERDICT_SCORING_FIELD_MASK_VERSION =
   GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.version;
 export const GOOGLE_VERDICT_SCORING_FIELD_MASK =
   GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.mask;
+type GoogleVerdictFieldMaskName = Extract<
+  GoogleProviderNearbyFieldMaskName,
+  "verdict_fetch" | "verdict_scoring"
+>;
 
 function buildSupabaseAdapter(
   env: ComputeVerdictEnv,
@@ -598,7 +602,7 @@ function isVibeFitEnabled(env: ComputeVerdictEnv): boolean {
 
 function googleVerdictFieldMaskName(
   env: ComputeVerdictEnv,
-): Extract<GoogleProviderFieldMaskName, "verdict_fetch" | "verdict_scoring"> {
+): GoogleVerdictFieldMaskName {
   return isVibeFitEnabled(env) ? "verdict_scoring" : "verdict_fetch";
 }
 

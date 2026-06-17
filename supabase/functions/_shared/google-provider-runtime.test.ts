@@ -3,6 +3,8 @@ import {
   buildGoogleProviderNearbySearchRequest,
   buildGoogleProviderPlaceDetailsRequest,
   fetchGoogleProviderWithRetry,
+  GOOGLE_NEARBY_SEARCH_URL,
+  GOOGLE_PLACE_DETAILS_URL_PREFIX,
   GOOGLE_PROVIDER_ATTRIBUTION,
   GOOGLE_PROVIDER_FIELD_MASKS,
   redactGoogleObservabilityValue,
@@ -43,13 +45,12 @@ Deno.test("TB-30: Google provider runtime builds Q5 and verdict requests from on
   const display = buildGoogleProviderPlaceDetailsRequest({
     apiKey: "google-secret",
     fieldMask: "verdict_display",
+    placeId: "google-place",
   });
 
-  assertEquals(q5.url, "https://places.googleapis.com/v1/places:searchNearby");
-  assertEquals(
-    verdict.url,
-    "https://places.googleapis.com/v1/places:searchNearby",
-  );
+  assertEquals(q5.url, GOOGLE_NEARBY_SEARCH_URL);
+  assertEquals(verdict.url, GOOGLE_NEARBY_SEARCH_URL);
+  assertEquals(display.url, `${GOOGLE_PLACE_DETAILS_URL_PREFIX}google-place`);
   assertEquals(q5.init.headers, {
     "Content-Type": "application/json",
     "X-Goog-Api-Key": "google-secret",
@@ -60,7 +61,7 @@ Deno.test("TB-30: Google provider runtime builds Q5 and verdict requests from on
     "X-Goog-Api-Key": "google-secret",
     "X-Goog-FieldMask": GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.mask,
   });
-  assertEquals(display.headers, {
+  assertEquals(display.init.headers, {
     "X-Goog-Api-Key": "google-secret",
     "X-Goog-FieldMask": GOOGLE_PROVIDER_FIELD_MASKS.verdict_display.mask,
     "Accept": "application/json",
@@ -77,7 +78,7 @@ Deno.test("TB-30: Google provider runtime owns retry and redaction policy", asyn
         "https://places.googleapis.com/v1/places:searchNearby",
       );
       assertEquals(
-        (init?.headers as Record<string, string>)["X-Goog-Api-Key"],
+        new Headers(init?.headers).get("X-Goog-Api-Key"),
         "google-secret",
       );
       return Promise.resolve(
