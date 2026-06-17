@@ -23,6 +23,10 @@ import {
   type VibeFitSignal,
 } from "../_shared/vibe-fit.ts";
 import { GOOGLE_PROVIDER_FIELD_MASKS } from "../_shared/google-provider-runtime.ts";
+import {
+  type CandidateOption,
+  computeVerdict,
+} from "../_shared/verdict-engine.ts";
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -365,8 +369,17 @@ Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scorin
       summaryField,
     );
   }
+  assertStringIncludes(indexSource, "GOOGLE_VERDICT_FETCH_FIELD_MASK");
+  assertStringIncludes(indexSource, "GOOGLE_VERDICT_SCORING_FIELD_MASK");
+  assertStringIncludes(indexSource, '"places.reviewSummary"');
+  assertStringIncludes(indexSource, '"places.generativeSummary"');
   assertStringIncludes(indexSource, "isVibeFitEnabled(env)");
   assertStringIncludes(indexSource, "googleVerdictFieldMaskName(env)");
+  assert(
+    indexSource.indexOf('"places.reviewSummary"') >
+      indexSource.indexOf("GOOGLE_VERDICT_SCORING_FIELD_MASK"),
+    "summary fields must belong to the internal scoring mask, not the base fetch/display masks",
+  );
 });
 
 Deno.test("TB-09: production Vibe Fit uses canonical embeddings flag and no fake embeddings", () => {
@@ -530,4 +543,48 @@ Deno.test("TB-04: Vibe Fit candidates are built only after hard eligibility cuts
   assertEquals(candidates.map((candidate) => candidate.candidateId), [
     "google-eligible",
   ]);
+
+  const verdict = computeVerdict({
+    candidates: [eligible, overBudget, lowCrowdFloor, cuisineNever].map(
+      optionRowToCandidate,
+    ),
+    radius_meters: 200,
+    votes: [{
+      user_id: "u1",
+      display_name: "u1",
+      q1_vetoes: ["vegan"],
+      q2_budget: 2,
+      hard_vetoes: [{ kind: "cuisine_never", token: "sushi" }],
+      scores: { __fallback: 5 },
+    }],
+  });
+
+  assertEquals(verdict.winning_option_id, "eligible");
+  assertEquals(
+    verdict.cuts.map((cut) => [cut.option_id, cut.cut_reason]),
+    [
+      ["over-budget", "budget"],
+      ["low-crowd", "crowd_floor"],
+      ["cuisine-never", "veto"],
+    ],
+  );
 });
+
+function optionRowToCandidate(row: RoomOptionRow): CandidateOption {
+  return {
+    id: row.id,
+    google_place_id: row.google_place_id,
+    name: row.payload?.name ?? row.id,
+    price_tier: row.payload?.price_tier ?? null,
+    dietary_tags: row.payload?.dietary_tags ?? [],
+    categories: row.payload?.categories ?? [],
+    distance_meters: row.payload?.distance_meters ?? null,
+    rating: row.payload?.rating ?? null,
+    total_ratings: row.payload?.total_ratings ?? null,
+    user_rating_count: row.payload?.user_rating_count ?? null,
+    current_open_now: row.payload?.current_open_now ?? null,
+    regular_opening_periods: row.payload?.regular_opening_periods,
+    dine_in: row.payload?.dine_in ?? null,
+    takeout: row.payload?.takeout ?? null,
+  };
+}

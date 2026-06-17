@@ -66,6 +66,10 @@ import {
   type VibeFitCandidate,
   type VibeFitSignal,
 } from "../_shared/vibe-fit.ts";
+import {
+  evaluateHardEligibility,
+  type HardEligibilityVote,
+} from "../_shared/hard-eligibility.ts";
 
 // TB-21 — re-export the union primitive's row types so the Edge entry
 // point (`index.ts`) and the handler tests can bind them without a
@@ -498,12 +502,6 @@ function buildGoogleOptionIdMap(
   return out;
 }
 
-interface HardEligibilityVote {
-  q1_vetoes: string[];
-  q2_budget: number;
-  hard_vetoes: HardVeto[];
-}
-
 type EffectiveVoteInput = HardEligibilityVote & { row: MemberVoteRow };
 type VibeFitScoringVenueProfile = Q5VenueProfile & {
   vibeFitCandidateId?: string;
@@ -524,12 +522,24 @@ export function buildEligibleVibeFitCandidatesForVerdict(input: {
   optionRows: readonly RoomOptionRow[];
   votes: readonly HardEligibilityVote[];
   radiusMeters: number | null;
+  mealTiming?: { open_at?: string | null };
+  serviceShape?: "dineIn" | "takeout" | null;
 }): VibeFitCandidate[] {
   return input.optionRows
     .filter(hasVibeFitCandidate)
-    .filter((row) =>
-      isCandidateHardEligibleForVibeFit(row, input.votes, input.radiusMeters)
-    )
+    .filter((row) => {
+      const candidate = hardEligibilityCandidateFromOptionRow(row);
+      if (!candidate) return false;
+      return evaluateHardEligibility({
+        candidate,
+        votes: input.votes,
+        room: {
+          radius_meters: input.radiusMeters,
+          meal_timing: input.mealTiming,
+          service_shape: input.serviceShape,
+        },
+      }).eligible;
+    })
     .map((row) => row.vibe_fit_candidate);
 }
 
@@ -626,103 +636,36 @@ function buildDurableVerdictScoringVersion(
   ].join("|");
 }
 
-function isCandidateHardEligibleForVibeFit(
+function hardEligibilityCandidateFromOptionRow(
   row: RoomOptionRow,
-  votes: readonly HardEligibilityVote[],
-  radiusMeters: number | null,
-): boolean {
+): CandidateOption | null {
+  if (!row.payload) return null;
+  return candidateOptionFromOptionRow(row);
+}
+
+function candidateOptionFromOptionRow(row: RoomOptionRow): CandidateOption {
   const payload = row.payload;
-  if (!payload) return false;
-  if (
-    radiusMeters !== null &&
-    typeof payload.distance_meters === "number" &&
-    payload.distance_meters > radiusMeters
-  ) {
-    return false;
-  }
-  if (!hasRequiredGoogleMetadata(payload)) return false;
-  if (payload.current_open_now !== true) return false;
-
-  const minBudget = votes.reduce(
-    (acc, vote) => Math.min(acc, vote.q2_budget),
-    Number.POSITIVE_INFINITY,
-  );
-  if (
-    typeof payload.price_tier === "number" &&
-    payload.price_tier > minBudget
-  ) {
-    return false;
-  }
-
-  const requiredDietaryTags = new Set<string>();
-  const requiredRawTags = new Set<string>();
-  const cuisineNevers = new Set<string>();
-  for (const vote of votes) {
-    for (const chip of vote.q1_vetoes) {
-      const tag = dietaryTagForVetoChip(chip);
-      if (tag) requiredDietaryTags.add(tag);
-    }
-    for (const veto of vote.hard_vetoes) {
-      if (veto.kind === "dietary") {
-        const tag = dietaryTagForVetoChip(veto.token);
-        if (tag) requiredDietaryTags.add(tag);
-      }
-      if (veto.kind === "tag") requiredRawTags.add(veto.token.trim());
-      if (veto.kind === "cuisine_never") {
-        const token = veto.token.trim().toLowerCase();
-        if (token) cuisineNevers.add(token);
-      }
-    }
-  }
-  for (const tag of requiredDietaryTags) {
-    if (!payload.dietary_tags?.includes(tag)) return false;
-  }
-  for (const tag of requiredRawTags) {
-    if (!payload.dietary_tags?.includes(tag)) return false;
-  }
-  const lowerCategories = (payload.categories ?? []).map((category) =>
-    category.toLowerCase()
-  );
-  for (const token of cuisineNevers) {
-    if (lowerCategories.some((category) => category.includes(token))) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function hasRequiredGoogleMetadata(
-  payload: NonNullable<RoomOptionRow["payload"]>,
-): boolean {
-  return typeof payload.price_tier === "number" &&
-    typeof payload.rating === "number" &&
-    payload.rating >= 3.7 &&
-    typeof payload.user_rating_count === "number" &&
-    payload.user_rating_count >= 15;
-}
-
-function dietaryTagForVetoChip(chip: string): string | null {
-  switch (chip.trim().toLowerCase()) {
-    case "vegan":
-      return "vegan_friendly";
-    case "vegetarian":
-      return "vegetarian_friendly";
-    case "halal":
-      return "halal";
-    case "kosher":
-      return "kosher";
-    case "gluten":
-      return "gluten_free_options";
-    case "dairy":
-      return "no_dairy_unverified";
-    case "shellfish":
-      return "no_shellfish_unverified";
-    case "nuts":
-      return "no_nuts_unverified";
-    default:
-      return null;
-  }
+  return {
+    id: row.id,
+    google_place_id: row.google_place_id,
+    name: payload?.name ?? "Unnamed",
+    price_tier: payload?.price_tier ?? null,
+    dietary_tags: payload?.dietary_tags ?? [],
+    categories: payload?.categories ?? [],
+    distance_meters: payload?.distance_meters ?? null,
+    // TB-23 — carry the Foursquare reputation / vibe signal so the
+    // server-side venue classifier can derive the preference axes. The
+    // engine itself never reads these fields.
+    rating: payload?.rating ?? null,
+    total_ratings: payload?.total_ratings ?? null,
+    user_rating_count: payload?.user_rating_count ?? null,
+    date_created: payload?.date_created ?? null,
+    tastes: payload?.tastes ?? [],
+    current_open_now: payload?.current_open_now ?? null,
+    regular_opening_periods: payload?.regular_opening_periods,
+    dine_in: payload?.dine_in ?? null,
+    takeout: payload?.takeout ?? null,
+  };
 }
 
 export async function handleRequest(
@@ -925,26 +868,7 @@ export async function handleRequest(
   // Use the committed room radius as the hard Search area boundary.
   const startingRadius = (await data.fetchRoomRadius(roomId)) ?? null;
 
-  const candidates: CandidateOption[] = optionRows.map((row) => ({
-    id: row.id,
-    google_place_id: row.google_place_id,
-    name: row.payload?.name ?? "Unnamed",
-    price_tier: row.payload?.price_tier ?? null,
-    dietary_tags: row.payload?.dietary_tags ?? [],
-    categories: row.payload?.categories ?? [],
-    distance_meters: row.payload?.distance_meters ?? null,
-    // TB-23 — carry the Foursquare reputation / vibe signal so the
-    // server-side venue classifier can derive the preference axes. The
-    // engine itself never reads these fields.
-    rating: row.payload?.rating ?? null,
-    total_ratings: row.payload?.total_ratings ?? null,
-    date_created: row.payload?.date_created ?? null,
-    tastes: row.payload?.tastes ?? [],
-    current_open_now: row.payload?.current_open_now ?? null,
-    regular_opening_periods: row.payload?.regular_opening_periods,
-    dine_in: row.payload?.dine_in ?? null,
-    takeout: row.payload?.takeout ?? null,
-  }));
+  const candidates = optionRows.map(candidateOptionFromOptionRow);
 
   // TB-23 — classify the FULL candidate pool into per-venue
   // `Q5VenueProfile`s, ONCE. Reputation is pool-relative (its volume
