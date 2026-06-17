@@ -71,7 +71,7 @@ export function generateQ5FactorialCards({
   q5CardSetId,
 }: GenerateInput): Q5FactorialCard[] | null {
   const probedCuisines = selectProbedCuisines(member, pool);
-  const reputationDropCuisine = probedCuisines[0] ?? null;
+  const crowdApprovalDropCuisine = probedCuisines[0] ?? null;
   const vibeDropCuisine = probedCuisines[1] ?? probedCuisines[0] ?? null;
 
   for (const vibeTolerance of vibeToleranceBands) {
@@ -94,20 +94,21 @@ export function generateQ5FactorialCards({
 
     usedVenueIds.add(cuisineDrop.id);
 
-    const reputationDrop = pickVenue(pool, usedVenueIds, {
+    const crowdApprovalDrop = pickVenue(pool, usedVenueIds, {
       cuisine: (cuisine) =>
-        reputationDropCuisine === null || cuisine === reputationDropCuisine,
+        crowdApprovalDropCuisine === null ||
+        cuisine === crowdApprovalDropCuisine,
       reputation: (reputation) =>
         member.reputation === noPreferenceReputation ||
         reputation !== member.reputation,
       vibe: vibeMatches,
     });
 
-    if (!reputationDrop) {
+    if (!crowdApprovalDrop) {
       continue;
     }
 
-    usedVenueIds.add(reputationDrop.id);
+    usedVenueIds.add(crowdApprovalDrop.id);
 
     const vibeDrop = pickVenue(pool, usedVenueIds, {
       cuisine: (cuisine) =>
@@ -124,7 +125,7 @@ export function generateQ5FactorialCards({
 
     const cards = [
       { venue: cuisineDrop, droppedAxis: "cuisine" as const },
-      { venue: reputationDrop, droppedAxis: "crowd_approval" as const },
+      { venue: crowdApprovalDrop, droppedAxis: "crowd_approval" as const },
       { venue: vibeDrop, droppedAxis: "vibe" as const },
     ];
 

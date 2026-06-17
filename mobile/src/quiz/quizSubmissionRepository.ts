@@ -79,7 +79,7 @@ type QuestionSlot = {
   answer: Record<string, unknown>;
 };
 
-type VoteAxis = "cuisine" | "crowd_approval" | "vibe";
+type VoteAxis = Q5Axis;
 
 type Q5Rating = {
   droppedAxis: VoteAxis;
