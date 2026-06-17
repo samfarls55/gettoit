@@ -12,22 +12,31 @@ const CI_PATH = new URL(
   import.meta.url,
 );
 
-// deno-lint-ignore no-explicit-any
-function loadWorkflow(): any {
+function loadWorkflow(): unknown {
   return parse(Deno.readTextFileSync(CI_PATH));
 }
 
-// deno-lint-ignore no-explicit-any
-function jobStepsText(job: any): string {
-  const steps = (job?.steps ?? []) as Array<Record<string, unknown>>;
+function recordFromUnknown(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function jobStepsText(job: unknown): string {
+  const jobRecord = recordFromUnknown(job);
+  const steps = Array.isArray(jobRecord?.steps) ? jobRecord.steps : [];
   return steps
-    .map((step) => (typeof step.run === "string" ? step.run : ""))
+    .map((step) => {
+      const stepRecord = recordFromUnknown(step);
+      return typeof stepRecord?.run === "string" ? stepRecord.run : "";
+    })
     .join("\n");
 }
 
 Deno.test("ci.yml — edge-deploy deploys the q5-card-set function", () => {
-  const wf = loadWorkflow();
-  const text = jobStepsText(wf?.jobs?.["edge-deploy"]);
+  const workflow = recordFromUnknown(loadWorkflow());
+  const jobs = recordFromUnknown(workflow?.jobs);
+  const text = jobStepsText(jobs?.["edge-deploy"]);
   assertStringIncludes(
     text,
     "q5-card-set",

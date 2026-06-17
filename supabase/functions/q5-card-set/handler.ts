@@ -105,7 +105,7 @@ export async function handleRequest(
   let body: unknown;
   try {
     body = await req.json();
-  } catch (_e) {
+  } catch {
     return jsonResponse({ error: "invalid_json" }, {
       status: 400,
       headers: corsHeaders(),
@@ -165,18 +165,24 @@ function parseRequestBody(
   }
 
   const objectBody = body as Record<string, unknown>;
-  if (
-    typeof objectBody.room_id !== "string" ||
-    objectBody.room_id.trim().length === 0
-  ) {
+  if (typeof objectBody.room_id !== "string") {
     return null;
   }
 
+  const roomId = objectBody.room_id.trim();
+  if (roomId.length === 0) {
+    return null;
+  }
+
+  const rawCardSetId = objectBody.q5_card_set_id;
+  const requestedCardSetId = typeof rawCardSetId === "string"
+    ? rawCardSetId.trim()
+    : "";
+
   return {
-    roomId: objectBody.room_id.trim(),
-    q5CardSetId: typeof objectBody.q5_card_set_id === "string" &&
-        objectBody.q5_card_set_id.trim().length > 0
-      ? objectBody.q5_card_set_id.trim()
+    roomId,
+    q5CardSetId: requestedCardSetId.length > 0
+      ? requestedCardSetId
       : defaultQ5CardSetId,
   };
 }

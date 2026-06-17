@@ -194,6 +194,9 @@ function generateFactorialCards(
   const probedCuisines = selectProbedCuisines(member, pool);
   const crowdDropCuisine = probedCuisines[0] ?? null;
   const vibeDropCuisine = probedCuisines[1] ?? probedCuisines[0] ?? null;
+  const acceptsAnyCrowdApproval = crowdApprovalIsNoPreference(
+    member.crowdApproval,
+  );
 
   for (const vibeTolerance of vibeToleranceBands) {
     const vibeMatches = (vibe: number) =>
@@ -206,8 +209,7 @@ function generateFactorialCards(
       cuisine: (cuisine) =>
         cuisine === null || !member.cuisines.includes(cuisine),
       crowdApproval: (crowdApproval) =>
-        crowdApprovalIsNoPreference(member.crowdApproval) ||
-        crowdApproval === member.crowdApproval,
+        acceptsAnyCrowdApproval || crowdApproval === member.crowdApproval,
       vibe: vibeMatches,
     });
     if (!cuisineDrop) continue;
@@ -217,8 +219,7 @@ function generateFactorialCards(
       cuisine: (cuisine) =>
         crowdDropCuisine === null || cuisine === crowdDropCuisine,
       crowdApproval: (crowdApproval) =>
-        crowdApprovalIsNoPreference(member.crowdApproval) ||
-        crowdApproval !== member.crowdApproval,
+        acceptsAnyCrowdApproval || crowdApproval !== member.crowdApproval,
       vibe: vibeMatches,
     });
     if (!crowdApprovalDrop) continue;
@@ -228,8 +229,7 @@ function generateFactorialCards(
       cuisine: (cuisine) =>
         vibeDropCuisine === null || cuisine === vibeDropCuisine,
       crowdApproval: (crowdApproval) =>
-        crowdApprovalIsNoPreference(member.crowdApproval) ||
-        crowdApproval === member.crowdApproval,
+        acceptsAnyCrowdApproval || crowdApproval === member.crowdApproval,
       vibe: vibeDiffers,
     });
     if (!vibeDrop) continue;

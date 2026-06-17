@@ -65,7 +65,7 @@ function finiteNumber(value: unknown): number | null {
 
 function positiveNumber(value: unknown): number | null {
   const numberValue = finiteNumber(value);
-  return numberValue && numberValue > 0 ? numberValue : null;
+  return numberValue !== null && numberValue > 0 ? numberValue : null;
 }
 
 function stringArray(value: unknown): string[] | undefined {
@@ -86,10 +86,9 @@ function answersFromProgress(
     return {};
   }
   const stored = answers as Record<string, unknown>;
+  const q1CuisineCravings = stringArray(stored.q1CuisineCravings);
   return {
-    ...(stringArray(stored.q1CuisineCravings)
-      ? { q1CuisineCravings: stringArray(stored.q1CuisineCravings) }
-      : {}),
+    ...(q1CuisineCravings ? { q1CuisineCravings } : {}),
     ...(typeof stored.q2SpendCap === "string"
       ? { q2SpendCap: stored.q2SpendCap }
       : {}),
@@ -201,23 +200,26 @@ function q5PoolFromGoogleResponse(
     seenPlaceIds.add(place.place_id);
 
     const profileIndex = pool.length % 3;
-    const candidateProfile = profileIndex === 0
-      ? {
+    let candidateProfile: Q5CardSetPoolCandidate["profile"];
+    if (profileIndex === 0) {
+      candidateProfile = {
         cuisine: null,
         crowdApproval: targetCrowdApproval,
         vibe: profile.vibe,
-      }
-      : profileIndex === 1
-      ? {
+      };
+    } else if (profileIndex === 1) {
+      candidateProfile = {
         cuisine: selectedCuisine,
         crowdApproval: alternateCrowdApproval,
         vibe: profile.vibe,
-      }
-      : {
+      };
+    } else {
+      candidateProfile = {
         cuisine: secondSelectedCuisine,
         crowdApproval: targetCrowdApproval,
         vibe: alternateVibe,
       };
+    }
 
     pool.push({
       googlePlaceId: place.place_id,
