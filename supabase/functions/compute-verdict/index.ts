@@ -34,6 +34,12 @@ import {
   type VotesRow,
 } from "../_shared/votes-schema.ts";
 import { buildVibeFitCandidate } from "../_shared/vibe-fit.ts";
+import {
+  buildGoogleProviderNearbySearchRequest,
+  fetchGoogleProviderWithRetry,
+  GOOGLE_PROVIDER_FIELD_MASKS,
+  type GoogleProviderNearbyFieldMaskName,
+} from "../_shared/google-provider-runtime.ts";
 // tb-WF-11 â€” resolves each member's name from the joined
 // `members.display_name`, falling back to the `m<uuid>` placeholder.
 import { resolveMemberDisplayName } from "./member-display-name.ts";
@@ -41,33 +47,18 @@ import { resolveMemberDisplayName } from "./member-display-name.ts";
 // below; import it so `deno check` resolves the type.
 import type { HardVeto } from "../_shared/verdict-engine.ts";
 
-const GOOGLE_NEARBY_SEARCH_URL =
-  "https://places.googleapis.com/v1/places:searchNearby";
-export const GOOGLE_VERDICT_FETCH_FIELD_MASK_VERSION = "verdict_fetch_v1";
-export const GOOGLE_VERDICT_FETCH_FIELD_MASK = [
-  "places.id",
-  "places.displayName",
-  "places.types",
-  "places.primaryType",
-  "places.priceLevel",
-  "places.rating",
-  "places.userRatingCount",
-  "places.currentOpeningHours.openNow",
-  "places.regularOpeningHours.periods",
-  "places.dineIn",
-  "places.takeout",
-].join(",");
+export const GOOGLE_VERDICT_FETCH_FIELD_MASK_VERSION =
+  GOOGLE_PROVIDER_FIELD_MASKS.verdict_fetch.version;
+export const GOOGLE_VERDICT_FETCH_FIELD_MASK =
+  GOOGLE_PROVIDER_FIELD_MASKS.verdict_fetch.mask;
 export const GOOGLE_VERDICT_SCORING_FIELD_MASK_VERSION =
-  "verdict_scoring_vibe_fit_v1";
-export const GOOGLE_VERDICT_SCORING_FIELD_MASK = [
-  GOOGLE_VERDICT_FETCH_FIELD_MASK,
-  "places.reviewSummary",
-  "places.generativeSummary",
-  "places.liveMusic",
-  "places.goodForGroups",
-  "places.goodForWatchingSports",
-  "places.outdoorSeating",
-].join(",");
+  GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.version;
+export const GOOGLE_VERDICT_SCORING_FIELD_MASK =
+  GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.mask;
+type GoogleVerdictFieldMaskName = Extract<
+  GoogleProviderNearbyFieldMaskName,
+  "verdict_fetch" | "verdict_scoring"
+>;
 
 function buildSupabaseAdapter(
   env: ComputeVerdictEnv,
@@ -147,14 +138,10 @@ function buildSupabaseAdapter(
         );
         return [];
       }
-      const response = await fetch(GOOGLE_NEARBY_SEARCH_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": googleApiKey,
-          "X-Goog-FieldMask": googleVerdictFieldMask(env),
-        },
-        body: JSON.stringify({
+      const request = buildGoogleProviderNearbySearchRequest({
+        apiKey: googleApiKey,
+        fieldMask: googleVerdictFieldMaskName(env),
+        body: {
           includedPrimaryTypes: ["restaurant"],
           maxResultCount: 20,
           locationRestriction: {
@@ -166,8 +153,13 @@ function buildSupabaseAdapter(
               radius: room.radius_meters,
             },
           },
-        }),
+        },
       });
+      const response = await fetchGoogleProviderWithRetry(
+        fetch,
+        request.url,
+        request.init,
+      );
       if (!response.ok) {
         console.warn(
           `compute-verdict Google verdict fetch failed: ${response.status}`,
@@ -608,10 +600,10 @@ function isVibeFitEnabled(env: ComputeVerdictEnv): boolean {
   return raw === "1" || raw?.toLowerCase() === "true";
 }
 
-function googleVerdictFieldMask(env: ComputeVerdictEnv): string {
-  return isVibeFitEnabled(env)
-    ? GOOGLE_VERDICT_SCORING_FIELD_MASK
-    : GOOGLE_VERDICT_FETCH_FIELD_MASK;
+function googleVerdictFieldMaskName(
+  env: ComputeVerdictEnv,
+): GoogleVerdictFieldMaskName {
+  return isVibeFitEnabled(env) ? "verdict_scoring" : "verdict_fetch";
 }
 
 function shapeGoogleVerdictCandidates(

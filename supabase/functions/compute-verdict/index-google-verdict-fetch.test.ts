@@ -22,6 +22,7 @@ import {
   buildVibeFitCandidate,
   type VibeFitSignal,
 } from "../_shared/vibe-fit.ts";
+import { GOOGLE_PROVIDER_FIELD_MASKS } from "../_shared/google-provider-runtime.ts";
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
 
@@ -340,18 +341,32 @@ Deno.test("TB-07: Google verdict scoring keeps no-vibe-evidence candidates eligi
 });
 
 Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scoring", () => {
-  const source = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
-
-  assertStringIncludes(source, "GOOGLE_VERDICT_FETCH_FIELD_MASK");
-  assertStringIncludes(source, "GOOGLE_VERDICT_SCORING_FIELD_MASK");
-  assertStringIncludes(source, '"places.reviewSummary"');
-  assertStringIncludes(source, '"places.generativeSummary"');
-  assertStringIncludes(source, "isVibeFitEnabled(env)");
-  assert(
-    source.indexOf('"places.reviewSummary"') >
-      source.indexOf("GOOGLE_VERDICT_SCORING_FIELD_MASK"),
-    "summary fields must belong to the internal scoring mask, not the base fetch/display masks",
+  const indexSource = Deno.readTextFileSync(
+    new URL("./index.ts", import.meta.url),
   );
+  const summaryFields = [
+    "places.reviewSummary",
+    "places.generativeSummary",
+  ];
+
+  for (const summaryField of summaryFields) {
+    assertEquals(
+      GOOGLE_PROVIDER_FIELD_MASKS.verdict_fetch.mask.includes(summaryField),
+      false,
+      `${summaryField} must not be in the base verdict fetch mask`,
+    );
+    assertEquals(
+      GOOGLE_PROVIDER_FIELD_MASKS.verdict_display.mask.includes(summaryField),
+      false,
+      `${summaryField} must not be in the verdict display mask`,
+    );
+    assertStringIncludes(
+      GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.mask,
+      summaryField,
+    );
+  }
+  assertStringIncludes(indexSource, "isVibeFitEnabled(env)");
+  assertStringIncludes(indexSource, "googleVerdictFieldMaskName(env)");
 });
 
 Deno.test("TB-09: production Vibe Fit uses canonical embeddings flag and no fake embeddings", () => {
