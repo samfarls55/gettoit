@@ -424,9 +424,9 @@ function ebaPrune(
   const survivors: CandidateOption[] = [];
   const cuts: OptionCut[] = [];
 
-  for (const c of candidates) {
+  for (const candidate of candidates) {
     const result = evaluateHardEligibility({
-      candidate: c,
+      candidate,
       votes,
       room: {
         meal_timing: roomEligibility.mealTiming,
@@ -434,7 +434,7 @@ function ebaPrune(
         radius_meters: roomEligibility.radiusMeters ?? null,
       },
     });
-    if (result.eligible) survivors.push(c);
+    if (result.eligible) survivors.push(candidate);
     else cuts.push(result.cut);
   }
 

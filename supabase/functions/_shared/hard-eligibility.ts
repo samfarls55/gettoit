@@ -61,10 +61,16 @@ export type HardEligibilityResult =
   | { eligible: true }
   | { eligible: false; cut: HardEligibilityCut };
 
-interface DietaryRequirement {
+export interface DietaryRequirement {
   chip: string;
   requiredTag: string;
   label: string;
+}
+
+interface MemberHardConstraints {
+  dietaryRequirements: DietaryRequirement[];
+  requiredRawTags: Set<string>;
+  cuisineNevers: Set<string>;
 }
 
 const GOOGLE_CROWD_FLOOR = Object.freeze({
@@ -126,7 +132,7 @@ export function evaluateHardEligibility(input: {
 }): HardEligibilityResult {
   const { candidate, votes } = input;
   const room = input.room ?? {};
-  const googleCandidate = typeof candidate.google_place_id === "string" &&
+  const isGoogleCandidate = typeof candidate.google_place_id === "string" &&
     candidate.google_place_id.trim().length > 0;
 
   if (
@@ -138,11 +144,11 @@ export function evaluateHardEligibility(input: {
     return cut(candidate.id, "radius", "outside the Search area");
   }
 
-  if (googleCandidate && typeof candidate.price_tier !== "number") {
+  if (isGoogleCandidate && typeof candidate.price_tier !== "number") {
     return cut(candidate.id, "metadata", "missing required provider metadata");
   }
 
-  if (googleCandidate) {
+  if (isGoogleCandidate) {
     if (
       typeof candidate.rating !== "number" ||
       typeof candidate.user_rating_count !== "number"
@@ -161,31 +167,35 @@ export function evaluateHardEligibility(input: {
     }
   }
 
-  if (!passesAvailability(candidate, room, googleCandidate)) {
+  if (!passesAvailability(candidate, room, isGoogleCandidate)) {
     return cut(candidate.id, "availability", "unavailable for this Plan");
   }
 
-  const minBudget = votes.reduce(
+  const lowestBudgetCap = votes.reduce(
     (acc, vote) => Math.min(acc, vote.q2_budget),
     Number.POSITIVE_INFINITY,
   );
   if (
-    Number.isFinite(minBudget) &&
+    Number.isFinite(lowestBudgetCap) &&
     typeof candidate.price_tier === "number" &&
-    candidate.price_tier > minBudget
+    candidate.price_tier > lowestBudgetCap
   ) {
     return cut(candidate.id, "budget", "over the budget cap");
   }
 
   const constraints = buildMemberHardConstraints(votes);
-  const missingReq = constraints.dietaryReqs.find((req) =>
-    !candidate.dietary_tags.includes(req.requiredTag)
+  const missingDietaryRequirement = constraints.dietaryRequirements.find(
+    (requirement) => !candidate.dietary_tags.includes(requirement.requiredTag),
   );
-  if (missingReq) {
-    return cut(candidate.id, "dietary", `${missingReq.chip} veto`);
+  if (missingDietaryRequirement) {
+    return cut(
+      candidate.id,
+      "dietary",
+      `${missingDietaryRequirement.chip} veto`,
+    );
   }
 
-  for (const tag of constraints.requiredTags) {
+  for (const tag of constraints.requiredRawTags) {
     if (!candidate.dietary_tags.includes(tag)) {
       return cut(candidate.id, "veto", "fails an allergy veto");
     }
@@ -218,37 +228,46 @@ function cut(
   };
 }
 
-function buildMemberHardConstraints(votes: readonly HardEligibilityVote[]): {
-  dietaryReqs: DietaryRequirement[];
-  requiredTags: Set<string>;
-  cuisineNevers: Set<string>;
-} {
-  const dietaryReqs: DietaryRequirement[] = [];
-  const addReq = (chip: string) => {
-    const req = lookupDietaryRequirement(chip);
-    if (req && !dietaryReqs.find((existing) => existing.chip === req.chip)) {
-      dietaryReqs.push(req);
+function buildMemberHardConstraints(
+  votes: readonly HardEligibilityVote[],
+): MemberHardConstraints {
+  const dietaryRequirements: DietaryRequirement[] = [];
+  const addDietaryRequirement = (chip: string) => {
+    const requirement = lookupDietaryRequirement(chip);
+    if (
+      requirement &&
+      !dietaryRequirements.find((existing) =>
+        existing.chip === requirement.chip
+      )
+    ) {
+      dietaryRequirements.push(requirement);
     }
   };
-  const requiredTags = new Set<string>();
+  const requiredRawTags = new Set<string>();
   const cuisineNevers = new Set<string>();
 
   for (const vote of votes) {
-    for (const chip of vote.q1_vetoes) addReq(chip);
+    for (const chip of vote.q1_vetoes) addDietaryRequirement(chip);
     for (const veto of vote.hard_vetoes) {
-      if (veto.kind === "dietary") addReq(veto.token);
-      if (veto.kind === "tag") {
-        const token = veto.token.trim();
-        if (token.length > 0) requiredTags.add(token);
-      }
-      if (veto.kind === "cuisine_never") {
-        const token = veto.token.trim().toLowerCase();
-        if (token.length > 0) cuisineNevers.add(token);
+      switch (veto.kind) {
+        case "dietary":
+          addDietaryRequirement(veto.token);
+          break;
+        case "tag": {
+          const token = veto.token.trim();
+          if (token.length > 0) requiredRawTags.add(token);
+          break;
+        }
+        case "cuisine_never": {
+          const token = veto.token.trim().toLowerCase();
+          if (token.length > 0) cuisineNevers.add(token);
+          break;
+        }
       }
     }
   }
 
-  return { dietaryReqs, requiredTags, cuisineNevers };
+  return { dietaryRequirements, requiredRawTags, cuisineNevers };
 }
 
 function passesAvailability(
