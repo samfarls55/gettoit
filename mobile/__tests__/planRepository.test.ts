@@ -10,7 +10,11 @@ type QueryCall = {
   filters: Array<[string, string, unknown]>;
   mutation:
     | { type: "delete"; row: null }
-    | { type: "insert" | "update"; row: Record<string, unknown> }
+    | {
+        type: "insert" | "update" | "upsert";
+        row: Record<string, unknown>;
+        options?: Record<string, unknown>;
+      }
     | null;
   orderBy: string | null;
   selectColumns: string | null;
@@ -90,6 +94,14 @@ class TestQuery<T> implements PromiseLike<SupabaseQueryResult<T[]>> {
 
   insert(row: Record<string, unknown>) {
     this.call.mutation = { type: "insert", row };
+    return new TestMutation<T>(this.call, {
+      data: this.result.data?.[0] ?? null,
+      error: this.result.error,
+    });
+  }
+
+  upsert(row: Record<string, unknown>, options?: Record<string, unknown>) {
+    this.call.mutation = { type: "upsert", row, options };
     return new TestMutation<T>(this.call, {
       data: this.result.data?.[0] ?? null,
       error: this.result.error,
@@ -438,6 +450,76 @@ describe("planRepository", () => {
 
     expect(calls[1].mutation?.type).toBe("update");
     expect(calls[1].filters).toEqual([["eq", "id", "saved-plan"]]);
+  });
+
+  it("repairs owner membership when launching an existing room", async () => {
+    const calls: QueryCall[] = [];
+    const repository = createSupabasePlanRepository({
+      supabase: makeSupabaseClient(
+        {
+          plans: {
+            data: [
+              {
+                id: "plan-1",
+                creator_id: "user-1",
+                name: "Visual QA dinner",
+                scope: "group",
+                location: null,
+                session_params: {
+                  meal_time: "dinner",
+                  service_shape: "dineIn",
+                },
+                distance_meters: 3219,
+                status: "pending",
+                created_at: "2026-06-04T10:00:00Z",
+                verdict_fired_at: null,
+                expired_at: null,
+              },
+            ],
+            error: null,
+          },
+          rooms: {
+            data: [{ id: "room-1", plan_id: "plan-1" }],
+            error: null,
+          },
+          members: {
+            data: [],
+            error: null,
+          },
+        },
+        calls,
+      ),
+      userId: "user-1",
+    });
+
+    await expect(
+      repository.launchPlan({
+        id: "plan-1",
+        name: "Visual QA dinner",
+        participantScope: "group",
+        searchArea: null,
+        mealTime: "dinner",
+        serviceShape: "dineIn",
+      }),
+    ).resolves.toMatchObject({ id: "plan-1", roomId: "room-1" });
+
+    expect(calls.map((call) => call.table)).toEqual([
+      "plans",
+      "rooms",
+      "members",
+    ]);
+    expect(calls[2].mutation).toEqual({
+      type: "upsert",
+      row: {
+        room_id: "room-1",
+        user_id: "user-1",
+        role: "owner",
+      },
+      options: {
+        onConflict: "room_id,user_id",
+        ignoreDuplicates: true,
+      },
+    });
   });
 
   it("deletes a created Plan through Supabase plans", async () => {

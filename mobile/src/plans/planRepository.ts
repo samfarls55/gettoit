@@ -80,6 +80,11 @@ export type SupabaseQueryResult<TData> = {
   error: Error | null;
 };
 
+export type SupabaseUpsertOptions = {
+  onConflict?: string;
+  ignoreDuplicates?: boolean;
+};
+
 export type PlanSupabaseQuery<TRow> = PromiseLike<
   SupabaseQueryResult<TRow[]>
 > & {
@@ -104,6 +109,10 @@ export type PlanSupabaseTable<TRow> = PlanSupabaseQuery<TRow> & {
   delete: () => PlanSupabaseMutation<TRow>;
   insert: (
     row: Record<string, unknown> | Array<Record<string, unknown>>,
+  ) => PlanSupabaseMutation<TRow>;
+  upsert: (
+    row: Record<string, unknown> | Array<Record<string, unknown>>,
+    options?: SupabaseUpsertOptions,
   ) => PlanSupabaseMutation<TRow>;
   update: (row: Record<string, unknown>) => PlanSupabaseMutation<TRow>;
 };
@@ -347,6 +356,17 @@ function roomWriteRow(
   return row;
 }
 
+function ownerMembershipWriteRow(
+  roomId: string,
+  userId: string,
+): Record<string, unknown> {
+  return {
+    room_id: roomId,
+    user_id: userId,
+    role: "owner",
+  };
+}
+
 function pendingCreatedItem(plan: SupabasePlanRow): PlanListItem {
   return {
     id: plan.id,
@@ -406,6 +426,19 @@ export function createSupabasePlanRepository({
   supabase,
   userId,
 }: SupabasePlanRepositoryDependencies): PlanRepository {
+  const ensureOwnerMembership = async (roomId: string): Promise<void> => {
+    const memberResult = await supabase
+      .from<SupabaseRoomMemberRow>("members")
+      .upsert(ownerMembershipWriteRow(roomId, userId), {
+        onConflict: "room_id,user_id",
+        ignoreDuplicates: true,
+      });
+
+    if (memberResult.error) {
+      throw new Error(`Plan owner membership failed: ${memberResult.error.message}`);
+    }
+  };
+
   const savePlan = async (plan: PlanSetup): Promise<SavedPlanSetup> => {
     const row = planWriteRow(plan, userId);
     const mutation = plan.id
@@ -444,6 +477,7 @@ export function createSupabasePlanRepository({
     )[0];
 
     if (existingRoom) {
+      await ensureOwnerMembership(existingRoom.id);
       return existingRoom.id;
     }
 
@@ -461,17 +495,7 @@ export function createSupabasePlanRepository({
       throw new Error("Plan room create failed: no row returned");
     }
 
-    const memberResult = await supabase
-      .from<SupabaseRoomMemberRow>("members")
-      .insert({
-        room_id: roomResult.data.id,
-        user_id: userId,
-        role: "owner",
-      });
-
-    if (memberResult.error) {
-      throw new Error(`Plan owner membership failed: ${memberResult.error.message}`);
-    }
+    await ensureOwnerMembership(roomResult.data.id);
 
     return roomResult.data.id;
   };

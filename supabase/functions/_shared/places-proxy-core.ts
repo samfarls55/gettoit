@@ -527,6 +527,8 @@ type GoogleNearbySearchResponse = {
 type GoogleQ5ShapeResult = {
   places: GoogleQ5Place[];
   strictCount: number;
+  timingRelaxedCandidateCount: number;
+  timingRelaxed: boolean;
 };
 
 type GooglePlaceDetailsResponse = {
@@ -581,8 +583,10 @@ export async function handleGoogleQ5PlacesProxy(
   console.info("google_q5_shape", JSON.stringify({
     raw_count: body.places?.length ?? 0,
     strict_count: shaped.strictCount,
+    timing_relaxed_candidate_count: shaped.timingRelaxedCandidateCount,
     returned_count: shaped.places.length,
     relaxed_service_used: shaped.places.length > shaped.strictCount,
+    relaxed_timing_used: shaped.timingRelaxed,
     has_open_at: Boolean(input.filters?.open_at),
     service_shape: input.filters?.service_shape ?? null,
     radius_meters: input.radius_meters,
@@ -726,6 +730,8 @@ function shapeGoogleQ5Places(
     return {
       places: strict,
       strictCount: strict.length,
+      timingRelaxedCandidateCount: 0,
+      timingRelaxed: false,
     };
   }
 
@@ -735,9 +741,35 @@ function shapeGoogleQ5Places(
     isGooglePlaceEligibleForTimingAndRelaxedService,
   );
 
+  if (relaxedService.length >= GOOGLE_Q5_MIN_CARD_COUNT) {
+    return {
+      places: relaxedService,
+      strictCount: strict.length,
+      timingRelaxedCandidateCount: 0,
+      timingRelaxed: false,
+    };
+  }
+
+  if (!input.filters?.open_at) {
+    return {
+      places: relaxedService,
+      strictCount: strict.length,
+      timingRelaxedCandidateCount: 0,
+      timingRelaxed: false,
+    };
+  }
+
+  const serviceOnly = collectGoogleQ5Places(
+    input,
+    body,
+    isGooglePlaceEligibleForRelaxedService,
+  );
+
   return {
-    places: relaxedService,
+    places: mergeGoogleQ5Places(relaxedService, serviceOnly),
     strictCount: strict.length,
+    timingRelaxedCandidateCount: serviceOnly.length,
+    timingRelaxed: serviceOnly.length > relaxedService.length,
   };
 }
 
@@ -769,6 +801,25 @@ function collectGoogleQ5Places(
   return places;
 }
 
+function mergeGoogleQ5Places(
+  primary: GoogleQ5Place[],
+  fallback: GoogleQ5Place[],
+): GoogleQ5Place[] {
+  const seenPlaceIds = new Set(primary.map((place) => place.place_id));
+  const merged = [...primary];
+
+  for (const place of fallback) {
+    if (seenPlaceIds.has(place.place_id)) {
+      continue;
+    }
+
+    seenPlaceIds.add(place.place_id);
+    merged.push(place);
+  }
+
+  return merged;
+}
+
 function isGooglePlaceEligibleForTimingAndService(
   place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
   input: PlacesProxyInput,
@@ -797,6 +848,21 @@ function isGooglePlaceEligibleForTimingAndRelaxedService(
   if (!isGooglePlaceEligibleForTiming(place, input)) {
     return false;
   }
+
+  if (serviceShape === "dineIn" && place.dineIn === false) {
+    return false;
+  }
+  if (serviceShape === "takeout" && place.takeout === false) {
+    return false;
+  }
+  return true;
+}
+
+function isGooglePlaceEligibleForRelaxedService(
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+  input: PlacesProxyInput,
+): boolean {
+  const serviceShape = input.filters?.service_shape;
 
   if (serviceShape === "dineIn" && place.dineIn === false) {
     return false;

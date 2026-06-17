@@ -352,7 +352,9 @@ function q5PoolFromGoogleResponse(
     return [];
   }
 
-  const selectedCuisine = selectedCuisines(answers)[0] ?? null;
+  const cuisines = selectedCuisines(answers);
+  const firstSelectedCuisine = cuisines[0] ?? null;
+  const secondSelectedCuisine = cuisines[1] ?? firstSelectedCuisine;
   const targetReputation = reputationFromAnswers(answers);
   const targetVibe = vibeFromAnswers(answers);
   const attributionText =
@@ -371,12 +373,12 @@ function q5PoolFromGoogleResponse(
           }
         : profileIndex === 1
           ? {
-              cuisine: selectedCuisine,
+              cuisine: firstSelectedCuisine,
               reputation: alternateReputation(targetReputation),
               vibe: targetVibe,
             }
           : {
-              cuisine: selectedCuisine,
+              cuisine: secondSelectedCuisine,
               reputation: targetReputation,
               vibe: alternateVibe(targetVibe),
             };
@@ -411,8 +413,12 @@ export function createSupabaseQ5CandidateRepository({
         throw new Error(`Q5 places read failed: ${result.error.message}`);
       }
 
-      if (!result.data || result.data.error) {
+      if (!result.data) {
         return [];
+      }
+
+      if (result.data.error) {
+        throw new Error(`Q5 places read failed: ${result.data.error}`);
       }
 
       return q5PoolFromGoogleResponse(result.data, answers);

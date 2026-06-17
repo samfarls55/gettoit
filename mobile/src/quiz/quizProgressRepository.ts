@@ -25,6 +25,11 @@ export type SupabaseQueryResult<TData> = {
   error: Error | null;
 };
 
+export type SupabaseUpsertOptions = {
+  onConflict?: string;
+  ignoreDuplicates?: boolean;
+};
+
 export type QuizProgressSupabaseQuery<TRow> = PromiseLike<
   SupabaseQueryResult<TRow[]>
 > & {
@@ -44,6 +49,10 @@ export type QuizProgressSupabaseMutation<TRow> = PromiseLike<
 export type QuizProgressSupabaseTable<TRow> =
   QuizProgressSupabaseQuery<TRow> & {
     delete: () => QuizProgressSupabaseMutation<TRow>;
+    upsert: (
+      row: Record<string, unknown>,
+      options?: SupabaseUpsertOptions,
+    ) => QuizProgressSupabaseMutation<TRow>;
   };
 
 export type QuizProgressSupabaseClient = {
@@ -58,6 +67,12 @@ type SupabaseMemberProgressRow = {
   room_id: string;
   user_id: string;
   quiz_progress?: Record<string, unknown> | null;
+};
+
+type SupabaseRoomRow = {
+  id: string;
+  plan_id?: string | null;
+  creator_user_id?: string | null;
 };
 
 export type SupabaseQuizProgressRepositoryDependencies = {
@@ -179,36 +194,107 @@ function progressWritePayload(progress: QuizProgress): Record<string, unknown> {
   };
 }
 
+function ownerMembershipWriteRow(
+  roomId: string,
+  userId: string,
+): Record<string, unknown> {
+  return {
+    room_id: roomId,
+    user_id: userId,
+    role: "owner",
+  };
+}
+
+async function ensureOwnerMembership(
+  supabase: QuizProgressSupabaseClient,
+  userId: string,
+  room: SupabaseRoomRow,
+): Promise<void> {
+  if (room.creator_user_id !== userId) {
+    return;
+  }
+
+  const result = await supabase
+    .from<SupabaseMemberProgressRow>("members")
+    .upsert(ownerMembershipWriteRow(room.id, userId), {
+      onConflict: "room_id,user_id",
+      ignoreDuplicates: true,
+    });
+
+  if (result.error) {
+    throw new Error(`Quiz owner membership repair failed: ${result.error.message}`);
+  }
+}
+
+async function resolveVisibleRoom(
+  supabase: QuizProgressSupabaseClient,
+  roomOrPlanId: string,
+): Promise<SupabaseRoomRow | null> {
+  const directRows = assertSupabaseRows(
+    await supabase
+      .from<SupabaseRoomRow>("rooms")
+      .select("id, plan_id, creator_user_id")
+      .eq("id", roomOrPlanId),
+    "Quiz room read",
+  );
+
+  if (directRows[0]) {
+    return directRows[0];
+  }
+
+  const planRoomRows = assertSupabaseRows(
+    await supabase
+      .from<SupabaseRoomRow>("rooms")
+      .select("id, plan_id, creator_user_id")
+      .eq("plan_id", roomOrPlanId),
+    "Quiz plan room read",
+  );
+
+  return planRoomRows[0] ?? null;
+}
+
 export function createSupabaseQuizProgressRepository({
   supabase,
   userId,
 }: SupabaseQuizProgressRepositoryDependencies): QuizProgressRepository {
   return {
     loadProgress: async (roomId) => {
+      const resolvedRoom = await resolveVisibleRoom(supabase, roomId);
+      if (!resolvedRoom) {
+        return null;
+      }
+
       const rows = assertSupabaseRows(
         await supabase
           .from<SupabaseMemberProgressRow>("members")
           .select("room_id, user_id, quiz_progress")
-          .eq("room_id", roomId)
+          .eq("room_id", resolvedRoom.id)
           .eq("user_id", userId),
         "Quiz progress read",
       );
       const row = rows[0];
 
       if (!row) {
+        await ensureOwnerMembership(supabase, userId, resolvedRoom);
         return null;
       }
 
       const storedProgress = row.quiz_progress ?? null;
       return {
-        roomId,
+        roomId: resolvedRoom.id,
         currentQuestion: currentQuestionFromStored(storedProgress),
         answers: quizAnswersFromStored(storedProgress?.answers),
       };
     },
     saveProgress: async (progress) => {
+      const resolvedRoom = await resolveVisibleRoom(supabase, progress.roomId);
+      if (!resolvedRoom) {
+        throw new Error("Quiz progress save failed: no joined room found");
+      }
+      await ensureOwnerMembership(supabase, userId, resolvedRoom);
+
       const result = await supabase.rpc("members_progress_upsert", {
-        p_room_id: progress.roomId,
+        p_room_id: resolvedRoom.id,
         p_progress: progressWritePayload(progress),
       });
 
@@ -217,10 +303,15 @@ export function createSupabaseQuizProgressRepository({
       }
     },
     exitPlan: async ({ roomId }) => {
+      const resolvedRoom = await resolveVisibleRoom(supabase, roomId);
+      if (!resolvedRoom) {
+        return;
+      }
+
       const result = await supabase
         .from<SupabaseMemberProgressRow>("members")
         .delete()
-        .eq("room_id", roomId)
+        .eq("room_id", resolvedRoom.id)
         .eq("user_id", userId);
 
       if (result.error) {

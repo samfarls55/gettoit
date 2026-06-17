@@ -344,6 +344,18 @@ Deno.test("google q5 — applies meal timing and service-mode eligibility before
           dineIn: true,
         },
         {
+          id: "current-open-dine-in-2",
+          displayName: { text: "Second Open Dine-In" },
+          currentOpeningHours: { openNow: true },
+          dineIn: true,
+        },
+        {
+          id: "current-open-dine-in-3",
+          displayName: { text: "Third Open Dine-In" },
+          currentOpeningHours: { openNow: true },
+          dineIn: true,
+        },
+        {
           id: "current-closed",
           displayName: { text: "Closed Now" },
           currentOpeningHours: { openNow: false },
@@ -357,6 +369,30 @@ Deno.test("google q5 — applies meal timing and service-mode eligibility before
         {
           id: "future-open-takeout-unknown",
           displayName: { text: "Future Open" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+        },
+        {
+          id: "future-open-takeout-unknown-2",
+          displayName: { text: "Second Future Open" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+        },
+        {
+          id: "future-open-takeout-unknown-3",
+          displayName: { text: "Third Future Open" },
           regularOpeningHours: {
             periods: [
               {
@@ -389,6 +425,14 @@ Deno.test("google q5 — applies meal timing and service-mode eligibility before
 
   assertEquals(current.places, [
     { place_id: "current-open-dine-in", display_name: "Open Dine-In" },
+    {
+      place_id: "current-open-dine-in-2",
+      display_name: "Second Open Dine-In",
+    },
+    {
+      place_id: "current-open-dine-in-3",
+      display_name: "Third Open Dine-In",
+    },
   ]);
 
   const future = await handleGoogleQ5PlacesProxy({
@@ -398,6 +442,62 @@ Deno.test("google q5 — applies meal timing and service-mode eligibility before
 
   assertEquals(future.places, [
     { place_id: "future-open-takeout-unknown", display_name: "Future Open" },
+    {
+      place_id: "future-open-takeout-unknown-2",
+      display_name: "Second Future Open",
+    },
+    {
+      place_id: "future-open-takeout-unknown-3",
+      display_name: "Third Future Open",
+    },
+  ]);
+});
+
+Deno.test("google q5 - relaxes timing evidence when timing leaves too few cards", async () => {
+  const fetch: ProxyDeps["fetch"] = () =>
+    Promise.resolve(new Response(JSON.stringify({
+      places: [
+        {
+          id: "known-open",
+          displayName: { text: "Known Open" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+          dineIn: true,
+        },
+        {
+          id: "missing-hours",
+          displayName: { text: "Missing Hours" },
+          dineIn: true,
+        },
+        {
+          id: "closed-now",
+          displayName: { text: "Closed Now" },
+          currentOpeningHours: { openNow: false },
+          dineIn: true,
+        },
+        {
+          id: "known-no-dine-in",
+          displayName: { text: "Known No Dine-In" },
+          dineIn: false,
+        },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+
+  const result = await handleGoogleQ5PlacesProxy({
+    ...TYPICAL_INPUT,
+    filters: { open_at: "3T1900", service_shape: "dineIn" },
+  }, { fetch, googleApiKey: "google-secret" });
+
+  assertEquals(result.places, [
+    { place_id: "known-open", display_name: "Known Open" },
+    { place_id: "missing-hours", display_name: "Missing Hours" },
+    { place_id: "closed-now", display_name: "Closed Now" },
   ]);
 });
 

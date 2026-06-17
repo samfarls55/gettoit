@@ -195,6 +195,11 @@ const webSupabaseSessionStorage: MobileSupabaseSessionStorage = {
 const mobileSupabaseSessionStorage =
   Platform.OS === "web" ? webSupabaseSessionStorage : new LargeSecureStore();
 
+type SupabaseJsClient = ReturnType<typeof createClient>;
+
+let cachedSupabaseClient: SupabaseJsClient | null = null;
+let cachedSupabaseConfigKey: string | null = null;
+
 export function getMobileSupabaseConfig(
   env: Record<string, string | undefined> = expoPublicEnv(),
 ): MobileSupabaseConfig {
@@ -210,10 +215,23 @@ export function getMobileSupabaseConfig(
   return { supabaseUrl, supabaseAnonKey };
 }
 
-export function createMobileSupabaseClient(
-  config = getMobileSupabaseConfig(),
-): MobileSupabaseClient {
-  const client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+export function resetMobileSupabaseClientCacheForTests() {
+  cachedSupabaseClient = null;
+  cachedSupabaseConfigKey = null;
+}
+
+function supabaseConfigKey(config: MobileSupabaseConfig): string {
+  return `${config.supabaseUrl}\n${config.supabaseAnonKey}`;
+}
+
+function getOrCreateSupabaseClient(config: MobileSupabaseConfig) {
+  const configKey = supabaseConfigKey(config);
+
+  if (cachedSupabaseClient && cachedSupabaseConfigKey === configKey) {
+    return cachedSupabaseClient;
+  }
+
+  cachedSupabaseClient = createClient(config.supabaseUrl, config.supabaseAnonKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
@@ -222,6 +240,15 @@ export function createMobileSupabaseClient(
     },
     realtime: { params: { eventsPerSecond: 5 } },
   });
+  cachedSupabaseConfigKey = configKey;
+
+  return cachedSupabaseClient;
+}
+
+export function createMobileSupabaseClient(
+  config = getMobileSupabaseConfig(),
+): MobileSupabaseClient {
+  const client = getOrCreateSupabaseClient(config);
 
   return {
     auth: {

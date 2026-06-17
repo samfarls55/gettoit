@@ -2,6 +2,7 @@ import {
   generateQ5FactorialCards,
   q5CardsToCandidates,
   replaceQ5FactorialCard,
+  selectProbedCuisines,
   type Q5MemberProfile,
   type Q5PoolVenue,
 } from "../src/quiz/q5Factorial";
@@ -71,6 +72,29 @@ describe("generateQ5FactorialCards", () => {
       "thai",
       "mexican",
       "mexican",
+    ]);
+  });
+
+  it("does not require a selected cuisine that has no pool support", () => {
+    const member: Q5MemberProfile = {
+      cuisines: ["italian", "mexican"],
+      reputation: "hiddenGem",
+      vibe: 2,
+    };
+    const pool = [
+      venue("contrast", null, "hiddenGem", 2),
+      venue("reputation-drop", "italian", "popular", 2),
+      venue("vibe-drop", "italian", "hiddenGem", 4),
+    ];
+
+    expect(selectProbedCuisines(member, pool)).toEqual(["italian"]);
+
+    const cards = generateQ5FactorialCards({ member, pool });
+
+    expect(cards?.map((card) => card.venue.id)).toEqual([
+      "contrast",
+      "reputation-drop",
+      "vibe-drop",
     ]);
   });
 

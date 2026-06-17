@@ -16,13 +16,32 @@ export type SupabaseQueryResult<TData> = {
   error: Error | null;
 };
 
+export type SupabaseUpsertOptions = {
+  onConflict?: string;
+  ignoreDuplicates?: boolean;
+};
+
 export type QuizSubmissionSupabaseMutation<TRow> = PromiseLike<
   SupabaseQueryResult<TRow>
 >;
 
-export type QuizSubmissionSupabaseTable<TRow> = {
-  insert: (row: Record<string, unknown>) => QuizSubmissionSupabaseMutation<TRow>;
+export type QuizSubmissionSupabaseQuery<TRow> = PromiseLike<
+  SupabaseQueryResult<TRow[]>
+> & {
+  select: (columns: string) => QuizSubmissionSupabaseQuery<TRow>;
+  eq: (column: string, value: unknown) => QuizSubmissionSupabaseQuery<TRow>;
 };
+
+export type QuizSubmissionSupabaseTable<TRow> =
+  QuizSubmissionSupabaseQuery<TRow> & {
+    insert: (
+      row: Record<string, unknown>,
+    ) => QuizSubmissionSupabaseMutation<TRow>;
+    upsert: (
+      row: Record<string, unknown>,
+      options?: SupabaseUpsertOptions,
+    ) => QuizSubmissionSupabaseMutation<TRow>;
+  };
 
 export type QuizSubmissionSupabaseClient = {
   from: <TRow>(table: string) => QuizSubmissionSupabaseTable<TRow>;
@@ -31,6 +50,18 @@ export type QuizSubmissionSupabaseClient = {
 type SupabaseVoteRow = {
   room_id: string;
   user_id: string;
+};
+
+type SupabaseMemberRow = {
+  room_id: string;
+  user_id: string;
+  role: string;
+};
+
+type SupabaseRoomRow = {
+  id: string;
+  plan_id?: string | null;
+  creator_user_id?: string | null;
 };
 
 type QuestionKind =
@@ -183,15 +214,101 @@ function isDuplicateVote(error: Error): boolean {
   );
 }
 
+function assertSupabaseRows<TRow>(
+  result: SupabaseQueryResult<TRow[]>,
+  queryName: string,
+): TRow[] {
+  if (result.error) {
+    throw new Error(`${queryName} failed: ${result.error.message}`);
+  }
+
+  return result.data ?? [];
+}
+
+function ownerMembershipWriteRow(
+  roomId: string,
+  userId: string,
+): Record<string, unknown> {
+  return {
+    room_id: roomId,
+    user_id: userId,
+    role: "owner",
+  };
+}
+
+async function ensureOwnerMembership(
+  supabase: QuizSubmissionSupabaseClient,
+  userId: string,
+  room: SupabaseRoomRow,
+): Promise<void> {
+  if (room.creator_user_id !== userId) {
+    return;
+  }
+
+  const result = await supabase
+    .from<SupabaseMemberRow>("members")
+    .upsert(ownerMembershipWriteRow(room.id, userId), {
+      onConflict: "room_id,user_id",
+      ignoreDuplicates: true,
+    });
+
+  if (result.error) {
+    throw new Error(`Quiz owner membership repair failed: ${result.error.message}`);
+  }
+}
+
+async function resolveVisibleRoomId(
+  supabase: QuizSubmissionSupabaseClient,
+  userId: string,
+  roomOrPlanId: string,
+): Promise<string | null> {
+  const directRows = assertSupabaseRows(
+    await supabase
+      .from<SupabaseRoomRow>("rooms")
+      .select("id, plan_id, creator_user_id")
+      .eq("id", roomOrPlanId),
+    "Quiz submit room read",
+  );
+
+  if (directRows[0]) {
+    await ensureOwnerMembership(supabase, userId, directRows[0]);
+    return directRows[0].id;
+  }
+
+  const planRoomRows = assertSupabaseRows(
+    await supabase
+      .from<SupabaseRoomRow>("rooms")
+      .select("id, plan_id, creator_user_id")
+      .eq("plan_id", roomOrPlanId),
+    "Quiz submit plan room read",
+  );
+
+  if (planRoomRows[0]) {
+    await ensureOwnerMembership(supabase, userId, planRoomRows[0]);
+    return planRoomRows[0].id;
+  }
+
+  return null;
+}
+
 export function createSupabaseQuizSubmissionRepository({
   supabase,
   userId,
 }: SupabaseQuizSubmissionRepositoryDependencies): QuizSubmissionRepository {
   return {
     submitQuiz: async (payload) => {
+      const resolvedRoomId = await resolveVisibleRoomId(
+        supabase,
+        userId,
+        payload.roomId,
+      );
+      if (!resolvedRoomId) {
+        throw new Error("Quiz submit failed: no joined room found");
+      }
+
       const result = await supabase
         .from<SupabaseVoteRow>("votes")
-        .insert(voteRow({ ...payload, userId }));
+        .insert(voteRow({ ...payload, roomId: resolvedRoomId, userId }));
 
       if (result.error && !isDuplicateVote(result.error)) {
         throw new Error(`Quiz submit failed: ${result.error.message}`);

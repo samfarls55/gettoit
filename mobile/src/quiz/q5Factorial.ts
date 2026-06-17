@@ -233,6 +233,7 @@ export function selectProbedCuisines(
       pickOrder,
       support: support.get(cuisine) ?? 0,
     }))
+    .filter((entry) => entry.support > 0)
     .sort((left, right) => {
       if (left.support !== right.support) {
         return right.support - left.support;

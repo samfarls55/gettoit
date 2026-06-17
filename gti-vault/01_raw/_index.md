@@ -12,6 +12,6 @@ Unprocessed notes, dumps, and assets. Cleared on `compile`.
 
 ## Contents
 
-_Empty._
+- [[q5-no-results-investigation-2026-06-17|Q5 no-results investigation]]
 
 Last cleared 2026-05-14 (compile moved testflight-first-dogfood-2026-05-14 to `15_issues/0.1.0/`; the three research bundles to `50_product/research/`). 2026-05-25: Advanced Swift PDF archived to [[../60_engineering/references/_index|60_engineering/references/]] after extraction into `/CODING_STANDARDS.md`. 2026-05-25: Designing Interfaces PDF (Tidwell/Brewer/Valencia, 3rd ed.) archived to [[../60_engineering/references/_index|60_engineering/references/]] after extraction into [[../30_design/interaction-patterns/README|30_design/interaction-patterns/]] as an actionable workflow-audit framework.

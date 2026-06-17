@@ -223,6 +223,104 @@ describe("q5CandidateRepository", () => {
     ).resolves.toEqual([]);
   });
 
+  it("profiles two selected cuisines so three Google places can form Q5 cards", async () => {
+    const invoke = jest.fn().mockResolvedValue({
+      data: {
+        places: [
+          { place_id: "google-contrast", display_name: "Contrast Cafe" },
+          { place_id: "google-italian", display_name: "Italian Spot" },
+          { place_id: "google-mexican", display_name: "Mexican Spot" },
+        ],
+      },
+      error: null,
+    });
+    const repository = createSupabaseQ5CandidateRepository({
+      supabase: makeSupabaseClient(
+        {
+          plans: {
+            data: [
+              {
+                id: "plan-1",
+                location: { lat: 40.7128, lng: -74.006 },
+                distance_meters: 3219,
+                session_params: {},
+              },
+            ],
+            error: null,
+          },
+          rooms: { data: [], error: null },
+        },
+        [],
+        invoke,
+      ),
+    });
+
+    const pool = await repository.loadCandidates({
+      roomId: "plan-1",
+      answers: {
+        q1CuisineCravings: ["italian", "mexican"],
+        q2SpendCap: "$$",
+        q3Reputation: "hiddenGem",
+        q4VibeEnergy: "social",
+      },
+    });
+
+    expect(pool.map((venue) => venue.profile.cuisine)).toEqual([
+      null,
+      "italian",
+      "mexican",
+    ]);
+
+    const cards = generateQ5FactorialCards({
+      member: {
+        cuisines: ["italian", "mexican"],
+        reputation: "hiddenGem",
+        vibe: 2,
+      },
+      pool,
+    });
+
+    expect(cards?.map((card) => card.venue.id)).toEqual([
+      "google-contrast",
+      "google-italian",
+      "google-mexican",
+    ]);
+  });
+
+  it("throws Google Q5 edge errors instead of treating them as empty pools", async () => {
+    const invoke = jest.fn().mockResolvedValue({
+      data: { error: "google_places_upstream_429" },
+      error: null,
+    });
+    const repository = createSupabaseQ5CandidateRepository({
+      supabase: makeSupabaseClient(
+        {
+          plans: {
+            data: [
+              {
+                id: "plan-1",
+                location: { lat: 40.7128, lng: -74.006 },
+                distance_meters: 3219,
+                session_params: {},
+              },
+            ],
+            error: null,
+          },
+          rooms: { data: [], error: null },
+        },
+        [],
+        invoke,
+      ),
+    });
+
+    await expect(
+      repository.loadCandidates({
+        roomId: "plan-1",
+        answers: {},
+      }),
+    ).rejects.toThrow("Q5 places read failed: google_places_upstream_429");
+  });
+
   it("returns no Q5 pool when the Plan has no search location", async () => {
     const invoke = jest.fn();
     const repository = createSupabaseQ5CandidateRepository({

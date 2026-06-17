@@ -4,6 +4,7 @@ import {
   createMobileSupabaseClient,
   createSupabaseAuthRepository,
   getMobileSupabaseConfig,
+  resetMobileSupabaseClientCacheForTests,
   type AppleCredential,
   type MobileAuthRepositoryDependencies,
   type SupabaseAuthSession,
@@ -118,6 +119,7 @@ describe("authRepository", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    resetMobileSupabaseClientCacheForTests();
     process.env = { ...originalEnv };
   });
 
@@ -165,6 +167,18 @@ describe("authRepository", () => {
         }),
       }),
     );
+  });
+
+  it("reuses the same Supabase client for one browser session", () => {
+    const config = {
+      supabaseUrl: "https://example.supabase.co",
+      supabaseAnonKey: "public-anon-key",
+    };
+
+    createMobileSupabaseClient(config);
+    createMobileSupabaseClient(config);
+
+    expect(createClient).toHaveBeenCalledTimes(1);
   });
 
   it.each([
