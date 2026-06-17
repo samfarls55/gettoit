@@ -16,10 +16,19 @@ import {
   type FoursquareSearchResponse,
   OPEN_AT_PATTERN,
   type PlacesProxyInput,
-  shapeFoursquareResult,
   type ShapedPlace,
+  shapeFoursquareResult,
   THIN_RESULTS_THRESHOLD,
 } from "./foursquare.ts";
+import {
+  buildGoogleProviderNearbySearchRequest,
+  buildGoogleProviderPlaceDetailsRequest,
+  fetchGoogleProviderWithRetry,
+  GOOGLE_PLACE_DETAILS_URL_PREFIX,
+  GOOGLE_PROVIDER_ATTRIBUTION,
+  GOOGLE_PROVIDER_FIELD_MASKS,
+} from "./google-provider-runtime.ts";
+export { redactGoogleObservabilityValue } from "./google-provider-runtime.ts";
 
 /** Cache record persisted under `(geo_h3, query_signature)`. */
 export interface CacheRow {
@@ -157,11 +166,17 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const lat = obj.lat;
   const lng = obj.lng;
   const radius = obj.radius_meters;
-  if (typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90) {
+  if (
+    typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90
+  ) {
     throw new PlacesProxyInputError("lat must be a finite number in [-90, 90]");
   }
-  if (typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-    throw new PlacesProxyInputError("lng must be a finite number in [-180, 180]");
+  if (
+    typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180
+  ) {
+    throw new PlacesProxyInputError(
+      "lng must be a finite number in [-180, 180]",
+    );
   }
   if (
     typeof radius !== "number" ||
@@ -205,7 +220,9 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     ? filters.service_shape
     : undefined;
   return {
-    lat, lng, radius_meters: radius,
+    lat,
+    lng,
+    radius_meters: radius,
     filters: { dietary, price_tier, open_at, cuisine, service_shape },
   };
 }
@@ -278,7 +295,9 @@ export async function handlePlacesProxy(
       // header is unset.
       throw new FoursquareUpstreamError(
         410,
-        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${body.slice(0, 200)}`,
+        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${
+          body.slice(0, 200)
+        }`,
       );
     }
     // Non-410 upstream failure. Degrade to a thin response, but surface
@@ -336,27 +355,15 @@ export async function handlePlacesProxy(
   };
 }
 
-const GOOGLE_NEARBY_SEARCH_URL =
-  "https://places.googleapis.com/v1/places:searchNearby";
-export const GOOGLE_Q5_FIELD_MASK_VERSION = "q5_name_only_v1";
-export const GOOGLE_Q5_FIELD_MASK = [
-  "places.id",
-  "places.displayName",
-  "places.currentOpeningHours",
-  "places.regularOpeningHours",
-  "places.dineIn",
-  "places.takeout",
-].join(",");
+export const GOOGLE_Q5_FIELD_MASK_VERSION =
+  GOOGLE_PROVIDER_FIELD_MASKS.q5_fetch.version;
+export const GOOGLE_Q5_FIELD_MASK = GOOGLE_PROVIDER_FIELD_MASKS.q5_fetch.mask;
 export const GOOGLE_Q5_MAX_RESULTS = 20;
 const GOOGLE_Q5_MIN_CARD_COUNT = 3;
 export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK_VERSION =
-  "verdict_display_v1";
-export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK = [
-  "id",
-  "displayName",
-  "googleMapsUri",
-  "formattedAddress",
-].join(",");
+  GOOGLE_PROVIDER_FIELD_MASKS.verdict_display.version;
+export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK =
+  GOOGLE_PROVIDER_FIELD_MASKS.verdict_display.mask;
 
 export const GOOGLE_OUTCOME_LABELS = [
   "q5_rated",
@@ -391,45 +398,6 @@ export type GoogleOutcomeLabel = typeof GOOGLE_OUTCOME_LABELS[number];
 export type GoogleOperationalReceiptCode =
   typeof GOOGLE_OPERATIONAL_RECEIPT_CODES[number];
 export type GoogleReasonCode = typeof GOOGLE_REASON_CODES[number];
-type GoogleObservabilityRedactionOptions = {
-  allowGooglePlaceIds?: boolean;
-};
-
-const GOOGLE_DISPLAY_CONTENT_REDACTION = "[redacted_google_display_content]";
-const GOOGLE_PLACE_ID_REDACTION = "[redacted_google_place_id]";
-
-const GOOGLE_OBSERVABILITY_FORBIDDEN_KEYS = new Set([
-  "display_name",
-  "displayName",
-  "name",
-  "formatted_address",
-  "formattedAddress",
-  "address",
-  "google_maps_uri",
-  "googleMapsUri",
-  "maps_uri",
-  "rating",
-  "hours",
-  "currentOpeningHours",
-  "regularOpeningHours",
-  "price",
-  "atmosphere",
-  "types",
-  "photos",
-  "raw_payload",
-  "rawPayload",
-  "generativeSummary",
-  "reviewSummary",
-  "summary",
-]);
-
-const GOOGLE_PLACE_ID_KEYS = new Set([
-  "place_id",
-  "placeId",
-  "google_place_id",
-  "googlePlaceId",
-]);
-
 function isStringInList<TValue extends string>(
   value: unknown,
   values: readonly TValue[],
@@ -437,7 +405,9 @@ function isStringInList<TValue extends string>(
   return typeof value === "string" && values.includes(value as TValue);
 }
 
-export function isGoogleOutcomeLabel(value: unknown): value is GoogleOutcomeLabel {
+export function isGoogleOutcomeLabel(
+  value: unknown,
+): value is GoogleOutcomeLabel {
   return isStringInList(value, GOOGLE_OUTCOME_LABELS);
 }
 
@@ -453,37 +423,12 @@ export function isGoogleReasonCode(value: unknown): value is GoogleReasonCode {
 
 export function assertGoogleReasonCode(value: unknown): GoogleReasonCode {
   if (!isGoogleReasonCode(value)) {
-    throw new PlacesProxyInputError("reason_code must be controlled app-authored code");
+    throw new PlacesProxyInputError(
+      "reason_code must be controlled app-authored code",
+    );
   }
 
   return value;
-}
-
-export function redactGoogleObservabilityValue(
-  value: unknown,
-  options: GoogleObservabilityRedactionOptions = {},
-): unknown {
-  if (Array.isArray(value)) {
-    return value.map((item) => redactGoogleObservabilityValue(item, options));
-  }
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const redacted: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    if (GOOGLE_OBSERVABILITY_FORBIDDEN_KEYS.has(key)) {
-      redacted[key] = GOOGLE_DISPLAY_CONTENT_REDACTION;
-      continue;
-    }
-    if (GOOGLE_PLACE_ID_KEYS.has(key) && !options.allowGooglePlaceIds) {
-      redacted[key] = GOOGLE_PLACE_ID_REDACTION;
-      continue;
-    }
-    redacted[key] = redactGoogleObservabilityValue(entryValue, options);
-  }
-
-  return redacted;
 }
 
 export function buildGoogleOverfetchTelemetry(input: {
@@ -580,25 +525,24 @@ export async function handleGoogleQ5PlacesProxy(
 
   const body = (await response.json()) as GoogleNearbySearchResponse;
   const shaped = shapeGoogleQ5Places(input, body);
-  console.info("google_q5_shape", JSON.stringify({
-    raw_count: body.places?.length ?? 0,
-    strict_count: shaped.strictCount,
-    timing_relaxed_candidate_count: shaped.timingRelaxedCandidateCount,
-    returned_count: shaped.places.length,
-    relaxed_service_used: shaped.places.length > shaped.strictCount,
-    relaxed_timing_used: shaped.timingRelaxed,
-    has_open_at: Boolean(input.filters?.open_at),
-    service_shape: input.filters?.service_shape ?? null,
-    radius_meters: input.radius_meters,
-  }));
+  console.info(
+    "google_q5_shape",
+    JSON.stringify({
+      raw_count: body.places?.length ?? 0,
+      strict_count: shaped.strictCount,
+      timing_relaxed_candidate_count: shaped.timingRelaxedCandidateCount,
+      returned_count: shaped.places.length,
+      relaxed_service_used: shaped.places.length > shaped.strictCount,
+      relaxed_timing_used: shaped.timingRelaxed,
+      has_open_at: Boolean(input.filters?.open_at),
+      service_shape: input.filters?.service_shape ?? null,
+      radius_meters: input.radius_meters,
+    }),
+  );
 
   return {
     places: shaped.places,
-    attribution: {
-      provider: "google",
-      render: "text",
-      text: "Powered by Google",
-    },
+    attribution: GOOGLE_PROVIDER_ATTRIBUTION,
   };
 }
 
@@ -632,11 +576,7 @@ export async function handleGoogleVerdictDisplayProxy(
       placeId,
       (await response.json()) as GooglePlaceDetailsResponse,
     ),
-    attribution: {
-      provider: "google",
-      render: "text",
-      text: "Powered by Google",
-    },
+    attribution: GOOGLE_PROVIDER_ATTRIBUTION,
   };
 }
 
@@ -646,7 +586,9 @@ function validateGoogleVerdictDisplayInput(raw: unknown): string {
   }
   const placeId = (raw as Record<string, unknown>).google_place_id;
   if (typeof placeId !== "string" || placeId.trim().length === 0) {
-    throw new PlacesProxyInputError("google_place_id must be a non-empty string");
+    throw new PlacesProxyInputError(
+      "google_place_id must be a non-empty string",
+    );
   }
   return placeId.trim();
 }
@@ -682,26 +624,14 @@ async function fetchGooglePlaceDetailsWithRetry(
   fetch: FetchFn,
   googleApiKey: string,
 ): Promise<Response> {
-  const init = buildGoogleVerdictDisplayRequest(googleApiKey);
-  const url = `https://places.googleapis.com/v1/places/${
+  const init = buildGoogleProviderPlaceDetailsRequest({
+    apiKey: googleApiKey,
+    fieldMask: "verdict_display",
+  });
+  const url = `${GOOGLE_PLACE_DETAILS_URL_PREFIX}${
     encodeURIComponent(placeId)
   }`;
-  let response = await fetch(url, init);
-  if (response.status === 429 || response.status >= 500) {
-    response = await fetch(url, init);
-  }
-  return response;
-}
-
-function buildGoogleVerdictDisplayRequest(googleApiKey: string): RequestInit {
-  return {
-    method: "GET",
-    headers: {
-      "X-Goog-Api-Key": googleApiKey,
-      "X-Goog-FieldMask": GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
-      "Accept": "application/json",
-    },
-  };
+  return fetchGoogleProviderWithRetry(fetch, url, init);
 }
 
 async function fetchGoogleNearbyWithRetry(
@@ -709,12 +639,12 @@ async function fetchGoogleNearbyWithRetry(
   fetch: FetchFn,
   googleApiKey: string,
 ): Promise<Response> {
-  const init = buildGoogleQ5Request(input, googleApiKey);
-  let response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
-  if (response.status === 429 || response.status >= 500) {
-    response = await fetch(GOOGLE_NEARBY_SEARCH_URL, init);
-  }
-  return response;
+  const request = buildGoogleProviderNearbySearchRequest({
+    apiKey: googleApiKey,
+    fieldMask: "q5_fetch",
+    body: buildGoogleQ5RequestBody(input),
+  });
+  return fetchGoogleProviderWithRetry(fetch, request.url, request.init);
 }
 
 function shapeGoogleQ5Places(
@@ -893,7 +823,9 @@ function isOpenAtGoogleRegularTime(
 ): boolean {
   const target = parseOpenAtToken(openAt);
   if (!target || !Array.isArray(hours?.periods)) return false;
-  return hours.periods.some((period) => periodContainsGoogleMinute(period, target));
+  return hours.periods.some((period) =>
+    periodContainsGoogleMinute(period, target)
+  );
 }
 
 function parseOpenAtToken(
@@ -925,7 +857,9 @@ function periodContainsGoogleMinute(
   return targetMinute >= open || targetMinute < close;
 }
 
-function googlePointMinuteOfWeek(point: GoogleOpeningPoint | undefined): number | null {
+function googlePointMinuteOfWeek(
+  point: GoogleOpeningPoint | undefined,
+): number | null {
   if (!point) return null;
   if (
     typeof point.day !== "number" ||
@@ -943,29 +877,20 @@ function googlePointMinuteOfWeek(point: GoogleOpeningPoint | undefined): number 
   return point.day * 24 * 60 + point.hour * 60 + point.minute;
 }
 
-function buildGoogleQ5Request(
+function buildGoogleQ5RequestBody(
   input: PlacesProxyInput,
-  apiKey: string,
-): RequestInit {
+): Record<string, unknown> {
   return {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": GOOGLE_Q5_FIELD_MASK,
-    },
-    body: JSON.stringify({
-      includedPrimaryTypes: ["restaurant"],
-      maxResultCount: GOOGLE_Q5_MAX_RESULTS,
-      locationRestriction: {
-        circle: {
-          center: {
-            latitude: input.lat,
-            longitude: input.lng,
-          },
-          radius: input.radius_meters,
+    includedPrimaryTypes: ["restaurant"],
+    maxResultCount: GOOGLE_Q5_MAX_RESULTS,
+    locationRestriction: {
+      circle: {
+        center: {
+          latitude: input.lat,
+          longitude: input.lng,
         },
+        radius: input.radius_meters,
       },
-    }),
+    },
   };
 }

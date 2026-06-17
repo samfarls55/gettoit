@@ -340,16 +340,22 @@ Deno.test("TB-07: Google verdict scoring keeps no-vibe-evidence candidates eligi
 });
 
 Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scoring", () => {
-  const source = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
+  const runtimeSource = Deno.readTextFileSync(
+    new URL("../_shared/google-provider-runtime.ts", import.meta.url),
+  );
+  const indexSource = Deno.readTextFileSync(
+    new URL("./index.ts", import.meta.url),
+  );
 
-  assertStringIncludes(source, "GOOGLE_VERDICT_FETCH_FIELD_MASK");
-  assertStringIncludes(source, "GOOGLE_VERDICT_SCORING_FIELD_MASK");
-  assertStringIncludes(source, '"places.reviewSummary"');
-  assertStringIncludes(source, '"places.generativeSummary"');
-  assertStringIncludes(source, "isVibeFitEnabled(env)");
+  assertStringIncludes(runtimeSource, "verdict_fetch");
+  assertStringIncludes(runtimeSource, "verdict_scoring");
+  assertStringIncludes(runtimeSource, '"places.reviewSummary"');
+  assertStringIncludes(runtimeSource, '"places.generativeSummary"');
+  assertStringIncludes(indexSource, "isVibeFitEnabled(env)");
+  assertStringIncludes(indexSource, "googleVerdictFieldMaskName(env)");
   assert(
-    source.indexOf('"places.reviewSummary"') >
-      source.indexOf("GOOGLE_VERDICT_SCORING_FIELD_MASK"),
+    runtimeSource.indexOf('"places.reviewSummary"') >
+      runtimeSource.indexOf("verdict_scoring"),
     "summary fields must belong to the internal scoring mask, not the base fetch/display masks",
   );
 });
