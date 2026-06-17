@@ -1,0 +1,343 @@
+export interface HardEligibilityCandidate {
+  id: string;
+  google_place_id?: string;
+  price_tier: number | null;
+  dietary_tags: string[];
+  categories: string[];
+  distance_meters?: number | null;
+  rating?: number | null;
+  total_ratings?: number | null;
+  user_rating_count?: number | null;
+  current_open_now?: boolean | null;
+  regular_opening_periods?: OpeningPeriod[];
+  dine_in?: boolean | null;
+  takeout?: boolean | null;
+}
+
+export interface OpeningPeriod {
+  open?: OpeningPoint;
+  close?: OpeningPoint;
+}
+
+export interface OpeningPoint {
+  day?: number;
+  hour?: number;
+  minute?: number;
+}
+
+export interface HardVeto {
+  kind: "dietary" | "cuisine_never" | "tag";
+  token: string;
+}
+
+export interface HardEligibilityVote {
+  q1_vetoes: string[];
+  q2_budget: number;
+  hard_vetoes: HardVeto[];
+}
+
+export interface HardEligibilityRoom {
+  meal_timing?: { open_at?: string | null };
+  service_shape?: "dineIn" | "takeout" | null;
+  radius_meters?: number | null;
+}
+
+export type HardEligibilityCutReason =
+  | "metadata"
+  | "budget"
+  | "availability"
+  | "dietary"
+  | "veto"
+  | "radius"
+  | "crowd_floor";
+
+export interface HardEligibilityCut {
+  option_id: string;
+  cut_reason: HardEligibilityCutReason;
+  cut_text: string;
+}
+
+export type HardEligibilityResult =
+  | { eligible: true }
+  | { eligible: false; cut: HardEligibilityCut };
+
+interface DietaryRequirement {
+  chip: string;
+  requiredTag: string;
+  label: string;
+}
+
+const GOOGLE_CROWD_FLOOR = Object.freeze({
+  minRating: 3.7,
+  minUserRatingCount: 15,
+});
+
+const DIETARY_REQUIREMENTS: readonly DietaryRequirement[] = Object.freeze([
+  { chip: "vegan", requiredTag: "vegan_friendly", label: "vegan options" },
+  {
+    chip: "vegetarian",
+    requiredTag: "vegetarian_friendly",
+    label: "vegetarian options",
+  },
+  { chip: "halal", requiredTag: "halal", label: "halal options" },
+  { chip: "kosher", requiredTag: "kosher", label: "kosher options" },
+  {
+    chip: "gluten",
+    requiredTag: "gluten_free_options",
+    label: "gluten-free options",
+  },
+  {
+    chip: "dairy",
+    requiredTag: "no_dairy_unverified",
+    label: "dairy-safe options",
+  },
+  {
+    chip: "shellfish",
+    requiredTag: "no_shellfish_unverified",
+    label: "shellfish-safe options",
+  },
+  {
+    chip: "nuts",
+    requiredTag: "no_nuts_unverified",
+    label: "nut-safe options",
+  },
+]);
+
+const NO_OP_CHIPS: ReadonlySet<string> = new Set([
+  "nothing_tonight",
+  "nothing tonight",
+  "nothing",
+  "none",
+  "no_preference",
+]);
+
+export function lookupDietaryRequirement(
+  chip: string,
+): DietaryRequirement | undefined {
+  const normalized = chip.trim().toLowerCase();
+  if (NO_OP_CHIPS.has(normalized)) return undefined;
+  return DIETARY_REQUIREMENTS.find((r) => r.chip === normalized);
+}
+
+export function evaluateHardEligibility(input: {
+  candidate: HardEligibilityCandidate;
+  votes: readonly HardEligibilityVote[];
+  room?: HardEligibilityRoom;
+}): HardEligibilityResult {
+  const { candidate, votes } = input;
+  const room = input.room ?? {};
+  const googleCandidate = typeof candidate.google_place_id === "string" &&
+    candidate.google_place_id.trim().length > 0;
+
+  if (
+    room.radius_meters !== null &&
+    room.radius_meters !== undefined &&
+    typeof candidate.distance_meters === "number" &&
+    candidate.distance_meters > room.radius_meters
+  ) {
+    return cut(candidate.id, "radius", "outside the Search area");
+  }
+
+  if (googleCandidate && typeof candidate.price_tier !== "number") {
+    return cut(candidate.id, "metadata", "missing required provider metadata");
+  }
+
+  if (googleCandidate) {
+    if (
+      typeof candidate.rating !== "number" ||
+      typeof candidate.user_rating_count !== "number"
+    ) {
+      return cut(
+        candidate.id,
+        "metadata",
+        "missing required provider metadata",
+      );
+    }
+    if (
+      candidate.rating < GOOGLE_CROWD_FLOOR.minRating ||
+      candidate.user_rating_count < GOOGLE_CROWD_FLOOR.minUserRatingCount
+    ) {
+      return cut(candidate.id, "crowd_floor", "below the crowd approval floor");
+    }
+  }
+
+  if (!passesAvailability(candidate, room, googleCandidate)) {
+    return cut(candidate.id, "availability", "unavailable for this Plan");
+  }
+
+  const minBudget = votes.reduce(
+    (acc, vote) => Math.min(acc, vote.q2_budget),
+    Number.POSITIVE_INFINITY,
+  );
+  if (
+    Number.isFinite(minBudget) &&
+    typeof candidate.price_tier === "number" &&
+    candidate.price_tier > minBudget
+  ) {
+    return cut(candidate.id, "budget", "over the budget cap");
+  }
+
+  const constraints = buildMemberHardConstraints(votes);
+  const missingReq = constraints.dietaryReqs.find((req) =>
+    !candidate.dietary_tags.includes(req.requiredTag)
+  );
+  if (missingReq) {
+    return cut(candidate.id, "dietary", `${missingReq.chip} veto`);
+  }
+
+  for (const tag of constraints.requiredTags) {
+    if (!candidate.dietary_tags.includes(tag)) {
+      return cut(candidate.id, "veto", "fails an allergy veto");
+    }
+  }
+
+  const lowerCategories = candidate.categories.map((category) =>
+    category.toLowerCase()
+  );
+  for (const token of constraints.cuisineNevers) {
+    if (lowerCategories.some((category) => category.includes(token))) {
+      return cut(candidate.id, "veto", "cuisine vetoed");
+    }
+  }
+
+  return { eligible: true };
+}
+
+function cut(
+  optionId: string,
+  cutReason: HardEligibilityCutReason,
+  cutText: string,
+): HardEligibilityResult {
+  return {
+    eligible: false,
+    cut: {
+      option_id: optionId,
+      cut_reason: cutReason,
+      cut_text: cutText,
+    },
+  };
+}
+
+function buildMemberHardConstraints(votes: readonly HardEligibilityVote[]): {
+  dietaryReqs: DietaryRequirement[];
+  requiredTags: Set<string>;
+  cuisineNevers: Set<string>;
+} {
+  const dietaryReqs: DietaryRequirement[] = [];
+  const addReq = (chip: string) => {
+    const req = lookupDietaryRequirement(chip);
+    if (req && !dietaryReqs.find((existing) => existing.chip === req.chip)) {
+      dietaryReqs.push(req);
+    }
+  };
+  const requiredTags = new Set<string>();
+  const cuisineNevers = new Set<string>();
+
+  for (const vote of votes) {
+    for (const chip of vote.q1_vetoes) addReq(chip);
+    for (const veto of vote.hard_vetoes) {
+      if (veto.kind === "dietary") addReq(veto.token);
+      if (veto.kind === "tag") {
+        const token = veto.token.trim();
+        if (token.length > 0) requiredTags.add(token);
+      }
+      if (veto.kind === "cuisine_never") {
+        const token = veto.token.trim().toLowerCase();
+        if (token.length > 0) cuisineNevers.add(token);
+      }
+    }
+  }
+
+  return { dietaryReqs, requiredTags, cuisineNevers };
+}
+
+function passesAvailability(
+  candidate: HardEligibilityCandidate,
+  room: HardEligibilityRoom,
+  googleCandidate: boolean,
+): boolean {
+  const openAt = room.meal_timing?.open_at ?? null;
+  if (openAt) {
+    return isOpenAtRegularTime(candidate.regular_opening_periods, openAt) &&
+      passesServiceMode(candidate, room.service_shape);
+  }
+
+  const shouldCheckCurrentHours = googleCandidate ||
+    room.service_shape === "dineIn" ||
+    room.service_shape === "takeout" ||
+    !!room.meal_timing;
+  if (shouldCheckCurrentHours && candidate.current_open_now !== true) {
+    return false;
+  }
+
+  return passesServiceMode(candidate, room.service_shape);
+}
+
+function passesServiceMode(
+  candidate: HardEligibilityCandidate,
+  serviceShape: HardEligibilityRoom["service_shape"],
+): boolean {
+  if (serviceShape === "dineIn" && candidate.dine_in !== true) {
+    return false;
+  }
+  if (serviceShape === "takeout" && candidate.takeout === false) {
+    return false;
+  }
+  return true;
+}
+
+function isOpenAtRegularTime(
+  periods: OpeningPeriod[] | undefined,
+  openAt: string,
+): boolean {
+  const target = parseOpenAtToken(openAt);
+  if (!target || !Array.isArray(periods)) return false;
+  return periods.some((period) => periodContainsMinute(period, target));
+}
+
+function parseOpenAtToken(
+  openAt: string,
+): { googleDay: number; minuteOfDay: number } | null {
+  const match = /^([1-7])T([0-2][0-9])([0-5][0-9])$/.exec(openAt);
+  if (!match) return null;
+  const foursquareDay = Number(match[1]);
+  const hour = Number(match[2]);
+  const minute = Number(match[3]);
+  if (hour > 23) return null;
+  return {
+    googleDay: foursquareDay === 7 ? 0 : foursquareDay,
+    minuteOfDay: hour * 60 + minute,
+  };
+}
+
+function periodContainsMinute(
+  period: OpeningPeriod,
+  target: { googleDay: number; minuteOfDay: number },
+): boolean {
+  const open = pointMinuteOfWeek(period.open);
+  const close = pointMinuteOfWeek(period.close);
+  if (open === null || close === null) return false;
+  const targetMinute = target.googleDay * 24 * 60 + target.minuteOfDay;
+  if (close > open) {
+    return targetMinute >= open && targetMinute < close;
+  }
+  return targetMinute >= open || targetMinute < close;
+}
+
+function pointMinuteOfWeek(point: OpeningPoint | undefined): number | null {
+  if (
+    !point ||
+    typeof point.day !== "number" ||
+    typeof point.hour !== "number" ||
+    typeof point.minute !== "number" ||
+    point.day < 0 ||
+    point.day > 6 ||
+    point.hour < 0 ||
+    point.hour > 23 ||
+    point.minute < 0 ||
+    point.minute > 59
+  ) {
+    return null;
+  }
+  return point.day * 24 * 60 + point.hour * 60 + point.minute;
+}

@@ -41,6 +41,11 @@
 // field name. `MemberVote` is the stable shape that mapping layer
 // produces.
 
+import {
+  evaluateHardEligibility,
+  lookupDietaryRequirement,
+} from "./hard-eligibility.ts";
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Public types
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -79,6 +84,9 @@ export interface CandidateOption {
    *  classifier's pool-relative reputation terciles. The engine never
    *  reads it. Optional / null when the venue carries no count. */
   total_ratings?: number | null;
+  /** Google user-rating count. Shared hard eligibility reads this for
+   *  the crowd approval floor on Google candidates. */
+  user_rating_count?: number | null;
   /** Foursquare ISO-8601 record-creation date. Carried for the TB-23
    *  venue classifier's reputation age check. The engine never reads
    *  it. Optional / null when absent. */
@@ -295,46 +303,7 @@ const THRESHOLD_RELAX_STEP = 1;
 const MAX_CASCADE_ITERS = 64;
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Dietary chip â†’ required tag mapping
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-//
-// Mirrors `DIETARY_CHIP_MAP.emit_tag` from `_shared/foursquare.ts`. Kept
-// inline â€” the mapping is small and visibly local to the EBA logic.
-
-interface DietaryRequirement {
-  chip: string;
-  requiredTag: string;
-  label: string;
-}
-
-const DIETARY_REQUIREMENTS: readonly DietaryRequirement[] = Object.freeze([
-  { chip: "vegan", requiredTag: "vegan_friendly", label: "vegan options" },
-  { chip: "vegetarian", requiredTag: "vegetarian_friendly", label: "vegetarian options" },
-  { chip: "halal", requiredTag: "halal", label: "halal options" },
-  { chip: "kosher", requiredTag: "kosher", label: "kosher options" },
-  { chip: "gluten", requiredTag: "gluten_free_options", label: "gluten-free options" },
-  { chip: "dairy", requiredTag: "no_dairy_unverified", label: "dairy-safe options" },
-  { chip: "shellfish", requiredTag: "no_shellfish_unverified", label: "shellfish-safe options" },
-  { chip: "nuts", requiredTag: "no_nuts_unverified", label: "nut-safe options" },
-]);
-
-/** The "Nothing tonight" chip carries no constraint. Accepted
- *  defensively in several spellings so quiz-copy churn doesn't break
- *  the engine. */
-const NO_OP_CHIPS: ReadonlySet<string> = new Set([
-  "nothing_tonight",
-  "nothing tonight",
-  "nothing",
-  "none",
-  "no_preference",
-]);
-
-function lookupRequirement(chip: string): DietaryRequirement | undefined {
-  const normalized = chip.trim().toLowerCase();
-  if (NO_OP_CHIPS.has(normalized)) return undefined;
-  return DIETARY_REQUIREMENTS.find((r) => r.chip === normalized);
-}
-
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Public surface
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -358,7 +327,8 @@ export function computeVerdict(
     );
   }
 
-  const initialThreshold = input.satisficing_threshold ?? DEFAULT_SATISFICING_THRESHOLD;
+  const initialThreshold = input.satisficing_threshold ??
+    DEFAULT_SATISFICING_THRESHOLD;
   const initialRadius = input.radius_meters ?? null;
   // â”€â”€ Step 1 â€” EBA prune â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Hard vetoes never relax. The EBA pass is run once; its survivors
@@ -366,24 +336,11 @@ export function computeVerdict(
   const ebaResult = ebaPrune(candidates, votes, {
     mealTiming: input.meal_timing,
     serviceShape: input.service_shape,
+    radiusMeters: initialRadius,
   });
 
   // â”€â”€ Empty-pool / all-pruned short circuit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const radiusCuts: OptionCut[] = [];
-  const eligibleSurvivors = initialRadius === null
-    ? ebaResult.survivors
-    : ebaResult.survivors.filter((candidate) => {
-      const inRadius = candidate.distance_meters == null ||
-        candidate.distance_meters <= initialRadius;
-      if (!inRadius) {
-        radiusCuts.push({
-          option_id: candidate.id,
-          cut_reason: "radius",
-          cut_text: "outside the Search area",
-        });
-      }
-      return inRadius;
-    });
+  const eligibleSurvivors = ebaResult.survivors;
 
   if (eligibleSurvivors.length === 0) {
     return buildNoSurvivorOutput({
@@ -410,7 +367,7 @@ export function computeVerdict(
       return seatWinner({
         floorSurvivors,
         allScored: scored,
-        ebaCuts: [...ebaResult.cuts, ...radiusCuts],
+        ebaCuts: ebaResult.cuts,
         votes,
         method: input.method ?? "manual",
         threshold,
@@ -452,6 +409,7 @@ interface EbaResult {
 interface RoomEligibility {
   mealTiming?: { open_at?: string | null };
   serviceShape?: "dineIn" | "takeout" | null;
+  radiusMeters?: number | null;
 }
 
 /** Drop venues failing ANY member's hard vetoes. Three veto channels,
@@ -463,200 +421,24 @@ function ebaPrune(
   votes: MemberVote[],
   roomEligibility: RoomEligibility = {},
 ): EbaResult {
-  // Q2 cap â€” the binding cap is the MIN tier among members.
-  const minBudget = votes.reduce(
-    (acc, v) => Math.min(acc, v.q2_budget),
-    Number.POSITIVE_INFINITY,
-  );
-
-  // Aggregate the active dietary requirements (from Q1-era chips and
-  // from `hard_vetoes` of kind `dietary`).
-  const dietaryReqs: DietaryRequirement[] = [];
-  const addReq = (chip: string) => {
-    const req = lookupRequirement(chip);
-    if (req && !dietaryReqs.find((r) => r.chip === req.chip)) {
-      dietaryReqs.push(req);
-    }
-  };
-  for (const v of votes) {
-    for (const chip of v.q1_vetoes) addReq(chip);
-    for (const hv of v.hard_vetoes) {
-      if (hv.kind === "dietary") addReq(hv.token);
-    }
-  }
-
-  // Raw required tags (`hard_vetoes` of kind `tag`) and cuisine NEVERS.
-  const requiredTags = new Set<string>();
-  const cuisineNevers = new Set<string>();
-  for (const v of votes) {
-    for (const hv of v.hard_vetoes) {
-      if (hv.kind === "tag") requiredTags.add(hv.token.trim());
-      if (hv.kind === "cuisine_never") {
-        const t = hv.token.trim().toLowerCase();
-        if (t.length > 0) cuisineNevers.add(t);
-      }
-    }
-  }
-
   const survivors: CandidateOption[] = [];
   const cuts: OptionCut[] = [];
-  const hasRoomEligibility = shouldApplyRoomEligibility(roomEligibility);
 
   for (const c of candidates) {
-    if (hasRoomEligibility && !passesRoomEligibility(c, roomEligibility)) {
-      cuts.push({
-        option_id: c.id,
-        cut_reason: "availability",
-        cut_text: "unavailable for this Plan",
-      });
-      continue;
-    }
-
-    // Q2 spend cap.
-    if (c.price_tier !== null && c.price_tier > minBudget) {
-      cuts.push({
-        option_id: c.id,
-        cut_reason: "budget",
-        cut_text: "over the budget cap",
-      });
-      continue;
-    }
-
-    // Dietary menu-compliance.
-    const missingReq = dietaryReqs.find((r) => !c.dietary_tags.includes(r.requiredTag));
-    if (missingReq) {
-      cuts.push({
-        option_id: c.id,
-        cut_reason: "dietary",
-        cut_text: `${missingReq.chip} veto`,
-      });
-      continue;
-    }
-
-    // Raw required allergy tags.
-    let missingTag: string | null = null;
-    for (const tag of requiredTags) {
-      if (!c.dietary_tags.includes(tag)) {
-        missingTag = tag;
-        break;
-      }
-    }
-    if (missingTag !== null) {
-      cuts.push({
-        option_id: c.id,
-        cut_reason: "veto",
-        cut_text: "fails an allergy veto",
-      });
-      continue;
-    }
-
-    // Cuisine NEVERS â€” a candidate is pruned when any category contains
-    // a vetoed cuisine substring.
-    const lowerCategories = c.categories.map((cat) => cat.toLowerCase());
-    let vetoedCuisine: string | null = null;
-    for (const never of cuisineNevers) {
-      if (lowerCategories.some((cat) => cat.includes(never))) {
-        vetoedCuisine = never;
-        break;
-      }
-    }
-    if (vetoedCuisine !== null) {
-      cuts.push({
-        option_id: c.id,
-        cut_reason: "veto",
-        cut_text: "cuisine vetoed",
-      });
-      continue;
-    }
-
-    survivors.push(c);
+    const result = evaluateHardEligibility({
+      candidate: c,
+      votes,
+      room: {
+        meal_timing: roomEligibility.mealTiming,
+        service_shape: roomEligibility.serviceShape,
+        radius_meters: roomEligibility.radiusMeters ?? null,
+      },
+    });
+    if (result.eligible) survivors.push(c);
+    else cuts.push(result.cut);
   }
 
   return { survivors, cuts };
-}
-
-function shouldApplyRoomEligibility(roomEligibility: RoomEligibility): boolean {
-  return !!roomEligibility.mealTiming ||
-    roomEligibility.serviceShape === "dineIn" ||
-    roomEligibility.serviceShape === "takeout";
-}
-
-function passesRoomEligibility(
-  candidate: CandidateOption,
-  roomEligibility: RoomEligibility,
-): boolean {
-  const openAt = roomEligibility.mealTiming?.open_at ?? null;
-  if (openAt) {
-    if (!isOpenAtRegularTime(candidate.regular_opening_periods, openAt)) {
-      return false;
-    }
-  } else if (candidate.current_open_now !== true) {
-    return false;
-  }
-
-  if (roomEligibility.serviceShape === "dineIn" && candidate.dine_in !== true) {
-    return false;
-  }
-  if (roomEligibility.serviceShape === "takeout" && candidate.takeout === false) {
-    return false;
-  }
-  return true;
-}
-
-function isOpenAtRegularTime(
-  periods: OpeningPeriod[] | undefined,
-  openAt: string,
-): boolean {
-  const target = parseOpenAtToken(openAt);
-  if (!target || !Array.isArray(periods)) return false;
-  return periods.some((period) => periodContainsMinute(period, target));
-}
-
-function parseOpenAtToken(
-  openAt: string,
-): { googleDay: number; minuteOfDay: number } | null {
-  const match = /^([1-7])T([0-2][0-9])([0-5][0-9])$/.exec(openAt);
-  if (!match) return null;
-  const foursquareDay = Number(match[1]);
-  const hour = Number(match[2]);
-  const minute = Number(match[3]);
-  if (hour > 23) return null;
-  return {
-    googleDay: foursquareDay === 7 ? 0 : foursquareDay,
-    minuteOfDay: hour * 60 + minute,
-  };
-}
-
-function periodContainsMinute(
-  period: OpeningPeriod,
-  target: { googleDay: number; minuteOfDay: number },
-): boolean {
-  const open = pointMinuteOfWeek(period.open);
-  const close = pointMinuteOfWeek(period.close);
-  if (open === null || close === null) return false;
-  const targetMinute = target.googleDay * 24 * 60 + target.minuteOfDay;
-  if (close > open) {
-    return targetMinute >= open && targetMinute < close;
-  }
-  return targetMinute >= open || targetMinute < close;
-}
-
-function pointMinuteOfWeek(point: OpeningPoint | undefined): number | null {
-  if (
-    !point ||
-    typeof point.day !== "number" ||
-    typeof point.hour !== "number" ||
-    typeof point.minute !== "number" ||
-    point.day < 0 ||
-    point.day > 6 ||
-    point.hour < 0 ||
-    point.hour > 23 ||
-    point.minute < 0 ||
-    point.minute > 59
-  ) {
-    return null;
-  }
-  return point.day * 24 * 60 + point.hour * 60 + point.minute;
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -821,13 +603,19 @@ function buildVerdictSlate(scored: ScoredCandidate[]): VerdictSlateEntry[] {
 
 function finalFitScore(scored: ScoredCandidate): number {
   const memberCount = Math.max(1, scored.memberScores.size);
-  return Number((scored.minScore + scored.sumScore / (memberCount * 10)).toFixed(6));
+  return Number(
+    (scored.minScore + scored.sumScore / (memberCount * 10)).toFixed(6),
+  );
 }
 
-function compareScoredCandidateIdentity(a: ScoredCandidate, b: ScoredCandidate): number {
+function compareScoredCandidateIdentity(
+  a: ScoredCandidate,
+  b: ScoredCandidate,
+): number {
   const aKey = a.candidate.google_place_id ?? a.candidate.id;
   const bKey = b.candidate.google_place_id ?? b.candidate.id;
-  return aKey.localeCompare(bKey) || a.candidate.id.localeCompare(b.candidate.id);
+  return aKey.localeCompare(bKey) ||
+    a.candidate.id.localeCompare(b.candidate.id);
 }
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -890,7 +678,9 @@ function buildRuleText(args: {
   const parts: string[] = [];
 
   if (args.rerollReason) {
-    parts.push(rerollPrefixSentence(args.rerollReason, args.previousWinnerName));
+    parts.push(
+      rerollPrefixSentence(args.rerollReason, args.previousWinnerName),
+    );
   }
 
   // Maximin is the load-bearing mechanic â€” name the rule, not the
@@ -914,7 +704,9 @@ function buildRuleText(args: {
   return parts.join(" ");
 }
 
-function buildNoSurvivorRuleText(survivingHardNeeds: readonly string[]): string {
+function buildNoSurvivorRuleText(
+  survivingHardNeeds: readonly string[],
+): string {
   if (survivingHardNeeds.length === 0) {
     return "No spot fit the room tonight.";
   }
@@ -935,12 +727,12 @@ function buildSurvivingHardNeeds(votes: MemberVote[]): string[] {
 
   for (const v of votes) {
     for (const chip of v.q1_vetoes) {
-      const req = lookupRequirement(chip);
+      const req = lookupDietaryRequirement(chip);
       if (req) push(req.label);
     }
     for (const hv of v.hard_vetoes) {
       if (hv.kind === "dietary") {
-        const req = lookupRequirement(hv.token);
+        const req = lookupDietaryRequirement(hv.token);
         if (req) push(req.label);
       }
     }
@@ -966,9 +758,11 @@ function buildReceipts(votes: MemberVote[]): VoiceReceipt[] {
 
 /** One-phrase anonymized summary of a member's loudest input. */
 function receiptAction(v: MemberVote): string {
-  const firstVeto = v.q1_vetoes.find((chip) => lookupRequirement(chip));
+  const firstVeto = v.q1_vetoes.find((chip) => lookupDietaryRequirement(chip));
   if (firstVeto) return `filtered ${firstVeto}`;
   if (v.hard_vetoes.length > 0) return "set a hard limit";
-  if (v.q2_budget < 4) return `capped at ${"$".repeat(Math.max(1, v.q2_budget))}`;
+  if (v.q2_budget < 4) {
+    return `capped at ${"$".repeat(Math.max(1, v.q2_budget))}`;
+  }
   return "voted in";
 }
