@@ -35,6 +35,24 @@ describe("packQuizProgress", () => {
       budget: 2,
       reputation: "hidden_gem",
       vibe: 4,
+      q1CuisineCravings: ["italian", "thai"],
+      q2SpendCap: "$$",
+      q3Reputation: "hidden_gem",
+      q4VibeEnergy: "rowdy",
+    });
+  });
+
+  it("packs no-preference Q1 in the server-readable Q5 card-set answer shape", () => {
+    const packed = packQuizProgress({
+      ...SAMPLE,
+      cuisines: [],
+      noPreference: true,
+      vibe: 2,
+    });
+
+    expect(packed.answers).toMatchObject({
+      q1CuisineCravings: ["noPreference"],
+      q4VibeEnergy: "social",
     });
   });
 });

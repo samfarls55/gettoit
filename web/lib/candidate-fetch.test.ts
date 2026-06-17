@@ -1,17 +1,18 @@
-// GetToIt web — per-member candidate fetch tests (tb-WF-10).
+// GetToIt web — Q5 candidate fetch tests.
 //
-// Pins the redesigned Q5 candidate path: the N+1 fetch planner, the venue
-// classifier, the strict-factorial card generator, and the end-to-end
-// fetch. The factorial / classifier are faithful ports of the legacy
-// Swift modules — active mobile implementation now lives in `mobile/`.
-// These tests mirror `Q5FactorialCardGeneratorTests` /
-// `Q5VenueClassifierTests`.
+// Pins the assigned-card-set reader plus the older tb-WF-10 helpers:
+// the N+1 fetch planner, the venue classifier, the strict-factorial
+// card generator, and the end-to-end fetch. The factorial / classifier
+// are faithful ports of the legacy Swift modules — active mobile
+// implementation now lives in `mobile/`. These tests mirror
+// `Q5FactorialCardGeneratorTests` / `Q5VenueClassifierTests`.
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildQ5Ratings,
   classifyPool,
+  fetchAssignedQ5CardSet,
   fetchMemberCandidates,
   generateFactorialCards,
   openAtToken,
@@ -25,6 +26,90 @@ import {
   type PlacesProxyResponse,
   type PoolVenue,
 } from "./candidate-fetch";
+
+describe("fetchAssignedQ5CardSet", () => {
+  it("loads assigned name-only Q5 cards with server-provided axis receipts", async () => {
+    const invoke = vi.fn().mockResolvedValue({
+      data: {
+        status: "assigned",
+        cards: [
+          {
+            googlePlaceId: "google-katzs-delicatessen",
+            displayName: "Katz's Delicatessen",
+            attribution: { text: "Powered by Google" },
+            axisReceipt: { droppedAxis: "cuisine" },
+          },
+          {
+            googlePlaceId: "google-los-tacos-no-1",
+            displayName: "Los Tacos No. 1",
+            attribution: { text: "Powered by Google" },
+            axisReceipt: { droppedAxis: "crowd_approval" },
+          },
+          {
+            googlePlaceId: "google-cosme",
+            displayName: "Cosme",
+            attribution: { text: "Powered by Google" },
+            axisReceipt: { droppedAxis: "vibe" },
+          },
+        ],
+      },
+      error: null,
+    });
+
+    const result = await fetchAssignedQ5CardSet({
+      roomId: "room-1",
+      invoke,
+    });
+
+    expect(invoke).toHaveBeenCalledWith("q5-card-set", {
+      body: {
+        room_id: "room-1",
+        q5_card_set_id: "initial",
+      },
+    });
+    expect(result.source).toBe("fetched");
+    expect(result.rawFetch).toEqual([]);
+    expect(result.candidates).toEqual([
+      {
+        id: "google-katzs-delicatessen",
+        name: "Katz's Delicatessen",
+        meta: "",
+        attributionText: "Powered by Google",
+        droppedAxis: "cuisine",
+      },
+      {
+        id: "google-los-tacos-no-1",
+        name: "Los Tacos No. 1",
+        meta: "",
+        attributionText: "Powered by Google",
+        droppedAxis: "crowd_approval",
+      },
+      {
+        id: "google-cosme",
+        name: "Cosme",
+        meta: "",
+        attributionText: "Powered by Google",
+        droppedAxis: "vibe",
+      },
+    ]);
+  });
+
+  it("degrades assigned card-set no-results responses to the Q5 no-results path", async () => {
+    await expect(
+      fetchAssignedQ5CardSet({
+        roomId: "room-1",
+        invoke: vi.fn().mockResolvedValue({
+          data: { status: "no_results", reason: "thin_pool" },
+          error: null,
+        }),
+      }),
+    ).resolves.toEqual({
+      candidates: [],
+      source: "no-results",
+      rawFetch: [],
+    });
+  });
+});
 
 // -- venue fixtures --------------------------------------------------
 

@@ -1,31 +1,17 @@
 // GetToIt web — verdict shaping helpers.
 //
-// The web invitee verdict surface is the locked
-// verdict card": plan name + verdict venue only. §C spells out,
+// The web invitee verdict surface is the locked `web-01-invitee-shell`
+// §C verdict card: plan name + verdict venue only. §C spells out,
 // verbatim, "No receipts, no per-axis cuts, no rule chip" and "No
 // primary CTA" — the web invitee card is a far smaller read than the
 // mobile S05 Verdict surface.
 //
-// These helpers shape the rows the engine wrote (`verdicts`,
-// `options`) into that §C surface. They carry NO receipt / cut
+// These helpers shape the engine's verdict row plus the current
+// Plan-state display name into that §C surface. They carry NO receipt / cut
 // machinery: `votes` is ephemeral and gone by the time a Plan is
 // decided (decision doc §Q6), so a receipt surface has no live data
-// source on web. the mobile app keeps its full receipt surface — web/mobile verdict
+// source on web. The mobile app keeps its full receipt surface — web/mobile verdict
 // parity is not a goal (bug-17).
-
-export type OptionPayload = {
-  fsq_place_id?: string;
-  name?: string;
-  price_tier?: number;
-  walk_minutes_estimate?: number;
-  dietary_tags?: string[];
-  categories?: string[];
-};
-
-export type OptionRow = {
-  id: string;
-  payload: OptionPayload;
-};
 
 export type VerdictRow = {
   id: string;
@@ -61,19 +47,19 @@ export const NO_SURVIVOR_VENUE = "No spot fits";
 
 /** Shape the §C read-only verdict surface from the engine's rows.
  *
- *  `planName` comes from the joiner-readable `plans_decided_for_user` /
- *  `plans_history_for_user` RPCs (the `plans` table itself carries a
- *  creator-only SELECT policy, so a web invitee cannot read it
- *  directly). `winningOption` is the verdict's `options` row.
+ *  `planName` and `verdictPlaceName` come from the joiner-readable
+ *  Plan-state RPCs or current Google display refetch path. This helper
+ *  intentionally does not read `options.payload` display fields; those
+ *  are stale provider display snapshots in Google-backed flows.
  *
- *  Returns `null` for a non-no-survivor verdict with no winning option
+ *  Returns `null` for a non-no-survivor verdict with no place name
  *  — there is no §C surface to render without a venue. */
 export function shapeVerdictView(args: {
   verdict: VerdictRow;
   planName: string;
-  winningOption: OptionRow | null;
+  verdictPlaceName: string | null;
 }): VerdictView | null {
-  const { verdict, planName, winningOption } = args;
+  const { verdict, planName, verdictPlaceName } = args;
 
   if (verdict.method === "no_survivor") {
     return {
@@ -82,13 +68,14 @@ export function shapeVerdictView(args: {
     };
   }
 
-  if (!winningOption) {
+  const placeName = verdictPlaceName?.trim() ?? "";
+  if (!placeName) {
     return null;
   }
 
   return {
     mode: "default",
     planName,
-    verdictPlaceName: winningOption.payload.name ?? "Unnamed",
+    verdictPlaceName: placeName,
   };
 }

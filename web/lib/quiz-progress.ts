@@ -63,8 +63,20 @@ export type QuizProgressPayload = {
     budget: number;
     reputation: string;
     vibe: number;
+    q1CuisineCravings: string[];
+    q2SpendCap: string;
+    q3Reputation: string;
+    q4VibeEnergy: string;
   };
 };
+
+const VIBE_ANSWER_BY_INDEX = [
+  "quiet",
+  "chill",
+  "social",
+  "lively",
+  "rowdy",
+] as const;
 
 /** Pack the in-flight quiz state into the `quiz_progress` jsonb payload
  *  the `members_progress_upsert` RPC writes. */
@@ -79,6 +91,12 @@ export function packQuizProgress(
       budget: state.budget,
       reputation: state.reputation,
       vibe: state.vibe,
+      q1CuisineCravings: state.noPreference
+        ? ["noPreference"]
+        : [...state.cuisines],
+      q2SpendCap: "$".repeat(state.budget),
+      q3Reputation: state.reputation,
+      q4VibeEnergy: VIBE_ANSWER_BY_INDEX[state.vibe] ?? "social",
     },
   };
 }

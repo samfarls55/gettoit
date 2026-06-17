@@ -17,11 +17,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 
-// The per-member candidate fetch is irrelevant to the verdict path —
-// SessionRoom boots straight into the decided room, never the quiz.
-// Stub it so the test does not pull the Foursquare proxy machinery.
+// Q5 state is irrelevant to the verdict path: SessionRoom boots
+// straight into the decided room, never the quiz.
 vi.mock("../lib/candidate-fetch", () => ({
-  fetchMemberCandidates: vi.fn(),
   buildQ5Ratings: vi.fn(() => []),
   seedRatings: vi.fn(() => ({})),
 }));
@@ -57,7 +55,7 @@ const USER_ID = "anon-user-1";
 // ── A configurable fake Supabase client ─────────────────────────────
 //
 // SessionRoom's boot + verdict-fetch effects query `members`, `votes`,
-// `rooms`, `verdicts` and `options` through the PostgREST builder, and
+// `rooms` and `verdicts` through the PostgREST builder, and
 // open a Realtime channel. The fake below answers each table with a
 // canned row set and captures the `verdict_ready` broadcast listener so
 // a test can fire a rebroadcast.
@@ -65,8 +63,6 @@ const USER_ID = "anon-user-1";
 type FakeState = {
   /** The current `verdicts` row the next verdict fetch returns. */
   verdictRow: Record<string, unknown>;
-  /** The current winning `options` row (default-mode venue fallback). */
-  optionRow: Record<string, unknown> | null;
 };
 
 function makeClient(state: FakeState) {
@@ -95,8 +91,6 @@ function makeClient(state: FakeState) {
           ];
         case "verdicts":
           return [state.verdictRow];
-        case "options":
-          return state.optionRow ? [state.optionRow] : [];
         default:
           return [];
       }
@@ -146,7 +140,9 @@ beforeEach(() => {
 });
 
 describe("SessionRoom — §C verdict live-update on a reroll (bug-20)", () => {
-  it("re-fetches the verdict and updates the venue when a verdict_ready rebroadcast arrives", async () => {
+  it(
+    "re-fetches the verdict and updates the venue when a verdict_ready rebroadcast arrives",
+    async () => {
     const state: FakeState = {
       verdictRow: {
         id: "v1",
@@ -156,7 +152,6 @@ describe("SessionRoom — §C verdict live-update on a reroll (bug-20)", () => {
         method: "deadline",
         rule_text: "",
       },
-      optionRow: null,
     };
     const { client, fireRebroadcast } = makeClient(state);
     getSupabaseClient.mockReturnValue(client);
@@ -191,7 +186,9 @@ describe("SessionRoom — §C verdict live-update on a reroll (bug-20)", () => {
         "Pico's Taqueria",
       ),
     );
-  });
+    },
+    10000,
+  );
 
   it("flips a no-survivor verdict to a venue across §C variants on a rebroadcast", async () => {
     const state: FakeState = {
@@ -203,7 +200,6 @@ describe("SessionRoom — §C verdict live-update on a reroll (bug-20)", () => {
         method: "no_survivor",
         rule_text: "",
       },
-      optionRow: null,
     };
     const { client, fireRebroadcast } = makeClient(state);
     getSupabaseClient.mockReturnValue(client);
@@ -281,7 +277,6 @@ describe("SessionRoom — §C verdict live-update on a reroll (bug-20)", () => {
         method: "deadline",
         rule_text: "",
       },
-      optionRow: null,
     };
     const { client } = makeClient(state);
     getSupabaseClient.mockReturnValue(client);

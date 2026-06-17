@@ -57,9 +57,9 @@ export interface MemberFetchRow {
  *  a migration. */
 export interface OptionInsertRow {
   room_id: string;
-  fsq_place_id: string;
+  fsq_place_id?: string;
   google_place_id?: string;
-  payload: unknown;
+  payload?: unknown;
 }
 
 /** Pull a string `fsq_place_id` off a fetched-venue payload entry.

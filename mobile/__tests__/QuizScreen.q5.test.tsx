@@ -39,26 +39,23 @@ const candidatePool = [
   {
     id: "google-katzs-delicatessen",
     name: "Katz's Delicatessen",
-    categories: ["Deli"],
-    priceTier: 2,
-    walkMinutesEstimate: 6,
-    profile: { cuisine: "american", reputation: "popular", vibe: 2 },
+    meta: "",
+    attributionText: "Powered by Google",
+    droppedAxis: "cuisine" as const,
   },
   {
     id: "google-los-tacos-no-1",
     name: "Los Tacos No. 1",
-    categories: ["Mexican"],
-    priceTier: 2,
-    walkMinutesEstimate: 9,
-    profile: { cuisine: "mexican", reputation: "hiddenGem", vibe: 2 },
+    meta: "",
+    attributionText: "Powered by Google",
+    droppedAxis: "crowd_approval" as const,
   },
   {
     id: "google-cosme",
     name: "Cosme",
-    categories: ["Mexican"],
-    priceTier: 4,
-    walkMinutesEstimate: 4,
-    profile: { cuisine: "mexican", reputation: "popular", vibe: 4 },
+    meta: "",
+    attributionText: "Powered by Google",
+    droppedAxis: "vibe" as const,
   },
 ];
 
@@ -143,7 +140,7 @@ describe("QuizScreen Q5", () => {
     });
 
     expect(screen.getByText("Katz's Delicatessen")).toBeOnTheScreen();
-    expect(screen.getByText("DELI - $$ - 6 MIN")).toBeOnTheScreen();
+    expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
     expect(screen.getByLabelText("Rate 5 for Katz's Delicatessen")).toBeOnTheScreen();
   });
 
@@ -227,7 +224,7 @@ describe("QuizScreen Q5", () => {
             name: "Katz's Delicatessen",
           }),
           expect.objectContaining({
-            droppedAxis: "reputation",
+            droppedAxis: "crowd_approval",
             id: "google-los-tacos-no-1",
             name: "Los Tacos No. 1",
           }),
@@ -251,29 +248,23 @@ describe("QuizScreen Q5", () => {
           {
             id: "google-katzs-delicatessen",
             name: "Katz's Delicatessen",
-            categories: [],
+            meta: "",
             attributionText: "Powered by Google",
-            priceTier: 2,
-            walkMinutesEstimate: 6,
-            profile: { cuisine: "american", reputation: "popular", vibe: 2 },
+            droppedAxis: "cuisine",
           },
           {
             id: "google-los-tacos-no-1",
             name: "Los Tacos No. 1",
-            categories: [],
+            meta: "",
             attributionText: "Powered by Google",
-            priceTier: 2,
-            walkMinutesEstimate: 9,
-            profile: { cuisine: "mexican", reputation: "hiddenGem", vibe: 2 },
+            droppedAxis: "crowd_approval",
           },
           {
             id: "google-cosme",
             name: "Cosme",
-            categories: [],
+            meta: "",
             attributionText: "Powered by Google",
-            priceTier: 4,
-            walkMinutesEstimate: 4,
-            profile: { cuisine: "mexican", reputation: "popular", vibe: 4 },
+            droppedAxis: "vibe",
           },
         ])}
         role="initiator"

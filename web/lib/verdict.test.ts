@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import {
   shapeVerdictView,
   NO_SURVIVOR_VENUE,
-  type OptionRow,
   type VerdictRow,
 } from "./verdict";
 
@@ -24,21 +23,11 @@ describe("shapeVerdictView (web-01 §C)", () => {
     rule_text: "Budget cap cut Ren Soba.",
   };
 
-  const winningOption: OptionRow = {
-    id: "o-1",
-    payload: {
-      name: "Pico's Taqueria",
-      categories: ["Mexican"],
-      price_tier: 2,
-      walk_minutes_estimate: 8,
-    },
-  };
-
   it("builds a default-mode view — plan name + verdict venue only", () => {
     const view = shapeVerdictView({
       verdict,
       planName: "Friday dinner",
-      winningOption,
+      verdictPlaceName: "Pico's Taqueria",
     });
     expect(view).not.toBeNull();
     if (view?.mode !== "default") throw new Error("expected default mode");
@@ -50,7 +39,7 @@ describe("shapeVerdictView (web-01 §C)", () => {
     const view = shapeVerdictView({
       verdict,
       planName: "Friday dinner",
-      winningOption,
+      verdictPlaceName: "Pico's Taqueria",
     });
     // §C is plan name + venue only — the dead TB-15 shaping is gone.
     expect(view).not.toBeNull();
@@ -61,21 +50,21 @@ describe("shapeVerdictView (web-01 §C)", () => {
     expect(view).not.toHaveProperty("ruleText");
   });
 
-  it("falls back to 'Unnamed' when the winning option has no name", () => {
-    const view = shapeVerdictView({
-      verdict,
-      planName: "Friday dinner",
-      winningOption: { id: "o-1", payload: {} },
-    });
-    if (view?.mode !== "default") throw new Error("expected default mode");
-    expect(view.verdictPlaceName).toBe("Unnamed");
+  it("returns null when current display refetch has no place name", () => {
+    expect(
+      shapeVerdictView({
+        verdict,
+        planName: "Friday dinner",
+        verdictPlaceName: "",
+      }),
+    ).toBeNull();
   });
 
   it("returns a no-survivor view when the engine emits no_survivor", () => {
     const view = shapeVerdictView({
       verdict: { ...verdict, method: "no_survivor", option_id: null },
       planName: "Friday dinner",
-      winningOption: null,
+      verdictPlaceName: null,
     });
     if (view?.mode !== "no-survivor") {
       throw new Error("expected no-survivor mode");
@@ -87,12 +76,12 @@ describe("shapeVerdictView (web-01 §C)", () => {
     expect(view).not.toHaveProperty("metaLine");
   });
 
-  it("returns null when a non-no-survivor verdict has no winning option", () => {
+  it("returns null when a non-no-survivor verdict has no place name", () => {
     expect(
       shapeVerdictView({
         verdict,
         planName: "Friday dinner",
-        winningOption: null,
+        verdictPlaceName: null,
       }),
     ).toBeNull();
   });

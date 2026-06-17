@@ -149,7 +149,13 @@ function adapterForGoogleVerdictFetch(
     async insertOptions(rows) {
       for (const row of rows) {
         insertedOptions.push(row);
-        const googlePlaceId = row.google_place_id ?? row.fsq_place_id;
+        const googlePlaceId = row.google_place_id;
+        assert(googlePlaceId, "current Google path must persist google_place_id");
+        assertEquals(
+          row.fsq_place_id,
+          undefined,
+          "current Google path must not write fsq_place_id compatibility",
+        );
         optionsTable.push({
           id: `option_${googlePlaceId.slice(-1)}`,
           google_place_id: googlePlaceId,
@@ -223,6 +229,11 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
     "Q5 member fetches are not reused",
   );
   assertEquals(
+    state.insertedOptions.map((row) => row.fsq_place_id),
+    [undefined, undefined, undefined, undefined, undefined],
+    "Google identity is not mirrored through fsq_place_id compatibility",
+  );
+  assertEquals(
     state.insertedOptions.map((row) => row.google_place_id),
     ["google-c", "google-a", "google-b", "google-d", "google-e"],
     "Google identity is persisted without display payloads",
@@ -269,6 +280,26 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
     true,
     "slate rows keep app-owned metadata only",
   );
+});
+
+Deno.test("TB-31: empty current Google verdict fetch does not fall back to member_fetches", async () => {
+  const state = adapterForGoogleVerdictFetch([]);
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => state.adapter },
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(state.fetchContexts.length, 1);
+  assertEquals(
+    state.memberFetchReadCount,
+    0,
+    "current Google verdict fetch owns empty-pool/no-survivor behavior",
+  );
+  assertEquals(state.insertedOptions.length, 0);
+  assertEquals(state.insertedVerdicts[0].method, "no_survivor");
+  assertEquals(state.insertedVerdicts[0].winner_google_place_id, null);
 });
 
 Deno.test("TB-07: Vibe Fit member scoring degrades missing and low-confidence evidence toward neutral", () => {
@@ -371,15 +402,10 @@ Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scorin
   }
   assertStringIncludes(indexSource, "GOOGLE_VERDICT_FETCH_FIELD_MASK");
   assertStringIncludes(indexSource, "GOOGLE_VERDICT_SCORING_FIELD_MASK");
-  assertStringIncludes(indexSource, '"places.reviewSummary"');
-  assertStringIncludes(indexSource, '"places.generativeSummary"');
+  assertStringIncludes(indexSource, "googleReviewSummary(place)");
+  assertStringIncludes(indexSource, "googleGenerativeSummary(place)");
   assertStringIncludes(indexSource, "isVibeFitEnabled(env)");
   assertStringIncludes(indexSource, "googleVerdictFieldMaskName(env)");
-  assert(
-    indexSource.indexOf('"places.reviewSummary"') >
-      indexSource.indexOf("GOOGLE_VERDICT_SCORING_FIELD_MASK"),
-    "summary fields must belong to the internal scoring mask, not the base fetch/display masks",
-  );
 });
 
 Deno.test("TB-09: production Vibe Fit uses canonical embeddings flag and no fake embeddings", () => {

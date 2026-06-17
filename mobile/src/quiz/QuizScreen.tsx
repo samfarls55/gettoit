@@ -4,11 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { mobileTokens } from "../design/tokens";
 import type { Q5CandidateRepository } from "./q5CandidateRepository";
 import {
-  generateQ5FactorialCards,
-  q5CardsToCandidates,
   type Q5Candidate,
-  type Q5MemberProfile,
-  type Q5PoolVenue,
 } from "./q5Factorial";
 import type {
   QuizAnswers,
@@ -52,13 +48,6 @@ const maxMultiSelectValues = 3;
 const quizQuestionIds: readonly QuizQuestionId[] = ["q1", "q2", "q3", "q4", "q5"];
 const defaultQ5Rating = 3;
 const q5RatingScores = [1, 2, 3, 4, 5] as const;
-const vibeValueByAnswer: Record<string, number> = {
-  quiet: 0,
-  chill: 1,
-  social: 2,
-  lively: 3,
-  rowdy: 4,
-};
 
 const questionConfigs: readonly QuestionConfig[] = [
   {
@@ -218,13 +207,12 @@ export function QuizScreen({
     setQ5Status("loading");
 
     try {
-      const pool = await q5CandidateRepository.loadCandidates({
+      const candidates = await q5CandidateRepository.loadCandidates({
         roomId,
         answers: nextQuizAnswers,
       });
-      const candidates = q5CandidatesFromAnswers(pool, nextQuizAnswers);
 
-      if (!candidates) {
+      if (candidates.length === 0) {
         setQ5Candidates([]);
         setQ5Status("noResults");
         return;
@@ -432,28 +420,6 @@ export function QuizScreen({
       ) : null}
     </View>
   );
-}
-
-function memberProfileFromAnswers(quizAnswers: QuizAnswers): Q5MemberProfile {
-  return {
-    cuisines: (quizAnswers.q1CuisineCravings ?? []).filter(
-      (cuisine) => cuisine !== noPreferenceValue,
-    ),
-    reputation: quizAnswers.q3Reputation ?? noPreferenceValue,
-    vibe: vibeValueByAnswer[quizAnswers.q4VibeEnergy ?? "social"] ?? 2,
-  };
-}
-
-function q5CandidatesFromAnswers(
-  pool: Q5PoolVenue[],
-  quizAnswers: QuizAnswers,
-): Q5Candidate[] | null {
-  const cards = generateQ5FactorialCards({
-    member: memberProfileFromAnswers(quizAnswers),
-    pool,
-  });
-
-  return cards ? q5CardsToCandidates(cards) : null;
 }
 
 function initialQ5Ratings(candidates: Q5Candidate[]): Record<string, number> {

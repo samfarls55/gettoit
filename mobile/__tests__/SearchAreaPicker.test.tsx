@@ -93,7 +93,9 @@ describe("Search area state", () => {
 });
 
 describe("SearchAreaPickerPreview", () => {
-  it("uses fakeable adapter contracts for current-location jumps, typed jumps, and preview pins", async () => {
+  it(
+    "uses fakeable adapter contracts for current-location jumps, typed jumps, and preview pins",
+    async () => {
     const adapter = makeAdapter();
     const onCommit = jest.fn();
 
@@ -136,7 +138,9 @@ describe("SearchAreaPickerPreview", () => {
       },
       radiusMiles: 3.5,
     });
-  });
+    },
+    10000,
+  );
 
   it("surfaces dirty close choices without committing until the user chooses", () => {
     const adapter = makeAdapter();

@@ -36,40 +36,26 @@
 
 import {
   type CandidateOption,
-  computeVerdict,
   type HardVeto,
-  type MemberVote,
-  type VerdictEngineOutput,
   type VerdictMethod,
-  type VerdictSlateEntry,
 } from "../_shared/verdict-engine.ts";
 import {
   type MemberFetchRow,
   type OptionInsertRow,
-  unionMemberFetches,
 } from "../_shared/member-fetch-union.ts";
-import {
-  buildPreferenceFunction,
-  type PreferenceFunctionOptions,
-  type Q5VenueProfile,
-  scoreVibeAxis,
-  THRESHOLD_T,
-  VIBE_SCALE_STOPS,
-} from "../_shared/preference-function.ts";
-import { classifyVenuePool } from "../_shared/venue-classifier.ts";
 import type { MemberPreferenceInputs } from "../_shared/votes-schema.ts";
 import {
-  scoreVibeFitCandidate,
-  scoreVibeFitCandidateFlow,
-  VIBE_FIT_CONFIG,
   type VibeEmbeddingFetch,
   type VibeFitCandidate,
-  type VibeFitSignal,
 } from "../_shared/vibe-fit.ts";
-import {
-  evaluateHardEligibility,
-  type HardEligibilityVote,
-} from "../_shared/hard-eligibility.ts";
+import { createVerdictRunStore, runVerdictForRoom } from "./verdict-run.ts";
+
+export {
+  buildEligibleVibeFitCandidatesForVerdict,
+  mergeHardVetoes,
+  mergeQ1Vetoes,
+  scoreVibeFitSignalForMember,
+} from "./verdict-run.ts";
 
 // TB-21 — re-export the union primitive's row types so the Edge entry
 // point (`index.ts`) and the handler tests can bind them without a
@@ -393,281 +379,6 @@ function isUuid(s: unknown): s is string {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 }
 
-/** TB-10 — merge the original Q1 dietary chips with the diet-reason
- *  reroll additions. Dedupe on lowercase token; order preserved per the
- *  spec's "Q1 chips" + reroll-extra append rule. */
-export function mergeQ1Vetoes(
-  base: readonly string[],
-  extra: readonly string[] | undefined,
-): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const chip of base) {
-    const key = chip.trim().toLowerCase();
-    if (key.length === 0 || seen.has(key)) continue;
-    seen.add(key);
-    out.push(chip);
-  }
-  if (!extra) return out;
-  for (const chip of extra) {
-    const key = chip.trim().toLowerCase();
-    if (key.length === 0 || seen.has(key)) continue;
-    seen.add(key);
-    out.push(chip);
-  }
-  return out;
-}
-
-/** TB-12 — union session hard vetoes with the member's sticky profile
- *  vetoes. Deduped on the `(kind, token)` pair (token compared
- *  case-insensitively, matching the engine's own normalization);
- *  `session` entries land first, `profile` entries are appended. The
- *  engine's veto lookup is set-based so a duplicate would not change
- *  the verdict — the dedupe keeps the engine input minimal. */
-export function mergeHardVetoes(
-  session: readonly HardVeto[],
-  profile: readonly HardVeto[],
-): HardVeto[] {
-  const out: HardVeto[] = [];
-  const seen = new Set<string>();
-  for (const v of [...session, ...profile]) {
-    const key = `${v.kind} ${v.token.trim().toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(v);
-  }
-  return out;
-}
-
-function dedupeGoogleVerdictCandidates(
-  candidates: readonly GoogleVerdictCandidateRow[],
-): GoogleVerdictCandidateRow[] {
-  const seen = new Set<string>();
-  const out: GoogleVerdictCandidateRow[] = [];
-  for (const candidate of candidates) {
-    const id = candidate.google_place_id.trim();
-    if (id.length === 0 || seen.has(id)) continue;
-    seen.add(id);
-    out.push({ ...candidate, google_place_id: id });
-  }
-  return out;
-}
-
-async function fetchGoogleVerdictOptionRows(
-  data: ComputeVerdictDataAdapter,
-  roomId: string,
-  activeMemberIds: string[] | null,
-  voteRows: MemberVoteRow[],
-): Promise<RoomOptionRow[] | null> {
-  if (!data.fetchGoogleVerdictCandidates) return null;
-
-  const googleCandidates = await data.fetchGoogleVerdictCandidates(roomId, {
-    active_member_ids: activeMemberIds ?? voteRows.map((row) => row.user_id),
-    votes: voteRows,
-  });
-  const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(
-    googleCandidates,
-  );
-  if (dedupedGoogleCandidates.length === 0 || !data.insertOptions) return null;
-
-  await data.insertOptions(dedupedGoogleCandidates.map((candidate) => ({
-    room_id: roomId,
-    fsq_place_id: candidate.google_place_id,
-    google_place_id: candidate.google_place_id,
-    payload: candidate.payload,
-  })));
-
-  const optionIdByGooglePlaceId = buildGoogleOptionIdMap(
-    await data.fetchOptions(roomId),
-  );
-  return dedupedGoogleCandidates.map((candidate) => ({
-    id: optionIdByGooglePlaceId.get(candidate.google_place_id) ??
-      candidate.google_place_id,
-    google_place_id: candidate.google_place_id,
-    place_provider: "google",
-    payload: candidate.payload,
-    vibe_fit_candidate: candidate.vibe_fit_candidate,
-  }));
-}
-
-function buildGoogleOptionIdMap(
-  optionRows: readonly RoomOptionRow[],
-): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const row of optionRows) {
-    if (typeof row.google_place_id === "string") {
-      out.set(row.google_place_id, row.id);
-    }
-  }
-  return out;
-}
-
-type EffectiveVoteInput = HardEligibilityVote & { row: MemberVoteRow };
-type VibeFitScoringVenueProfile = Q5VenueProfile & {
-  vibeFitCandidateId?: string;
-};
-
-const VERDICT_SCORING_FORMULA_VERSION = "verdict-vibe-member-blend-v1";
-const Q5_GENERATION_RULES_VERSION = "q5-factorial-v1";
-const GOOGLE_SCORING_MASK_VERSION = "verdict_scoring_vibe_fit_v1";
-const VERDICT_VIBE_FIT_MAX_TEXTS_PER_FLOW =
-  (20 * VIBE_FIT_CONFIG.maxSpansPerCandidate +
-    VIBE_FIT_CONFIG.anchors.flatMap((anchor) => anchor.phrases).length) * 2;
-
-function clampLegacyVibeIndex(value: number): number {
-  return Math.max(0, Math.min(VIBE_SCALE_STOPS - 1, Math.round(value)));
-}
-
-export function buildEligibleVibeFitCandidatesForVerdict(input: {
-  optionRows: readonly RoomOptionRow[];
-  votes: readonly HardEligibilityVote[];
-  radiusMeters: number | null;
-  mealTiming?: { open_at?: string | null };
-  serviceShape?: "dineIn" | "takeout" | null;
-}): VibeFitCandidate[] {
-  return input.optionRows
-    .filter(hasVibeFitCandidate)
-    .filter((row) => {
-      const candidate = hardEligibilityCandidateFromOptionRow(row);
-      if (!candidate) return false;
-      return evaluateHardEligibility({
-        candidate,
-        votes: input.votes,
-        room: {
-          radius_meters: input.radiusMeters,
-          meal_timing: input.mealTiming,
-          service_shape: input.serviceShape,
-        },
-      }).eligible;
-    })
-    .map((row) => row.vibe_fit_candidate);
-}
-
-function hasVibeFitCandidate(
-  row: RoomOptionRow,
-): row is RoomOptionRow & { vibe_fit_candidate: VibeFitCandidate } {
-  return row.vibe_fit_candidate !== undefined;
-}
-
-async function scoreEligibleVibeFitCandidates(
-  candidates: readonly VibeFitCandidate[],
-  env: ComputeVerdictEnv,
-  fetch?: VibeEmbeddingFetch,
-): Promise<Map<string, VibeFitSignal>> {
-  const out = new Map<string, VibeFitSignal>();
-  if (candidates.length === 0) {
-    return out;
-  }
-  const signals =
-    candidates.every((candidate) => candidate.embeddingMode === "fake")
-      ? candidates.map((candidate) => scoreVibeFitCandidate(candidate))
-      : await scoreVibeFitCandidateFlow(candidates, {
-        env: {
-          VOYAGE_API_KEY: env.VOYAGE_API_KEY,
-          VIBE_EMBEDDINGS_ENABLED: env.VIBE_EMBEDDINGS_ENABLED,
-        },
-        budget: { maxTextsPerFlow: VERDICT_VIBE_FIT_MAX_TEXTS_PER_FLOW },
-        ...(fetch ? { fetch } : {}),
-      });
-  for (const signal of signals) {
-    out.set(signal.candidateId, signal);
-  }
-  return out;
-}
-
-export function scoreVibeFitSignalForMember(
-  signal: VibeFitSignal | undefined,
-  statedLegacyVibe: number,
-): number {
-  if (!signal || signal.vibePosition === null) return THRESHOLD_T;
-  if (!Number.isFinite(statedLegacyVibe)) return THRESHOLD_T;
-  const rawScore = scoreVibeAxis(
-    signal.vibePosition - 1,
-    clampLegacyVibeIndex(statedLegacyVibe),
-  );
-  const confidence = Math.max(0, Math.min(1, signal.confidence));
-  return THRESHOLD_T + (rawScore - THRESHOLD_T) * confidence;
-}
-
-function buildVibeFitPreferenceOptions(
-  signalsByCandidateId: ReadonlyMap<string, VibeFitSignal>,
-): PreferenceFunctionOptions {
-  return {
-    scoreVibeAxis: (_venueVibe, statedVibe, venue) => {
-      const candidateId = vibeFitCandidateIdForVenue(venue);
-      if (!candidateId) return THRESHOLD_T;
-      return scoreVibeFitSignalForMember(
-        signalsByCandidateId.get(candidateId),
-        statedVibe,
-      );
-    },
-  };
-}
-
-function vibeFitCandidateIdForVenue(
-  venue: Q5VenueProfile,
-): string | undefined {
-  if (!("vibeFitCandidateId" in venue)) return undefined;
-  return typeof venue.vibeFitCandidateId === "string"
-    ? venue.vibeFitCandidateId
-    : undefined;
-}
-
-function buildDurableVerdictScoringVersion(
-  signals: Iterable<VibeFitSignal>,
-): string {
-  const projectionVersions = [
-    ...new Set(
-      [...signals].map((signal) => signal.projectionVersion),
-    ),
-  ].sort();
-  const projectionVersion = projectionVersions.length > 0
-    ? projectionVersions.join("+")
-    : VIBE_FIT_CONFIG.voyageProjectionVersion;
-  return [
-    "verdict-fit-v2",
-    `google_mask=${GOOGLE_SCORING_MASK_VERSION}`,
-    `vibe_anchor=${VIBE_FIT_CONFIG.anchorVersion}`,
-    `vibe_span=${VIBE_FIT_CONFIG.spanAssemblerVersion}`,
-    `embedding=voyage:${VIBE_FIT_CONFIG.voyageModel}`,
-    `projection=${projectionVersion}`,
-    `q5=${Q5_GENERATION_RULES_VERSION}`,
-    `formula=${VERDICT_SCORING_FORMULA_VERSION}`,
-  ].join("|");
-}
-
-function hardEligibilityCandidateFromOptionRow(
-  row: RoomOptionRow,
-): CandidateOption | null {
-  if (!row.payload) return null;
-  return candidateOptionFromOptionRow(row);
-}
-
-function candidateOptionFromOptionRow(row: RoomOptionRow): CandidateOption {
-  const payload = row.payload;
-  return {
-    id: row.id,
-    google_place_id: row.google_place_id,
-    name: payload?.name ?? "Unnamed",
-    price_tier: payload?.price_tier ?? null,
-    dietary_tags: payload?.dietary_tags ?? [],
-    categories: payload?.categories ?? [],
-    distance_meters: payload?.distance_meters ?? null,
-    // TB-23 — carry the Foursquare reputation / vibe signal so the
-    // server-side venue classifier can derive the preference axes. The
-    // engine itself never reads these fields.
-    rating: payload?.rating ?? null,
-    total_ratings: payload?.total_ratings ?? null,
-    user_rating_count: payload?.user_rating_count ?? null,
-    date_created: payload?.date_created ?? null,
-    tastes: payload?.tastes ?? [],
-    current_open_now: payload?.current_open_now ?? null,
-    regular_opening_periods: payload?.regular_opening_periods,
-    dine_in: payload?.dine_in ?? null,
-    takeout: payload?.takeout ?? null,
-  };
-}
-
 export async function handleRequest(
   req: Request,
   deps: ComputeVerdictDeps,
@@ -754,343 +465,44 @@ export async function handleRequest(
     });
   }
 
-  const data = deps.buildDataAdapter(deps.env);
-
-  // TB-10 — read the reroll-state slice up front so the idempotency
-  // check can short-circuit on reroll runs: when the room has a
-  // `last_reroll_reason` set, the apply_reroll RPC just deleted the
-  // prior verdict and tightened the room state; we must run the
-  // engine fresh and NOT return a stale "already_computed" payload.
-  const rerollState: RoomRerollState | null = data.fetchRoomRerollState
-    ? await data.fetchRoomRerollState(roomId)
-    : null;
-  const isRerollRun = (rerollState?.last_reroll_reason ?? null) !== null;
-
-  // Idempotency — if a verdict already exists for this room, return it
-  // with the cuts, 200. TB-07 will use ON CONFLICT to support trigger-
-  // retry. TB-10's reroll run is the exception: when
-  // `last_reroll_reason` is set on the room, the apply_reroll RPC
-  // already deleted the prior verdict; any verdict we see now is
-  // post-reroll and must NOT be re-returned as "already_computed."
-  const existing = await data.existingVerdict(roomId);
-  if (existing && !isRerollRun) {
-    return jsonResponse({
-      verdict: existing,
-      cuts: [],
-      already_computed: true,
-    }, { status: 200, headers: corsHeaders() });
-  } else if (existing && isRerollRun) {
-    // Race: a stale verdict slipped past the apply_reroll DELETE.
-    // Drop it so the fresh engine run can write under the UNIQUE
-    // constraint.
-    await data.deleteVerdictForRoom(roomId);
-  }
-
-  const room = await data.fetchRoom(roomId);
-  if (!room) {
-    return jsonResponse({ error: "room_not_found" }, {
-      status: 404,
-      headers: corsHeaders(),
-    });
-  }
-  const activeMemberIds = data.fetchActiveMemberIds
-    ? await data.fetchActiveMemberIds(roomId)
-    : null;
-  const activeMemberIdSet = activeMemberIds ? new Set(activeMemberIds) : null;
-  const filterToActiveMembers = <T extends { user_id: string }>(
-    rows: T[],
-  ): T[] =>
-    activeMemberIdSet
-      ? rows.filter((row) => activeMemberIdSet.has(row.user_id))
-      : rows;
-
-  const voteRows = filterToActiveMembers(await data.fetchVotes(roomId));
-
-  // A room with no member votes can't yield a verdict at all — there
-  // is no group to render the result for. That stays a hard 404.
-  if (voteRows.length === 0) {
-    return jsonResponse({ error: "no_votes" }, {
-      status: 404,
-      headers: corsHeaders(),
-    });
-  }
-
-  // TB-21 — populate `options` from the per-member persisted fetches.
-  //
-  // Parent bug-08: `QuizCandidateFetch` (iOS) fetched each member's
-  // full Foursquare venue union, picked the three Q5 factorial cards
-  // from it, and discarded the union — nothing ever wrote `options`,
-  // so the engine had no pool and every room returned `no_candidates`.
-  // The bug-08 fork (2026-05-18) put the union server-side: the iOS
-  // quiz now persists each member's raw fetch into `member_fetches`,
-  // and here — at verdict fire time — the server assembles the running
-  // union of every member's fetch (first-seen dedup by `fsq_place_id`)
-  // and writes it into `options` before the engine reads the pool.
-  //
-  // The server is the single owner of the union — iOS never writes
-  // `options`. The union runs only when `options` is empty: a room
-  // whose pool was already populated (a prior fire, a reroll re-run)
-  // is left untouched, so the union is idempotent across re-invokes.
-  let optionRows = await data.fetchOptions(roomId);
-  const googleOptionRows = await fetchGoogleVerdictOptionRows(
-    data,
+  const run = await runVerdictForRoom({
     roomId,
-    activeMemberIds,
-    voteRows,
-  );
-  if (googleOptionRows) {
-    optionRows = googleOptionRows;
-  } else if (
-    optionRows.length === 0 &&
-    data.fetchMemberFetches &&
-    data.insertOptions
-  ) {
-    const memberFetches = filterToActiveMembers(
-      await data.fetchMemberFetches(roomId),
-    );
-    const unionRows = unionMemberFetches(roomId, memberFetches);
-    if (unionRows.length > 0) {
-      await data.insertOptions(unionRows);
-      optionRows = await data.fetchOptions(roomId);
-    }
-  }
-
-  // bug-13 — an EMPTY candidate pool is NOT an error. It is a valid
-  // terminal outcome: the engine short-circuits an empty pool to a
-  // `no_survivor` output (verdict-engine.ts: empty EBA survivors →
-  // buildNoSurvivorOutput), and the code below persists that terminal
-  // verdict row + advances the room out of `firing`, exactly as a
-  // normal verdict does. Returning `no_candidates` as a 404 here is
-  // what wedged ~29% of rooms on 2026-05-19: no `verdicts` row ever
-  // landed, so the room stayed `firing` forever and iOS polled a
-  // verdict that never resolved. The empty pool now flows through.
-
-  // Use the committed room radius as the hard Search area boundary.
-  const startingRadius = (await data.fetchRoomRadius(roomId)) ?? null;
-
-  const candidates = optionRows.map(candidateOptionFromOptionRow);
-
-  // TB-23 — classify the FULL candidate pool into per-venue
-  // `Q5VenueProfile`s, ONCE. Reputation is pool-relative (its volume
-  // terciles are derived from this pool), so classification must see
-  // the whole pool in a single call. Every member's `prefFn` then
-  // scores against this shared classified pool.
-  const venueProfiles = classifyVenuePool(candidates);
-
-  // TB-12 — fetch each member's sticky per-account profile vetoes
-  // (allergies / dietary restrictions / cuisine NEVERS). Profile data
-  // lives on the account record, not the per-session `votes` row, so
-  // it is read here and folded into the member's `hard_vetoes` channel
-  // — the same generic EBA channel the schema mapping layer feeds. A
-  // member with no profile row contributes nothing.
-  const profileVetoes: Record<string, HardVeto[]> = data.fetchProfileVetoes
-    ? await data.fetchProfileVetoes(voteRows.map((r) => r.user_id))
-    : {};
-
-  // Vibe Fit hard eligibility and the engine must see the same merged
-  // vetoes and reroll budget caps.
-  const effectiveVoteInputs: EffectiveVoteInput[] = voteRows.map((row) => ({
-    row,
-    q1_vetoes: mergeQ1Vetoes(row.q1_vetoes, row.q1_vetoes_extra),
-    q2_budget: rerollState?.budget_tier_override != null
-      ? Math.min(row.q2_budget, rerollState.budget_tier_override)
-      : row.q2_budget,
-    hard_vetoes: mergeHardVetoes(
-      row.hard_vetoes ?? [],
-      profileVetoes[row.user_id] ?? [],
-    ),
-  }));
-  const transientVibeFitSignalsByCandidateId =
-    await scoreEligibleVibeFitCandidates(
-      buildEligibleVibeFitCandidatesForVerdict({
-        optionRows,
-        votes: effectiveVoteInputs,
-        radiusMeters: startingRadius,
-      }),
-      deps.env,
-      deps.vibeEmbeddingFetch,
-    );
-  const useVibeFitPreferenceScoring = optionRows.some(hasVibeFitCandidate);
-  const vibeFitPreferenceOptions: PreferenceFunctionOptions =
-    useVibeFitPreferenceScoring
-      ? buildVibeFitPreferenceOptions(transientVibeFitSignalsByCandidateId)
-      : {};
-
-  // TB-10 — merge q1_vetoes + q1_vetoes_extra so the EBA filter sees
-  // the union of "original quiz answer" + "diet-reason reroll add."
-  // The engine itself doesn't need the split visible — its lookup
-  // table is set-based and the dedupe in the engine handles duplicates
-  // naturally.
-  const votes: MemberVote[] = effectiveVoteInputs.map(({
-    row,
-    q1_vetoes,
-    q2_budget,
-    hard_vetoes,
-  }) => {
-    // TB-23 — server-side preference scoring. When the vote row carries
-    // `preference_inputs` (the member's stated Q1/Q3/Q4 profile + their
-    // three Q5 factorial ratings), build that member's `prefFn` and
-    // inject it. The engine then scores EVERY candidate in the full
-    // `options` pool through the member's preference function — a score
-    // over the whole running union, not just the three Q5 cards. This
-    // is the bug-08 Option 2 fix: the verdict winner can be a venue no
-    // member saw at Q5.
-    //
-    // The Q5 ratings are the *preference probe* that feeds the prefFn
-    // build — they are no longer the candidate scores. A vote row with
-    // no `preference_inputs` falls back to the static `scores` map (the
-    // test / replay path); the engine's `scoreFor` reads `prefFn` first
-    // and `scores` only when `prefFn` is absent.
-    let prefFn: MemberVote["prefFn"] | undefined;
-    if (row.preference_inputs) {
-      const built = buildPreferenceFunction(
-        row.preference_inputs.member,
-        row.preference_inputs.q5Ratings,
-        vibeFitPreferenceOptions,
-      );
-      prefFn = (candidate) => {
-        // A candidate with no classified profile (it was not in the
-        // pool the classifier saw — should not happen, the classifier
-        // covers the whole pool) scores at the match ceiling, the same
-        // benefit-of-the-doubt the engine gives a no-signal candidate.
-        const profile = venueProfiles.get(candidate.id);
-        if (!profile) return 5;
-        const scoringProfile: VibeFitScoringVenueProfile = {
-          ...profile,
-          vibeFitCandidateId: candidate.google_place_id ?? candidate.id,
-        };
-        return built(scoringProfile);
-      };
-    }
-    return {
-      user_id: row.user_id,
-      display_name: row.display_name,
-      q1_vetoes,
-      q2_budget,
-      hard_vetoes,
-      scores: row.scores ?? {},
-      prefFn,
-    };
+    method,
+    env: deps.env,
+    store: createVerdictRunStore(deps.buildDataAdapter(deps.env)),
+    vibeEmbeddingFetch: deps.vibeEmbeddingFetch,
   });
 
-  // TB-10 — fetch the previous winner's display name when this run is
-  // a reroll. The aggregate-rule prefix reads "Cost reroll cut Pico's."
-  const previousWinnerName: string | undefined =
-    (isRerollRun && data.fetchPreviousWinnerName)
-      ? ((await data.fetchPreviousWinnerName(roomId)) ?? undefined)
-      : undefined;
-
-  let result: VerdictEngineOutput;
-  try {
-    result = computeVerdict({
-      candidates,
-      votes,
-      method,
-      radius_meters: startingRadius ?? undefined,
-      excluded_option_ids: rerollState?.excluded_option_ids,
-      reroll_reason: rerollState?.last_reroll_reason ?? undefined,
-      previous_winner_name: previousWinnerName,
-    });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    console.error("compute-verdict engine error:", e);
-    return jsonResponse({ error: "engine_error", detail: message }, {
-      status: 500,
-      headers: corsHeaders(),
-    });
+  switch (run.kind) {
+    case "already_computed":
+      return jsonResponse({
+        verdict: run.verdict,
+        cuts: [],
+        already_computed: true,
+      }, { status: 200, headers: corsHeaders() });
+    case "room_not_found":
+      return jsonResponse({ error: "room_not_found" }, {
+        status: 404,
+        headers: corsHeaders(),
+      });
+    case "no_votes":
+      return jsonResponse({ error: "no_votes" }, {
+        status: 404,
+        headers: corsHeaders(),
+      });
+    case "engine_error":
+      return jsonResponse({ error: "engine_error", detail: run.detail }, {
+        status: 500,
+        headers: corsHeaders(),
+      });
+    case "computed":
+      return jsonResponse({
+        verdict: run.verdict,
+        cuts: run.cuts,
+        receipts: run.receipts,
+        surviving_hard_needs: run.surviving_hard_needs,
+        radius_meters_used: run.radius_meters_used,
+        relax_chain_applied: run.relax_chain_applied,
+      }, { status: 200, headers: corsHeaders() });
   }
-  if (optionRows.some((row) => row.google_place_id)) {
-    const durableScoringVersion = buildDurableVerdictScoringVersion(
-      transientVibeFitSignalsByCandidateId.values(),
-    );
-    result = {
-      ...result,
-      slate: result.slate.map((entry) => ({
-        ...entry,
-        scoring_version: durableScoringVersion,
-      })),
-    };
-  }
-
-  // Persist — the no_survivor row carries `option_id = null` and no
-  // option_cuts; the manual row carries both. TB-10 — stamp the
-  // reroll_reason on the verdict so subsequent reads (and the iOS
-  // VerdictStore) know the surface should attribute the reroll.
-  const verdict = await data.insertVerdict({
-    room_id: roomId,
-    option_id: result.winning_option_id,
-    method: result.method,
-    rule_text: result.rule_text,
-    winner_place_provider: result.slate[0]?.google_place_id ? "google" : null,
-    winner_google_place_id: result.slate[0]?.google_place_id ?? null,
-    final_fit_score: result.slate[0]?.final_fit_score ?? null,
-    scoring_version: result.slate[0]?.scoring_version ?? null,
-    receipts: result.receipts,
-    reroll_reason: rerollState?.last_reroll_reason ?? null,
-  });
-
-  if (result.cuts.length > 0) {
-    await data.insertOptionCuts(result.cuts.map((c) => ({
-      verdict_id: verdict.id,
-      option_id: c.option_id,
-      cut_reason: c.cut_reason,
-      cut_text: c.cut_text,
-    })));
-  }
-  if (data.insertVerdictSlateEntries && result.slate.length > 0) {
-    await data.insertVerdictSlateEntries(result.slate.map((entry) => ({
-      verdict_id: verdict.id,
-      room_id: roomId,
-      slate_rank: entry.slate_rank,
-      place_provider: "google",
-      google_place_id: entry.google_place_id,
-      final_fit_score: entry.final_fit_score,
-      scoring_version: entry.scoring_version,
-      receipts: result.receipts,
-    })));
-  }
-
-  // Post-write notifications. The room status flip lets iOS clients
-  // observing rooms.status route to S05; the broadcast emit is the
-  // canonical "verdict_ready" signal per stack-patterns.md §Realtime
-  // ("Use Realtime Broadcast for live ... the verdict_ready notification").
-  // Both are best-effort — a failure here is logged but doesn't fail
-  // the user-visible verdict response.
-  if (data.markRoomVerdictReady) {
-    try {
-      await data.markRoomVerdictReady(roomId);
-    } catch (e) {
-      console.warn("compute-verdict markRoomVerdictReady failed:", e);
-    }
-  }
-  if (data.emitVerdictReadyBroadcast) {
-    try {
-      await data.emitVerdictReadyBroadcast(roomId, verdict.id);
-    } catch (e) {
-      console.warn("compute-verdict emitVerdictReadyBroadcast failed:", e);
-    }
-  }
-  // tb-WF-1 (workflow-overhaul) — transition the parent Plan to
-  // `decided-active` if the Room is linked to one. Legacy rooms
-  // (pre-workflow-overhaul S01 path) carry `plan_id = null` and
-  // skip this entirely. Best-effort: a failure is logged and does
-  // not fail the verdict response — the Plan list surface will
-  // reconcile on its next read.
-  const planId = (room as { plan_id?: string | null }).plan_id ?? null;
-  if (planId && data.setPlanDecidedActive) {
-    try {
-      await data.setPlanDecidedActive(planId);
-    } catch (e) {
-      console.warn("compute-verdict setPlanDecidedActive failed:", e);
-    }
-  }
-
-  return jsonResponse({
-    verdict,
-    cuts: result.cuts,
-    receipts: result.receipts,
-    surviving_hard_needs: result.surviving_hard_needs,
-    radius_meters_used: result.radius_meters_used,
-    relax_chain_applied: result.relax_chain_applied,
-  }, { status: 200, headers: corsHeaders() });
 }

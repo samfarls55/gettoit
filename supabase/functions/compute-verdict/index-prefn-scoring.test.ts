@@ -117,6 +117,7 @@ function prefScoringAdapter(seed: AdapterSeed = {}): AdapterState {
     async insertOptions(rows) {
       for (const row of rows) {
         insertedOptions.push(row);
+        assert(row.fsq_place_id, "legacy union rows carry fsq_place_id");
         optionsTable.push({
           id: row.fsq_place_id,
           payload: row.payload as RoomOptionRow["payload"],

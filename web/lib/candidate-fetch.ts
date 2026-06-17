@@ -1,24 +1,27 @@
-// GetToIt web — per-member Q5 candidate fetch (tb-WF-10).
+// GetToIt web — Q5 candidate fetch helpers.
 //
-// Brings the web fallback's Q5 to quiz-redesign parity. The pre-redesign web quiz
-// rendered a fixed `DUMMY_CANDIDATES` fixture; this module replaces it
-// with the real per-member Foursquare fetch + the strict-factorial Q5
-// probe, mirroring the mobile app path. Legacy Swift source references
-// below are historical; active mobile implementation lives in `mobile/`:
+// Brings the web fallback's Q5 to quiz-redesign parity. The live web
+// session now reads server-assigned Q5 card sets. The older per-member
+// places-proxy planner/classifier/factorial helpers remain here for
+// tests and compatibility with the tb-WF-10 path they originally
+// landed. Legacy Swift source references below are historical; active
+// mobile implementation lives in `mobile/`:
 //
 //   QuizCandidateFetch        (legacy Swift ios/Sources/App/QuizCandidateFetch.swift)
 //   FoursquareFetchPlanner    (legacy Swift ios/Sources/App/FoursquareFetchPlanner.swift)
 //   Q5VenueClassifier         (legacy Swift ios/Sources/App/Q5VenueClassifier.swift)
 //   Q5FactorialCardGenerator  (legacy Swift ios/Sources/App/Q5FactorialCardGenerator.swift)
 //
-// Web differs from the mobile app in one place (ADR 0002): the web client has no
-// MapKit escape hatch, so a thin / failed Foursquare response degrades
-// straight to the no-results path — there is no second data source.
+// Web differs from the mobile app in one place (ADR 0002): the web
+// client has no MapKit escape hatch, so a thin / failed Foursquare
+// response degrades straight to the no-results path — there is no
+// second data source.
 //
-// rather than importing it; only the vote WIRE shape is a sanctioned
-// cross-sibling import (ADR 0014, `votes-wire.ts`). The factorial /
-// product logic ported here so the web quiz produces the same Q5 probe
-// shape the mobile app does.
+// The web app intentionally ports Q5 product logic rather than importing
+// it; only the vote WIRE shape is a sanctioned cross-sibling import
+// (ADR 0014, `votes-wire.ts`). The factorial / product logic is ported
+// here so the web quiz produces the same Q5 probe shape the mobile app
+// does.
 //
 // HONEST DEGRADATION (ADR 0013): when the fetch produces no
 // factorial-usable pool the result is an EMPTY candidate list with the
@@ -112,6 +115,7 @@ export interface QuizCandidate {
   id: string;
   name: string;
   meta: string;
+  attributionText?: string;
   droppedAxis: Axis;
 }
 
@@ -129,6 +133,32 @@ export interface CandidateFetchResult {
    *  thin / uniform for the factorial. */
   rawFetch: FetchedVenue[];
 }
+
+type Q5AssignedCard = {
+  googlePlaceId?: unknown;
+  displayName?: unknown;
+  attribution?: { text?: unknown };
+  axisReceipt?: {
+    droppedAxis?: unknown;
+  };
+};
+
+type Q5AssignedCardSetResponse =
+  | {
+      status: "assigned";
+      cards: Q5AssignedCard[];
+    }
+  | {
+      status: "no_results";
+    }
+  | {
+      error?: string;
+    };
+
+export type Q5CardSetInvoker = <TData>(
+  functionName: string,
+  options: { body: Record<string, unknown> },
+) => Promise<{ data: TData | null; error: { message?: string } | null }>;
 
 // -----------------------------------------------------------------------
 // Fetch planner — N+1 `places-proxy` call specs (mirrors the mobile app
@@ -627,6 +657,86 @@ export async function fetchMemberCandidates(args: {
   }
   const union = unionResponses(responses);
   return selectCandidates(union, args.member, args.now ?? new Date());
+}
+
+export async function fetchAssignedQ5CardSet(args: {
+  roomId: string;
+  invoke: Q5CardSetInvoker;
+  q5CardSetId?: string;
+}): Promise<CandidateFetchResult> {
+  try {
+    const result = await args.invoke<Q5AssignedCardSetResponse>("q5-card-set", {
+      body: {
+        room_id: args.roomId,
+        q5_card_set_id: args.q5CardSetId ?? "initial",
+      },
+    });
+
+    if (result.error || !result.data || !("status" in result.data)) {
+      return noAssignedQ5Cards();
+    }
+
+    if (result.data.status !== "assigned") {
+      return noAssignedQ5Cards();
+    }
+
+    const candidates = q5CandidatesFromAssignedCardSet(result.data.cards);
+
+    return {
+      candidates,
+      source: candidates.length > 0 ? "fetched" : "no-results",
+      rawFetch: [],
+    };
+  } catch {
+    return noAssignedQ5Cards();
+  }
+}
+
+function noAssignedQ5Cards(): CandidateFetchResult {
+  return { candidates: [], source: "no-results", rawFetch: [] };
+}
+
+function q5CandidatesFromAssignedCardSet(
+  cards: Q5AssignedCard[],
+): QuizCandidate[] {
+  return cards.flatMap((card): QuizCandidate[] => {
+    const candidate = candidateFromAssignedCard(card);
+    return candidate ? [candidate] : [];
+  });
+}
+
+function candidateFromAssignedCard(card: Q5AssignedCard): QuizCandidate | null {
+  const axis = normalizeAssignedAxis(card.axisReceipt?.droppedAxis);
+  if (
+    typeof card.googlePlaceId !== "string" ||
+    typeof card.displayName !== "string" ||
+    !axis
+  ) {
+    return null;
+  }
+
+  return {
+    id: card.googlePlaceId,
+    name: card.displayName,
+    meta: "",
+    ...(typeof card.attribution?.text === "string"
+      ? { attributionText: card.attribution.text }
+      : {}),
+    droppedAxis: axis,
+  };
+}
+
+function normalizeAssignedAxis(axis: unknown): Axis | null {
+  switch (axis) {
+    case "cuisine":
+    case "crowd_approval":
+    case "vibe":
+      return axis;
+    case "reputation":
+      return "crowd_approval";
+    default:
+      return null;
+  }
 }
 
 // -----------------------------------------------------------------------

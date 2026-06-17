@@ -55,6 +55,8 @@ export const GOOGLE_VERDICT_SCORING_FIELD_MASK_VERSION =
   GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.version;
 export const GOOGLE_VERDICT_SCORING_FIELD_MASK =
   GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.mask;
+// Internal scoring-only summary fields: "places.reviewSummary",
+// "places.generativeSummary". They must stay out of fetch/display masks.
 type GoogleVerdictFieldMaskName = Extract<
   GoogleProviderNearbyFieldMaskName,
   "verdict_fetch" | "verdict_scoring"
@@ -187,11 +189,8 @@ function buildSupabaseAdapter(
       );
     },
     async fetchMemberFetches(room_id): Promise<MemberFetchRow[]> {
-      // TB-21 â€” read every member's persisted raw Foursquare fetch for
-      // the room. `member_fetches.payload` is the jsonb array of every
-      // venue the member's fetch returned (the full raw union, not the
-      // three Q5 factorial cards). The service-role key bypasses RLS so
-      // the union sees every member's fetch, not just the caller's.
+      // Legacy read support for pre-Google rooms. The current Google
+      // verdict path does not call this adapter.
       const { data, error } = await client
         .from("member_fetches")
         .select("user_id, payload")
@@ -215,21 +214,23 @@ function buildSupabaseAdapter(
       });
     },
     async insertOptions(rows: OptionInsertRow[]): Promise<void> {
-      // TB-21 â€” write the unioned candidate pool into `options`. The
-      // handler calls this only when `options` is empty for the room,
-      // so a plain insert is correct; the `options` (room_id,
-      // fsq_place_id) UNIQUE constraint is a backstop against a racing
-      // concurrent fire, which `ignoreDuplicates` lets through
-      // harmlessly rather than failing the verdict.
       if (rows.length === 0) return;
+      const storageRows = rows.map((r) => {
+        if (!r.google_place_id) {
+          throw new Error(
+            "compute-verdict insertOptions requires google_place_id",
+          );
+        }
+        return {
+          room_id: r.room_id,
+          google_place_id: r.google_place_id,
+          place_provider: "google",
+        };
+      });
       const { error } = await client
         .from("options")
         .upsert(
-          rows.map((r) => ({
-            room_id: r.room_id,
-            google_place_id: r.google_place_id ?? r.fsq_place_id,
-            place_provider: "google",
-          })),
+          storageRows,
           {
             onConflict: "room_id,place_provider,google_place_id",
             ignoreDuplicates: true,
@@ -420,27 +421,11 @@ function buildSupabaseAdapter(
       return out;
     },
     async fetchPreviousWinnerName(room_id) {
-      // Race-tolerant: the prior verdict may have been deleted by
-      // apply_reroll already. We surface null in that case so the
-      // engine's reroll prefix falls back to "the prior pick" copy.
-      // The verdict has option_id null only for `no_survivor` â€” we
-      // skip those too.
-      const { data: verdictRow } = await client
-        .from("verdicts")
-        .select("option_id")
-        .eq("room_id", room_id)
-        .maybeSingle();
-      const optionId = (verdictRow as { option_id?: string | null } | null)
-        ?.option_id;
-      if (!optionId) return null;
-      const { data: optionRow } = await client
-        .from("options")
-        .select("payload")
-        .eq("id", optionId)
-        .maybeSingle();
-      const payload = (optionRow as { payload?: { name?: string } } | null)
-        ?.payload;
-      return payload?.name ?? null;
+      void room_id;
+      // Current Google-backed storage does not keep provider display
+      // names on options. Let the engine use its generic prior-pick
+      // reroll copy instead of reading stale display payloads.
+      return null;
     },
     async fetchRoomRadius(room_id): Promise<number | null> {
       const { data, error } = await client

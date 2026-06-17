@@ -1,4 +1,4 @@
-export type Q5Axis = "cuisine" | "reputation" | "vibe";
+export type Q5Axis = "cuisine" | "crowd_approval" | "reputation" | "vibe";
 
 export type Q5VenueProfile = {
   cuisine: string | null;
@@ -300,6 +300,7 @@ function replacementRulesForAxis(
           reputation === member.reputation,
         vibe: vibeMatches,
       };
+    case "crowd_approval":
     case "reputation":
       return {
         cuisine: selectedCuisine,

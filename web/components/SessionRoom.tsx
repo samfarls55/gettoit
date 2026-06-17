@@ -6,21 +6,21 @@
 //   1. Anonymous sign-in (idempotent).
 //   2. Insert the caller as a `members` row (idempotent — the unique
 //      (room_id, user_id) primary key swallows retries).
-//   3. Drive the quiz-redesign 5-question quiz; on Q4 -> Q5 fire the per-member
-//      Foursquare candidate fetch; submit the `votes` row.
+//   3. Drive the quiz-redesign 5-question quiz; on Q4 -> Q5 request the
+//      server-assigned Q5 card set; submit the `votes` row.
 //   4. Subscribe to Realtime so the Waiting + Verdict surfaces stay in
 //      lockstep with the mobile app.
 //   5. Once `rooms.status === 'verdict_ready'` (or the broadcast
-//      arrives), fetch the verdict + cuts + receipts and render the
-//      read-only S05 surface.
+//      arrives), fetch the verdict + Plan-state display data and render
+//      the read-only S05 surface.
 //
 // tb-WF-10 — the quiz is brought to quiz-redesign parity: scenario questions
 // (Q1 cuisine craving, Q3 reputation), the generic `q1`..`q5` jsonb
-// votes (via the shared `votes-wire.ts` contract), the real per-member
-// candidate fetch (replacing the retired `DUMMY_CANDIDATES`), and the
+// votes (via the shared `votes-wire.ts` contract), server-assigned
+// Google Q5 cards (replacing the retired `DUMMY_CANDIDATES`), and the
 // Q5 strict-factorial probe with the `no-results` honest-degradation
 // path. A resume into Q5 (the user re-clicked the link past Q4)
-// re-fires the per-member fetch so the rater has cards.
+// re-fires the Q5 card-set request so the rater has cards.
 
 "use client";
 
@@ -38,20 +38,12 @@ import {
 
 import {
   buildQ5Ratings,
-  fetchMemberCandidates,
   seedRatings,
-  type CandidateFetchResult,
-  type MealTime,
-  type PlacesProxyCaller,
-  type PlacesProxyRequest,
-  type PlacesProxyResponse,
   type QuizCandidate,
-  type SessionFetchContext,
 } from "../lib/candidate-fetch";
 
 import {
   shapeVerdictView,
-  type OptionRow,
   type VerdictRow,
   type VerdictView,
 } from "../lib/verdict";
@@ -100,26 +92,22 @@ type RoomsRow = {
 };
 
 const POSTGRES_CHANGE_INSERT = "INSERT" as const;
-/** The candidate-pool radius default — matches `rooms.radius_meters`'s
- *  column default (˜ 2.0 mi) so a room with a NULL radius still fetches. */
-const DEFAULT_RADIUS_METERS = 3219;
 
-const VALID_MEAL_TIMES: ReadonlySet<string> = new Set([
-  "breakfast",
-  "lunch",
-  "dinner",
-  "late_night",
-]);
+type Q5CardSetResponse =
+  | {
+      status: "assigned";
+      cards: Array<{
+        googlePlaceId: string;
+        displayName: string;
+        axisReceipt: { droppedAxis: QuizCandidate["droppedAxis"] };
+      }>;
+    }
+  | { status: "no_results" };
 
-/** Read the session meal time off `rooms.session_params`, falling back
- *  to `dinner` (the mobile app default) when the column is
- *  NULL or carries an unknown value. */
-function readMealTime(params: RoomsRow["session_params"]): MealTime {
-  const raw = params?.meal_time;
-  return typeof raw === "string" && VALID_MEAL_TIMES.has(raw)
-    ? (raw as MealTime)
-    : "dinner";
-}
+type Q5CardSetFetchResult = {
+  candidates: QuizCandidate[];
+  source: "fetched" | "no-results";
+};
 
 export function SessionRoom({
   roomId,
@@ -171,11 +159,9 @@ export function SessionRoom({
   const [candidates, setCandidates] = useState<QuizCandidate[]>([]);
   const [q5Ratings, setQ5Ratings] = useState<Record<string, number>>({});
 
-  // The room context for the per-member fetch — set once on boot.
-  const fetchContextRef = useRef<SessionFetchContext | null>(null);
-  // The in-flight per-member fetch, so a resume / re-render folds into
-  // the running fetch instead of firing the N+1 calls twice.
-  const fetchPromiseRef = useRef<Promise<CandidateFetchResult> | null>(null);
+  // The in-flight Q5 card-set fetch, so a resume / re-render folds into
+  // the running fetch instead of firing the Edge Function twice.
+  const fetchPromiseRef = useRef<Promise<Q5CardSetFetchResult> | null>(null);
 
   // Realtime + room state.
   const [members, setMembers] = useState<MembersRow[]>([]);
@@ -260,15 +246,6 @@ export function SessionRoom({
         if (room) {
           setRoomStatus(room.status);
           setDeadlineAt(room.deadline_at);
-          // The room context drives the per-member Foursquare fetch on
-          // the Q4 -> Q5 transition.
-          fetchContextRef.current = {
-            lat: room.location_lat,
-            lng: room.location_lng,
-            radiusMeters: room.radius_meters ?? DEFAULT_RADIUS_METERS,
-            timeZone: room.location_tz ?? "UTC",
-            mealTime: readMealTime(room.session_params),
-          };
         }
 
         // Realtime — broadcast (verdict_ready) + postgres_changes.
@@ -464,40 +441,14 @@ export function SessionRoom({
         // §C still renders a venue-only card.
         const planName =
           planState.kind === "decided" ? planState.planName : "";
-        let verdictPlaceName =
+        const verdictPlaceName =
           planState.kind === "decided" ? planState.verdictPlaceName : "";
-
-        // Default-mode fallback: when the RPC carried no venue name
-        // (an unlinked room), read the winning `options` row directly
-        // — `options` is web-member-readable (`options_select_room_members`).
-        if (
-          verdict.method !== "no_survivor" &&
-          !verdictPlaceName &&
-          verdict.option_id
-        ) {
-          const { data: optionRows } = await client
-            .from("options")
-            .select("id, payload")
-            .eq("id", verdict.option_id)
-            .limit(1);
-          const winning = (optionRows as OptionRow[] | null)?.[0];
-          verdictPlaceName = winning?.payload.name ?? "";
-        }
 
         if (cancelled) return;
         const view = shapeVerdictView({
           verdict,
           planName,
-          // §C default-mode venue. `no_survivor` ignores this and
-          // shows the "No spot fits" card; an empty string here on a
-          // default verdict is shaped to "Unnamed".
-          winningOption:
-            verdict.method === "no_survivor"
-              ? null
-              : {
-                  id: verdict.option_id ?? "",
-                  payload: { name: verdictPlaceName },
-                },
+          verdictPlaceName,
         });
         if (view) setPhase({ kind: "verdict", view });
       } catch {
@@ -511,12 +462,12 @@ export function SessionRoom({
   }, [roomId, roomStatus, userId, verdictRefetchSignal]);
 
   // ----------------------------------------------------------------
-  // Q5 per-member candidate fetch.
+  // Q5 card-set fetch.
   // ----------------------------------------------------------------
 
-  /** Fire the per-member Foursquare fetch and fold its result into the
+  /** Request the server-assigned Q5 card set and fold its result into
    *  Q5 state. Idempotent within a session — a fetch already in flight
-   *  (or resolved) is reused rather than re-firing the N+1 calls.
+   *  (or resolved) is reused rather than re-firing the Edge Function.
    *
    *  This runs both on the Q4 -> Q5 advance AND on a resume that lands
    *  the user directly on Q5 (the issue's resume-into-Q5 requirement):
@@ -524,37 +475,22 @@ export function SessionRoom({
    *  whenever Q5 is entered, regardless of how. */
   const startCandidateFetch = useCallback(() => {
     if (fetchPromiseRef.current) return; // already running / resolved
-    const context = fetchContextRef.current;
-    if (!context) {
-      // No room context (a stale routing) — honest degradation.
-      setQ5State("no-results");
-      setCandidates([]);
-      setQ5Ratings({});
-      return;
-    }
     setQ5State("loading");
-    const promise = fetchMemberCandidates({
-      member: {
-        cuisines: cuisine.noPreference
-          ? []
-          : Array.from(cuisine.cuisines).sort(),
-        reputation,
-        vibe,
-      },
-      budgetTier: budget,
-      context,
-      caller: makePlacesProxyCaller(),
-    });
+    const promise = fetchQ5CardSet(roomId);
     fetchPromiseRef.current = promise;
     void promise.then((result) => {
       setCandidates(result.candidates);
       setQ5Ratings(seedRatings(result.candidates));
       setQ5State(result.source === "fetched" ? "default" : "no-results");
+    }).catch(() => {
+      setCandidates([]);
+      setQ5Ratings({});
+      setQ5State("no-results");
     });
-  }, [budget, cuisine, reputation, vibe]);
+  }, [roomId]);
 
-  // When the quiz lands on Q5 — by advancing OR by resume — fire the
-  // per-member fetch if it has not already run.
+  // When the quiz lands on Q5 — by advancing OR by resume — request
+  // the card set if it has not already loaded.
   useEffect(() => {
     if (phase.kind === "quiz" && phase.step === 5) {
       startCandidateFetch();
@@ -602,35 +538,6 @@ export function SessionRoom({
     setPhase({ kind: "submitting" });
     try {
       const client = getSupabaseClient();
-
-      // Gate the verdict-firing `votes` write on the candidate fetch —
-      // the raw fetched union must land in `member_fetches` before the
-      // verdict can union it into `options` (mirrors mobile app submit).
-      const fetchResult = await (fetchPromiseRef.current ??
-        Promise.resolve<CandidateFetchResult>({
-          candidates: [],
-          source: "no-results",
-          rawFetch: [],
-        }));
-
-      // Persist the member's raw fetched union into `member_fetches` so
-      // `compute-verdict` can union it into the room's `options` pool.
-      // Best-effort: a failed persist must not strand the member — the
-      // verdict still fires, just without this member's pool
-      // contribution. The row is written even when the fetch was empty
-      // (a real "this member fetched nothing" record).
-      try {
-        await client.from("member_fetches").upsert(
-          {
-            room_id: roomId,
-            user_id: userId,
-            payload: fetchResult.rawFetch,
-          },
-          { onConflict: "room_id,user_id" },
-        );
-      } catch {
-        // Swallow — the member still reaches the verdict.
-      }
 
       const row: VoteRow = buildVoteRow({
         roomId,
@@ -859,25 +766,24 @@ export function SessionRoom({
   );
 }
 
-/** Build a `PlacesProxyCaller` over the deployed `places-proxy` Edge
- *  Function. The web client has no MapKit fallback (ADR 0002), so a
- *  non-2xx / thrown call resolves to an empty, thin response — the
- *  fetch then degrades to the Q5 no-results path. */
-function makePlacesProxyCaller(): PlacesProxyCaller {
-  return async (req: PlacesProxyRequest): Promise<PlacesProxyResponse> => {
-    const client = getSupabaseClient();
-    const { data, error } = await client.functions.invoke<PlacesProxyResponse>(
-      "places-proxy",
-      { body: req },
-    );
-    if (error || !data) {
-      return { places: [], is_thin: true, error: "places_proxy_unreachable" };
-    }
-    return {
-      places: Array.isArray(data.places) ? data.places : [],
-      is_thin: data.is_thin ?? true,
-      error: data.error,
-    };
+async function fetchQ5CardSet(roomId: string): Promise<Q5CardSetFetchResult> {
+  const client = getSupabaseClient();
+  const { data, error } = await client.functions.invoke<Q5CardSetResponse>(
+    "q5-card-set",
+    { body: { room_id: roomId } },
+  );
+  if (error || !data || data.status === "no_results") {
+    return { candidates: [], source: "no-results" };
+  }
+
+  return {
+    source: "fetched",
+    candidates: data.cards.map((card) => ({
+      id: card.googlePlaceId,
+      name: card.displayName,
+      meta: "",
+      droppedAxis: card.axisReceipt.droppedAxis,
+    })),
   };
 }
 

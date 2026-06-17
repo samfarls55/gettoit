@@ -138,6 +138,8 @@ function normalizeQ5Axis(axis: Q5Axis | undefined, index: number): VoteAxis {
   switch (axis) {
     case "cuisine":
       return "cuisine";
+    case "crowd_approval":
+      return "crowd_approval";
     case "reputation":
       return "crowd_approval";
     case "vibe":

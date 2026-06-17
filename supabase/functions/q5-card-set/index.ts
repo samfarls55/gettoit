@@ -78,6 +78,33 @@ function stringArray(value: unknown): string[] | undefined {
   return strings.length > 0 ? strings : undefined;
 }
 
+function firstString(...values: unknown[]): string | undefined {
+  return values.find((value): value is string => typeof value === "string");
+}
+
+function spendCapFromProgress(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  const tier = Math.max(1, Math.min(4, Math.round(value)));
+  return "$".repeat(tier);
+}
+
+function vibeEnergyFromProgress(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return undefined;
+  }
+  return ["quiet", "chill", "social", "lively", "rowdy"][
+    Math.max(0, Math.min(4, Math.round(value)))
+  ];
+}
+
 function answersFromProgress(
   progress: Record<string, unknown> | null | undefined,
 ): QuizAnswers {
@@ -86,18 +113,20 @@ function answersFromProgress(
     return {};
   }
   const stored = answers as Record<string, unknown>;
-  const q1CuisineCravings = stringArray(stored.q1CuisineCravings);
+  const q1CuisineCravings = stringArray(stored.q1CuisineCravings) ??
+    stringArray(stored.cuisines);
+  const q2SpendCap = spendCapFromProgress(
+    stored.q2SpendCap ?? stored.budget,
+  );
+  const q3Reputation = firstString(stored.q3Reputation, stored.reputation);
+  const q4VibeEnergy = vibeEnergyFromProgress(
+    stored.q4VibeEnergy ?? stored.vibe,
+  );
   return {
     ...(q1CuisineCravings ? { q1CuisineCravings } : {}),
-    ...(typeof stored.q2SpendCap === "string"
-      ? { q2SpendCap: stored.q2SpendCap }
-      : {}),
-    ...(typeof stored.q3Reputation === "string"
-      ? { q3Reputation: stored.q3Reputation }
-      : {}),
-    ...(typeof stored.q4VibeEnergy === "string"
-      ? { q4VibeEnergy: stored.q4VibeEnergy }
-      : {}),
+    ...(q2SpendCap ? { q2SpendCap } : {}),
+    ...(q3Reputation ? { q3Reputation } : {}),
+    ...(q4VibeEnergy ? { q4VibeEnergy } : {}),
   };
 }
 
