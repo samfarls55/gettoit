@@ -234,7 +234,7 @@ export function SearchAreaPickerPreview({
         </View>
       </View>
 
-      <View pointerEvents="none" style={styles.centerReadout}>
+      <View style={styles.centerReadout}>
         <Text style={styles.mapLabel}>{draft.center.label}</Text>
         <Text style={styles.coordinateText}>
           {draft.center.latitude.toFixed(4)}, {draft.center.longitude.toFixed(4)}
@@ -376,6 +376,7 @@ const styles = StyleSheet.create({
   centerReadout: {
     alignItems: "center",
     left: mobileTokens.spacing[4],
+    pointerEvents: "none",
     position: "absolute",
     right: mobileTokens.spacing[4],
     top: "42%",

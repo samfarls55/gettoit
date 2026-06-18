@@ -247,6 +247,8 @@ const defaultNativeLinkBoundary: NativeLinkBoundary = {
   subscribe: () => () => undefined,
 };
 
+const shouldUseNativeAnimationDriver = Platform.OS !== "web";
+
 function isWebDevLoginEnabled(): boolean {
   return (
     Platform.OS === "web" &&
@@ -1022,13 +1024,13 @@ function SignInGate({
         duration: 520,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeAnimationDriver,
       }),
       Animated.timing(actionIntro, {
         duration: 420,
         easing: Easing.out(Easing.cubic),
         toValue: 1,
-        useNativeDriver: true,
+        useNativeDriver: shouldUseNativeAnimationDriver,
       }),
     ]).start();
   }, [actionIntro, heroIntro]);

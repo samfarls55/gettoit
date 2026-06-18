@@ -3,8 +3,8 @@ import { StyleSheet, View } from "react-native";
 export function VerdictBackdrop() {
   return (
     <>
-      <View pointerEvents="none" style={styles.sunGlow} />
-      <View pointerEvents="none" style={styles.emberGlow} />
+      <View style={styles.sunGlow} />
+      <View style={styles.emberGlow} />
     </>
   );
 }
@@ -12,6 +12,7 @@ export function VerdictBackdrop() {
 const styles = StyleSheet.create({
   sunGlow: {
     position: "absolute",
+    pointerEvents: "none",
     right: -54,
     top: -64,
     width: 188,
@@ -21,6 +22,7 @@ const styles = StyleSheet.create({
   },
   emberGlow: {
     position: "absolute",
+    pointerEvents: "none",
     left: -84,
     bottom: 96,
     width: 220,
