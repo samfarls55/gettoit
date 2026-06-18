@@ -616,6 +616,111 @@ describe("planRepository", () => {
     });
   });
 
+  it("logs real Plan launch backend timings without raw setup details", async () => {
+    const calls: QueryCall[] = [];
+    const events: Array<{
+      event: string;
+      payload: Record<string, unknown>;
+    }> = [];
+    let clock = 1000;
+    const repository = createSupabasePlanRepository({
+      logEvent: (event, payload) => events.push({ event, payload }),
+      now: () => {
+        clock += 11;
+        return clock;
+      },
+      supabase: makeSupabaseClient(
+        {
+          plans: {
+            data: [
+              {
+                id: "plan-1",
+                creator_id: "user-1",
+                name: "Private dinner name",
+                scope: "solo",
+                location: {
+                  lat: 37.7749,
+                  lng: -122.4194,
+                  name: "San Francisco",
+                },
+                session_params: {
+                  meal_time: "dinner",
+                  service_shape: "dineIn",
+                },
+                distance_meters: 402,
+                status: "pending",
+                created_at: "2026-06-04T10:00:00Z",
+                verdict_fired_at: null,
+                expired_at: null,
+              },
+            ],
+            error: null,
+          },
+          rooms: [
+            {
+              data: [],
+              error: null,
+            },
+            {
+              data: [{ id: "room-1", plan_id: "plan-1" }],
+              error: null,
+            },
+          ],
+          members: {
+            data: [],
+            error: null,
+          },
+        },
+        calls,
+      ),
+      userId: "user-1",
+    });
+
+    await repository.launchPlan({
+      id: "plan-1",
+      name: "Private dinner name",
+      participantScope: "solo",
+      searchArea: {
+        center: {
+          latitude: 37.7749,
+          longitude: -122.4194,
+          label: "San Francisco",
+        },
+        radiusMiles: 0.25,
+      },
+      mealTime: "dinner",
+      serviceShape: "dineIn",
+    });
+
+    expect(events.map((event) => event.event)).toEqual([
+      "plan.launch.start",
+      "plan.save.start",
+      "plan.save.success",
+      "plan.room.read.start",
+      "plan.room.read.success",
+      "plan.room.create.start",
+      "plan.room.create.success",
+      "plan.owner_membership.upsert.start",
+      "plan.owner_membership.upsert.success",
+      "plan.launch.success",
+    ]);
+    expect(events.find((event) => event.event === "plan.launch.success"))
+      ?.toMatchObject({
+        payload: {
+          planId: "plan-1",
+          roomId: "room-1",
+          durationMs: expect.any(Number),
+          participantScope: "solo",
+          hasSearchArea: true,
+          radiusMiles: 0.25,
+        },
+      });
+    expect(JSON.stringify(events)).not.toContain("Private dinner name");
+    expect(JSON.stringify(events)).not.toContain("San Francisco");
+    expect(JSON.stringify(events)).not.toContain("37.7749");
+    expect(JSON.stringify(events)).not.toContain("-122.4194");
+  });
+
   it("deletes a created Plan through Supabase plans", async () => {
     const calls: QueryCall[] = [];
     const repository = createSupabasePlanRepository({

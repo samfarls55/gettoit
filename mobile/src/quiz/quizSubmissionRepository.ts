@@ -11,6 +11,11 @@ export type QuizSubmissionRepository = {
   submitQuiz: (payload: QuizSubmissionPayload) => Promise<void>;
 };
 
+export type QuizSubmissionRepositoryLogEvent = (
+  event: string,
+  payload: Record<string, unknown>,
+) => void;
+
 export type SupabaseQueryResult<TData> = {
   data: TData | null;
   error: Error | null;
@@ -87,6 +92,8 @@ type Q5Rating = {
 };
 
 export type SupabaseQuizSubmissionRepositoryDependencies = {
+  logEvent?: QuizSubmissionRepositoryLogEvent;
+  now?: () => number;
   supabase: QuizSubmissionSupabaseClient;
   userId: string;
 };
@@ -224,6 +231,26 @@ function isDuplicateVote(error: Error): boolean {
   );
 }
 
+function durationMs(startedAt: number, now: () => number): number {
+  return Math.max(0, Math.round(now() - startedAt));
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function logQuizSubmissionEvent(
+  logEvent: QuizSubmissionRepositoryLogEvent | undefined,
+  event: string,
+  payload: Record<string, unknown>,
+): void {
+  try {
+    logEvent?.(event, payload);
+  } catch {
+    // Logging must never change quiz submission behavior.
+  }
+}
+
 function assertSupabaseRows<TRow>(
   result: SupabaseQueryResult<TRow[]>,
   queryName: string,
@@ -302,26 +329,77 @@ async function resolveVisibleRoomId(
 }
 
 export function createSupabaseQuizSubmissionRepository({
+  logEvent,
+  now = Date.now,
   supabase,
   userId,
 }: SupabaseQuizSubmissionRepositoryDependencies): QuizSubmissionRepository {
+  const log = (event: string, payload: Record<string, unknown>) =>
+    logQuizSubmissionEvent(logEvent, event, payload);
+
   return {
     submitQuiz: async (payload) => {
-      const resolvedRoomId = await resolveVisibleRoomId(
-        supabase,
-        userId,
-        payload.roomId,
-      );
-      if (!resolvedRoomId) {
-        throw new Error("Quiz submit failed: no joined room found");
-      }
+      const startedAt = now();
+      log("quiz.submit.start", {
+        roomId: payload.roomId,
+        answers: payload.answers,
+        q5Candidates: payload.q5Candidates,
+      });
 
-      const result = await supabase
-        .from<SupabaseVoteRow>("votes")
-        .insert(voteRow({ ...payload, roomId: resolvedRoomId, userId }));
+      try {
+        const resolvedRoomId = await resolveVisibleRoomId(
+          supabase,
+          userId,
+          payload.roomId,
+        );
+        log("quiz.submit.resolved_room", {
+          requestedRoomId: payload.roomId,
+          resolvedRoomId,
+          durationMs: durationMs(startedAt, now),
+        });
+        if (!resolvedRoomId) {
+          throw new Error("Quiz submit failed: no joined room found");
+        }
 
-      if (result.error && !isDuplicateVote(result.error)) {
-        throw new Error(`Quiz submit failed: ${result.error.message}`);
+        const row = voteRow({ ...payload, roomId: resolvedRoomId, userId });
+        log("quiz.submit.vote_row", {
+          requestedRoomId: payload.roomId,
+          resolvedRoomId,
+          answers: payload.answers,
+          q5Candidates: payload.q5Candidates,
+          voteRow: row,
+        });
+        const result = await supabase
+          .from<SupabaseVoteRow>("votes")
+          .insert(row);
+
+        if (result.error && !isDuplicateVote(result.error)) {
+          throw new Error(`Quiz submit failed: ${result.error.message}`);
+        }
+        if (result.error && isDuplicateVote(result.error)) {
+          log("quiz.submit.duplicate_ignored", {
+            requestedRoomId: payload.roomId,
+            resolvedRoomId,
+            durationMs: durationMs(startedAt, now),
+            message: result.error.message,
+          });
+          return;
+        }
+
+        log("quiz.submit.success", {
+          requestedRoomId: payload.roomId,
+          resolvedRoomId,
+          durationMs: durationMs(startedAt, now),
+        });
+      } catch (error) {
+        log("quiz.submit.error", {
+          requestedRoomId: payload.roomId,
+          answers: payload.answers,
+          q5Candidates: payload.q5Candidates,
+          durationMs: durationMs(startedAt, now),
+          message: errorMessage(error),
+        });
+        throw error;
       }
     },
   };

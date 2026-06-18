@@ -31,6 +31,7 @@ Architecture, conventions, runbooks, ADRs.
 - [[github-actions-secrets|github-actions-secrets.md]] â€” Secret roster for CI, TestFlight upload, Supabase deploys, and live smoke tests; replaces the retired devcontainer setup note.
 - [[vibe-embeddings-runtime-secrets|vibe-embeddings-runtime-secrets.md]] - Server-only Supabase Edge Function secret names for the transient Vibe fit embedding path.
 - [[local-edge-test-debug-logs|local-edge-test-debug-logs.md]] - Local-only Supabase Edge Function JSONL logs for Q5, Verdict, and Vibe embedding test debugging.
+- [[expo-dev-run-logs|expo-dev-run-logs.md]] - Expo `npx expo start` JSONL logs for real Plan flow backend timing during local dev runs.
 - [[apple-keys-setup|apple-keys-setup.md]] â€” Runbook for obtaining and wiring the Apple credentials 0.1.0 needs (App Store Connect API key â†’ CI, Sign in with Apple key â†’ Supabase; MapKit JS skipped).
 - [[supabase-setup|supabase-setup.md]] â€” Runbook for provisioning the 0.1.0 Supabase project (Pro plan, extensions postgis/pg_cron/pgmq, anonymous auth, CLI link, GH Actions secret mirror).
 - [[ios-ci-setup|ios-ci-setup.md]] â€” Runbook for the iOS CI lane (XcodeGen-driven project generation, macOS-14 runner, Xcode 15.4 pin, Supabase env injection, no-local-Xcode constraint).

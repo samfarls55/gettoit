@@ -49,6 +49,10 @@ import {
   type VibeFitCandidate,
 } from "../_shared/vibe-fit.ts";
 import { createVerdictRunStore, runVerdictForRoom } from "./verdict-run.ts";
+import {
+  collectLocalDebugTrace,
+  type LocalDebugTraceEvent,
+} from "../_shared/local-test-run-logger.ts";
 
 export {
   buildEligibleVibeFitCandidatesForVerdict,
@@ -360,6 +364,8 @@ export interface VerdictSlateEntryInsert {
   receipts: unknown[];
 }
 
+type VerdictRunResult = Awaited<ReturnType<typeof runVerdictForRoom>>;
+
 // ───────────────────────────────────────────────────────────────────────
 
 function corsHeaders(): Record<string, string> {
@@ -446,6 +452,7 @@ export async function handleRequest(
   const rawMethod = (body as { method?: unknown })?.method;
   const method: VerdictMethod =
     (rawMethod === "quorum" || rawMethod === "deadline") ? rawMethod : "manual";
+  const debugTrace = shouldCollectDebugTrace(body);
 
   // Optional widen-radius override (S05 no-survivor "Widen radius"
   // CTA, TB-09). Plan-backed Rooms now lock search area parameters,
@@ -472,7 +479,7 @@ export async function handleRequest(
     });
   }
 
-  const run = await runVerdictForRoom({
+  const runVerdict = () => runVerdictForRoom({
     roomId,
     method,
     env: deps.env,
@@ -480,36 +487,69 @@ export async function handleRequest(
     vibeEmbeddingFetch: deps.vibeEmbeddingFetch,
   });
 
+  if (debugTrace) {
+    const { result, trace } = await collectLocalDebugTrace(runVerdict);
+    return verdictRunResponse(result, trace);
+  }
+
+  return verdictRunResponse(await runVerdict());
+}
+
+function shouldCollectDebugTrace(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return false;
+  }
+
+  const objectBody = body as Record<string, unknown>;
+  return objectBody.debug_trace === "expo_dev_run" ||
+    objectBody.debugTrace === "expo_dev_run" ||
+    objectBody.debugTrace === true;
+}
+
+function withDebugTrace(
+  body: Record<string, unknown>,
+  debugTrace?: LocalDebugTraceEvent[],
+): Record<string, unknown> {
+  return debugTrace ? { ...body, debugTrace } : body;
+}
+
+function verdictRunResponse(
+  run: VerdictRunResult,
+  debugTrace?: LocalDebugTraceEvent[],
+): Response {
   switch (run.kind) {
     case "already_computed":
-      return jsonResponse({
+      return jsonResponse(withDebugTrace({
         verdict: run.verdict,
         cuts: [],
         already_computed: true,
-      }, { status: 200, headers: corsHeaders() });
+      }, debugTrace), { status: 200, headers: corsHeaders() });
     case "room_not_found":
-      return jsonResponse({ error: "room_not_found" }, {
+      return jsonResponse(withDebugTrace({ error: "room_not_found" }, debugTrace), {
         status: 404,
         headers: corsHeaders(),
       });
     case "no_votes":
-      return jsonResponse({ error: "no_votes" }, {
+      return jsonResponse(withDebugTrace({ error: "no_votes" }, debugTrace), {
         status: 404,
         headers: corsHeaders(),
       });
     case "engine_error":
-      return jsonResponse({ error: "engine_error", detail: run.detail }, {
+      return jsonResponse(withDebugTrace({
+        error: "engine_error",
+        detail: run.detail,
+      }, debugTrace), {
         status: 500,
         headers: corsHeaders(),
       });
     case "computed":
-      return jsonResponse({
+      return jsonResponse(withDebugTrace({
         verdict: run.verdict,
         cuts: run.cuts,
         receipts: run.receipts,
         surviving_hard_needs: run.surviving_hard_needs,
         radius_meters_used: run.radius_meters_used,
         relax_chain_applied: run.relax_chain_applied,
-      }, { status: 200, headers: corsHeaders() });
+      }, debugTrace), { status: 200, headers: corsHeaders() });
   }
 }

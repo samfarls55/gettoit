@@ -20,6 +20,11 @@ export type QuizProgressRepository = {
   exitPlan: (input: { roomId: string }) => Promise<void>;
 };
 
+export type QuizProgressRepositoryLogEvent = (
+  event: string,
+  payload: Record<string, unknown>,
+) => void;
+
 export type SupabaseQueryResult<TData> = {
   data: TData | null;
   error: Error | null;
@@ -76,6 +81,8 @@ type SupabaseRoomRow = {
 };
 
 export type SupabaseQuizProgressRepositoryDependencies = {
+  logEvent?: QuizProgressRepositoryLogEvent;
+  now?: () => number;
   supabase: QuizProgressSupabaseClient;
   userId: string;
 };
@@ -203,6 +210,26 @@ function progressWritePayload(progress: QuizProgress): Record<string, unknown> {
   };
 }
 
+function durationMs(startedAt: number, now: () => number): number {
+  return Math.max(0, Math.round(now() - startedAt));
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function logQuizProgressEvent(
+  logEvent: QuizProgressRepositoryLogEvent | undefined,
+  event: string,
+  payload: Record<string, unknown>,
+): void {
+  try {
+    logEvent?.(event, payload);
+  } catch {
+    // Logging must never change quiz progress behavior.
+  }
+}
+
 function ownerMembershipWriteRow(
   roomId: string,
   userId: string,
@@ -263,52 +290,123 @@ async function resolveVisibleRoom(
 }
 
 export function createSupabaseQuizProgressRepository({
+  logEvent,
+  now = Date.now,
   supabase,
   userId,
 }: SupabaseQuizProgressRepositoryDependencies): QuizProgressRepository {
+  const log = (event: string, payload: Record<string, unknown>) =>
+    logQuizProgressEvent(logEvent, event, payload);
+
   return {
     loadProgress: async (roomId) => {
-      const resolvedRoom = await resolveVisibleRoom(supabase, roomId);
-      if (!resolvedRoom) {
-        return null;
+      const startedAt = now();
+      log("quiz.progress.load.start", { roomId });
+
+      try {
+        const resolvedRoom = await resolveVisibleRoom(supabase, roomId);
+        log("quiz.progress.load.resolved_room", {
+          requestedRoomId: roomId,
+          resolvedRoom,
+          durationMs: durationMs(startedAt, now),
+        });
+        if (!resolvedRoom) {
+          log("quiz.progress.load.result", {
+            requestedRoomId: roomId,
+            progress: null,
+            durationMs: durationMs(startedAt, now),
+          });
+          return null;
+        }
+
+        const rows = assertSupabaseRows(
+          await supabase
+            .from<SupabaseMemberProgressRow>("members")
+            .select("room_id, user_id, quiz_progress")
+            .eq("room_id", resolvedRoom.id)
+            .eq("user_id", userId),
+          "Quiz progress read",
+        );
+        const row = rows[0];
+
+        if (!row) {
+          await ensureOwnerMembership(supabase, userId, resolvedRoom);
+          log("quiz.progress.load.missing_member", {
+            requestedRoomId: roomId,
+            resolvedRoomId: resolvedRoom.id,
+            durationMs: durationMs(startedAt, now),
+          });
+          return null;
+        }
+
+        const storedProgress = row.quiz_progress ?? null;
+        const progress = {
+          roomId: resolvedRoom.id,
+          currentQuestion: currentQuestionFromStored(storedProgress),
+          answers: quizAnswersFromStored(storedProgress?.answers),
+        };
+        log("quiz.progress.load.result", {
+          requestedRoomId: roomId,
+          resolvedRoomId: resolvedRoom.id,
+          storedProgress,
+          mappedProgress: progress,
+          durationMs: durationMs(startedAt, now),
+        });
+
+        return progress;
+      } catch (error) {
+        log("quiz.progress.load.error", {
+          roomId,
+          durationMs: durationMs(startedAt, now),
+          message: errorMessage(error),
+        });
+        throw error;
       }
-
-      const rows = assertSupabaseRows(
-        await supabase
-          .from<SupabaseMemberProgressRow>("members")
-          .select("room_id, user_id, quiz_progress")
-          .eq("room_id", resolvedRoom.id)
-          .eq("user_id", userId),
-        "Quiz progress read",
-      );
-      const row = rows[0];
-
-      if (!row) {
-        await ensureOwnerMembership(supabase, userId, resolvedRoom);
-        return null;
-      }
-
-      const storedProgress = row.quiz_progress ?? null;
-      return {
-        roomId: resolvedRoom.id,
-        currentQuestion: currentQuestionFromStored(storedProgress),
-        answers: quizAnswersFromStored(storedProgress?.answers),
-      };
     },
     saveProgress: async (progress) => {
-      const resolvedRoom = await resolveVisibleRoom(supabase, progress.roomId);
-      if (!resolvedRoom) {
-        throw new Error("Quiz progress save failed: no joined room found");
-      }
-      await ensureOwnerMembership(supabase, userId, resolvedRoom);
+      const startedAt = now();
+      const writePayload = progressWritePayload(progress);
+      log("quiz.progress.save.start", { progress });
 
-      const result = await supabase.rpc("members_progress_upsert", {
-        p_room_id: resolvedRoom.id,
-        p_progress: progressWritePayload(progress),
-      });
+      try {
+        const resolvedRoom = await resolveVisibleRoom(supabase, progress.roomId);
+        log("quiz.progress.save.resolved_room", {
+          requestedRoomId: progress.roomId,
+          resolvedRoom,
+          durationMs: durationMs(startedAt, now),
+        });
+        if (!resolvedRoom) {
+          throw new Error("Quiz progress save failed: no joined room found");
+        }
+        await ensureOwnerMembership(supabase, userId, resolvedRoom);
 
-      if (result.error) {
-        throw new Error(`Quiz progress save failed: ${result.error.message}`);
+        log("quiz.progress.save.request", {
+          requestedRoomId: progress.roomId,
+          resolvedRoomId: resolvedRoom.id,
+          writePayload,
+        });
+        const result = await supabase.rpc("members_progress_upsert", {
+          p_room_id: resolvedRoom.id,
+          p_progress: writePayload,
+        });
+
+        if (result.error) {
+          throw new Error(`Quiz progress save failed: ${result.error.message}`);
+        }
+        log("quiz.progress.save.success", {
+          requestedRoomId: progress.roomId,
+          resolvedRoomId: resolvedRoom.id,
+          writePayload,
+          durationMs: durationMs(startedAt, now),
+        });
+      } catch (error) {
+        log("quiz.progress.save.error", {
+          requestedRoomId: progress.roomId,
+          progress,
+          durationMs: durationMs(startedAt, now),
+          message: errorMessage(error),
+        });
+        throw error;
       }
     },
     exitPlan: async ({ roomId }) => {

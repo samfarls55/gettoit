@@ -303,12 +303,19 @@ function buildDataAdapter(
         return [];
       }
 
+      const placesProxyRequest = input.debugTrace
+        ? {
+          ...input.placesProxyRequest,
+          debug_trace: "expo_dev_run",
+        }
+        : input.placesProxyRequest;
+
       logLocalTestEvent("q5_card_set.places_proxy.request", {
         roomId: input.roomId,
         memberId: input.memberId,
         profile: input.profile,
         fetchPlan: input.fetchPlan,
-        request: input.placesProxyRequest,
+        request: placesProxyRequest,
       });
       const response = await fetch(
         `${env.SUPABASE_URL}/functions/v1/places-proxy`,
@@ -318,7 +325,7 @@ function buildDataAdapter(
             Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(input.placesProxyRequest),
+          body: JSON.stringify(placesProxyRequest),
         },
       );
       if (!response.ok) {
@@ -334,7 +341,15 @@ function buildDataAdapter(
 
       const body = await response.json() as GoogleQ5Response & {
         error?: string;
+        debugTrace?: unknown;
       };
+      if (body.debugTrace) {
+        logLocalTestEvent("q5_card_set.places_proxy.backend_trace", {
+          roomId: input.roomId,
+          memberId: input.memberId,
+          trace: body.debugTrace,
+        });
+      }
       logLocalTestEvent("q5_card_set.places_proxy.response", {
         roomId: input.roomId,
         memberId: input.memberId,

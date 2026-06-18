@@ -6,6 +6,7 @@ import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
 import { handleRequest } from "./handler.ts";
 import {
   type CacheAdapter,
+  GOOGLE_Q5_DEBUG_FIELD_MASK,
   GOOGLE_Q5_FIELD_MASK,
   GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
 } from "../_shared/places-proxy-core.ts";
@@ -225,6 +226,91 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
   const serialized = JSON.stringify(body);
   assertEquals(serialized.includes("rating"), false);
   assertEquals(serialized.includes("Hidden address"), false);
+});
+
+Deno.test("handleRequest - q5 debug trace returns raw Google candidate attributes", async () => {
+  const fetchCalls: { url: string; init?: RequestInit }[] = [];
+  const stubFetch = (url: string | URL, init?: RequestInit) => {
+    fetchCalls.push({ url: String(url), init });
+    return Promise.resolve(
+      new Response(
+        JSON.stringify({
+          places: [{
+            id: "google-1",
+            displayName: { text: "Only Name" },
+            currentOpeningHours: { openNow: true },
+            regularOpeningHours: {
+              periods: [
+                {
+                  open: { day: 3, hour: 18, minute: 0 },
+                  close: { day: 3, hour: 22, minute: 0 },
+                },
+              ],
+            },
+            dineIn: true,
+            rating: 4.7,
+            formattedAddress: "Hidden address",
+          }],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+  };
+
+  const res = await handleRequest(
+    new Request("https://example/places-proxy", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer test-jwt",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        surface: "q5",
+        debug_trace: "expo_dev_run",
+        lat: 1.0,
+        lng: 2.0,
+        radius_meters: 100,
+        filters: {
+          target_open_time: { day: 3, hour: 19, minute: 0 },
+          service_shape: "dineIn",
+        },
+      }),
+    }),
+    {
+      env: { ...envOk(), FOURSQUARE_API_KEY: "" },
+      buildCacheAdapter: memoryCache,
+      fetch: stubFetch as typeof fetch,
+    },
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(fetchCalls.length, 1);
+  const headers = fetchCalls[0].init?.headers as Record<string, string>;
+  assertEquals(headers["X-Goog-FieldMask"], GOOGLE_Q5_DEBUG_FIELD_MASK);
+  const body = await res.json();
+  const trace = body.debugTrace as Array<{
+    event: string;
+    payload: Record<string, unknown>;
+  }>;
+  const responseEvent = trace.find((entry) =>
+    entry.event === "places_proxy.google_q5.response"
+  );
+  assertEquals(
+    ((responseEvent?.payload.body as { places?: Array<{ rating?: number }> })
+      .places?.[0]?.rating),
+    4.7,
+  );
+  const evaluationsEvent = trace.find((entry) =>
+    entry.event === "places_proxy.google_q5.candidate_evaluations"
+  );
+  const evaluations = evaluationsEvent?.payload.evaluations as Array<{
+    place: { formattedAddress?: string };
+    strictEligible: boolean;
+    strictRejectionReasons: string[];
+  }>;
+  assertEquals(evaluations[0].place.formattedAddress, "Hidden address");
+  assertEquals(evaluations[0].strictEligible, true);
+  assertEquals(evaluations[0].strictRejectionReasons, []);
 });
 
 Deno.test("handleRequest — verdict display refetches by Place ID without lat/radius", async () => {

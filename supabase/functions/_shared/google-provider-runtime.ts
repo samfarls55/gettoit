@@ -17,6 +17,29 @@ const GOOGLE_Q5_FIELDS = [
   "places.takeout",
 ] as const;
 
+const GOOGLE_Q5_DEBUG_FIELDS = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.googleMapsUri",
+  "places.photos",
+  "places.types",
+  "places.primaryType",
+  "places.priceLevel",
+  "places.rating",
+  "places.userRatingCount",
+  "places.currentOpeningHours",
+  "places.regularOpeningHours",
+  "places.dineIn",
+  "places.takeout",
+  "places.reviewSummary",
+  "places.generativeSummary",
+  "places.liveMusic",
+  "places.goodForGroups",
+  "places.goodForWatchingSports",
+  "places.outdoorSeating",
+] as const;
+
 const GOOGLE_VERDICT_FETCH_FIELDS = [
   "places.id",
   "places.displayName",
@@ -57,6 +80,10 @@ export const GOOGLE_PROVIDER_FIELD_MASKS = {
     version: "q5_name_only_v1",
     mask: buildGoogleFieldMask(GOOGLE_Q5_FIELDS),
   },
+  q5_debug_fetch: {
+    version: "q5_debug_attributes_v1",
+    mask: buildGoogleFieldMask(GOOGLE_Q5_DEBUG_FIELDS),
+  },
   verdict_fetch: {
     version: "verdict_fetch_v1",
     mask: buildGoogleFieldMask(GOOGLE_VERDICT_FETCH_FIELDS),
@@ -75,7 +102,7 @@ export type GoogleProviderFieldMaskName =
   keyof typeof GOOGLE_PROVIDER_FIELD_MASKS;
 export type GoogleProviderNearbyFieldMaskName = Extract<
   GoogleProviderFieldMaskName,
-  "q5_fetch" | "verdict_fetch" | "verdict_scoring"
+  "q5_fetch" | "q5_debug_fetch" | "verdict_fetch" | "verdict_scoring"
 >;
 export type GoogleProviderPlaceDetailsFieldMaskName = Extract<
   GoogleProviderFieldMaskName,

@@ -13,6 +13,10 @@ import {
 Deno.test("TB-30: Google provider runtime centralizes field masks and attribution", () => {
   assertEquals(GOOGLE_PROVIDER_FIELD_MASKS.q5_fetch.version, "q5_name_only_v1");
   assertEquals(
+    GOOGLE_PROVIDER_FIELD_MASKS.q5_debug_fetch.version,
+    "q5_debug_attributes_v1",
+  );
+  assertEquals(
     GOOGLE_PROVIDER_FIELD_MASKS.verdict_fetch.version,
     "verdict_fetch_v1",
   );
@@ -42,6 +46,11 @@ Deno.test("TB-30: Google provider runtime builds Q5 and verdict requests from on
     fieldMask: "verdict_scoring",
     body: { includedPrimaryTypes: ["mexican_restaurant"], maxResultCount: 20 },
   });
+  const q5Debug = buildGoogleProviderNearbySearchRequest({
+    apiKey: "google-secret",
+    fieldMask: "q5_debug_fetch",
+    body: { includedPrimaryTypes: ["mexican_restaurant"], maxResultCount: 20 },
+  });
   const display = buildGoogleProviderPlaceDetailsRequest({
     apiKey: "google-secret",
     fieldMask: "verdict_display",
@@ -60,6 +69,11 @@ Deno.test("TB-30: Google provider runtime builds Q5 and verdict requests from on
     "Content-Type": "application/json",
     "X-Goog-Api-Key": "google-secret",
     "X-Goog-FieldMask": GOOGLE_PROVIDER_FIELD_MASKS.verdict_scoring.mask,
+  });
+  assertEquals(q5Debug.init.headers, {
+    "Content-Type": "application/json",
+    "X-Goog-Api-Key": "google-secret",
+    "X-Goog-FieldMask": GOOGLE_PROVIDER_FIELD_MASKS.q5_debug_fetch.mask,
   });
   assertEquals(display.init.headers, {
     "X-Goog-Api-Key": "google-secret",

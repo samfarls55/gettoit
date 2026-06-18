@@ -17,6 +17,7 @@ import {
   type PlanRepository,
   type PlanSupabaseClient,
 } from "../plans/planRepository";
+import { logDevRunEvent, shouldRequestDevRunTrace } from "./devRunLogger";
 import {
   createSupabaseQ5CandidateRepository,
   type Q5CandidateRepository,
@@ -127,6 +128,7 @@ async function createRuntimePlanRepository() {
   const authState = await requireLinkedAppleSession(supabase, "Plans");
 
   return createSupabasePlanRepository({
+    logEvent: logDevRunEvent,
     supabase: supabase as PlanSupabaseClient,
     userId: authState.userId,
   });
@@ -134,12 +136,15 @@ async function createRuntimePlanRepository() {
 
 function createRuntimeVerdictRepository() {
   return createSupabaseVerdictRepository({
+    logEvent: logDevRunEvent,
     supabase: createMobileSupabaseClient() as VerdictSupabaseClient,
   });
 }
 
 function createRuntimeQ5CandidateRepository() {
   return createSupabaseQ5CandidateRepository({
+    logEvent: logDevRunEvent,
+    shouldRequestDebugTrace: shouldRequestDevRunTrace,
     supabase: createMobileSupabaseClient() as Q5SupabaseClient,
   });
 }
@@ -149,6 +154,7 @@ async function createRuntimeQuizProgressRepository() {
   const authState = await requireLinkedAppleSession(supabase, "Quiz progress");
 
   return createSupabaseQuizProgressRepository({
+    logEvent: logDevRunEvent,
     supabase: supabase as QuizProgressSupabaseClient,
     userId: authState.userId,
   });
@@ -159,6 +165,7 @@ async function createRuntimeQuizSubmissionRepository() {
   const authState = await requireLinkedAppleSession(supabase, "Quiz submit");
 
   return createSupabaseQuizSubmissionRepository({
+    logEvent: logDevRunEvent,
     supabase: supabase as QuizSubmissionSupabaseClient,
     userId: authState.userId,
   });
@@ -169,6 +176,7 @@ async function createRuntimeWaitingRepository() {
   const authState = await requireLinkedAppleSession(supabase, "Waiting room");
 
   return createSupabaseWaitingRepository({
+    logEvent: logDevRunEvent,
     supabase: supabase as WaitingSupabaseClient,
     userId: authState.userId,
   });

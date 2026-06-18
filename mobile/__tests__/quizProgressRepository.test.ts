@@ -135,7 +135,9 @@ describe("quizProgressRepository", () => {
     const { rpcCalls, supabase } = makeSupabaseClient({
       rooms: [{ id: "room-1", plan_id: "plan-1" }],
     });
+    const logEvent = jest.fn();
     const repository = createSupabaseQuizProgressRepository({
+      logEvent,
       supabase,
       userId: "user-1",
     });
@@ -159,6 +161,30 @@ describe("quizProgressRepository", () => {
         },
       },
     ]);
+    expect(logEvent).toHaveBeenCalledWith(
+      "quiz.progress.save.request",
+      expect.objectContaining({
+        requestedRoomId: "plan-1",
+        resolvedRoomId: "room-1",
+        writePayload: {
+          current_question: "q5",
+          last_index: 5,
+          answers: { q4VibeEnergy: "social" },
+        },
+      }),
+    );
+    expect(logEvent).toHaveBeenCalledWith(
+      "quiz.progress.save.success",
+      expect.objectContaining({
+        requestedRoomId: "plan-1",
+        resolvedRoomId: "room-1",
+        writePayload: {
+          current_question: "q5",
+          last_index: 5,
+          answers: { q4VibeEnergy: "social" },
+        },
+      }),
+    );
   });
 
   it("repairs missing owner membership before saving progress", async () => {

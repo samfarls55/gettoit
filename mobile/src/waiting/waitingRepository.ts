@@ -20,6 +20,11 @@ export type WaitingRepository = {
   fireVerdict: (input: { roomId: string }) => Promise<WaitingSnapshot>;
 };
 
+export type WaitingRepositoryLogEvent = (
+  event: string,
+  payload: Record<string, unknown>,
+) => void;
+
 export type SupabaseQueryResult<TData> = {
   data: TData | null;
   error: Error | null;
@@ -65,6 +70,8 @@ type FireVerdictResult = {
 };
 
 export type SupabaseWaitingRepositoryDependencies = {
+  logEvent?: WaitingRepositoryLogEvent;
+  now?: () => number;
   supabase: WaitingSupabaseClient;
   userId: string;
 };
@@ -119,81 +126,177 @@ function fireVerdictError(data: FireVerdictResult | null): string | null {
   return data.error;
 }
 
+function durationMs(startedAt: number, now: () => number): number {
+  return Math.max(0, Math.round(now() - startedAt));
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function logWaitingEvent(
+  logEvent: WaitingRepositoryLogEvent | undefined,
+  event: string,
+  payload: Record<string, unknown>,
+): void {
+  try {
+    logEvent?.(event, payload);
+  } catch {
+    // Logging must never change waiting-room behavior.
+  }
+}
+
 export function createSupabaseWaitingRepository({
+  logEvent,
+  now = Date.now,
   supabase,
   userId,
 }: SupabaseWaitingRepositoryDependencies): WaitingRepository {
+  const log = (event: string, payload: Record<string, unknown>) =>
+    logWaitingEvent(logEvent, event, payload);
+
   const loadSnapshot = async (roomId: string): Promise<WaitingSnapshot> => {
-    const roomRows = assertSupabaseRows(
-      await supabase
-        .from<SupabaseRoomRow>("rooms")
-        .select("id, status")
-        .eq("id", roomId),
-      "Waiting room read",
-    );
-    const room = roomRows[0];
+    const startedAt = now();
+    log("waiting.snapshot.load.start", { roomId });
 
-    if (!room) {
-      return { roomId, status: "sessionEnded", members: [] };
-    }
+    try {
+      const roomRows = assertSupabaseRows(
+        await supabase
+          .from<SupabaseRoomRow>("rooms")
+          .select("id, status")
+          .eq("id", roomId),
+        "Waiting room read",
+      );
+      const room = roomRows[0];
 
-    const [memberRows, voteRows] = await Promise.all([
-      supabase
-        .from<SupabaseMemberRow>("members")
-        .select("user_id, display_name")
-        .eq("room_id", roomId)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from<SupabaseVoteRow>("votes")
-        .select("user_id")
-        .eq("room_id", roomId),
-    ]);
-    const votesByUserId = new Set(
-      assertSupabaseRows(voteRows, "Waiting votes read").map(
-        (vote) => vote.user_id,
-      ),
-    );
+      if (!room) {
+        const snapshot = { roomId, status: "sessionEnded" as const, members: [] };
+        log("waiting.snapshot.load.result", {
+          roomId,
+          roomRows,
+          memberRows: [],
+          voteRows: [],
+          snapshot,
+          durationMs: durationMs(startedAt, now),
+        });
+        return snapshot;
+      }
 
-    return {
-      roomId,
-      status: snapshotStatusForRoomStatus(room.status),
-      members: assertSupabaseRows(memberRows, "Waiting members read").map(
-        (member) => ({
+      const [memberRows, voteRows] = await Promise.all([
+        supabase
+          .from<SupabaseMemberRow>("members")
+          .select("user_id, display_name")
+          .eq("room_id", roomId)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from<SupabaseVoteRow>("votes")
+          .select("user_id")
+          .eq("room_id", roomId),
+      ]);
+      const memberRowValues = assertSupabaseRows(
+        memberRows,
+        "Waiting members read",
+      );
+      const voteRowValues = assertSupabaseRows(voteRows, "Waiting votes read");
+      const votesByUserId = new Set(voteRowValues.map((vote) => vote.user_id));
+
+      const snapshot = {
+        roomId,
+        status: snapshotStatusForRoomStatus(room.status),
+        members: memberRowValues.map((member) => ({
           id: member.user_id,
           displayName: displayNameForMember(member, userId),
           quizSubmitted: votesByUserId.has(member.user_id),
-        }),
-      ),
-    };
+        })),
+      };
+      log("waiting.snapshot.load.result", {
+        roomId,
+        roomRows,
+        memberRows: memberRowValues,
+        voteRows: voteRowValues,
+        snapshot,
+        durationMs: durationMs(startedAt, now),
+      });
+
+      return snapshot;
+    } catch (error) {
+      log("waiting.snapshot.load.error", {
+        roomId,
+        durationMs: durationMs(startedAt, now),
+        message: errorMessage(error),
+      });
+      throw error;
+    }
   };
 
   return {
     loadSnapshot,
     fireVerdict: async ({ roomId }) => {
-      const fireResult = await supabase.rpc<FireVerdictResult>("fire_verdict", {
-        p_room_id: roomId,
+      const startedAt = now();
+      log("verdict.fire.rpc.start", {
+        roomId,
+        rpc: "fire_verdict",
+        args: { p_room_id: roomId },
       });
 
-      if (fireResult.error) {
-        throw new Error(`Verdict fire failed: ${fireResult.error.message}`);
-      }
+      try {
+        const fireResult = await supabase.rpc<FireVerdictResult>("fire_verdict", {
+          p_room_id: roomId,
+        });
+        log("verdict.fire.rpc.response", {
+          roomId,
+          data: fireResult.data,
+          error: fireResult.error
+            ? { name: fireResult.error.name, message: fireResult.error.message }
+            : null,
+          durationMs: durationMs(startedAt, now),
+        });
 
-      const rpcError = fireVerdictError(fireResult.data);
-      if (rpcError) {
-        throw new Error(`Verdict fire failed: ${rpcError}`);
-      }
+        if (fireResult.error) {
+          throw new Error(`Verdict fire failed: ${fireResult.error.message}`);
+        }
 
-      let snapshot = await loadSnapshot(roomId);
-      for (
-        let attempt = 0;
-        attempt < verdictPollAttempts && snapshot.status === "waiting";
-        attempt += 1
-      ) {
-        await delay(verdictPollDelayMs);
-        snapshot = await loadSnapshot(roomId);
-      }
+        const rpcError = fireVerdictError(fireResult.data);
+        if (rpcError) {
+          throw new Error(`Verdict fire failed: ${rpcError}`);
+        }
 
-      return snapshot;
+        let snapshot = await loadSnapshot(roomId);
+        log("verdict.fire.poll", {
+          roomId,
+          attempt: 0,
+          snapshot,
+          durationMs: durationMs(startedAt, now),
+        });
+        for (
+          let attempt = 0;
+          attempt < verdictPollAttempts && snapshot.status === "waiting";
+          attempt += 1
+        ) {
+          await delay(verdictPollDelayMs);
+          snapshot = await loadSnapshot(roomId);
+          log("verdict.fire.poll", {
+            roomId,
+            attempt: attempt + 1,
+            snapshot,
+            durationMs: durationMs(startedAt, now),
+          });
+        }
+
+        log("verdict.fire.result", {
+          roomId,
+          snapshot,
+          durationMs: durationMs(startedAt, now),
+        });
+        return snapshot;
+      } catch (error) {
+        log("verdict.fire.error", {
+          roomId,
+          durationMs: durationMs(startedAt, now),
+          message: errorMessage(error),
+        });
+        throw error;
+      }
     },
   };
 }

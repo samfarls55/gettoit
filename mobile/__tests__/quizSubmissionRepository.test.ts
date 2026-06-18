@@ -182,7 +182,9 @@ describe("quizSubmissionRepository", () => {
     const { insertedVotes, supabase } = makeSupabaseClient([
       { id: "room-1", plan_id: "plan-1" },
     ]);
+    const logEvent = jest.fn();
     const repository = createSupabaseQuizSubmissionRepository({
+      logEvent,
       supabase,
       userId: "user-1",
     });
@@ -222,6 +224,37 @@ describe("quizSubmissionRepository", () => {
       ],
     });
 
+    expect(logEvent).toHaveBeenCalledWith(
+      "quiz.submit.vote_row",
+      expect.objectContaining({
+        requestedRoomId: "plan-1",
+        resolvedRoomId: "room-1",
+        voteRow: expect.objectContaining({
+          room_id: "room-1",
+          user_id: "user-1",
+          q4: {
+            meta: {
+              question_kind: "vibe",
+              prompt: "Choose the energy.",
+            },
+            answer: { level: 3 },
+          },
+          q5: {
+            meta: {
+              question_kind: "regret",
+              prompt: "How excited does each of these make you?",
+            },
+            answer: {
+              ratings: [
+                { droppedAxis: "cuisine", score: 2 },
+                { droppedAxis: "crowd_approval", score: 5 },
+                { droppedAxis: "vibe", score: 3 },
+              ],
+            },
+          },
+        }),
+      }),
+    );
     expect(insertedVotes[0]).toMatchObject({
       q4: {
         answer: { level: 3 },

@@ -18,6 +18,10 @@ import {
   PlacesProxyInputError,
   validateInput,
 } from "../_shared/places-proxy-core.ts";
+import {
+  collectLocalDebugTrace,
+  type LocalDebugTraceEvent,
+} from "../_shared/local-test-run-logger.ts";
 
 export interface HandlerEnv {
   /** Foursquare service key — server-only secret. */
@@ -105,8 +109,25 @@ export async function handleRequest(
     });
   }
 
-  const isGoogleVerdictDisplayRequest = isGoogleVerdictDisplayInput(body);
   const fetch = deps.fetch ?? globalThis.fetch.bind(globalThis);
+  const debugTrace = shouldCollectDebugTrace(body);
+  const dispatch = () =>
+    dispatchPlacesProxyRequest(body, deps, fetch, debugTrace);
+  if (debugTrace) {
+    const { result, trace } = await collectLocalDebugTrace(dispatch);
+    return responseWithDebugTrace(result, trace);
+  }
+
+  return dispatch();
+}
+
+async function dispatchPlacesProxyRequest(
+  body: unknown,
+  deps: HandlerDeps,
+  fetch: typeof globalThis.fetch,
+  debugTrace: boolean,
+): Promise<Response> {
+  const isGoogleVerdictDisplayRequest = isGoogleVerdictDisplayInput(body);
   if (isGoogleVerdictDisplayRequest) {
     try {
       const result = await handleGoogleVerdictDisplayProxy(body, {
@@ -159,6 +180,7 @@ export async function handleRequest(
       const result = await handleGoogleQ5PlacesProxy(input, {
         fetch,
         googleApiKey: deps.env.GOOGLE_PLACES_API_KEY ?? "",
+        debugTrace,
       });
       return jsonResponse(result, { headers: corsHeaders() });
     }
@@ -196,4 +218,38 @@ export async function handleRequest(
       error: "places_proxy_unexpected_error",
     }, { status: 200, headers: corsHeaders() });
   }
+}
+
+function shouldCollectDebugTrace(body: unknown): boolean {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return false;
+  }
+
+  const objectBody = body as Record<string, unknown>;
+  return objectBody.debug_trace === "expo_dev_run" ||
+    objectBody.debugTrace === "expo_dev_run" ||
+    objectBody.debugTrace === true;
+}
+
+async function responseWithDebugTrace(
+  response: Response,
+  debugTrace: LocalDebugTraceEvent[],
+): Promise<Response> {
+  let body: Record<string, unknown>;
+  try {
+    const parsed = await response.json();
+    body = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    body = {};
+  }
+
+  const headers = new Headers(response.headers);
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ ...body, debugTrace }), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

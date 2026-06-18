@@ -49,6 +49,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+mobile/.dev-run-logs/
 supabase/functions/.local-test-logs/
 
 # Dependencies (pre-emptive — no code yet)

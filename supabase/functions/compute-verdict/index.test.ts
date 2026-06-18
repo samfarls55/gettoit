@@ -234,6 +234,36 @@ Deno.test("compute-verdict â€” existing verdict returns 200 without re-comp
   assertEquals(inserts.length, 0, "must not re-insert a verdict that exists");
 });
 
+Deno.test("compute-verdict returns opt-in local debug trace events", async () => {
+  const existing: VerdictRow = {
+    id: "v-1",
+    room_id: VALID_ROOM_ID,
+    option_id: "opt-1",
+    method: "manual",
+    rule_text: "Existing rule.",
+    computed_at: "2026-05-13T00:00:00Z",
+  };
+  const { adapter } = memoryAdapter({ existing });
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID, debug_trace: "expo_dev_run" }),
+    { env: envOk(), buildDataAdapter: () => adapter },
+  );
+
+  assertEquals(res.status, 200);
+  const body = await res.json();
+  assert(Array.isArray(body.debugTrace));
+  assert(
+    body.debugTrace.some((entry: { event: string }) =>
+      entry.event === "verdict.run.start"
+    ),
+  );
+  assert(
+    body.debugTrace.some((entry: { event: string }) =>
+      entry.event === "verdict.run.already_computed"
+    ),
+  );
+});
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Lookup failure modes
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

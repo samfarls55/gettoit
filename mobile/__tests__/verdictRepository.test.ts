@@ -121,7 +121,9 @@ describe("verdictRepository", () => {
       }),
       error: null,
     });
+    const logEvent = jest.fn();
     const repository = createSupabaseVerdictRepository({
+      logEvent,
       supabase: makeSupabaseClient(
         {
           verdicts: {
@@ -224,6 +226,19 @@ describe("verdictRepository", () => {
         google_place_id: "google-pico",
       },
     });
+    expect(logEvent).toHaveBeenCalledWith(
+      "verdict.load.result",
+      expect.objectContaining({
+        roomId: "room-1",
+        flavor: "group",
+        googlePlaceId: "google-pico",
+        viewModel: expect.objectContaining({
+          kind: "live",
+          placeName: "Pico's Taqueria",
+          ruleText: "Best fit for the table.",
+        }),
+      }),
+    );
   });
 
   it("maps solo verdicts without group-only receipts or audience copy", async () => {

@@ -33,6 +33,7 @@ import {
   isOpenAtGoogleTargetTime,
   normalizeGoogleTargetOpenTime,
 } from "./google-opening-hours.ts";
+import { logLocalTestEvent } from "./local-test-run-logger.ts";
 export { redactGoogleObservabilityValue } from "./google-provider-runtime.ts";
 
 /** Cache record persisted under `(geo_h3, query_signature)`. */
@@ -134,6 +135,7 @@ export interface GoogleVerdictDisplayResponse {
 interface GooglePlacesProxyDeps {
   fetch: FetchFn;
   googleApiKey: string;
+  debugTrace?: boolean;
 }
 
 export type PlacesProxyResponse =
@@ -312,6 +314,13 @@ export async function handlePlacesProxy(
   // 2. Cache miss â€” call Foursquare.
   const plan = buildFoursquareQuery(input);
   const url = `${FOURSQUARE_BASE_URL}/places/search?${plan.query.toString()}`;
+  logLocalTestEvent("places_proxy.foursquare.request", {
+    input,
+    url,
+    query: Object.fromEntries(plan.query.entries()),
+    emittedTags: plan.emitted_tags,
+    postFilters: plan.post_filters,
+  });
   const response = await deps.fetch(url, {
     headers: {
       "Authorization": `Bearer ${deps.apiKey}`,
@@ -325,6 +334,11 @@ export async function handlePlacesProxy(
     // whether to MapKit-fallback (iOS) or empty-state (web). We log
     // the upstream status for observability without 500ing.
     const body = await response.text().catch(() => "");
+    logLocalTestEvent("places_proxy.foursquare.response_error", {
+      input,
+      status: response.status,
+      body,
+    });
     if (response.status === 410) {
       // Hard signal that the API version pin slipped â€” fail loud so a
       // human notices in CI / logs. Per ADR 0002, the legacy host
@@ -369,6 +383,17 @@ export async function handlePlacesProxy(
     places,
     disclaimers: plan.post_filters.disclaimers,
   };
+  logLocalTestEvent("places_proxy.foursquare.response", {
+    input,
+    status: response.status,
+    body,
+    rawResultCount: rawResults.length,
+    rawResults,
+    postFilteredCount: postFiltered.length,
+    postFiltered,
+    shapedCount: places.length,
+    places,
+  });
 
   // 3. Write through to cache. Failures here are not fatal â€” a cache
   // write error must not break the user's session; we'll re-query
@@ -395,6 +420,10 @@ export async function handlePlacesProxy(
 export const GOOGLE_Q5_FIELD_MASK_VERSION =
   GOOGLE_PROVIDER_FIELD_MASKS.q5_fetch.version;
 export const GOOGLE_Q5_FIELD_MASK = GOOGLE_PROVIDER_FIELD_MASKS.q5_fetch.mask;
+export const GOOGLE_Q5_DEBUG_FIELD_MASK_VERSION =
+  GOOGLE_PROVIDER_FIELD_MASKS.q5_debug_fetch.version;
+export const GOOGLE_Q5_DEBUG_FIELD_MASK =
+  GOOGLE_PROVIDER_FIELD_MASKS.q5_debug_fetch.mask;
 export const GOOGLE_Q5_MAX_RESULTS = 20;
 const GOOGLE_Q5_MIN_CARD_COUNT = 3;
 export const GOOGLE_VERDICT_DISPLAY_FIELD_MASK_VERSION =
@@ -541,12 +570,35 @@ export async function handleGoogleQ5PlacesProxy(
     );
   }
 
-  const response = await fetchGoogleNearbyWithRetry(
+  const requestBody = buildGoogleQ5RequestBody(input);
+  const fieldMaskName = deps.debugTrace ? "q5_debug_fetch" : "q5_fetch";
+  const request = buildGoogleProviderNearbySearchRequest({
+    apiKey: googleApiKey,
+    fieldMask: fieldMaskName,
+    body: requestBody,
+  });
+  logLocalTestEvent("places_proxy.google_q5.request", {
     input,
+    url: request.url,
+    method: request.init.method,
+    fieldMaskName,
+    fieldMaskVersion: GOOGLE_PROVIDER_FIELD_MASKS[fieldMaskName].version,
+    fieldMask: GOOGLE_PROVIDER_FIELD_MASKS[fieldMaskName].mask,
+    body: requestBody,
+  });
+
+  const response = await fetchGoogleProviderWithRetry(
     deps.fetch,
-    googleApiKey,
+    request.url,
+    request.init,
   );
   if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    logLocalTestEvent("places_proxy.google_q5.response_error", {
+      input,
+      status: response.status,
+      body,
+    });
     throw new GooglePlacesGuardrailError(
       `google_places_upstream_${response.status}`,
       `Google Places returned ${response.status}`,
@@ -555,6 +607,23 @@ export async function handleGoogleQ5PlacesProxy(
 
   const body = (await response.json()) as GoogleNearbySearchResponse;
   const shaped = shapeGoogleQ5Places(input, body);
+  logLocalTestEvent("places_proxy.google_q5.response", {
+    input,
+    status: response.status,
+    rawCandidateCount: body.places?.length ?? 0,
+    body,
+  });
+  logLocalTestEvent("places_proxy.google_q5.candidate_evaluations", {
+    input,
+    evaluations: evaluateGoogleQ5Candidates(input, body),
+  });
+  logLocalTestEvent("places_proxy.google_q5.shaped", {
+    input,
+    strictCount: shaped.strictCount,
+    returnedCount: shaped.places.length,
+    relaxedServiceUsed: shaped.places.length > shaped.strictCount,
+    places: shaped.places,
+  });
   console.info(
     "google_q5_shape",
     JSON.stringify({
@@ -587,23 +656,56 @@ export async function handleGoogleVerdictDisplayProxy(
   }
 
   const placeId = validateGoogleVerdictDisplayInput(raw);
-  const response = await fetchGooglePlaceDetailsWithRetry(
+  const request = buildGoogleProviderPlaceDetailsRequest({
+    apiKey: googleApiKey,
+    fieldMask: "verdict_display",
     placeId,
+  });
+  logLocalTestEvent("places_proxy.google_verdict_display.request", {
+    raw,
+    placeId,
+    url: request.url,
+    method: request.init.method,
+    fieldMaskName: "verdict_display",
+    fieldMaskVersion: GOOGLE_PROVIDER_FIELD_MASKS.verdict_display.version,
+    fieldMask: GOOGLE_PROVIDER_FIELD_MASKS.verdict_display.mask,
+  });
+
+  const response = await fetchGoogleProviderWithRetry(
     deps.fetch,
-    googleApiKey,
+    request.url,
+    request.init,
   );
   if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    logLocalTestEvent("places_proxy.google_verdict_display.response_error", {
+      raw,
+      placeId,
+      status: response.status,
+      body,
+    });
     throw new GooglePlacesGuardrailError(
       `google_places_refetch_${response.status}`,
       `Google Places refetch returned ${response.status}`,
     );
   }
 
+  const body = (await response.json()) as GooglePlaceDetailsResponse;
+  const place = shapeGoogleVerdictDisplayPlace(placeId, body);
+  logLocalTestEvent("places_proxy.google_verdict_display.response", {
+    raw,
+    placeId,
+    status: response.status,
+    body,
+  });
+  logLocalTestEvent("places_proxy.google_verdict_display.shaped", {
+    raw,
+    placeId,
+    place,
+  });
+
   return {
-    place: shapeGoogleVerdictDisplayPlace(
-      placeId,
-      (await response.json()) as GooglePlaceDetailsResponse,
-    ),
+    place,
     attribution: GOOGLE_PROVIDER_ATTRIBUTION,
   };
 }
@@ -645,32 +747,6 @@ function shapeGoogleVerdictDisplayPlace(
       ? { formatted_address: body.formattedAddress }
       : {}),
   };
-}
-
-async function fetchGooglePlaceDetailsWithRetry(
-  placeId: string,
-  fetch: FetchFn,
-  googleApiKey: string,
-): Promise<Response> {
-  const request = buildGoogleProviderPlaceDetailsRequest({
-    apiKey: googleApiKey,
-    fieldMask: "verdict_display",
-    placeId,
-  });
-  return fetchGoogleProviderWithRetry(fetch, request.url, request.init);
-}
-
-async function fetchGoogleNearbyWithRetry(
-  input: PlacesProxyInput,
-  fetch: FetchFn,
-  googleApiKey: string,
-): Promise<Response> {
-  const request = buildGoogleProviderNearbySearchRequest({
-    apiKey: googleApiKey,
-    fieldMask: "q5_fetch",
-    body: buildGoogleQ5RequestBody(input),
-  });
-  return fetchGoogleProviderWithRetry(fetch, request.url, request.init);
 }
 
 function shapeGoogleQ5Places(
@@ -734,6 +810,72 @@ function collectGoogleQ5Places(
     });
   }
   return places;
+}
+
+function evaluateGoogleQ5Candidates(
+  input: PlacesProxyInput,
+  body: GoogleNearbySearchResponse,
+): Array<{
+  index: number;
+  googlePlaceId: string | null;
+  displayName: string | null;
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number];
+  strictEligible: boolean;
+  relaxedServiceEligible: boolean;
+  strictRejectionReasons: string[];
+  relaxedServiceRejectionReasons: string[];
+}> {
+  return (body.places ?? []).map((place, index) => ({
+    index,
+    googlePlaceId: typeof place.id === "string" ? place.id : null,
+    displayName: typeof place.displayName?.text === "string"
+      ? place.displayName.text
+      : null,
+    place,
+    strictEligible: isGooglePlaceEligibleForTimingAndService(place, input),
+    relaxedServiceEligible: isGooglePlaceEligibleForTimingAndRelaxedService(
+      place,
+      input,
+    ),
+    strictRejectionReasons: googleQ5RejectionReasons(input, place, "strict"),
+    relaxedServiceRejectionReasons: googleQ5RejectionReasons(
+      input,
+      place,
+      "relaxed_service",
+    ),
+  }));
+}
+
+function googleQ5RejectionReasons(
+  input: PlacesProxyInput,
+  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
+  mode: "strict" | "relaxed_service",
+): string[] {
+  const reasons: string[] = [];
+  if (typeof place.id !== "string" || place.id.trim().length === 0) {
+    reasons.push("missing_place_id");
+  }
+  if (typeof place.displayName?.text !== "string") {
+    reasons.push("missing_display_name");
+  }
+  if (!isGooglePlaceEligibleForTiming(place, input)) {
+    reasons.push("closed_at_target_time_or_missing_hours");
+  }
+
+  const serviceShape = input.filters?.service_shape;
+  if (serviceShape === "dineIn") {
+    if (mode === "strict" && place.dineIn !== true) {
+      reasons.push("dine_in_not_explicitly_true");
+    }
+    if (mode === "relaxed_service" && place.dineIn === false) {
+      reasons.push("dine_in_explicitly_false");
+    }
+  }
+  if (serviceShape === "takeout" && place.takeout === false) {
+    reasons.push("takeout_explicitly_false");
+  }
+
+  return reasons;
 }
 
 function isGooglePlaceEligibleForTimingAndService(

@@ -5,7 +5,11 @@ import {
   type Q5MemberProbeProfile,
   type Q5ProbeFetchPlanStep,
 } from "../_shared/q5-card-set.ts";
-import { logLocalTestEvent } from "../_shared/local-test-run-logger.ts";
+import {
+  collectLocalDebugTrace,
+  type LocalDebugTraceEvent,
+  logLocalTestEvent,
+} from "../_shared/local-test-run-logger.ts";
 
 export type QuizAnswers = {
   q1CuisineCravings?: string[];
@@ -28,6 +32,7 @@ export type Q5PoolFetchInput = {
   profile: Q5MemberProbeProfile;
   fetchPlan: Q5ProbeFetchPlanStep[];
   placesProxyRequest?: Record<string, unknown>;
+  debugTrace?: boolean;
 };
 
 export interface Q5CardSetDataAdapter {
@@ -44,6 +49,12 @@ export interface HandlerDeps {
 }
 
 const defaultQ5CardSetId = "initial";
+
+type ParsedRequestBody = {
+  roomId: string;
+  q5CardSetId: string;
+  debugTrace: boolean;
+};
 
 const vibeValueByAnswer: Record<string, number> = {
   quiet: 0,
@@ -125,8 +136,22 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
-  logLocalTestEvent("q5_card_set.handler.input", { userId, input });
 
+  const run = () => handleValidRequest(input, userId, deps);
+  if (!input.debugTrace) {
+    return run();
+  }
+
+  const { result, trace } = await collectLocalDebugTrace(run);
+  return responseWithDebugTrace(result, trace);
+}
+
+async function handleValidRequest(
+  input: ParsedRequestBody,
+  userId: string,
+  deps: HandlerDeps,
+): Promise<Response> {
+  logLocalTestEvent("q5_card_set.handler.input", { userId, input });
   const memberContext = await deps.data.fetchRoomMember(input.roomId, userId);
   if (!memberContext) {
     logLocalTestEvent("q5_card_set.handler.room_not_found", {
@@ -165,6 +190,7 @@ export async function handleRequest(
     ...(memberContext.placesProxyRequest
       ? { placesProxyRequest: memberContext.placesProxyRequest }
       : {}),
+    ...(input.debugTrace ? { debugTrace: true } : {}),
   });
   logLocalTestEvent("q5_card_set.handler.pool", {
     roomId: memberContext.roomId,
@@ -191,9 +217,32 @@ export async function handleRequest(
   return jsonResponse(result, { status: 200, headers: corsHeaders() });
 }
 
+async function responseWithDebugTrace(
+  response: Response,
+  debugTrace: LocalDebugTraceEvent[],
+): Promise<Response> {
+  let body: Record<string, unknown>;
+  try {
+    const parsed = await response.json();
+    body = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    body = {};
+  }
+
+  const headers = new Headers(response.headers);
+  headers.set("Content-Type", "application/json");
+  return new Response(JSON.stringify({ ...body, debugTrace }), {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 function parseRequestBody(
   body: unknown,
-): { roomId: string; q5CardSetId: string } | null {
+): ParsedRequestBody | null {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return null;
   }
@@ -212,12 +261,16 @@ function parseRequestBody(
   const requestedCardSetId = typeof rawCardSetId === "string"
     ? rawCardSetId.trim()
     : "";
+  const debugTrace = objectBody.debug_trace === "expo_dev_run" ||
+    objectBody.debugTrace === "expo_dev_run" ||
+    objectBody.debugTrace === true;
 
   return {
     roomId,
     q5CardSetId: requestedCardSetId.length > 0
       ? requestedCardSetId
       : defaultQ5CardSetId,
+    debugTrace,
   };
 }
 

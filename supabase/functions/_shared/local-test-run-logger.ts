@@ -6,6 +6,34 @@ let cachedRunId: string | undefined;
 let started = false;
 let disabled = false;
 
+export type LocalDebugTraceEvent = {
+  timestamp: string;
+  event: string;
+  payload: unknown;
+};
+
+type TraceSink = (entry: LocalDebugTraceEvent) => void;
+
+const traceSinks: TraceSink[] = [];
+
+export async function collectLocalDebugTrace<T>(
+  run: () => Promise<T>,
+): Promise<{ result: T; trace: LocalDebugTraceEvent[] }> {
+  const trace: LocalDebugTraceEvent[] = [];
+  const sink: TraceSink = (entry) => trace.push(entry);
+
+  traceSinks.push(sink);
+  try {
+    const result = await run();
+    return { result, trace };
+  } finally {
+    const index = traceSinks.lastIndexOf(sink);
+    if (index >= 0) {
+      traceSinks.splice(index, 1);
+    }
+  }
+}
+
 export function isLocalTestRunLoggingEnabled(): boolean {
   const raw = Deno.env.get("GTI_LOCAL_TEST_LOGS")?.trim().toLowerCase();
   if (!raw || FALSY_LOG_FLAGS.has(raw)) return false;
@@ -20,6 +48,8 @@ export function logLocalTestEvent(
   event: string,
   payload: Record<string, unknown> = {},
 ): void {
+  pushTraceEvent(event, payload);
+
   if (disabled || !isLocalTestRunLoggingEnabled()) return;
 
   const filePath = localTestLogFilePath();
@@ -40,6 +70,20 @@ export function logLocalTestEvent(
   } catch {
     disabled = true;
   }
+}
+
+function pushTraceEvent(
+  event: string,
+  payload: Record<string, unknown>,
+): void {
+  const sink = traceSinks[traceSinks.length - 1];
+  if (!sink) return;
+
+  sink({
+    timestamp: new Date().toISOString(),
+    event,
+    payload: toJsonSafe(payload),
+  });
 }
 
 function writeEvent(
