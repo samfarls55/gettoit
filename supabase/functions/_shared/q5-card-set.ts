@@ -1,4 +1,5 @@
 import type { GoogleAttributionPayload } from "./places-proxy-core.ts";
+import { logLocalTestEvent } from "./local-test-run-logger.ts";
 
 export type Q5CardSetAxis = "cuisine" | "crowd_approval" | "vibe";
 
@@ -135,8 +136,18 @@ export function assignQ5CardSet({
   pool,
 }: AssignQ5CardSetInput): Q5CardSetResult {
   const stablePool = stableCandidatePool(pool);
+  logLocalTestEvent("q5_card_set.assign.start", {
+    roomId,
+    memberId,
+    q5CardSetId,
+    member,
+    inputPoolCount: pool.length,
+    inputPool: pool,
+    stablePoolCount: stablePool.length,
+    stablePool,
+  });
   if (stablePool.length < 3) {
-    return {
+    const result: Q5CardSetResult = {
       status: "no_results",
       reason: "thin_pool",
       q5CardSetId,
@@ -146,11 +157,18 @@ export function assignQ5CardSet({
         candidateCount: stablePool.length,
       }],
     };
+    logLocalTestEvent("q5_card_set.assign.no_results", {
+      roomId,
+      memberId,
+      q5CardSetId,
+      result,
+    });
+    return result;
   }
 
   const cards = generateFactorialCards(member, stablePool);
   if (!cards) {
-    return {
+    const result: Q5CardSetResult = {
       status: "no_results",
       reason: "strict_factorial_unavailable",
       q5CardSetId,
@@ -161,6 +179,14 @@ export function assignQ5CardSet({
         requiredAxes: canonicalAxes,
       }],
     };
+    logLocalTestEvent("q5_card_set.assign.no_results", {
+      roomId,
+      memberId,
+      q5CardSetId,
+      stablePool,
+      result,
+    });
+    return result;
   }
 
   const shuffleSeed = `${roomId}:${memberId}:${q5CardSetId}`;
@@ -169,7 +195,7 @@ export function assignQ5CardSet({
     assignedCard(card, index)
   );
 
-  return {
+  const result: Q5CardSetResult = {
     status: "assigned",
     q5CardSetId,
     generatorVersion: Q5_CARD_SET_GENERATOR_VERSION,
@@ -185,6 +211,19 @@ export function assignQ5CardSet({
       })),
     },
   };
+  logLocalTestEvent("q5_card_set.assign.assigned", {
+    roomId,
+    memberId,
+    q5CardSetId,
+    member,
+    stablePool,
+    generatedCards: cards,
+    shuffleSeed,
+    shuffledCards,
+    assignedCards,
+    result,
+  });
+  return result;
 }
 
 function generateFactorialCards(

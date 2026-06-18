@@ -19,7 +19,8 @@ Use the narrowest check that covers the files you changed. Prefer the combined c
 - `npm run mobile:test` runs Jest in `mobile/`.
 - `npm run mobile:verify` runs typecheck and tests in `mobile/`.
 - `npm run verify:web` runs typecheck, tests, and build.
-- `npm run verify:edge` runs all Deno tests under `supabase/functions/`.
+- `npm run verify:edge` runs all Deno tests under `supabase/functions/` and
+  writes local-only JSONL debug logs to `supabase/functions/.local-test-logs/`.
 - `npm run verify:local` runs web and Edge Function checks.
 
 ## Notes

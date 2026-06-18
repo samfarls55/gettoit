@@ -5,7 +5,7 @@
   "description": "GetToIt monorepo root. Houses mobile/, web/, supabase/, docs/, gti-vault/ as siblings per ADR 0004.",
   "scripts": {
     "verify:web": "npm run web:typecheck && npm run web:test && npm run web:build",
-    "verify:edge": "cd supabase/functions && deno test --allow-net --allow-env --allow-read",
+    "verify:edge": "node scripts/run-edge-tests.mjs",
     "verify:local": "npm run verify:web && npm run verify:edge",
     "web:typecheck": "npm run typecheck --prefix web",
     "web:test": "npm test --prefix web",

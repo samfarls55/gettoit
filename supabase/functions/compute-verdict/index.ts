@@ -40,6 +40,7 @@ import {
   GOOGLE_PROVIDER_FIELD_MASKS,
   type GoogleProviderNearbyFieldMaskName,
 } from "../_shared/google-provider-runtime.ts";
+import { logLocalTestEvent } from "../_shared/local-test-run-logger.ts";
 import { googlePrimaryTypesForQ1Cuisines } from "../_shared/google-cuisine-primary-types.ts";
 // tb-WF-11 â€” resolves each member's name from the joined
 // `members.display_name`, falling back to the `m<uuid>` placeholder.
@@ -114,6 +115,11 @@ function buildSupabaseAdapter(
         console.warn(
           "compute-verdict Google verdict fetch skipped: GOOGLE_PLACES_API_KEY is not set",
         );
+        logLocalTestEvent("verdict.google_candidates.skipped", {
+          roomId: room_id,
+          reason: "missing_google_places_api_key",
+          context,
+        });
         return [];
       }
       const { data, error } = await client
@@ -126,6 +132,12 @@ function buildSupabaseAdapter(
           "compute-verdict Google verdict fetch room read failed:",
           error?.message ?? "no row",
         );
+        logLocalTestEvent("verdict.google_candidates.skipped", {
+          roomId: room_id,
+          reason: "room_read_failed",
+          error: error?.message ?? "no row",
+          context,
+        });
         return [];
       }
       const room = data as {
@@ -141,26 +153,45 @@ function buildSupabaseAdapter(
         console.warn(
           "compute-verdict Google verdict fetch skipped: room search area is incomplete",
         );
+        logLocalTestEvent("verdict.google_candidates.skipped", {
+          roomId: room_id,
+          reason: "incomplete_room_search_area",
+          room,
+          context,
+        });
         return [];
       }
-      const request = buildGoogleProviderNearbySearchRequest({
-        apiKey: googleApiKey,
-        fieldMask: googleVerdictFieldMaskName(env),
-        body: {
-          includedPrimaryTypes: googlePrimaryTypesForQ1Cuisines(
-            googleVerdictCuisinesFromContext(context),
-          ),
-          maxResultCount: 20,
-          locationRestriction: {
-            circle: {
-              center: {
-                latitude: room.location_lat,
-                longitude: room.location_lng,
-              },
-              radius: room.radius_meters,
+      const fieldMaskName = googleVerdictFieldMaskName(env);
+      const requestBody = {
+        includedPrimaryTypes: googlePrimaryTypesForQ1Cuisines(
+          googleVerdictCuisinesFromContext(context),
+        ),
+        maxResultCount: 20,
+        locationRestriction: {
+          circle: {
+            center: {
+              latitude: room.location_lat,
+              longitude: room.location_lng,
             },
+            radius: room.radius_meters,
           },
         },
+      };
+      const request = buildGoogleProviderNearbySearchRequest({
+        apiKey: googleApiKey,
+        fieldMask: fieldMaskName,
+        body: requestBody,
+      });
+      logLocalTestEvent("verdict.google_candidates.request", {
+        roomId: room_id,
+        context,
+        room,
+        url: request.url,
+        fieldMaskName,
+        fieldMaskVersion: GOOGLE_PROVIDER_FIELD_MASKS[fieldMaskName].version,
+        fieldMask: GOOGLE_PROVIDER_FIELD_MASKS[fieldMaskName].mask,
+        body: requestBody,
+        includeVibeFit: isVibeFitEnabled(env),
       });
       const response = await fetchGoogleProviderWithRetry(
         fetch,
@@ -171,11 +202,29 @@ function buildSupabaseAdapter(
         console.warn(
           `compute-verdict Google verdict fetch failed: ${response.status}`,
         );
+        const body = await response.text().catch(() => "");
+        logLocalTestEvent("verdict.google_candidates.response_error", {
+          roomId: room_id,
+          status: response.status,
+          body,
+        });
         return [];
       }
-      return shapeGoogleVerdictCandidates(await response.json(), {
+      const body = await response.json();
+      logLocalTestEvent("verdict.google_candidates.response", {
+        roomId: room_id,
+        status: response.status,
+        body,
+      });
+      const candidates = shapeGoogleVerdictCandidates(body, {
         includeVibeFit: isVibeFitEnabled(env),
       });
+      logLocalTestEvent("verdict.google_candidates.shaped", {
+        roomId: room_id,
+        candidateCount: candidates.length,
+        candidates,
+      });
+      return candidates;
     },
     async fetchActiveMemberIds(room_id): Promise<string[]> {
       const { data, error } = await client

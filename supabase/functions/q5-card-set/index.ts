@@ -18,6 +18,7 @@ import {
   type Q5RoomMemberContext,
   type QuizAnswers,
 } from "./handler.ts";
+import { logLocalTestEvent } from "../_shared/local-test-run-logger.ts";
 
 type Env = {
   SUPABASE_URL?: string;
@@ -292,9 +293,23 @@ function buildDataAdapter(
 
     async fetchQ5Pool(input: Q5PoolFetchInput) {
       if (!input.placesProxyRequest) {
+        logLocalTestEvent("q5_card_set.places_proxy.skipped", {
+          roomId: input.roomId,
+          memberId: input.memberId,
+          profile: input.profile,
+          fetchPlan: input.fetchPlan,
+          reason: "missing_places_proxy_request",
+        });
         return [];
       }
 
+      logLocalTestEvent("q5_card_set.places_proxy.request", {
+        roomId: input.roomId,
+        memberId: input.memberId,
+        profile: input.profile,
+        fetchPlan: input.fetchPlan,
+        request: input.placesProxyRequest,
+      });
       const response = await fetch(
         `${env.SUPABASE_URL}/functions/v1/places-proxy`,
         {
@@ -307,17 +322,44 @@ function buildDataAdapter(
         },
       );
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => "");
+        logLocalTestEvent("q5_card_set.places_proxy.response_error", {
+          roomId: input.roomId,
+          memberId: input.memberId,
+          status: response.status,
+          body: errorBody,
+        });
         throw new Error(`Q5 places proxy failed: ${response.status}`);
       }
 
       const body = await response.json() as GoogleQ5Response & {
         error?: string;
       };
+      logLocalTestEvent("q5_card_set.places_proxy.response", {
+        roomId: input.roomId,
+        memberId: input.memberId,
+        status: response.status,
+        body,
+      });
       if (body.error) {
+        logLocalTestEvent("q5_card_set.places_proxy.body_error", {
+          roomId: input.roomId,
+          memberId: input.memberId,
+          error: body.error,
+          body,
+        });
         throw new Error(`Q5 places proxy failed: ${body.error}`);
       }
 
-      return q5PoolFromGoogleResponse(body, input.profile);
+      const pool = q5PoolFromGoogleResponse(body, input.profile);
+      logLocalTestEvent("q5_card_set.places_proxy.pool", {
+        roomId: input.roomId,
+        memberId: input.memberId,
+        profile: input.profile,
+        poolCount: pool.length,
+        pool,
+      });
+      return pool;
     },
   };
 }

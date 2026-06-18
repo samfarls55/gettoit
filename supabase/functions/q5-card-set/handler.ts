@@ -5,6 +5,7 @@ import {
   type Q5MemberProbeProfile,
   type Q5ProbeFetchPlanStep,
 } from "../_shared/q5-card-set.ts";
+import { logLocalTestEvent } from "../_shared/local-test-run-logger.ts";
 
 export type QuizAnswers = {
   q1CuisineCravings?: string[];
@@ -76,6 +77,10 @@ export async function handleRequest(
   req: Request,
   deps: HandlerDeps,
 ): Promise<Response> {
+  logLocalTestEvent("q5_card_set.handler.request", {
+    method: req.method,
+    url: req.url,
+  });
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
@@ -114,20 +119,30 @@ export async function handleRequest(
 
   const input = parseRequestBody(body);
   if (!input) {
+    logLocalTestEvent("q5_card_set.handler.invalid_input", { body });
     return jsonResponse({ error: "invalid_input" }, {
       status: 400,
       headers: corsHeaders(),
     });
   }
+  logLocalTestEvent("q5_card_set.handler.input", { userId, input });
 
   const memberContext = await deps.data.fetchRoomMember(input.roomId, userId);
   if (!memberContext) {
+    logLocalTestEvent("q5_card_set.handler.room_not_found", {
+      userId,
+      input,
+    });
     return jsonResponse({ error: "room_not_found" }, {
       status: 404,
       headers: corsHeaders(),
     });
   }
   if (!memberContext.parametersLocked) {
+    logLocalTestEvent("q5_card_set.handler.parameters_unlocked", {
+      userId,
+      memberContext,
+    });
     return jsonResponse({ error: "room_parameters_unlocked" }, {
       status: 409,
       headers: corsHeaders(),
@@ -136,6 +151,12 @@ export async function handleRequest(
 
   const profile = memberProfileFromAnswers(memberContext.answers);
   const fetchPlan = buildQ5ProbeFetchPlan(profile);
+  logLocalTestEvent("q5_card_set.handler.before_pool_fetch", {
+    userId,
+    memberContext,
+    profile,
+    fetchPlan,
+  });
   const pool = await deps.data.fetchQ5Pool({
     roomId: memberContext.roomId,
     memberId: memberContext.memberId,
@@ -145,6 +166,14 @@ export async function handleRequest(
       ? { placesProxyRequest: memberContext.placesProxyRequest }
       : {}),
   });
+  logLocalTestEvent("q5_card_set.handler.pool", {
+    roomId: memberContext.roomId,
+    memberId: memberContext.memberId,
+    profile,
+    fetchPlan,
+    poolCount: pool.length,
+    pool,
+  });
 
   const result = assignQ5CardSet({
     roomId: memberContext.roomId,
@@ -152,6 +181,11 @@ export async function handleRequest(
     q5CardSetId: input.q5CardSetId,
     member: profile,
     pool,
+  });
+  logLocalTestEvent("q5_card_set.handler.result", {
+    roomId: memberContext.roomId,
+    memberId: memberContext.memberId,
+    result,
   });
 
   return jsonResponse(result, { status: 200, headers: corsHeaders() });

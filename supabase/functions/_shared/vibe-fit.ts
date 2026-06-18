@@ -1,5 +1,6 @@
 import type { VibeBandId } from "./vibe-band.ts";
 import { VIBE_BANDS } from "./vibe-band.ts";
+import { logLocalTestEvent } from "./local-test-run-logger.ts";
 
 export type VibeReceiptCode =
   | "vibe_no_evidence"
@@ -458,8 +459,12 @@ export function scoreVibeFitCandidate(
   candidate: VibeFitCandidate,
 ): VibeFitSignal {
   const spans = extractVibeEvidenceSpans(candidate);
+  logLocalTestEvent("vibe_fit.fake_score.start", {
+    candidate,
+    spans,
+  });
   if (spans.length === 0) {
-    return {
+    const signal: VibeFitSignal = {
       candidateId: candidate.candidateId,
       anchorVersion: VIBE_FIT_CONFIG.anchorVersion,
       spanAssemblerVersion: VIBE_FIT_CONFIG.spanAssemblerVersion,
@@ -468,6 +473,11 @@ export function scoreVibeFitCandidate(
       confidence: 0,
       receiptCodes: ["vibe_no_evidence", "vibe_low_confidence"],
     };
+    logLocalTestEvent("vibe_fit.fake_score.no_evidence", {
+      candidate,
+      signal,
+    });
+    return signal;
   }
 
   const spanVectors: SpanVector[] = spans.map((span) => ({
@@ -514,7 +524,7 @@ export function scoreVibeFitCandidate(
     receiptCodes.push("vibe_mealtime_weighted");
   }
 
-  return {
+  const signal: VibeFitSignal = {
     candidateId: candidate.candidateId,
     anchorVersion: VIBE_FIT_CONFIG.anchorVersion,
     spanAssemblerVersion: VIBE_FIT_CONFIG.spanAssemblerVersion,
@@ -523,6 +533,23 @@ export function scoreVibeFitCandidate(
     confidence,
     receiptCodes,
   };
+  logLocalTestEvent("vibe_fit.fake_score.result", {
+    candidate,
+    spans,
+    spanVectors,
+    bandScores,
+    scoreTotal,
+    weightedPositionTotal,
+    vibePosition,
+    conflict,
+    clarity,
+    evidenceAmount,
+    ambiguityPenalty,
+    conflictPenalty,
+    confidence,
+    signal,
+  });
+  return signal;
 }
 
 export async function scoreVibeFitCandidateFlow(
@@ -531,15 +558,36 @@ export async function scoreVibeFitCandidateFlow(
 ): Promise<VibeFitSignal[]> {
   const extracted = candidates.map(extractVibeFitCandidate);
   const evidenceCandidates = extracted.filter(({ spans }) => spans.length > 0);
+  logLocalTestEvent("vibe_fit.flow.start", {
+    candidateCount: candidates.length,
+    candidates,
+    extracted,
+    evidenceCandidateCount: evidenceCandidates.length,
+    embeddingsEnabled: deps.env.VIBE_EMBEDDINGS_ENABLED,
+    budget: deps.budget,
+  });
 
   if (evidenceCandidates.length === 0) {
-    return extracted.map(({ candidate }) =>
+    const signals = extracted.map(({ candidate }) =>
       noEvidenceVibeFitSignal(candidate.candidateId)
     );
+    logLocalTestEvent("vibe_fit.flow.no_evidence", {
+      extracted,
+      signals,
+    });
+    return signals;
   }
 
   if (deps.env.VIBE_EMBEDDINGS_ENABLED !== "true") {
-    return fallbackVibeFitSignals(extracted, "vibe_embeddings_disabled");
+    const signals = fallbackVibeFitSignals(
+      extracted,
+      "vibe_embeddings_disabled",
+    );
+    logLocalTestEvent("vibe_fit.flow.embeddings_disabled", {
+      extracted,
+      signals,
+    });
+    return signals;
   }
 
   const texts = dedupeTexts([
@@ -548,9 +596,28 @@ export async function scoreVibeFitCandidateFlow(
       spans.map((span) => span.text)
     ),
   ]);
+  logLocalTestEvent("vibe_fit.flow.embedding_texts", {
+    textCount: texts.length,
+    maxTextsPerFlow: deps.budget.maxTextsPerFlow,
+    anchorPhrases: VIBE_FIT_CONFIG.anchors.flatMap((anchor) => anchor.phrases),
+    evidenceTexts: evidenceCandidates.flatMap(({ candidate, spans }) =>
+      spans.map((span) => ({ candidateId: candidate.candidateId, span }))
+    ),
+    texts,
+  });
 
   if (texts.length > deps.budget.maxTextsPerFlow) {
-    return fallbackVibeFitSignals(extracted, "vibe_embedding_budget_exhausted");
+    const signals = fallbackVibeFitSignals(
+      extracted,
+      "vibe_embedding_budget_exhausted",
+    );
+    logLocalTestEvent("vibe_fit.flow.embedding_budget_exhausted", {
+      extracted,
+      textCount: texts.length,
+      maxTextsPerFlow: deps.budget.maxTextsPerFlow,
+      signals,
+    });
+    return signals;
   }
 
   const embeddingResult = await embedTextsWithVoyage(texts, deps);
@@ -558,10 +625,17 @@ export async function scoreVibeFitCandidateFlow(
     const receipt = embeddingResult.error === "budget_exhausted"
       ? "vibe_embedding_budget_exhausted"
       : "vibe_embedding_unavailable";
-    return fallbackVibeFitSignals(extracted, receipt);
+    const signals = fallbackVibeFitSignals(extracted, receipt);
+    logLocalTestEvent("vibe_fit.flow.embedding_failed", {
+      error: embeddingResult.error,
+      receipt,
+      extracted,
+      signals,
+    });
+    return signals;
   }
 
-  return extracted.map((extractedCandidate) => {
+  const signals = extracted.map((extractedCandidate) => {
     const { candidate, spans } = extractedCandidate;
     if (spans.length === 0) {
       return noEvidenceVibeFitSignal(candidate.candidateId);
@@ -575,12 +649,21 @@ export async function scoreVibeFitCandidateFlow(
     return signal ??
       fallbackVibeFitSignal(extractedCandidate, "vibe_embedding_unavailable");
   });
+  logLocalTestEvent("vibe_fit.flow.result", {
+    signals,
+    embeddingTexts: texts,
+    embeddingsByText: embeddingResult.embeddingsByText,
+  });
+  return signals;
 }
 
 export async function selectQ5VibeKeepDropCandidates(
   input: Q5VibeSelectionInput,
   deps: VibeFitFlowDeps,
 ): Promise<Q5VibeSelectionResult> {
+  logLocalTestEvent("vibe_fit.q5_selection.start", {
+    input,
+  });
   const baseSignals = await scoreVibeFitCandidateFlow(input.candidates, deps);
   const signalsByCandidateId = new Map(
     baseSignals.map((signal) => [signal.candidateId, signal]),
@@ -594,10 +677,21 @@ export async function selectQ5VibeKeepDropCandidates(
   );
 
   const target = clamp(input.targetVibePosition, 1, 5);
+  logLocalTestEvent("vibe_fit.q5_selection.signals", {
+    target,
+    baseSignals,
+    q5Signals,
+  });
   for (const stage of Q5_VIBE_SELECTION_STAGES) {
     const keep = q5Signals.find((signal) =>
       isQ5VibeKeep(signal, target, stage.keepDistance, stage.minConfidence)
     );
+    logLocalTestEvent("vibe_fit.q5_selection.stage_keep", {
+      target,
+      stage,
+      keep,
+      q5Signals,
+    });
     if (!keep) {
       continue;
     }
@@ -606,9 +700,16 @@ export async function selectQ5VibeKeepDropCandidates(
       signal.candidateId !== keep.candidateId &&
       isQ5VibeDrop(signal, target, stage.dropDistance, stage.minConfidence)
     );
+    logLocalTestEvent("vibe_fit.q5_selection.stage_drop", {
+      target,
+      stage,
+      keep,
+      drop,
+      q5Signals,
+    });
 
     if (drop) {
-      return {
+      const result: Q5VibeSelectionResult = {
         kind: "selected",
         keepCandidateId: keep.candidateId,
         dropCandidateId: drop.candidateId,
@@ -618,15 +719,29 @@ export async function selectQ5VibeKeepDropCandidates(
           ...stage.receiptCodes,
         ]),
       };
+      logLocalTestEvent("vibe_fit.q5_selection.selected", {
+        target,
+        stage,
+        keep,
+        drop,
+        result,
+      });
+      return result;
     }
   }
 
-  return {
+  const result: Q5VibeSelectionResult = {
     kind: "no-results",
     receiptCodes: dedupeReceiptCodes(
       q5Signals.flatMap((signal) => signal.receiptCodes),
     ),
   };
+  logLocalTestEvent("vibe_fit.q5_selection.no_results", {
+    target,
+    q5Signals,
+    result,
+  });
+  return result;
 }
 
 export async function embedTextsWithVoyage(
@@ -634,32 +749,75 @@ export async function embedTextsWithVoyage(
   deps: VoyageEmbeddingDeps,
 ): Promise<VoyageEmbeddingResult> {
   const apiKey = deps.env.VOYAGE_API_KEY ?? "";
-  if (!apiKey) return { ok: false, error: "provider_unavailable" };
-
   const uniqueTexts = dedupeTexts(texts);
+  const timeoutMs = deps.timeoutMs ?? VIBE_FIT_CONFIG.embeddingTimeoutMs;
+  logLocalTestEvent("vibe_fit.embedding.prepare", {
+    model: VIBE_FIT_CONFIG.voyageModel,
+    endpoint: VIBE_FIT_CONFIG.voyageEndpoint,
+    inputTextCount: texts.length,
+    uniqueTextCount: uniqueTexts.length,
+    inputTexts: texts,
+    uniqueTexts,
+    budget: deps.budget,
+    timeoutMs,
+    hasApiKey: apiKey.length > 0,
+  });
+  if (!apiKey) {
+    const result: VoyageEmbeddingResult = {
+      ok: false,
+      error: "provider_unavailable",
+    };
+    logLocalTestEvent("vibe_fit.embedding.unavailable", {
+      reason: "missing_api_key",
+      result,
+    });
+    return result;
+  }
+
   if (uniqueTexts.length > deps.budget.maxTextsPerFlow) {
-    return { ok: false, error: "budget_exhausted" };
+    const result: VoyageEmbeddingResult = {
+      ok: false,
+      error: "budget_exhausted",
+    };
+    logLocalTestEvent("vibe_fit.embedding.budget_exhausted", {
+      uniqueTextCount: uniqueTexts.length,
+      maxTextsPerFlow: deps.budget.maxTextsPerFlow,
+      result,
+    });
+    return result;
   }
 
   const fetchImpl = deps.fetch ?? globalThis.fetch.bind(globalThis);
-  const timeoutMs = deps.timeoutMs ?? VIBE_FIT_CONFIG.embeddingTimeoutMs;
   const first = await voyageEmbeddingAttempt(uniqueTexts, {
     apiKey,
     fetch: fetchImpl,
     timeoutMs,
+  });
+  logLocalTestEvent("vibe_fit.embedding.attempt_result", {
+    attempt: 1,
+    result: first,
   });
   if (first.ok) return first;
   if (
     !first.transient ||
     uniqueTexts.length * 2 > deps.budget.maxTextsPerFlow
   ) {
-    return { ok: false, error: first.error };
+    const result: VoyageEmbeddingResult = { ok: false, error: first.error };
+    logLocalTestEvent("vibe_fit.embedding.failed", {
+      finalAttempt: 1,
+      result,
+    });
+    return result;
   }
 
   const second = await voyageEmbeddingAttempt(uniqueTexts, {
     apiKey,
     fetch: fetchImpl,
     timeoutMs,
+  });
+  logLocalTestEvent("vibe_fit.embedding.attempt_result", {
+    attempt: 2,
+    result: second,
   });
   return second.ok ? second : { ok: false, error: second.error };
 }
@@ -758,19 +916,36 @@ function scoreSpansWithEmbeddings(
   spans: readonly VibeEvidenceSpan[],
   embeddingsByText: Map<string, readonly number[]>,
 ): VibeFitSignal | null {
+  logLocalTestEvent("vibe_fit.embedding_projection.start", {
+    candidateId,
+    spans,
+    embeddingsByText,
+  });
   const anchorVectors = new Map<VibeBandId, readonly (readonly number[])[]>();
   for (const anchor of VIBE_FIT_CONFIG.anchors) {
     const vectors = anchor.phrases
       .map((phrase) => embeddingsByText.get(phrase))
       .filter((vector): vector is readonly number[] => Array.isArray(vector));
-    if (vectors.length === 0) return null;
+    if (vectors.length === 0) {
+      logLocalTestEvent("vibe_fit.embedding_projection.missing_anchor", {
+        candidateId,
+        anchor,
+      });
+      return null;
+    }
     anchorVectors.set(anchor.bandId, vectors);
   }
 
   const spanVectors: NumericSpanVector[] = [];
   for (const span of spans) {
     const vector = embeddingsByText.get(span.text);
-    if (!vector) return null;
+    if (!vector) {
+      logLocalTestEvent("vibe_fit.embedding_projection.missing_span", {
+        candidateId,
+        span,
+      });
+      return null;
+    }
     spanVectors.push({ span, vector });
   }
 
@@ -798,7 +973,16 @@ function scoreSpansWithEmbeddings(
     1,
     5,
   );
-  if (vibePosition === null) return null;
+  if (vibePosition === null) {
+    logLocalTestEvent("vibe_fit.embedding_projection.null_position", {
+      candidateId,
+      spans,
+      spanVectors,
+      bandScores,
+      scoreTotal,
+    });
+    return null;
+  }
 
   const conflict = hasNumericConflict(bandScores);
   const clarity = anchorClarity(bandScores);
@@ -824,7 +1008,7 @@ function scoreSpansWithEmbeddings(
     receiptCodes.push("vibe_mealtime_weighted");
   }
 
-  return {
+  const signal: VibeFitSignal = {
     candidateId,
     anchorVersion: VIBE_FIT_CONFIG.anchorVersion,
     spanAssemblerVersion: VIBE_FIT_CONFIG.spanAssemblerVersion,
@@ -833,6 +1017,23 @@ function scoreSpansWithEmbeddings(
     confidence,
     receiptCodes,
   };
+  logLocalTestEvent("vibe_fit.embedding_projection.result", {
+    candidateId,
+    spans,
+    spanVectors,
+    anchorVectors,
+    bandScores,
+    scoreTotal,
+    vibePosition,
+    conflict,
+    clarity,
+    evidenceAmount,
+    ambiguityPenalty,
+    conflictPenalty,
+    confidence,
+    signal,
+  });
+  return signal;
 }
 
 function q5SignalWithWeakHints(
@@ -952,6 +1153,16 @@ async function voyageEmbeddingAttempt(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), deps.timeoutMs);
   let response: Response;
+  const requestBody = {
+    model: VIBE_FIT_CONFIG.voyageModel,
+    input: texts,
+  };
+  logLocalTestEvent("vibe_fit.embedding.http_request", {
+    endpoint: VIBE_FIT_CONFIG.voyageEndpoint,
+    method: "POST",
+    timeoutMs: deps.timeoutMs,
+    body: requestBody,
+  });
   try {
     response = await deps.fetch(VIBE_FIT_CONFIG.voyageEndpoint, {
       method: "POST",
@@ -960,14 +1171,16 @@ async function voyageEmbeddingAttempt(
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
-      body: JSON.stringify({
-        model: VIBE_FIT_CONFIG.voyageModel,
-        input: texts,
-      }),
+      body: JSON.stringify(requestBody),
       signal: controller.signal,
     });
-  } catch (_e) {
+  } catch (error) {
     clearTimeout(timeout);
+    logLocalTestEvent("vibe_fit.embedding.http_error", {
+      error,
+      mappedError: "timeout",
+      transient: true,
+    });
     return { ok: false, error: "timeout", transient: true };
   }
   clearTimeout(timeout);
@@ -978,13 +1191,28 @@ async function voyageEmbeddingAttempt(
       response.status === 401 || response.status === 403
         ? "invalid_credential"
         : "provider_unavailable";
+    const body = await response.text().catch(() => "");
+    logLocalTestEvent("vibe_fit.embedding.http_response_error", {
+      status: response.status,
+      body,
+      mappedError: error,
+      transient,
+    });
     return { ok: false, error, transient };
   }
 
   let payload: unknown;
   try {
     payload = await response.json();
-  } catch (_e) {
+    logLocalTestEvent("vibe_fit.embedding.http_response", {
+      status: response.status,
+      payload,
+    });
+  } catch (error) {
+    logLocalTestEvent("vibe_fit.embedding.bad_json", {
+      status: response.status,
+      error,
+    });
     return { ok: false, error: "bad_response", transient: false };
   }
 
@@ -992,6 +1220,10 @@ async function voyageEmbeddingAttempt(
     ? payload.data
     : null;
   if (!data || data.length !== texts.length) {
+    logLocalTestEvent("vibe_fit.embedding.bad_response_shape", {
+      textCount: texts.length,
+      payload,
+    });
     return { ok: false, error: "bad_response", transient: false };
   }
 
@@ -1003,11 +1235,27 @@ async function voyageEmbeddingAttempt(
       !Array.isArray(entry.embedding) ||
       !entry.embedding.every((value) => typeof value === "number")
     ) {
+      logLocalTestEvent("vibe_fit.embedding.bad_embedding_entry", {
+        index,
+        text: texts[index],
+        entry,
+      });
       return { ok: false, error: "bad_response", transient: false };
     }
     embeddingsByText.set(texts[index], entry.embedding);
   }
 
+  logLocalTestEvent("vibe_fit.embedding.success", {
+    textCount: texts.length,
+    embeddings: texts.map((text) => {
+      const embedding = embeddingsByText.get(text) ?? [];
+      return {
+        text,
+        dimensions: embedding.length,
+        embedding,
+      };
+    }),
+  });
   return { ok: true, embeddingsByText };
 }
 

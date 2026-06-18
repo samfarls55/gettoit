@@ -21,6 +21,10 @@ import {
   type HardEligibilityVote,
 } from "../_shared/hard-eligibility.ts";
 import {
+  isLocalTestRunLoggingEnabled,
+  logLocalTestEvent,
+} from "../_shared/local-test-run-logger.ts";
+import {
   scoreVibeFitCandidate,
   scoreVibeFitCandidateFlow,
   VIBE_FIT_CONFIG,
@@ -281,20 +285,42 @@ export async function runVerdictForRoom(input: {
   vibeEmbeddingFetch?: VibeEmbeddingFetch;
 }): Promise<VerdictRunResult> {
   const { roomId, method, store } = input;
+  logLocalTestEvent("verdict.run.start", { roomId, method });
   const rerollState = await store.loadRerollState(roomId);
   const isRerollRun = (rerollState?.last_reroll_reason ?? null) !== null;
+  logLocalTestEvent("verdict.run.reroll_state", {
+    roomId,
+    rerollState,
+    isRerollRun,
+  });
 
   const existing = await store.readExistingVerdict(roomId);
   if (existing) {
     if (!isRerollRun) {
+      logLocalTestEvent("verdict.run.already_computed", {
+        roomId,
+        existing,
+      });
       return { kind: "already_computed", verdict: existing };
     }
+    logLocalTestEvent("verdict.run.delete_existing_for_reroll", {
+      roomId,
+      existing,
+    });
     await store.deleteVerdictForRoom(roomId);
   }
 
   const room = await store.loadRoom(roomId);
-  if (!room) return { kind: "room_not_found" };
+  if (!room) {
+    logLocalTestEvent("verdict.run.room_not_found", { roomId });
+    return { kind: "room_not_found" };
+  }
   const roomEligibility = roomEligibilityFromRoom(room);
+  logLocalTestEvent("verdict.run.room", {
+    roomId,
+    room,
+    roomEligibility,
+  });
 
   const activeMemberIds = await store.loadActiveMemberIds(roomId);
   const activeMemberIdSet = activeMemberIds ? new Set(activeMemberIds) : null;
@@ -302,7 +328,15 @@ export async function runVerdictForRoom(input: {
     await store.loadVotes(roomId),
     activeMemberIdSet,
   );
-  if (voteRows.length === 0) return { kind: "no_votes" };
+  logLocalTestEvent("verdict.run.votes", {
+    roomId,
+    activeMemberIds,
+    voteRows,
+  });
+  if (voteRows.length === 0) {
+    logLocalTestEvent("verdict.run.no_votes", { roomId, activeMemberIds });
+    return { kind: "no_votes" };
+  }
 
   const optionRows = await store.loadCandidatePool(roomId, {
     activeMemberIds,
@@ -310,10 +344,20 @@ export async function runVerdictForRoom(input: {
   });
   const startingRadius = await store.loadRoomRadius(roomId);
   const candidates = optionRows.map(candidateOptionFromOptionRow);
+  logLocalTestEvent("verdict.candidates.before_verdict", {
+    roomId,
+    startingRadius,
+    optionRows,
+    candidates,
+  });
   const venueProfiles = classifyVenuePool(candidates);
   const profileVetoes = await store.loadProfileVetoes(
     voteRows.map((r) => r.user_id),
   );
+  logLocalTestEvent("verdict.run.profile_vetoes", {
+    roomId,
+    profileVetoes,
+  });
 
   const effectiveVoteInputs: EffectiveVoteInput[] = voteRows.map((row) => ({
     row,
@@ -326,18 +370,34 @@ export async function runVerdictForRoom(input: {
       profileVetoes[row.user_id] ?? [],
     ),
   }));
+  logLocalTestEvent("verdict.run.effective_vote_inputs", {
+    roomId,
+    effectiveVoteInputs,
+  });
+  const eligibleVibeFitCandidates = buildEligibleVibeFitCandidatesForVerdict({
+    optionRows,
+    votes: effectiveVoteInputs,
+    radiusMeters: startingRadius,
+    mealTiming: roomEligibility.mealTiming,
+    serviceShape: roomEligibility.serviceShape,
+  });
+  logLocalTestEvent("verdict.vibe_fit.eligible_candidates", {
+    roomId,
+    candidateCount: eligibleVibeFitCandidates.length,
+    candidates: eligibleVibeFitCandidates,
+  });
   const transientVibeFitSignalsByCandidateId =
     await scoreEligibleVibeFitCandidates(
-      buildEligibleVibeFitCandidatesForVerdict({
-        optionRows,
-        votes: effectiveVoteInputs,
-        radiusMeters: startingRadius,
-        mealTiming: roomEligibility.mealTiming,
-        serviceShape: roomEligibility.serviceShape,
-      }),
+      eligibleVibeFitCandidates,
       input.env,
       input.vibeEmbeddingFetch,
     );
+  logLocalTestEvent("verdict.vibe_fit.signals", {
+    roomId,
+    signals: [...transientVibeFitSignalsByCandidateId.entries()].map(
+      ([candidateId, signal]) => ({ candidateId, signal }),
+    ),
+  });
   const useVibeFitPreferenceScoring = optionRows.some(hasVibeFitCandidate);
   const vibeFitPreferenceOptions: PreferenceFunctionOptions =
     useVibeFitPreferenceScoring
@@ -377,11 +437,36 @@ export async function runVerdictForRoom(input: {
       prefFn,
     };
   });
+  logLocalTestEvent("verdict.votes.before_compute", {
+    roomId,
+    useVibeFitPreferenceScoring,
+    votes: votes.map((vote) => ({
+      user_id: vote.user_id,
+      display_name: vote.display_name,
+      q1_vetoes: vote.q1_vetoes,
+      q2_budget: vote.q2_budget,
+      hard_vetoes: vote.hard_vetoes,
+      scores: vote.scores,
+      hasPrefFn: typeof vote.prefFn === "function",
+    })),
+  });
+  if (isLocalTestRunLoggingEnabled()) {
+    logLocalTestEvent("verdict.scores.before_compute", {
+      roomId,
+      method,
+      candidates,
+      scoreMatrix: buildVerdictScoreMatrix(votes, candidates),
+    });
+  }
 
   let previousWinnerName: string | undefined;
   if (isRerollRun) {
     previousWinnerName = (await store.loadPreviousWinnerName(roomId)) ??
       undefined;
+    logLocalTestEvent("verdict.run.previous_winner", {
+      roomId,
+      previousWinnerName,
+    });
   }
 
   let result: VerdictEngineOutput;
@@ -400,8 +485,14 @@ export async function runVerdictForRoom(input: {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.error("compute-verdict engine error:", e);
+    logLocalTestEvent("verdict.engine.error", {
+      roomId,
+      message,
+      error: e,
+    });
     return { kind: "engine_error", detail: message };
   }
+  logLocalTestEvent("verdict.engine.result", { roomId, result });
 
   if (optionRows.some((row) => row.google_place_id)) {
     const durableScoringVersion = buildDurableVerdictScoringVersion(
@@ -414,6 +505,11 @@ export async function runVerdictForRoom(input: {
         scoring_version: durableScoringVersion,
       })),
     };
+    logLocalTestEvent("verdict.engine.result_scoring_versioned", {
+      roomId,
+      durableScoringVersion,
+      result,
+    });
   }
 
   const persisted = await store.persistVerdictRun({
@@ -421,11 +517,24 @@ export async function runVerdictForRoom(input: {
     result,
     rerollReason: rerollState?.last_reroll_reason ?? null,
   });
+  logLocalTestEvent("verdict.persisted", {
+    roomId,
+    persisted,
+    result,
+  });
   await store.publishVerdictReady(roomId, persisted.verdict.id);
+  logLocalTestEvent("verdict.published", {
+    roomId,
+    verdictId: persisted.verdict.id,
+  });
 
   const planId = room.plan_id ?? null;
   if (planId) {
     await store.transitionPlanDecidedActive(planId);
+    logLocalTestEvent("verdict.plan_transitioned", {
+      roomId,
+      planId,
+    });
   }
 
   return {
@@ -485,6 +594,56 @@ function filterRowsToActiveMembers<T extends { user_id: string }>(
     : rows;
 }
 
+function buildVerdictScoreMatrix(
+  votes: readonly MemberVote[],
+  candidates: readonly CandidateOption[],
+) {
+  return candidates.map((candidate) => {
+    const memberScores = votes.map((vote) => {
+      if (vote.prefFn) {
+        try {
+          return {
+            user_id: vote.user_id,
+            display_name: vote.display_name,
+            source: "preference_function",
+            score: vote.prefFn(candidate),
+          };
+        } catch (error) {
+          return {
+            user_id: vote.user_id,
+            display_name: vote.display_name,
+            source: "preference_function",
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+
+      return {
+        user_id: vote.user_id,
+        display_name: vote.display_name,
+        source: "legacy_scores",
+        score: (vote.scores ?? {})[candidate.id] ?? THRESHOLD_T,
+      };
+    });
+    const numericScores = memberScores
+      .map((entry) => "score" in entry ? entry.score : null)
+      .filter((score): score is number => typeof score === "number");
+    return {
+      candidateId: candidate.id,
+      googlePlaceId: candidate.google_place_id,
+      name: candidate.name,
+      candidate,
+      memberScores,
+      minScore: numericScores.length > 0 ? Math.min(...numericScores) : null,
+      totalScore: numericScores.reduce((sum, score) => sum + score, 0),
+      averageScore: numericScores.length > 0
+        ? numericScores.reduce((sum, score) => sum + score, 0) /
+          numericScores.length
+        : null,
+    };
+  });
+}
+
 function dedupeGoogleVerdictCandidates(
   candidates: readonly GoogleVerdictCandidateRow[],
 ): GoogleVerdictCandidateRow[] {
@@ -511,14 +670,31 @@ async function fetchGoogleVerdictOptionRows(
     active_member_ids: activeMemberIds ?? voteRows.map((row) => row.user_id),
     votes: voteRows,
   };
+  logLocalTestEvent("verdict.google_options.before_fetch", {
+    roomId,
+    activeMemberIds,
+    voteRows,
+    context,
+  });
   const googleCandidates = await data.fetchGoogleVerdictCandidates(
     roomId,
     context,
   );
+  logLocalTestEvent("verdict.google_options.raw_candidates", {
+    roomId,
+    candidateCount: googleCandidates.length,
+    googleCandidates,
+  });
   const dedupedGoogleCandidates = dedupeGoogleVerdictCandidates(
     googleCandidates,
   );
+  logLocalTestEvent("verdict.google_options.deduped_candidates", {
+    roomId,
+    candidateCount: dedupedGoogleCandidates.length,
+    dedupedGoogleCandidates,
+  });
   if (dedupedGoogleCandidates.length === 0) {
+    logLocalTestEvent("verdict.google_options.empty", { roomId });
     return [];
   }
 
@@ -529,8 +705,16 @@ async function fetchGoogleVerdictOptionRows(
     place_provider: "google" as const,
     payload: candidate.payload,
   }));
+  logLocalTestEvent("verdict.google_options.option_rows", {
+    roomId,
+    googleOptionRows,
+  });
 
   if (!data.insertOptions) {
+    logLocalTestEvent("verdict.google_options.return_without_insert", {
+      roomId,
+      googleOptionRows,
+    });
     return googleOptionRows;
   }
 
@@ -539,14 +723,20 @@ async function fetchGoogleVerdictOptionRows(
   const optionIdByGooglePlaceId = buildGoogleOptionIdMap(
     await data.fetchOptions(roomId),
   );
-  return dedupedGoogleCandidates.map((candidate) => ({
+  const insertedRows = dedupedGoogleCandidates.map((candidate) => ({
     id: optionIdByGooglePlaceId.get(candidate.google_place_id) ??
       candidate.google_place_id,
     google_place_id: candidate.google_place_id,
-    place_provider: "google",
+    place_provider: "google" as const,
     payload: candidate.payload,
     vibe_fit_candidate: candidate.vibe_fit_candidate,
   }));
+  logLocalTestEvent("verdict.google_options.inserted_rows", {
+    roomId,
+    optionIdByGooglePlaceId,
+    insertedRows,
+  });
+  return insertedRows;
 }
 
 function buildGoogleOptionIdMap(
@@ -618,7 +808,18 @@ async function scoreEligibleVibeFitCandidates(
   fetch?: VibeEmbeddingFetch,
 ): Promise<Map<string, VibeFitSignal>> {
   const out = new Map<string, VibeFitSignal>();
-  if (candidates.length === 0) return out;
+  logLocalTestEvent("verdict.vibe_fit.score_start", {
+    candidateCount: candidates.length,
+    candidates,
+    embeddingsEnabled: env.VIBE_EMBEDDINGS_ENABLED,
+    mode: candidates.every((candidate) => candidate.embeddingMode === "fake")
+      ? "fake"
+      : "voyage",
+  });
+  if (candidates.length === 0) {
+    logLocalTestEvent("verdict.vibe_fit.score_empty", {});
+    return out;
+  }
   let signals: VibeFitSignal[];
   if (candidates.every((candidate) => candidate.embeddingMode === "fake")) {
     signals = candidates.map((candidate) => scoreVibeFitCandidate(candidate));
@@ -635,6 +836,10 @@ async function scoreEligibleVibeFitCandidates(
   for (const signal of signals) {
     out.set(signal.candidateId, signal);
   }
+  logLocalTestEvent("verdict.vibe_fit.score_result", {
+    signals,
+    signalsByCandidateId: out,
+  });
   return out;
 }
 
