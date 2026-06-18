@@ -259,7 +259,7 @@ function milesToMeters(radiusMiles: number): number {
 }
 
 function metersToMiles(distanceMeters: number): number {
-  return Math.round((distanceMeters / metersPerMile) * 10) / 10;
+  return Math.round((distanceMeters / metersPerMile) * 100) / 100;
 }
 
 function searchAreaFromPlanRow(plan: SupabasePlanRow): SearchArea | null {

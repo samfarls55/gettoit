@@ -4,7 +4,9 @@ import MapView, { Circle, Marker, type Region } from "react-native-maps";
 
 import {
   type DensityPreviewPin,
+  maximumSearchAreaZoom,
   milesToMeters,
+  minimumSearchAreaZoom,
   type SearchArea,
 } from "./searchArea";
 
@@ -83,6 +85,8 @@ export const SearchAreaMapView = forwardRef<
       initialRegion={regionForSearchArea(searchArea)}
       loadingEnabled
       mapType="standard"
+      maxZoomLevel={maximumSearchAreaZoom}
+      minZoomLevel={minimumSearchAreaZoom}
       onRegionChangeComplete={handleRegionChangeComplete}
       pitchEnabled={false}
       rotateEnabled={false}

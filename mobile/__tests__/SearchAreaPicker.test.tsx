@@ -10,8 +10,12 @@ import {
   commitSearchAreaDraft,
   createSearchAreaDraft,
   isSearchAreaDraftDirty,
+  maximumSearchAreaZoom,
+  minimumSearchAreaZoom,
   radiusLabel,
   radiusMilesFromCameraDeltas,
+  searchAreaRadiusBounds,
+  searchAreaRadiusRangeMeters,
   searchAreaDraftReducer,
   zoomForRadiusMiles,
 } from "../src/searchArea/searchArea";
@@ -74,6 +78,18 @@ describe("Search area state", () => {
 
     const steppedUp = searchAreaDraftReducer(draft, { type: "stepRadiusUp" });
     const steppedDown = searchAreaDraftReducer(steppedUp, { type: "stepRadiusDown" });
+    const steppedToMinimum = searchAreaDraftReducer(
+      { center, radiusMiles: 0.5 },
+      { type: "stepRadiusDown" },
+    );
+    const steppedBelowMinimum = searchAreaDraftReducer(steppedToMinimum, {
+      type: "stepRadiusDown",
+    });
+    const tooTight = searchAreaDraftReducer(draft, {
+      type: "mapCameraChanged",
+      center,
+      radiusMiles: 0.1,
+    });
     const tooWide = searchAreaDraftReducer(draft, {
       type: "mapCameraChanged",
       center,
@@ -82,17 +98,46 @@ describe("Search area state", () => {
 
     expect(steppedUp.radiusMiles).toBe(3.5);
     expect(steppedDown.radiusMiles).toBe(2);
+    expect(steppedToMinimum.radiusMiles).toBe(searchAreaRadiusBounds.minMiles);
+    expect(steppedBelowMinimum.radiusMiles).toBe(searchAreaRadiusBounds.minMiles);
+    expect(tooTight.radiusMiles).toBe(searchAreaRadiusBounds.minMiles);
+    expect(radiusLabel(tooTight.radiusMiles)).toBe("0.25 MI RADIUS");
     expect(tooWide.radiusMiles).toBe(10);
+    expect(searchAreaRadiusRangeMeters).toEqual({ min: 402, max: 16093 });
   });
 
   it("derives Search area radius from nearest visible map edge", () => {
+    expect(radiusMilesFromCameraDeltas(0.001, 0.001, 0)).toBe(0.25);
     expect(radiusMilesFromCameraDeltas(0.1, 0.1, 0)).toBeCloseTo(3.45);
     expect(radiusMilesFromCameraDeltas(2, 2, 40)).toBe(10);
     expect(zoomForRadiusMiles(2)).toBeGreaterThan(12);
+    expect(minimumSearchAreaZoom).toBe(
+      zoomForRadiusMiles(searchAreaRadiusBounds.maxMiles),
+    );
+    expect(maximumSearchAreaZoom).toBe(
+      zoomForRadiusMiles(searchAreaRadiusBounds.minMiles),
+    );
+    expect(minimumSearchAreaZoom).toBeLessThan(maximumSearchAreaZoom);
   });
 });
 
 describe("SearchAreaPickerPreview", () => {
+  it("passes backend radius zoom boundaries to the map", () => {
+    const { UNSAFE_getByProps } = render(
+      <SearchAreaPickerPreview
+        adapter={makeAdapter()}
+        initialSearchArea={{ center, radiusMiles: 2 }}
+      />,
+    );
+
+    expect(
+      UNSAFE_getByProps({
+        maxZoomLevel: maximumSearchAreaZoom,
+        minZoomLevel: minimumSearchAreaZoom,
+      }),
+    ).toBeTruthy();
+  });
+
   it(
     "uses fakeable adapter contracts for current-location jumps, typed jumps, and preview pins",
     async () => {

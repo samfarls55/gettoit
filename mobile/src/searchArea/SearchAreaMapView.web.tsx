@@ -7,7 +7,11 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import type { DensityPreviewPin, SearchArea } from "./searchArea";
-import { zoomForRadiusMiles } from "./searchArea";
+import {
+  maximumSearchAreaZoom,
+  minimumSearchAreaZoom,
+  zoomForRadiusMiles,
+} from "./searchArea";
 
 export type SearchAreaMapCameraMoveEvent = {
   latitude: number;
@@ -324,6 +328,8 @@ export const SearchAreaMapView = forwardRef<
         cameraPosition.coordinates.latitude,
       ],
       container,
+      maxZoom: maximumSearchAreaZoom,
+      minZoom: minimumSearchAreaZoom,
       pitchWithRotate: false,
       style: mapStyle(),
       zoom: cameraPosition.zoom,

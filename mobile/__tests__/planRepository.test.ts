@@ -21,6 +21,12 @@ type QueryCall = {
   single: boolean;
 };
 
+type SupabaseTableResults = Record<
+  string,
+  | SupabaseQueryResult<unknown[]>
+  | Array<SupabaseQueryResult<unknown[]>>
+>;
+
 class TestMutation<T> implements PromiseLike<SupabaseQueryResult<T>> {
   private readonly call: QueryCall;
   private readonly result: SupabaseQueryResult<T>;
@@ -127,9 +133,11 @@ class TestQuery<T> implements PromiseLike<SupabaseQueryResult<T[]>> {
 }
 
 function makeSupabaseClient(
-  results: Record<string, SupabaseQueryResult<unknown[]>>,
+  results: SupabaseTableResults,
   calls: QueryCall[] = [],
 ): PlanSupabaseClient {
+  const tableIndexes: Record<string, number> = {};
+
   return {
     from: <T,>(table: string) => {
       const call: QueryCall = {
@@ -141,10 +149,18 @@ function makeSupabaseClient(
         single: false,
       };
       calls.push(call);
+      const tableResult = results[table];
+      const result = Array.isArray(tableResult)
+        ? tableResult[
+            Math.min(tableIndexes[table] ?? 0, tableResult.length - 1)
+          ]
+        : tableResult;
+
+      tableIndexes[table] = (tableIndexes[table] ?? 0) + 1;
 
       return new TestQuery<T>(
         call,
-        results[table] as SupabaseQueryResult<T[]>,
+        result as SupabaseQueryResult<T[]>,
       );
     },
   };
@@ -519,6 +535,84 @@ describe("planRepository", () => {
         onConflict: "room_id,user_id",
         ignoreDuplicates: true,
       },
+    });
+  });
+
+  it("launches a 0.25 mile Search area inside the backend radius range", async () => {
+    const calls: QueryCall[] = [];
+    const repository = createSupabasePlanRepository({
+      supabase: makeSupabaseClient(
+        {
+          plans: {
+            data: [
+              {
+                id: "plan-1",
+                creator_id: "user-1",
+                name: "Tiny radius dinner",
+                scope: "solo",
+                location: {
+                  lat: 37.7749,
+                  lng: -122.4194,
+                  name: "San Francisco",
+                },
+                session_params: {
+                  meal_time: "dinner",
+                  service_shape: "dineIn",
+                },
+                distance_meters: 402,
+                status: "pending",
+                created_at: "2026-06-04T10:00:00Z",
+                verdict_fired_at: null,
+                expired_at: null,
+              },
+            ],
+            error: null,
+          },
+          rooms: [
+            {
+              data: [],
+              error: null,
+            },
+            {
+              data: [{ id: "room-1", plan_id: "plan-1" }],
+              error: null,
+            },
+          ],
+          members: {
+            data: [],
+            error: null,
+          },
+        },
+        calls,
+      ),
+      userId: "user-1",
+    });
+
+    await expect(
+      repository.launchPlan({
+        id: "plan-1",
+        name: "Tiny radius dinner",
+        participantScope: "solo",
+        searchArea: {
+          center: {
+            latitude: 37.7749,
+            longitude: -122.4194,
+            label: "San Francisco",
+          },
+          radiusMiles: 0.25,
+        },
+        mealTime: "dinner",
+        serviceShape: "dineIn",
+      }),
+    ).resolves.toMatchObject({ id: "plan-1", roomId: "room-1" });
+
+    expect(calls[0].mutation).toMatchObject({
+      type: "update",
+      row: { distance_meters: 402 },
+    });
+    expect(calls[2].mutation).toMatchObject({
+      type: "insert",
+      row: { radius_meters: 402 },
     });
   });
 

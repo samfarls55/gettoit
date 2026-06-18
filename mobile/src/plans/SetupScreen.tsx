@@ -10,6 +10,7 @@ import {
 
 import { mobileTokens } from "../design/tokens";
 import { SearchAreaPickerPreview } from "../searchArea/SearchAreaPickerPreview";
+import { formatRadiusMiles } from "../searchArea/searchArea";
 import type {
   PlanMealTime,
   PlanParticipantScope,
@@ -159,7 +160,7 @@ export function SetupScreen({
         <Pressable
           accessibilityLabel={
             plan.searchArea
-              ? `Search area, ${plan.searchArea.center.label}, ${plan.searchArea.radiusMiles.toFixed(1)} miles`
+              ? `Search area, ${plan.searchArea.center.label}, ${formatRadiusMiles(plan.searchArea.radiusMiles)} miles`
               : "Set search area"
           }
           accessibilityRole="button"
@@ -171,7 +172,7 @@ export function SetupScreen({
           </Text>
           <Text style={styles.searchAreaSupport}>
             {plan.searchArea
-              ? `Search area - ${plan.searchArea.radiusMiles.toFixed(1)} mi`
+              ? `Search area - ${formatRadiusMiles(plan.searchArea.radiusMiles)} mi`
               : "Tap to choose on map"}
           </Text>
         </Pressable>

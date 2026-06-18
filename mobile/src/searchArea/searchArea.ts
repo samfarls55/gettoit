@@ -32,12 +32,30 @@ export type SearchAreaDraftEvent =
   | { type: "stepRadiusDown" }
   | { type: "stepRadiusUp" };
 
-export const searchAreaRadiusStopsMiles = [
-  0.25, 0.5, 1, 1.5, 2, 3.5, 5, 7.5, 10,
-] as const;
-
 const metersPerMile = 1609.344;
 const milesPerLatitudeDegree = 69;
+
+export const searchAreaRadiusBounds = {
+  minMiles: 0.25,
+  maxMiles: 10,
+} as const;
+
+export const searchAreaRadiusRangeMeters = {
+  min: Math.round(searchAreaRadiusBounds.minMiles * metersPerMile),
+  max: Math.round(searchAreaRadiusBounds.maxMiles * metersPerMile),
+} as const;
+
+export const searchAreaRadiusStopsMiles = [
+  searchAreaRadiusBounds.minMiles,
+  0.5,
+  1,
+  1.5,
+  2,
+  3.5,
+  5,
+  7.5,
+  searchAreaRadiusBounds.maxMiles,
+] as const;
 
 export const defaultSearchArea: SearchArea = {
   center: {
@@ -54,15 +72,19 @@ export function createSearchAreaDraft(
   return committedSearchArea ?? defaultSearchArea;
 }
 
+export function formatRadiusMiles(radiusMiles: number): string {
+  return radiusMiles < 0.5 ? radiusMiles.toFixed(2) : radiusMiles.toFixed(1);
+}
+
 export function radiusLabel(radiusMiles: number): string {
-  return `${radiusMiles.toFixed(1)} MI RADIUS`;
+  return `${formatRadiusMiles(radiusMiles)} MI RADIUS`;
 }
 
 export function clampRadiusMiles(radiusMiles: number): number {
-  const min = searchAreaRadiusStopsMiles[0];
-  const max = searchAreaRadiusStopsMiles[searchAreaRadiusStopsMiles.length - 1];
-
-  return Math.min(max, Math.max(min, radiusMiles));
+  return Math.min(
+    searchAreaRadiusBounds.maxMiles,
+    Math.max(searchAreaRadiusBounds.minMiles, radiusMiles),
+  );
 }
 
 export function milesToMeters(miles: number): number {
@@ -90,6 +112,13 @@ export function zoomForRadiusMiles(radiusMiles: number): number {
 
   return Math.min(18, Math.max(4, Math.log2(360 / latitudeDelta)));
 }
+
+export const minimumSearchAreaZoom = zoomForRadiusMiles(
+  searchAreaRadiusBounds.maxMiles,
+);
+export const maximumSearchAreaZoom = zoomForRadiusMiles(
+  searchAreaRadiusBounds.minMiles,
+);
 
 function nearestRadiusStopIndex(radiusMiles: number): number {
   return searchAreaRadiusStopsMiles.reduce((nearestIndex, stop, index) => {
