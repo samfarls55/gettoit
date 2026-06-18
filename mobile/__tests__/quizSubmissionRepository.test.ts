@@ -100,7 +100,7 @@ describe("quizSubmissionRepository", () => {
       roomId: "plan-1",
       answers: {
         q1CuisineCravings: ["mexican"],
-        q2SpendCap: "$$",
+        q2SpendCap: 2,
         q3Reputation: "popular",
         q4VibeEnergy: "social",
         q5Ratings: { "candidate-1": 5 },
@@ -143,7 +143,7 @@ describe("quizSubmissionRepository", () => {
       roomId: "plan-orphaned-owner",
       answers: {
         q1CuisineCravings: ["mexican"],
-        q2SpendCap: "$$",
+        q2SpendCap: 2,
         q3Reputation: "popular",
         q4VibeEnergy: "social",
         q5Ratings: { "candidate-1": 4 },
@@ -191,7 +191,7 @@ describe("quizSubmissionRepository", () => {
       roomId: "plan-1",
       answers: {
         q1CuisineCravings: ["mexican"],
-        q2SpendCap: "$$",
+        q2SpendCap: 2,
         q3Reputation: "popular",
         q4VibeEnergy: "lively",
         q5Ratings: {

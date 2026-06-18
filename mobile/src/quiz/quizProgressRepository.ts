@@ -2,7 +2,7 @@ export type QuizQuestionId = "q1" | "q2" | "q3" | "q4" | "q5";
 
 export type QuizAnswers = {
   q1CuisineCravings?: string[];
-  q2SpendCap?: string;
+  q2SpendCap?: number;
   q3Reputation?: string;
   q4VibeEnergy?: string;
   q5Ratings?: Record<string, number>;
@@ -122,6 +122,16 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function priceTier(value: unknown): number | undefined {
+  const tier = typeof value === "number" && Number.isFinite(value)
+    ? Math.round(value)
+    : typeof value === "string"
+      ? value.length
+      : undefined;
+
+  return tier !== undefined && tier >= 1 && tier <= 4 ? tier : undefined;
+}
+
 function q5Ratings(value: unknown): Record<string, number> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
@@ -142,14 +152,13 @@ function quizAnswersFromStored(value: unknown): QuizAnswers {
   }
 
   const stored = value as Record<string, unknown>;
+  const q2SpendCap = priceTier(stored.q2SpendCap);
 
   return {
     ...(stringArray(stored.q1CuisineCravings)
       ? { q1CuisineCravings: stringArray(stored.q1CuisineCravings) }
       : {}),
-    ...(stringValue(stored.q2SpendCap)
-      ? { q2SpendCap: stringValue(stored.q2SpendCap) }
-      : {}),
+    ...(q2SpendCap ? { q2SpendCap } : {}),
     ...(stringValue(stored.q3Reputation)
       ? { q3Reputation: stringValue(stored.q3Reputation) }
       : {}),

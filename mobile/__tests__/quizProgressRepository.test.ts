@@ -122,7 +122,7 @@ describe("quizProgressRepository", () => {
     await expect(repository.loadProgress("plan-1")).resolves.toEqual({
       roomId: "room-1",
       currentQuestion: "q4",
-      answers: { q2SpendCap: "$$" },
+      answers: { q2SpendCap: 2 },
     });
     expect(calls.map((call) => call.filters)).toEqual([
       { id: "plan-1" },

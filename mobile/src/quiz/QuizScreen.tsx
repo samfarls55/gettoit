@@ -24,10 +24,11 @@ type QuizScreenProps = {
 };
 
 type AnswerKey = keyof QuizAnswers;
+type AnswerValue = string | number;
 
 type Option = {
   label: string;
-  value: string;
+  value: AnswerValue;
 };
 
 type QuestionConfig = {
@@ -37,7 +38,7 @@ type QuestionConfig = {
   cta: string;
   labelPrefix: string;
   options: readonly Option[];
-  fallbackValue?: string;
+  fallbackValue?: AnswerValue;
   multi?: true;
 };
 
@@ -80,12 +81,12 @@ const questionConfigs: readonly QuestionConfig[] = [
     answerKey: "q2SpendCap",
     cta: "Save spend",
     labelPrefix: "Spend cap",
-    fallbackValue: "$$",
+    fallbackValue: 2,
     options: [
-      { label: "$", value: "$" },
-      { label: "$$", value: "$$" },
-      { label: "$$$", value: "$$$" },
-      { label: "$$$$", value: "$$$$" },
+      { label: "$", value: 1 },
+      { label: "$$", value: 2 },
+      { label: "$$$", value: 3 },
+      { label: "$$$$", value: 4 },
     ],
   },
   {
@@ -139,14 +140,14 @@ function questionBefore(questionId: QuizQuestionId): QuizQuestionId {
 function selectedValues(
   answers: QuizAnswers,
   question: QuestionConfig,
-): string[] {
+): AnswerValue[] {
   const value = answers[question.answerKey];
 
   if (Array.isArray(value)) {
     return value;
   }
 
-  return typeof value === "string" ? [value] : [];
+  return typeof value === "string" || typeof value === "number" ? [value] : [];
 }
 
 function nextAnswers(
@@ -155,7 +156,9 @@ function nextAnswers(
 ): QuizAnswers {
   const currentValues = selectedValues(answers, question);
   const value = question.multi
-    ? currentValues
+    ? currentValues.filter((entry): entry is string =>
+      typeof entry === "string"
+    )
     : currentValues[0] ?? question.fallbackValue;
 
   return {
@@ -248,14 +251,22 @@ export function QuizScreen({
     };
   }, [progressRepository, roomId]);
 
-  const handleOptionPress = (value: string) => {
+  const handleOptionPress = (value: AnswerValue) => {
     setAnswers((currentAnswers) => {
       if (!currentQuestion.multi) {
         return { ...currentAnswers, [currentQuestion.answerKey]: value };
       }
+      if (typeof value !== "string") {
+        return currentAnswers;
+      }
 
       const currentValues = selectedValues(currentAnswers, currentQuestion);
-      const nextValues = nextMultiSelectValues(currentValues, value);
+      const nextValues = nextMultiSelectValues(
+        currentValues.filter((entry): entry is string =>
+          typeof entry === "string"
+        ),
+        value,
+      );
 
       return { ...currentAnswers, [currentQuestion.answerKey]: nextValues };
     });
@@ -365,7 +376,7 @@ export function QuizScreen({
                     isSelected ? " selected" : ""
                   }`}
                   accessibilityRole="button"
-                  key={option.value}
+                  key={String(option.value)}
                   onPress={() => handleOptionPress(option.value)}
                   style={[styles.option, isSelected && styles.selectedOption]}
                 >

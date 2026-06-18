@@ -13,6 +13,8 @@
 
 /** Pinned per ADR 0002 Â§"Live API surface verified 2026-05-13".
  *  Bump this date deliberately when migrating to a new Foursquare schema. */
+import type { GoogleTargetOpenTime } from "./google-opening-hours.ts";
+
 export const FOURSQUARE_API_VERSION = "2025-06-17";
 
 /** Live base URL â€” the legacy `api.foursquare.com/v3/*` surface returns
@@ -44,6 +46,7 @@ export interface PlacesProxyFilters {
    *  `hours.regular`, which are local). The iOS planner therefore
    *  resolves the meal instant in the search area's timezone and emits
    *  the token directly; the proxy passes it straight through. */
+  target_open_time?: GoogleTargetOpenTime;
   open_at?: string;
   /** TB-07/TB-17 (quiz redesign) â€” the craved cuisine this per-member fetch call
    *  is tagged for: a `QuizCuisine` id (e.g. `"mexican"`), enumerated in
@@ -58,6 +61,9 @@ export interface PlacesProxyFilters {
    *  category-scoped). An unknown / absent value degrades gracefully to
    *  the general query â€” no error. */
   cuisine?: string;
+  /** Google-backed callers can send the full selected Q1 cuisine set.
+   *  Foursquare keeps using the single `cuisine` advisory tag above. */
+  cuisines?: string[];
   /** Shared Room service-mode parameter. Google candidate eligibility
    *  treats dine-in as hard explicit true, while takeout only cuts an
    *  explicit false. */
@@ -428,7 +434,9 @@ export const ENTERTAINMENT_VENUE_CATEGORY_NAMES: readonly string[] = Object
  *  Empty / missing category list is kept (taxonomy-drift guard â€” the
  *  query-time floor already constrained it). An unrecognised primary
  *  string is kept for the same reason. */
-export function shouldKeepByVenueClass(categoryNames: readonly string[]): boolean {
+export function shouldKeepByVenueClass(
+  categoryNames: readonly string[],
+): boolean {
   if (categoryNames.length === 0) return true;
   const nightlife = new Set(NIGHTLIFE_CATEGORY_NAMES);
   const entertainment = new Set(ENTERTAINMENT_VENUE_CATEGORY_NAMES);
@@ -485,7 +493,9 @@ export interface FoursquareQueryPlan {
   emitted_tags: string[];
 }
 
-export function buildFoursquareQuery(input: PlacesProxyInput): FoursquareQueryPlan {
+export function buildFoursquareQuery(
+  input: PlacesProxyInput,
+): FoursquareQueryPlan {
   const params = new URLSearchParams();
   // ll = "lat,lng" â€” Foursquare's accepted geo parameter.
   params.set("ll", `${input.lat},${input.lng}`);
@@ -573,8 +583,7 @@ export function buildFoursquareQuery(input: PlacesProxyInput): FoursquareQueryPl
 
   if (filters.price_tier !== undefined) {
     const clamped = Math.max(1, Math.min(4, Math.floor(filters.price_tier)));
-    // We cap, never floor â€” a Q2 answer of "Under $15" means
-    // max_price = 1, allowing anything cheaper-or-equal.
+    // We cap, never floor: Q2 tier 1 maps to max_price = 1.
     params.set("max_price", String(clamped));
   }
 
@@ -674,7 +683,9 @@ export function computeGeoBucket(lat: number, lng: number): string {
  *  default within a couple of seconds at the radii we use). */
 const WALK_METRES_PER_MINUTE = 80;
 
-export function estimateWalkMinutes(distanceMetres: number | undefined): number | null {
+export function estimateWalkMinutes(
+  distanceMetres: number | undefined,
+): number | null {
   if (distanceMetres === undefined || !Number.isFinite(distanceMetres)) {
     return null;
   }
@@ -728,7 +739,9 @@ export function shapeFoursquareResult(
   emittedTags: string[],
 ): ShapedPlace | null {
   if (!result.fsq_place_id || !result.name) return null;
-  if (result.latitude === undefined || result.longitude === undefined) return null;
+  if (result.latitude === undefined || result.longitude === undefined) {
+    return null;
+  }
 
   // bug-15 â€” shape-time primary-class gate + entertainment-venue
   // backstop. Drops bars whose primary tag is `Bar` (Robert's Western
@@ -748,9 +761,9 @@ export function shapeFoursquareResult(
     dietary_tags: extractDietaryTags(result, emittedTags),
     hours: result.hours
       ? {
-          display: result.hours.display ?? null,
-          open_now: result.hours.open_now ?? null,
-        }
+        display: result.hours.display ?? null,
+        open_now: result.hours.open_now ?? null,
+      }
       : null,
     photos: (result.photos ?? []).map(photoToUrl),
     address: result.location?.formatted_address ?? null,

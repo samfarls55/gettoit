@@ -63,7 +63,7 @@ describe("q5CandidateRepository", () => {
       roomId: "room-1",
       answers: {
         q1CuisineCravings: ["mexican"],
-        q2SpendCap: "$$",
+        q2SpendCap: 2,
         q3Reputation: "popular",
         q4VibeEnergy: "social",
       },

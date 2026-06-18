@@ -1135,7 +1135,7 @@ describe("App", () => {
         currentQuestion: "q5",
         answers: {
           q1CuisineCravings: ["italian", "mexican"],
-          q2SpendCap: "$$",
+          q2SpendCap: 2,
           q3Reputation: "hiddenGem",
           q4VibeEnergy: "social",
         },
@@ -1146,7 +1146,7 @@ describe("App", () => {
       roomId: "joined-morgan-birthday",
       answers: {
         q1CuisineCravings: ["italian", "mexican"],
-        q2SpendCap: "$$",
+        q2SpendCap: 2,
         q3Reputation: "hiddenGem",
         q4VibeEnergy: "social",
       },
@@ -1179,7 +1179,7 @@ describe("App", () => {
           currentQuestion: "q5",
           answers: {
             q1CuisineCravings: ["italian"],
-            q2SpendCap: "$$",
+            q2SpendCap: 2,
             q3Reputation: "popular",
             q4VibeEnergy: "social",
           },
@@ -1200,7 +1200,7 @@ describe("App", () => {
         roomId: "active-room",
         answers: {
           q1CuisineCravings: ["italian"],
-          q2SpendCap: "$$",
+          q2SpendCap: 2,
           q3Reputation: "popular",
           q4VibeEnergy: "social",
           q5Ratings: {},
@@ -1290,7 +1290,7 @@ describe("App", () => {
           currentQuestion: "q5",
           answers: {
             q1CuisineCravings: ["ramen"],
-            q2SpendCap: "$$",
+            q2SpendCap: 2,
             q3Reputation: "hiddenGem",
             q4VibeEnergy: "cozy",
           },
@@ -1481,7 +1481,7 @@ describe("App", () => {
       currentQuestion: "q3",
       answers: {
         q1CuisineCravings: ["italian"],
-        q2SpendCap: "$$$",
+        q2SpendCap: 3,
       },
     });
 
@@ -1577,7 +1577,7 @@ describe("App", () => {
       currentQuestion: "q3",
       answers: {
         q1CuisineCravings: ["italian"],
-        q2SpendCap: "$$$",
+        q2SpendCap: 3,
       },
     });
 

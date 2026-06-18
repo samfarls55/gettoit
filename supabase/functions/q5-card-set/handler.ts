@@ -8,7 +8,7 @@ import {
 
 export type QuizAnswers = {
   q1CuisineCravings?: string[];
-  q2SpendCap?: string;
+  q2SpendCap?: number;
   q3Reputation?: string;
   q4VibeEnergy?: string;
 };

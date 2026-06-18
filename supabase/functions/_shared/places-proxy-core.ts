@@ -27,6 +27,12 @@ import {
   GOOGLE_PROVIDER_ATTRIBUTION,
   GOOGLE_PROVIDER_FIELD_MASKS,
 } from "./google-provider-runtime.ts";
+import { googlePrimaryTypesForQ1Cuisines } from "./google-cuisine-primary-types.ts";
+import {
+  type GoogleOpeningPeriod,
+  isOpenAtGoogleTargetTime,
+  normalizeGoogleTargetOpenTime,
+} from "./google-opening-hours.ts";
 export { redactGoogleObservabilityValue } from "./google-provider-runtime.ts";
 
 /** Cache record persisted under `(geo_h3, query_signature)`. */
@@ -194,6 +200,27 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const price_tier = typeof filters.price_tier === "number"
     ? filters.price_tier
     : undefined;
+  const target_open_time = normalizeGoogleTargetOpenTime(
+    filters.target_open_time,
+  ) ?? undefined;
+  const hasTargetOpenTime = Object.prototype.hasOwnProperty.call(
+    filters,
+    "target_open_time",
+  );
+  if (
+    hasTargetOpenTime &&
+    target_open_time === undefined
+  ) {
+    throw new PlacesProxyInputError(
+      "filters.target_open_time must be a Google opening-hours point " +
+        "{ day: 0..6, hour: 0..23, minute: 0..59 }",
+    );
+  }
+  if (obj.surface === "q5" && target_open_time === undefined) {
+    throw new PlacesProxyInputError(
+      "filters.target_open_time is required for q5",
+    );
+  }
   // `open_at` is Foursquare's `[1-7]THHMM` weekday + local-time token.
   // A present-but-malformed value is a client bug â€” reject it loudly
   // (400) rather than swallowing it, the same failure mode that hid the
@@ -215,6 +242,9 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const cuisine = typeof filters.cuisine === "string"
     ? filters.cuisine
     : undefined;
+  const cuisines = Array.isArray(filters.cuisines)
+    ? (filters.cuisines.filter((x) => typeof x === "string") as string[])
+    : undefined;
   const service_shape = isGoogleServiceShape(filters.service_shape)
     ? filters.service_shape
     : undefined;
@@ -222,7 +252,15 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     lat,
     lng,
     radius_meters: radius,
-    filters: { dietary, price_tier, open_at, cuisine, service_shape },
+    filters: {
+      dietary,
+      price_tier,
+      target_open_time,
+      open_at,
+      cuisine,
+      cuisines,
+      service_shape,
+    },
   };
 }
 
@@ -471,8 +509,6 @@ type GoogleNearbySearchResponse = {
 type GoogleQ5ShapeResult = {
   places: GoogleQ5Place[];
   strictCount: number;
-  timingRelaxedCandidateCount: number;
-  timingRelaxed: boolean;
 };
 
 type GooglePlaceDetailsResponse = {
@@ -487,17 +523,6 @@ interface GoogleOpeningHours {
   periods?: GoogleOpeningPeriod[];
 }
 
-interface GoogleOpeningPeriod {
-  open?: GoogleOpeningPoint;
-  close?: GoogleOpeningPoint;
-}
-
-interface GoogleOpeningPoint {
-  day?: unknown;
-  hour?: unknown;
-  minute?: unknown;
-}
-
 export async function handleGoogleQ5PlacesProxy(
   input: PlacesProxyInput,
   deps: GooglePlacesProxyDeps,
@@ -507,6 +532,12 @@ export async function handleGoogleQ5PlacesProxy(
     throw new GooglePlacesGuardrailError(
       "google_places_misconfigured",
       "GOOGLE_PLACES_API_KEY is not set",
+    );
+  }
+  if (!input.filters?.target_open_time) {
+    throw new GooglePlacesGuardrailError(
+      "google_q5_target_open_time_required",
+      "Q5 requires filters.target_open_time",
     );
   }
 
@@ -529,11 +560,9 @@ export async function handleGoogleQ5PlacesProxy(
     JSON.stringify({
       raw_count: body.places?.length ?? 0,
       strict_count: shaped.strictCount,
-      timing_relaxed_candidate_count: shaped.timingRelaxedCandidateCount,
       returned_count: shaped.places.length,
       relaxed_service_used: shaped.places.length > shaped.strictCount,
-      relaxed_timing_used: shaped.timingRelaxed,
-      has_open_at: Boolean(input.filters?.open_at),
+      has_target_open_time: Boolean(input.filters?.target_open_time),
       service_shape: input.filters?.service_shape ?? null,
       radius_meters: input.radius_meters,
     }),
@@ -657,8 +686,6 @@ function shapeGoogleQ5Places(
     return {
       places: strict,
       strictCount: strict.length,
-      timingRelaxedCandidateCount: 0,
-      timingRelaxed: false,
     };
   }
 
@@ -672,31 +699,12 @@ function shapeGoogleQ5Places(
     return {
       places: relaxedService,
       strictCount: strict.length,
-      timingRelaxedCandidateCount: 0,
-      timingRelaxed: false,
     };
   }
-
-  if (!input.filters?.open_at) {
-    return {
-      places: relaxedService,
-      strictCount: strict.length,
-      timingRelaxedCandidateCount: 0,
-      timingRelaxed: false,
-    };
-  }
-
-  const serviceOnly = collectGoogleQ5Places(
-    input,
-    body,
-    isGooglePlaceEligibleForRelaxedService,
-  );
 
   return {
-    places: mergeGoogleQ5Places(relaxedService, serviceOnly),
+    places: relaxedService,
     strictCount: strict.length,
-    timingRelaxedCandidateCount: serviceOnly.length,
-    timingRelaxed: serviceOnly.length > relaxedService.length,
   };
 }
 
@@ -726,25 +734,6 @@ function collectGoogleQ5Places(
     });
   }
   return places;
-}
-
-function mergeGoogleQ5Places(
-  primary: GoogleQ5Place[],
-  fallback: GoogleQ5Place[],
-): GoogleQ5Place[] {
-  const seenPlaceIds = new Set(primary.map((place) => place.place_id));
-  const merged = [...primary];
-
-  for (const place of fallback) {
-    if (seenPlaceIds.has(place.place_id)) {
-      continue;
-    }
-
-    seenPlaceIds.add(place.place_id);
-    merged.push(place);
-  }
-
-  return merged;
 }
 
 function isGooglePlaceEligibleForTimingAndService(
@@ -785,100 +774,23 @@ function isGooglePlaceEligibleForTimingAndRelaxedService(
   return true;
 }
 
-function isGooglePlaceEligibleForRelaxedService(
-  place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
-  input: PlacesProxyInput,
-): boolean {
-  const serviceShape = input.filters?.service_shape;
-
-  if (serviceShape === "dineIn" && place.dineIn === false) {
-    return false;
-  }
-  if (serviceShape === "takeout" && place.takeout === false) {
-    return false;
-  }
-  return true;
-}
-
 function isGooglePlaceEligibleForTiming(
   place: NonNullable<GoogleNearbySearchResponse["places"]>[number],
   input: PlacesProxyInput,
 ): boolean {
-  const openAt = input.filters?.open_at;
-
-  if (openAt) {
-    return isOpenAtGoogleRegularTime(place.regularOpeningHours, openAt);
-  }
-
-  return place.currentOpeningHours?.openNow === true ||
-    place.regularOpeningHours?.openNow === true;
-}
-
-function isOpenAtGoogleRegularTime(
-  hours: GoogleOpeningHours | undefined,
-  openAt: string,
-): boolean {
-  const target = parseOpenAtToken(openAt);
-  if (!target || !Array.isArray(hours?.periods)) return false;
-  return hours.periods.some((period) =>
-    periodContainsGoogleMinute(period, target)
+  return isOpenAtGoogleTargetTime(
+    place.regularOpeningHours?.periods,
+    input.filters?.target_open_time,
   );
-}
-
-function parseOpenAtToken(
-  openAt: string,
-): { googleDay: number; minuteOfDay: number } | null {
-  const match = /^([1-7])T([0-2][0-9])([0-5][0-9])$/.exec(openAt);
-  if (!match) return null;
-  const foursquareDay = Number(match[1]);
-  const hour = Number(match[2]);
-  const minute = Number(match[3]);
-  if (hour > 23) return null;
-  return {
-    googleDay: foursquareDay === 7 ? 0 : foursquareDay,
-    minuteOfDay: hour * 60 + minute,
-  };
-}
-
-function periodContainsGoogleMinute(
-  period: GoogleOpeningPeriod,
-  target: { googleDay: number; minuteOfDay: number },
-): boolean {
-  const open = googlePointMinuteOfWeek(period.open);
-  const close = googlePointMinuteOfWeek(period.close);
-  if (open === null || close === null) return false;
-  const targetMinute = target.googleDay * 24 * 60 + target.minuteOfDay;
-  if (close > open) {
-    return targetMinute >= open && targetMinute < close;
-  }
-  return targetMinute >= open || targetMinute < close;
-}
-
-function googlePointMinuteOfWeek(
-  point: GoogleOpeningPoint | undefined,
-): number | null {
-  if (!point) return null;
-  if (
-    typeof point.day !== "number" ||
-    typeof point.hour !== "number" ||
-    typeof point.minute !== "number" ||
-    point.day < 0 ||
-    point.day > 6 ||
-    point.hour < 0 ||
-    point.hour > 23 ||
-    point.minute < 0 ||
-    point.minute > 59
-  ) {
-    return null;
-  }
-  return point.day * 24 * 60 + point.hour * 60 + point.minute;
 }
 
 function buildGoogleQ5RequestBody(
   input: PlacesProxyInput,
 ): Record<string, unknown> {
+  const cuisines = input.filters?.cuisines ??
+    (input.filters?.cuisine ? [input.filters.cuisine] : undefined);
   return {
-    includedPrimaryTypes: ["restaurant"],
+    includedPrimaryTypes: googlePrimaryTypesForQ1Cuisines(cuisines),
     maxResultCount: GOOGLE_Q5_MAX_RESULTS,
     locationRestriction: {
       circle: {

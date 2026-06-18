@@ -9,6 +9,10 @@ import { runVerdictForRoom, type VerdictRunStore } from "./verdict-run.ts";
 
 const ROOM_ID = "11111111-1111-1111-1111-111111111111";
 const PLAN_ID = "22222222-2222-2222-2222-222222222222";
+const allWeekDinnerHours = Array.from({ length: 7 }, (_, day) => ({
+  open: { day, hour: 18, minute: 0 },
+  close: { day, hour: 22, minute: 0 },
+}));
 
 function option(id: string): RoomOptionRow {
   return {
@@ -21,6 +25,7 @@ function option(id: string): RoomOptionRow {
       total_ratings: 30,
       distance_meters: 100,
       current_open_now: true,
+      regular_opening_periods: allWeekDinnerHours,
       dine_in: true,
     },
     google_place_id: `google-${id}`,

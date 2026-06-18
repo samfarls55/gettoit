@@ -45,6 +45,10 @@ import {
   evaluateHardEligibility,
   lookupDietaryRequirement,
 } from "./hard-eligibility.ts";
+import type {
+  GoogleOpeningPeriod,
+  GoogleTargetOpenTime,
+} from "./google-opening-hours.ts";
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Public types
@@ -99,23 +103,14 @@ export interface CandidateOption {
   current_open_now?: boolean | null;
   /** Transient Google regular-hours periods. Missing is ineligible for
    *  future/recurring meal timing. */
-  regular_opening_periods?: OpeningPeriod[];
+  regular_opening_periods?: GoogleOpeningPeriod[];
   /** Transient Google service-mode facts. Dine-in requires explicit
    *  true; takeout only cuts explicit false. */
   dine_in?: boolean | null;
   takeout?: boolean | null;
 }
 
-export interface OpeningPeriod {
-  open?: OpeningPoint;
-  close?: OpeningPoint;
-}
-
-export interface OpeningPoint {
-  day?: number;
-  hour?: number;
-  minute?: number;
-}
+export type OpeningPeriod = GoogleOpeningPeriod;
 
 /** A generic, schema-driven hard veto. TB-12 profile vetoes
  *  (allergies, dietary restrictions, cuisine NEVERS) feed this channel
@@ -185,7 +180,7 @@ export interface VerdictEngineInput {
   candidates: CandidateOption[];
   votes: MemberVote[];
   /** Shared Room meal timing Parameter. Absent means immediate/current. */
-  meal_timing?: { open_at?: string | null };
+  meal_timing?: { target_open_time?: GoogleTargetOpenTime | null };
   /** Shared Room service-mode Parameter. */
   service_shape?: "dineIn" | "takeout" | null;
   /** Optional caller-supplied method; defaults to `manual`. The
@@ -407,7 +402,7 @@ interface EbaResult {
 }
 
 interface RoomEligibility {
-  mealTiming?: { open_at?: string | null };
+  mealTiming?: { target_open_time?: GoogleTargetOpenTime | null };
   serviceShape?: "dineIn" | "takeout" | null;
   radiusMeters?: number | null;
 }

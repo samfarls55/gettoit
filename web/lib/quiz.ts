@@ -54,10 +54,10 @@ export const CUISINE_OPTIONS: Array<{ id: string; label: string }> = [
 
 /** Q2 budget tiers — 1=$, 2=$$, 3=$$$, 4=$$$$. */
 export const BUDGET_TIERS: Array<{ tier: 1 | 2 | 3 | 4; label: string; sub: string }> = [
-  { tier: 1, label: "$", sub: "Under $15" },
-  { tier: 2, label: "$$", sub: "$15 – $30" },
-  { tier: 3, label: "$$$", sub: "$30 – $60" },
-  { tier: 4, label: "$$$$", sub: "No cap" },
+  { tier: 1, label: "$", sub: "Inexpensive" },
+  { tier: 2, label: "$$", sub: "Moderate" },
+  { tier: 3, label: "$$$", sub: "Expensive" },
+  { tier: 4, label: "$$$$", sub: "Very expensive" },
 ];
 
 // ───────────────────────────────────────────────────────────────────────

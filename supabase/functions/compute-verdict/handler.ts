@@ -98,7 +98,14 @@ export interface ComputeVerdictDataAdapter {
    *  one-way-or-the-other. */
   fetchRoom(
     room_id: string,
-  ): Promise<{ id: string; plan_id?: string | null } | null>;
+  ): Promise<
+    {
+      id: string;
+      plan_id?: string | null;
+      session_params?: Record<string, unknown> | null;
+      location_tz?: string | null;
+    } | null
+  >;
   /** Current active member user IDs for the room. Exited members have
    *  no `members` row and must not contribute fetches, votes, profile
    *  vetoes, budgets, or preference signals to the verdict. Optional

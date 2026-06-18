@@ -113,12 +113,19 @@ function withEligibleGoogleMetadata(row: RoomOptionRow): RoomOptionRow {
     payload: {
       rating: 4.2,
       user_rating_count: 30,
+      regular_opening_periods: allWeekDinnerHours,
+      dine_in: true,
       ...row.payload,
     },
   };
 }
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
+
+const allWeekDinnerHours = Array.from({ length: 7 }, (_, day) => ({
+  open: { day, hour: 18, minute: 0 },
+  close: { day, hour: 22, minute: 0 },
+}));
 
 function authedPost(body: unknown): Request {
   return new Request("https://example/compute-verdict", {
@@ -678,8 +685,22 @@ Deno.test("compute-verdict â€” TB-08: exited members do not contribute vote
   const { adapter } = memoryAdapter({
     activeMemberIds: ["u1"],
     options: [
-      { id: "opt-taco", payload: { name: "Taco Stand", price_tier: 2, categories: ["Taco Stand"] } },
-      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 3, categories: ["Sushi Restaurant"] } },
+      {
+        id: "opt-taco",
+        payload: {
+          name: "Taco Stand",
+          price_tier: 2,
+          categories: ["Taco Stand"],
+        },
+      },
+      {
+        id: "opt-sushi",
+        payload: {
+          name: "Sushi Bar",
+          price_tier: 3,
+          categories: ["Sushi Restaurant"],
+        },
+      },
     ],
     votes: [
       {
@@ -722,8 +743,22 @@ Deno.test("compute-verdict â€” TB-08: manual close ignores active members w
   const { adapter } = memoryAdapter({
     activeMemberIds: ["u1", "u2"],
     options: [
-      { id: "opt-taco", payload: { name: "Taco Stand", price_tier: 2, categories: ["Taco Stand"] } },
-      { id: "opt-sushi", payload: { name: "Sushi Bar", price_tier: 2, categories: ["Sushi Restaurant"] } },
+      {
+        id: "opt-taco",
+        payload: {
+          name: "Taco Stand",
+          price_tier: 2,
+          categories: ["Taco Stand"],
+        },
+      },
+      {
+        id: "opt-sushi",
+        payload: {
+          name: "Sushi Bar",
+          price_tier: 2,
+          categories: ["Sushi Restaurant"],
+        },
+      },
     ],
     votes: [
       {

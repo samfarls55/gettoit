@@ -5,6 +5,20 @@ import {
   type HardEligibilityVote,
 } from "./hard-eligibility.ts";
 
+const dinnerTarget = { day: 3, hour: 19, minute: 0 } as const;
+const dinnerHours = [
+  {
+    open: { day: 3, hour: 18, minute: 0 },
+    close: { day: 3, hour: 22, minute: 0 },
+  },
+];
+const breakfastHours = [
+  {
+    open: { day: 3, hour: 7, minute: 0 },
+    close: { day: 3, hour: 14, minute: 0 },
+  },
+];
+
 const baseCandidate: HardEligibilityCandidate = {
   id: "eligible",
   google_place_id: "google-eligible",
@@ -15,6 +29,7 @@ const baseCandidate: HardEligibilityCandidate = {
   rating: 4.2,
   user_rating_count: 30,
   current_open_now: true,
+  regular_opening_periods: dinnerHours,
   dine_in: true,
 };
 
@@ -44,7 +59,7 @@ Deno.test("TB-32: shared hard eligibility emits stable cut reasons", () => {
     },
     {
       name: "hours",
-      candidate: { ...baseCandidate, current_open_now: false },
+      candidate: { ...baseCandidate, regular_opening_periods: breakfastHours },
       reason: "availability",
     },
     {
@@ -86,6 +101,7 @@ Deno.test("TB-32: shared hard eligibility emits stable cut reasons", () => {
       votes: testCase.votes ?? baseVotes,
       room: {
         radius_meters: testCase.radiusMeters ?? null,
+        meal_timing: { target_open_time: dinnerTarget },
         service_shape: "dineIn",
       },
     });
@@ -101,7 +117,11 @@ Deno.test("TB-32: Vibe and Verdict callers can share one hard eligibility decisi
   const result = evaluateHardEligibility({
     candidate: { ...baseCandidate, id: "shared" },
     votes: baseVotes,
-    room: { radius_meters: 200, service_shape: "dineIn" },
+    room: {
+      radius_meters: 200,
+      meal_timing: { target_open_time: dinnerTarget },
+      service_shape: "dineIn",
+    },
   });
 
   assertEquals(result, { eligible: true });

@@ -36,7 +36,7 @@ describe("packQuizProgress", () => {
       reputation: "hidden_gem",
       vibe: 4,
       q1CuisineCravings: ["italian", "thai"],
-      q2SpendCap: "$$",
+      q2SpendCap: 2,
       q3Reputation: "hidden_gem",
       q4VibeEnergy: "rowdy",
     });

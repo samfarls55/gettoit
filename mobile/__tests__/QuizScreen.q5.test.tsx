@@ -12,7 +12,7 @@ function makeProgressRepository(): QuizProgressRepository {
       currentQuestion: "q4" as const,
       answers: {
         q1CuisineCravings: ["mexican"],
-        q2SpendCap: "$$",
+        q2SpendCap: 2,
         q3Reputation: "popular",
       },
     })),
@@ -131,7 +131,7 @@ describe("QuizScreen Q5", () => {
         roomId: "room-q5",
         answers: {
           q1CuisineCravings: ["mexican"],
-          q2SpendCap: "$$",
+          q2SpendCap: 2,
           q3Reputation: "popular",
           q4VibeEnergy: "social",
         },
@@ -208,7 +208,7 @@ describe("QuizScreen Q5", () => {
         roomId: "room-q5",
         answers: {
           q1CuisineCravings: ["mexican"],
-          q2SpendCap: "$$",
+          q2SpendCap: 2,
           q3Reputation: "popular",
           q4VibeEnergy: "social",
           q5Ratings: {

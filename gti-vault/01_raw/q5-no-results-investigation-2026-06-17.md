@@ -57,6 +57,14 @@ No `mexican` venue exists in the generated pool, so Q5 returns `null` and the UI
 - Edge Google Q5 shaping now has a last-resort timing relaxation when strict meal timing leaves fewer than three service-compatible places.
 - Added mobile and edge regression tests for the multi-cuisine and timing-relaxation failure modes.
 
+## Applied 2026-06-18
+
+- Kept Google Nearby Search as the provider path instead of switching Q5/verdict to Text Search.
+- Added a shared Q1 cuisine-to-Google primary type map and changed Google Q5 from broad `includedPrimaryTypes: ["restaurant"]` to the selected Q1 cuisine type union.
+- Changed final verdict Google fetch to use the active members' selected Q1 cuisines from vote preference inputs. If nobody selected a cuisine, it falls back to the bounded union of all Q1 cuisine mappings instead of generic `restaurant`.
+- Added edge tests for selected cuisine mapping, no-preference fallback, Q5 outbound request bodies, and production verdict wiring.
+- Aligned Q2 spend cap with Google's price-level model: UI/progress/backend now treat `$`, `$$`, `$$$`, and `$$$$` as numeric tiers `1`, `2`, `3`, and `4` instead of app-created dollar thresholds. Legacy saved dollar-string progress still decodes to the matching numeric tier.
+
 ## Submit RLS follow-up
 
 After Q5 options appeared, browser submit failed with:

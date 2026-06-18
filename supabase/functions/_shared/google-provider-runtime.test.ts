@@ -35,12 +35,12 @@ Deno.test("TB-30: Google provider runtime builds Q5 and verdict requests from on
   const q5 = buildGoogleProviderNearbySearchRequest({
     apiKey: "google-secret",
     fieldMask: "q5_fetch",
-    body: { includedPrimaryTypes: ["restaurant"], maxResultCount: 20 },
+    body: { includedPrimaryTypes: ["mexican_restaurant"], maxResultCount: 20 },
   });
   const verdict = buildGoogleProviderNearbySearchRequest({
     apiKey: "google-secret",
     fieldMask: "verdict_scoring",
-    body: { includedPrimaryTypes: ["restaurant"], maxResultCount: 20 },
+    body: { includedPrimaryTypes: ["mexican_restaurant"], maxResultCount: 20 },
   });
   const display = buildGoogleProviderPlaceDetailsRequest({
     apiKey: "google-secret",

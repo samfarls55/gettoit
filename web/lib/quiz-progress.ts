@@ -64,7 +64,7 @@ export type QuizProgressPayload = {
     reputation: string;
     vibe: number;
     q1CuisineCravings: string[];
-    q2SpendCap: string;
+    q2SpendCap: number;
     q3Reputation: string;
     q4VibeEnergy: string;
   };
@@ -94,7 +94,7 @@ export function packQuizProgress(
       q1CuisineCravings: state.noPreference
         ? ["noPreference"]
         : [...state.cuisines],
-      q2SpendCap: "$".repeat(state.budget),
+      q2SpendCap: state.budget,
       q3Reputation: state.reputation,
       q4VibeEnergy: VIBE_ANSWER_BY_INDEX[state.vibe] ?? "social",
     },

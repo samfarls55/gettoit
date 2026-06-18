@@ -29,6 +29,14 @@ import {
 } from "../_shared/verdict-engine.ts";
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
+const allWeekDinnerHours = Array.from({ length: 7 }, (_, day) => ({
+  open: { day, hour: 18, minute: 0 },
+  close: { day, hour: 22, minute: 0 },
+}));
+const allWeekBreakfastHours = Array.from({ length: 7 }, (_, day) => ({
+  open: { day, hour: 7, minute: 0 },
+  close: { day, hour: 14, minute: 0 },
+}));
 
 function authedPost(body: unknown): Request {
   return new Request("https://example/compute-verdict", {
@@ -63,6 +71,7 @@ function googleCandidate(
       categories: ["Restaurant"],
       distance_meters: 500,
       current_open_now: true,
+      regular_opening_periods: allWeekDinnerHours,
       dine_in: true,
       ...payload,
     },
@@ -150,7 +159,10 @@ function adapterForGoogleVerdictFetch(
       for (const row of rows) {
         insertedOptions.push(row);
         const googlePlaceId = row.google_place_id;
-        assert(googlePlaceId, "current Google path must persist google_place_id");
+        assert(
+          googlePlaceId,
+          "current Google path must persist google_place_id",
+        );
         assertEquals(
           row.fsq_place_id,
           undefined,
@@ -282,6 +294,27 @@ Deno.test("TB-10: Google final verdict fetch dedupes, scores, and persists deter
   );
 });
 
+Deno.test("Google final verdict treats planned open hours as a hard constraint", async () => {
+  const state = adapterForGoogleVerdictFetch([
+    googleCandidate("google-a", {
+      current_open_now: true,
+      regular_opening_periods: allWeekBreakfastHours,
+    }),
+    googleCandidate("google-b", {
+      current_open_now: false,
+      regular_opening_periods: allWeekDinnerHours,
+    }),
+  ], [vote({ option_a: 5, option_b: 4 })]);
+
+  const res = await handleRequest(
+    authedPost({ room_id: VALID_ROOM_ID }),
+    { env: envOk(), buildDataAdapter: () => state.adapter },
+  );
+
+  assertEquals(res.status, 200);
+  assertEquals(state.insertedVerdicts[0].winner_google_place_id, "google-b");
+});
+
 Deno.test("TB-31: empty current Google verdict fetch does not fall back to member_fetches", async () => {
   const state = adapterForGoogleVerdictFetch([]);
 
@@ -408,6 +441,25 @@ Deno.test("TB-04: Google verdict masks keep summaries internal to enabled scorin
   assertStringIncludes(indexSource, "googleVerdictFieldMaskName(env)");
 });
 
+Deno.test("Google final verdict fetch narrows by Q1 cuisine primary types", () => {
+  const source = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
+  const fetchStart = source.indexOf("async fetchGoogleVerdictCandidates");
+  assert(fetchStart >= 0, "fetchGoogleVerdictCandidates must exist");
+  const fetchEnd = source.indexOf("async fetchActiveMemberIds", fetchStart);
+  assert(fetchEnd > fetchStart, "fetchActiveMemberIds must follow fetch");
+  const fetchSource = source.slice(fetchStart, fetchEnd);
+
+  assertStringIncludes(fetchSource, "googlePrimaryTypesForQ1Cuisines");
+  assertStringIncludes(
+    fetchSource,
+    "googleVerdictCuisinesFromContext(context)",
+  );
+  assertEquals(
+    fetchSource.includes('includedPrimaryTypes: ["restaurant"]'),
+    false,
+  );
+});
+
 Deno.test("TB-09: production Vibe Fit uses canonical embeddings flag and no fake embeddings", () => {
   const source = Deno.readTextFileSync(new URL("./index.ts", import.meta.url));
 
@@ -515,6 +567,8 @@ Deno.test("TB-04: Vibe Fit candidates are built only after hard eligibility cuts
       dietary_tags: ["vegan_friendly"],
       distance_meters: 100,
       current_open_now: true,
+      regular_opening_periods: allWeekDinnerHours,
+      dine_in: true,
     },
     vibe_fit_candidate: buildVibeFitCandidate({
       candidateId: "google-eligible",
@@ -559,6 +613,8 @@ Deno.test("TB-04: Vibe Fit candidates are built only after hard eligibility cuts
   const candidates = buildEligibleVibeFitCandidatesForVerdict({
     optionRows: [eligible, overBudget, lowCrowdFloor, cuisineNever],
     radiusMeters: 200,
+    mealTiming: { target_open_time: { day: 3, hour: 19, minute: 0 } },
+    serviceShape: "dineIn",
     votes: [{
       q1_vetoes: ["vegan"],
       q2_budget: 2,
@@ -575,6 +631,8 @@ Deno.test("TB-04: Vibe Fit candidates are built only after hard eligibility cuts
       optionRowToCandidate,
     ),
     radius_meters: 200,
+    meal_timing: { target_open_time: { day: 3, hour: 19, minute: 0 } },
+    service_shape: "dineIn",
     votes: [{
       user_id: "u1",
       display_name: "u1",

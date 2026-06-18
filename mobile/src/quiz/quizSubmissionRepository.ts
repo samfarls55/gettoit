@@ -113,8 +113,18 @@ function selectedCuisines(answers: QuizAnswers): string[] {
     .sort();
 }
 
+function priceTier(value: unknown): number | undefined {
+  const tier = typeof value === "number" && Number.isFinite(value)
+    ? Math.round(value)
+    : typeof value === "string"
+      ? value.length
+      : undefined;
+
+  return tier !== undefined && tier >= 1 && tier <= 4 ? tier : undefined;
+}
+
 function budgetTier(answers: QuizAnswers): number {
-  const tier = answers.q2SpendCap?.length;
+  const tier = priceTier(answers.q2SpendCap);
   return tier && tier >= 1 && tier <= 4 ? tier : 2;
 }
 

@@ -40,6 +40,7 @@ import {
   GOOGLE_PROVIDER_FIELD_MASKS,
   type GoogleProviderNearbyFieldMaskName,
 } from "../_shared/google-provider-runtime.ts";
+import { googlePrimaryTypesForQ1Cuisines } from "../_shared/google-cuisine-primary-types.ts";
 // tb-WF-11 â€” resolves each member's name from the joined
 // `members.display_name`, falling back to the `m<uuid>` placeholder.
 import { resolveMemberDisplayName } from "./member-display-name.ts";
@@ -79,7 +80,7 @@ function buildSupabaseAdapter(
       // S01-created rooms); the handler treats a NULL as "no Plan."
       const { data, error } = await client
         .from("rooms")
-        .select("id, plan_id, session_params")
+        .select("id, plan_id, session_params, location_tz")
         .eq("id", room_id)
         .maybeSingle();
       if (error) {
@@ -90,6 +91,7 @@ function buildSupabaseAdapter(
         id: string;
         plan_id: string | null;
         session_params: Record<string, unknown> | null;
+        location_tz: string | null;
       } | null;
     },
     async fetchOptions(room_id): Promise<RoomOptionRow[]> {
@@ -105,6 +107,7 @@ function buildSupabaseAdapter(
     },
     async fetchGoogleVerdictCandidates(
       room_id,
+      context,
     ): Promise<GoogleVerdictCandidateRow[]> {
       const googleApiKey = env.GOOGLE_PLACES_API_KEY ?? "";
       if (!googleApiKey) {
@@ -144,7 +147,9 @@ function buildSupabaseAdapter(
         apiKey: googleApiKey,
         fieldMask: googleVerdictFieldMaskName(env),
         body: {
-          includedPrimaryTypes: ["restaurant"],
+          includedPrimaryTypes: googlePrimaryTypesForQ1Cuisines(
+            googleVerdictCuisinesFromContext(context),
+          ),
           maxResultCount: 20,
           locationRestriction: {
             circle: {
@@ -589,6 +594,25 @@ function googleVerdictFieldMaskName(
   env: ComputeVerdictEnv,
 ): GoogleVerdictFieldMaskName {
   return isVibeFitEnabled(env) ? "verdict_scoring" : "verdict_fetch";
+}
+
+function googleVerdictCuisinesFromContext(context: {
+  active_member_ids: string[];
+  votes: MemberVoteRow[];
+}): string[] | undefined {
+  const activeMemberIds = new Set(context.active_member_ids);
+  const cuisines = new Set<string>();
+
+  for (const vote of context.votes) {
+    if (!activeMemberIds.has(vote.user_id)) {
+      continue;
+    }
+    for (const cuisine of vote.preference_inputs?.member.cuisines ?? []) {
+      cuisines.add(cuisine);
+    }
+  }
+
+  return cuisines.size > 0 ? [...cuisines] : undefined;
 }
 
 function shapeGoogleVerdictCandidates(

@@ -1,3 +1,9 @@
+import {
+  type GoogleOpeningPeriod,
+  type GoogleTargetOpenTime,
+  isOpenAtGoogleTargetTime,
+} from "./google-opening-hours.ts";
+
 export interface HardEligibilityCandidate {
   id: string;
   google_place_id?: string;
@@ -9,20 +15,9 @@ export interface HardEligibilityCandidate {
   total_ratings?: number | null;
   user_rating_count?: number | null;
   current_open_now?: boolean | null;
-  regular_opening_periods?: OpeningPeriod[];
+  regular_opening_periods?: GoogleOpeningPeriod[];
   dine_in?: boolean | null;
   takeout?: boolean | null;
-}
-
-export interface OpeningPeriod {
-  open?: OpeningPoint;
-  close?: OpeningPoint;
-}
-
-export interface OpeningPoint {
-  day?: number;
-  hour?: number;
-  minute?: number;
 }
 
 export interface HardVeto {
@@ -37,7 +32,7 @@ export interface HardEligibilityVote {
 }
 
 export interface HardEligibilityRoom {
-  meal_timing?: { open_at?: string | null };
+  meal_timing?: { target_open_time?: GoogleTargetOpenTime | null };
   service_shape?: "dineIn" | "takeout" | null;
   radius_meters?: number | null;
 }
@@ -275,9 +270,12 @@ function passesAvailability(
   room: HardEligibilityRoom,
   googleCandidate: boolean,
 ): boolean {
-  const openAt = room.meal_timing?.open_at ?? null;
-  if (openAt) {
-    return isOpenAtRegularTime(candidate.regular_opening_periods, openAt) &&
+  const targetOpenTime = room.meal_timing?.target_open_time ?? null;
+  if (targetOpenTime) {
+    return isOpenAtGoogleTargetTime(
+      candidate.regular_opening_periods,
+      targetOpenTime,
+    ) &&
       passesServiceMode(candidate, room.service_shape);
   }
 
@@ -285,7 +283,7 @@ function passesAvailability(
     room.service_shape === "dineIn" ||
     room.service_shape === "takeout" ||
     !!room.meal_timing;
-  if (shouldCheckCurrentHours && candidate.current_open_now !== true) {
+  if (shouldCheckCurrentHours) {
     return false;
   }
 
@@ -303,60 +301,4 @@ function passesServiceMode(
     return false;
   }
   return true;
-}
-
-function isOpenAtRegularTime(
-  periods: OpeningPeriod[] | undefined,
-  openAt: string,
-): boolean {
-  const target = parseOpenAtToken(openAt);
-  if (!target || !Array.isArray(periods)) return false;
-  return periods.some((period) => periodContainsMinute(period, target));
-}
-
-function parseOpenAtToken(
-  openAt: string,
-): { googleDay: number; minuteOfDay: number } | null {
-  const match = /^([1-7])T([0-2][0-9])([0-5][0-9])$/.exec(openAt);
-  if (!match) return null;
-  const foursquareDay = Number(match[1]);
-  const hour = Number(match[2]);
-  const minute = Number(match[3]);
-  if (hour > 23) return null;
-  return {
-    googleDay: foursquareDay === 7 ? 0 : foursquareDay,
-    minuteOfDay: hour * 60 + minute,
-  };
-}
-
-function periodContainsMinute(
-  period: OpeningPeriod,
-  target: { googleDay: number; minuteOfDay: number },
-): boolean {
-  const open = pointMinuteOfWeek(period.open);
-  const close = pointMinuteOfWeek(period.close);
-  if (open === null || close === null) return false;
-  const targetMinute = target.googleDay * 24 * 60 + target.minuteOfDay;
-  if (close > open) {
-    return targetMinute >= open && targetMinute < close;
-  }
-  return targetMinute >= open || targetMinute < close;
-}
-
-function pointMinuteOfWeek(point: OpeningPoint | undefined): number | null {
-  if (
-    !point ||
-    typeof point.day !== "number" ||
-    typeof point.hour !== "number" ||
-    typeof point.minute !== "number" ||
-    point.day < 0 ||
-    point.day > 6 ||
-    point.hour < 0 ||
-    point.hour > 23 ||
-    point.minute < 0 ||
-    point.minute > 59
-  ) {
-    return null;
-  }
-  return point.day * 24 * 60 + point.hour * 60 + point.minute;
 }

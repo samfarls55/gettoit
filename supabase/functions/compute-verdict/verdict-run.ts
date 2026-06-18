@@ -28,6 +28,10 @@ import {
   type VibeFitCandidate,
   type VibeFitSignal,
 } from "../_shared/vibe-fit.ts";
+import {
+  type GoogleTargetOpenTime,
+  googleTargetOpenTimeForMealTime,
+} from "../_shared/google-opening-hours.ts";
 import type {
   ComputeVerdictDataAdapter,
   ComputeVerdictEnv,
@@ -55,13 +59,25 @@ export interface PersistVerdictRunOutput {
   cuts: VerdictEngineOutput["cuts"];
 }
 
+type RoomEligibilityInput = {
+  mealTiming: { target_open_time: GoogleTargetOpenTime };
+  serviceShape: "dineIn" | "takeout";
+};
+
 export interface VerdictRunStore {
   loadRerollState(roomId: string): Promise<RoomRerollState | null>;
   readExistingVerdict(roomId: string): Promise<VerdictRow | null>;
   deleteVerdictForRoom(roomId: string): Promise<void>;
   loadRoom(
     roomId: string,
-  ): Promise<{ id: string; plan_id?: string | null } | null>;
+  ): Promise<
+    {
+      id: string;
+      plan_id?: string | null;
+      session_params?: Record<string, unknown> | null;
+      location_tz?: string | null;
+    } | null
+  >;
   loadActiveMemberIds(roomId: string): Promise<string[] | null>;
   loadVotes(roomId: string): Promise<MemberVoteRow[]>;
   loadCandidatePool(
@@ -94,6 +110,31 @@ export type VerdictRunResult =
     radius_meters_used: VerdictEngineOutput["radius_meters_used"];
     relax_chain_applied: VerdictEngineOutput["relax_chain_applied"];
   };
+
+function roomEligibilityFromRoom(room: {
+  session_params?: Record<string, unknown> | null;
+  location_tz?: string | null;
+}): RoomEligibilityInput {
+  const sessionParams = room.session_params ?? {};
+  const mealTime = typeof sessionParams.meal_time === "string"
+    ? sessionParams.meal_time
+    : "dinner";
+  const rawServiceShape = typeof sessionParams.service_shape === "string"
+    ? sessionParams.service_shape
+    : "dineIn";
+
+  return {
+    mealTiming: {
+      target_open_time: googleTargetOpenTimeForMealTime(mealTime, {
+        timeZone: room.location_tz ?? null,
+      }),
+    },
+    serviceShape: rawServiceShape === "takeout" ||
+        rawServiceShape === "delivery"
+      ? "takeout"
+      : "dineIn",
+  };
+}
 
 export function createVerdictRunStore(
   data: ComputeVerdictDataAdapter,
@@ -253,6 +294,7 @@ export async function runVerdictForRoom(input: {
 
   const room = await store.loadRoom(roomId);
   if (!room) return { kind: "room_not_found" };
+  const roomEligibility = roomEligibilityFromRoom(room);
 
   const activeMemberIds = await store.loadActiveMemberIds(roomId);
   const activeMemberIdSet = activeMemberIds ? new Set(activeMemberIds) : null;
@@ -290,6 +332,8 @@ export async function runVerdictForRoom(input: {
         optionRows,
         votes: effectiveVoteInputs,
         radiusMeters: startingRadius,
+        mealTiming: roomEligibility.mealTiming,
+        serviceShape: roomEligibility.serviceShape,
       }),
       input.env,
       input.vibeEmbeddingFetch,
@@ -346,6 +390,8 @@ export async function runVerdictForRoom(input: {
       candidates,
       votes,
       method,
+      meal_timing: roomEligibility.mealTiming,
+      service_shape: roomEligibility.serviceShape,
       radius_meters: startingRadius ?? undefined,
       excluded_option_ids: rerollState?.excluded_option_ids,
       reroll_reason: rerollState?.last_reroll_reason ?? undefined,
@@ -535,7 +581,7 @@ export function buildEligibleVibeFitCandidatesForVerdict(input: {
   optionRows: readonly RoomOptionRow[];
   votes: readonly HardEligibilityVote[];
   radiusMeters: number | null;
-  mealTiming?: { open_at?: string | null };
+  mealTiming?: { target_open_time?: GoogleTargetOpenTime | null };
   serviceShape?: "dineIn" | "takeout" | null;
 }): VibeFitCandidate[] {
   const eligibleCandidates: VibeFitCandidate[] = [];

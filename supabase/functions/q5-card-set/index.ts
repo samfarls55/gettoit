@@ -10,6 +10,7 @@ import type {
   Q5CardSetPoolCandidate,
   Q5MemberProbeProfile,
 } from "../_shared/q5-card-set.ts";
+import { googleTargetOpenTimeForMealTime } from "../_shared/google-opening-hours.ts";
 import {
   handleRequest,
   type Q5CardSetDataAdapter,
@@ -28,6 +29,7 @@ type RoomRow = {
   plan_id?: unknown;
   location_lat?: unknown;
   location_lng?: unknown;
+  location_tz?: unknown;
   radius_meters?: unknown;
   session_params?: Record<string, unknown> | null;
 };
@@ -42,12 +44,6 @@ type MemberRow = {
 const defaultSearchRadiusMeters = 3219;
 const defaultMealTime = "dinner";
 const defaultServiceShape = "dineIn";
-const openAtHourByMealTime: Record<string, number> = {
-  breakfast: 9,
-  lunch: 12,
-  dinner: 19,
-  lateNight: 22,
-};
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
   return new Response(JSON.stringify(body), {
@@ -82,15 +78,14 @@ function firstString(...values: unknown[]): string | undefined {
   return values.find((value): value is string => typeof value === "string");
 }
 
-function spendCapFromProgress(value: unknown): string | undefined {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return undefined;
-  }
-  const tier = Math.max(1, Math.min(4, Math.round(value)));
-  return "$".repeat(tier);
+function priceTierFromProgress(value: unknown): number | undefined {
+  const tier = typeof value === "number" && Number.isFinite(value)
+    ? Math.round(value)
+    : typeof value === "string"
+    ? value.length
+    : undefined;
+
+  return tier !== undefined && tier >= 1 && tier <= 4 ? tier : undefined;
 }
 
 function vibeEnergyFromProgress(value: unknown): string | undefined {
@@ -115,7 +110,7 @@ function answersFromProgress(
   const stored = answers as Record<string, unknown>;
   const q1CuisineCravings = stringArray(stored.q1CuisineCravings) ??
     stringArray(stored.cuisines);
-  const q2SpendCap = spendCapFromProgress(
+  const q2SpendCap = priceTierFromProgress(
     stored.q2SpendCap ?? stored.budget,
   );
   const q3Reputation = firstString(stored.q3Reputation, stored.reputation);
@@ -137,15 +132,6 @@ function roomFromMemberRow(row: MemberRow): RoomRow | null {
   return row.rooms ?? null;
 }
 
-function openAtToken(mealTime: string): string {
-  const today = new Date();
-  const day = today.getDay() === 0 ? 7 : today.getDay();
-  const hour = String(
-    openAtHourByMealTime[mealTime] ?? openAtHourByMealTime[defaultMealTime],
-  ).padStart(2, "0");
-  return `${day}T${hour}00`;
-}
-
 function placesProxyRequestFromRoom(
   room: RoomRow,
   answers: QuizAnswers,
@@ -163,19 +149,25 @@ function placesProxyRequestFromRoom(
   const serviceShape = typeof sessionParams.service_shape === "string"
     ? sessionParams.service_shape
     : defaultServiceShape;
-  const cuisine = answers.q1CuisineCravings?.find((entry) =>
+  const locationTimeZone = typeof room.location_tz === "string"
+    ? room.location_tz
+    : null;
+  const cuisines = (answers.q1CuisineCravings ?? []).filter((entry) =>
     entry !== "noPreference"
   );
-  const priceTier = answers.q2SpendCap?.length;
+  const priceTier = answers.q2SpendCap;
   const filters: Record<string, unknown> = {
-    open_at: openAtToken(mealTime),
+    target_open_time: googleTargetOpenTimeForMealTime(mealTime, {
+      timeZone: locationTimeZone,
+    }),
     service_shape: serviceShape === "takeout" || serviceShape === "delivery"
       ? "takeout"
       : "dineIn",
   };
 
-  if (cuisine) {
-    filters.cuisine = cuisine;
+  if (cuisines.length > 0) {
+    filters.cuisine = cuisines[0];
+    filters.cuisines = cuisines;
   }
   if (priceTier && priceTier >= 1 && priceTier <= 4) {
     filters.price_tier = priceTier;
@@ -270,7 +262,7 @@ function buildDataAdapter(
       const { data, error } = await client
         .from("members")
         .select(
-          "room_id, user_id, quiz_progress, rooms!inner(id, plan_id, location_lat, location_lng, radius_meters, session_params)",
+          "room_id, user_id, quiz_progress, rooms!inner(id, plan_id, location_lat, location_lng, location_tz, radius_meters, session_params)",
         )
         .eq("room_id", roomId)
         .eq("user_id", userId)

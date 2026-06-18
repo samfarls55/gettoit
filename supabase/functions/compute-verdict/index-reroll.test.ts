@@ -111,12 +111,19 @@ function withEligibleGoogleMetadata(row: RoomOptionRow): RoomOptionRow {
     payload: {
       rating: 4.2,
       user_rating_count: 30,
+      regular_opening_periods: allWeekDinnerHours,
+      dine_in: true,
       ...row.payload,
     },
   };
 }
 
 const VALID_ROOM_ID = "11111111-1111-1111-1111-111111111111";
+
+const allWeekDinnerHours = Array.from({ length: 7 }, (_, day) => ({
+  open: { day, hour: 18, minute: 0 },
+  close: { day, hour: 22, minute: 0 },
+}));
 
 function authedPost(body: unknown): Request {
   return new Request("https://example/compute-verdict", {
