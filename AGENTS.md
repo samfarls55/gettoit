@@ -6,7 +6,7 @@ Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-s
 
 ## Voice
 
-Default voice should be `/caveman full`.
+Default voice should be `/ponytail full`.
 
 ## 1. Think Before Coding
 
