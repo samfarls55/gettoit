@@ -325,12 +325,10 @@ jobs:
     # Edge Function source; the `supabase-db` lane only pushes
     # migrations. Nothing ever ran `supabase functions deploy`, so
     # `places-proxy` (and the other functions) stayed dark on the live
-    # project — every quiz session fell through to the on-device MapKit
-    # fallback because the proxy never reached Foursquare.
+    # project.
     #
     # This lane deploys the functions and pushes their server-side
-    # secrets after the migration push, so the `places` cache table the
-    # `places-proxy` handler upserts into already exists.
+    # secrets after the migration push.
     #
     # push-to-main only: deploying on a PR would race the supabase-db
     # push and could ship a function ahead of the migration it depends
@@ -345,7 +343,6 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      FOURSQUARE_API_KEY: ${{ secrets.FOURSQUARE_API_KEY }}
       GOOGLE_PLACES_API_KEY: ${{ secrets.GOOGLE_PLACES_API_KEY }}
       VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
       VIBE_EMBEDDINGS_ENABLED: ${{ secrets.VIBE_EMBEDDINGS_ENABLED }}
@@ -374,18 +371,15 @@ jobs:
         with:
           version: v2.105.0
       - name: supabase secrets set (Edge Function runtime secrets)
-        # The places-proxy handler reads FOURSQUARE_API_KEY from the
+        # The places-proxy handler reads GOOGLE_PLACES_API_KEY from the
         # function runtime environment; a missing key makes it return
-        # `places_proxy_misconfigured`. SUPABASE_URL and
-        # SUPABASE_SERVICE_ROLE_KEY are injected automatically by the
-        # Supabase platform on every function — they do not need to be
-        # set here. We push the Foursquare key before the deploy so the
-        # function is live and configured in one CI run.
+        # `google_places_misconfigured`. We push the Google key before
+        # the deploy so the function is live and configured in one CI run.
         #
         # tb-WF-13 / tb-WF-14 — CLAIM_CODE_ENC_KEY (the AES-GCM key the
         # mint-claim-code function encrypts the web refresh token under
         # and the redeem-claim-code function decrypts it with) is pushed
-        # here too WHEN PRESENT. Unlike FOURSQUARE_API_KEY a missing
+        # here too WHEN PRESENT. Unlike GOOGLE_PLACES_API_KEY a missing
         # CLAIM_CODE_ENC_KEY does not fail the lane — it is a new secret;
         # both functions still deploy and return
         # `mint_claim_code_misconfigured` / `redeem_claim_code_misconfigured`
@@ -394,23 +388,14 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          if [ -z "${FOURSQUARE_API_KEY:-}" ]; then
-            echo "FOURSQUARE_API_KEY secret is not set — places-proxy would" >&2
-            echo "return places_proxy_misconfigured. Set the repo secret." >&2
+          if [ -z "${GOOGLE_PLACES_API_KEY:-}" ]; then
+            echo "GOOGLE_PLACES_API_KEY secret is not set — places-proxy would" >&2
+            echo "return google_places_misconfigured. Set the repo secret." >&2
             exit 1
           fi
           supabase secrets set \
             --project-ref "$SUPABASE_PROJECT_REF" \
-            FOURSQUARE_API_KEY="$FOURSQUARE_API_KEY"
-          if [ -n "${GOOGLE_PLACES_API_KEY:-}" ]; then
-            supabase secrets set \
-              --project-ref "$SUPABASE_PROJECT_REF" \
-              GOOGLE_PLACES_API_KEY="$GOOGLE_PLACES_API_KEY"
-          else
-            echo "GOOGLE_PLACES_API_KEY repo secret is not set -" >&2
-            echo "google-places-readiness requires it to already exist as" >&2
-            echo "a Supabase Edge Function secret." >&2
-          fi
+            GOOGLE_PLACES_API_KEY="$GOOGLE_PLACES_API_KEY"
           if [ -n "${VOYAGE_API_KEY:-}" ]; then
             supabase secrets set \
               --project-ref "$SUPABASE_PROJECT_REF" \
@@ -447,12 +432,11 @@ jobs:
             supabase functions deploy "$fn" \
               --project-ref "$SUPABASE_PROJECT_REF"
           done
-      - name: Verify places-proxy reaches Foursquare (live)
+      - name: Verify places-proxy reaches Google Places (live)
         # tb-14 acceptance criterion #4 — post-deploy smoke test. The
         # live integration test invokes the just-deployed function with
-        # a known dense-urban coordinate and asserts a Foursquare-sourced
-        # response (non-empty places, is_thin:false, no mapkit:-prefixed
-        # ids). It is credential-gated and self-skips when
+        # a known dense-urban coordinate and asserts the Google-backed
+        # response contract. It is credential-gated and self-skips when
         # SUPABASE_PROJECT_URL / SUPABASE_ANON_KEY are absent — here they
         # are present, so the assertion runs for real and fails the lane
         # if the deployed function is still dark.

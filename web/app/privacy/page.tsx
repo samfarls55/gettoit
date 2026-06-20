@@ -160,7 +160,7 @@ export default function PrivacyPage() {
           <li style={liStyle}>
             <strong>Precise location, ephemerally.</strong> When you start a
             decision, the app requests your current location to send to the
-            Foursquare Places API so we can find restaurants near you. We do
+            Google Places API so we can find restaurants near you. We do
             not store your coordinates against your identity; we use them in
             the request and discard them.
           </li>
@@ -211,9 +211,9 @@ export default function PrivacyPage() {
             privacy practices.
           </li>
           <li style={liStyle}>
-            <strong>Foursquare Places API.</strong> Receives only your
+            <strong>Google Places API.</strong> Receives only your
             current coordinates and search parameters (radius, time-of-day
-            hint) so it can return nearby restaurants. Foursquare does not
+            hint) so it can return nearby restaurants. Google does not
             receive your account ID, your name, your email, your quiz
             answers, or your preferences.
           </li>

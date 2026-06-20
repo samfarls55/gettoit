@@ -1,4 +1,4 @@
-type ConsoleMethod = "error" | "log" | "warn";
+type ConsoleMethod = "error" | "info" | "log" | "warn";
 
 export async function withMutedConsole<T>(
   methods: ConsoleMethod[],

@@ -1,9 +1,7 @@
 // PlacesEmptyState — web-fallback empty state for the PlacesProxy.
 //
-// Shown when the PlacesProxy Edge Function returns a thin response or
-// errors on the web side. ADR 0002 documents the divergence from the
-// mobile app: the web client has no native maps escape hatch, so this is the terminal
-// surface when Foursquare can't supply candidates.
+// Shown when the PlacesProxy Edge Function cannot supply candidates on
+// the web side.
 //
 // — no hand-coded hex / px / easing literals (CLAUDE.md hard rule).
 // The fallback retries the original quiz state on the user's tap
@@ -90,7 +88,7 @@ export function PlacesEmptyState({ onRetry }: PlacesEmptyStateProps) {
       <p style={eyebrowStyle}>Nearby</p>
       <h1 style={headlineStyle}>Couldn&apos;t load options nearby.</h1>
       <p style={bodyStyle}>
-        We hit a snag pulling places from Foursquare. Try again in a moment
+        We hit a snag pulling places nearby. Try again in a moment
         {APP_STORE_URL ? (
           <>
             {" "}
@@ -104,7 +102,7 @@ export function PlacesEmptyState({ onRetry }: PlacesEmptyStateProps) {
             >
               GetToIt mobile app
             </a>
-            , which can fall back to Apple Maps
+            {" "}for the full experience
           </>
         ) : null}
         .

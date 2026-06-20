@@ -1,43 +1,35 @@
 // HTTP-layer tests for the PlacesProxy Edge Function entry point.
-// Verifies method gating, auth gating, and config gating without
-// spinning up Deno.serve.
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { handleRequest } from "./handler.ts";
 import {
-  type CacheAdapter,
   GOOGLE_Q5_DEBUG_FIELD_MASK,
   GOOGLE_Q5_FIELD_MASK,
   GOOGLE_VERDICT_DISPLAY_FIELD_MASK,
 } from "../_shared/places-proxy-core.ts";
 import { withMutedConsole } from "../_shared/test-console.ts";
-
-function memoryCache(): CacheAdapter {
-  const store = new Map();
-  return {
-    get(g, q) {
-      return Promise.resolve(store.get(`${g}::${q}`) ?? null);
-    },
-    put(row) {
-      store.set(`${row.geo_h3}::${row.query_signature}`, row);
-      return Promise.resolve();
-    },
-  };
-}
+import { handleRequest } from "./handler.ts";
 
 function envOk() {
   return {
-    FOURSQUARE_API_KEY: "test-key",
     GOOGLE_PLACES_API_KEY: "google-key",
-    SUPABASE_URL: "https://example.supabase.co",
-    SUPABASE_SERVICE_ROLE_KEY: "test-service-role",
   };
 }
 
-Deno.test("handleRequest — OPTIONS returns 204 with CORS headers", async () => {
+function authedPost(body: unknown): Request {
+  return new Request("https://example/places-proxy", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer test-jwt",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+Deno.test("handleRequest - OPTIONS returns 204 with CORS headers", async () => {
   const res = await handleRequest(
     new Request("https://example/places-proxy", { method: "OPTIONS" }),
-    { env: envOk(), buildCacheAdapter: memoryCache },
+    { env: envOk() },
   );
   assertEquals(res.status, 204);
   assertEquals(
@@ -46,169 +38,113 @@ Deno.test("handleRequest — OPTIONS returns 204 with CORS headers", async () =>
   );
 });
 
-Deno.test("handleRequest — GET returns 405", async () => {
+Deno.test("handleRequest - GET returns 405", async () => {
   const res = await handleRequest(
     new Request("https://example/places-proxy", { method: "GET" }),
-    { env: envOk(), buildCacheAdapter: memoryCache },
+    { env: envOk() },
   );
   assertEquals(res.status, 405);
 });
 
-Deno.test("handleRequest — missing Authorization returns 401", async () => {
+Deno.test("handleRequest - missing Authorization returns 401", async () => {
   const res = await handleRequest(
     new Request("https://example/places-proxy", {
       method: "POST",
       body: JSON.stringify({ lat: 0, lng: 0, radius_meters: 100 }),
     }),
-    { env: envOk(), buildCacheAdapter: memoryCache },
+    { env: envOk() },
   );
   assertEquals(res.status, 401);
 });
 
-Deno.test("handleRequest — missing Foursquare key returns 500", async () => {
-  await withMutedConsole(["error"], async () => {
-    const res = await handleRequest(
-      new Request("https://example/places-proxy", {
-        method: "POST",
-        headers: {
-          Authorization: "Bearer test-jwt",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ lat: 0, lng: 0, radius_meters: 100 }),
-      }),
-      {
-        env: { ...envOk(), FOURSQUARE_API_KEY: "" },
-        buildCacheAdapter: memoryCache,
-      },
-    );
-    assertEquals(res.status, 500);
-    const body = await res.json();
-    assertEquals(body.error, "places_proxy_misconfigured");
-  });
-});
-
-Deno.test("handleRequest — invalid JSON body returns 400", async () => {
+Deno.test("handleRequest - invalid JSON body returns 400", async () => {
   const res = await handleRequest(
     new Request("https://example/places-proxy", {
       method: "POST",
       headers: { Authorization: "Bearer test-jwt" },
       body: "not-json",
     }),
-    { env: envOk(), buildCacheAdapter: memoryCache },
+    { env: envOk() },
   );
   assertEquals(res.status, 400);
+  assertEquals((await res.json()).error, "invalid_json");
 });
 
-Deno.test("handleRequest — invalid input returns 400 with detail", async () => {
+Deno.test("handleRequest - invalid input returns 400 with detail", async () => {
   const res = await handleRequest(
-    new Request("https://example/places-proxy", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer test-jwt",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ lat: 999, lng: 0, radius_meters: 100 }),
-    }),
-    { env: envOk(), buildCacheAdapter: memoryCache },
+    authedPost({ lat: 999, lng: 0, radius_meters: 100 }),
+    { env: envOk() },
   );
   assertEquals(res.status, 400);
   const body = await res.json();
   assertEquals(body.error, "invalid_input");
 });
 
-Deno.test("handleRequest — happy path returns shaped places", async () => {
-  // Stub fetch returns a 1-result Foursquare payload. With the
-  // thin-threshold > 1, is_thin must be true; the response still
-  // serialises through the proxy with the shaped row.
-  const stubFetch = (_url: string | URL, _init?: RequestInit) =>
-    Promise.resolve(
-      new Response(
-        JSON.stringify({
-          results: [{
-            fsq_place_id: "fsq-1",
-            name: "Solo Diner",
-            latitude: 1.0,
-            longitude: 2.0,
-            categories: [],
-            location: {},
-          }],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-
+Deno.test("handleRequest - unsupported non-Google surface returns 400", async () => {
   const res = await handleRequest(
-    new Request("https://example/places-proxy", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer test-jwt",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ lat: 1.0, lng: 2.0, radius_meters: 100 }),
-    }),
-    {
-      env: envOk(),
-      buildCacheAdapter: memoryCache,
-      fetch: stubFetch as typeof fetch,
-    },
+    authedPost({ lat: 0, lng: 0, radius_meters: 100 }),
+    { env: envOk() },
   );
-  assertEquals(res.status, 200);
-  const body = await res.json();
-  assertEquals(body.places.length, 1);
-  assertEquals(body.places[0].fsq_place_id, "fsq-1");
-  assertEquals(body.is_thin, true); // 1 < THIN_RESULTS_THRESHOLD
+  assertEquals(res.status, 400);
+  assertEquals((await res.json()).error, "unsupported_surface");
 });
 
-Deno.test("handleRequest — q5 uses Google name-only contract and ignores client field masks", async () => {
+Deno.test("handleRequest - missing Google key returns guardrail body", async () => {
+  await withMutedConsole(["error"], async () => {
+    const res = await handleRequest(
+      authedPost({
+        surface: "q5",
+        lat: 1,
+        lng: 2,
+        radius_meters: 100,
+        filters: { target_open_time: { day: 3, hour: 19, minute: 0 } },
+      }),
+      { env: { GOOGLE_PLACES_API_KEY: "" } },
+    );
+    assertEquals(res.status, 200);
+    assertEquals((await res.json()).error, "google_places_misconfigured");
+  });
+});
+
+Deno.test("handleRequest - q5 uses Google name-only contract", async () => {
   const fetchCalls: { url: string; init?: RequestInit }[] = [];
   const stubFetch = (url: string | URL, init?: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
     return Promise.resolve(
-      new Response(
-        JSON.stringify({
-          places: [{
-            id: "google-1",
-            displayName: { text: "Only Name" },
-            currentOpeningHours: { openNow: true },
-            regularOpeningHours: {
-              periods: [
-                {
-                  open: { day: 3, hour: 18, minute: 0 },
-                  close: { day: 3, hour: 22, minute: 0 },
-                },
-              ],
-            },
-            rating: 4.7,
-            formattedAddress: "Hidden address",
-          }],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+      Response.json({
+        places: [{
+          id: "google-1",
+          displayName: { text: "Only Name" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+          rating: 4.7,
+          formattedAddress: "Hidden address",
+        }],
+      }),
     );
   };
 
-  const res = await handleRequest(
-    new Request("https://example/places-proxy", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer test-jwt",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+  const res = await withMutedConsole(["info"], () =>
+    handleRequest(
+      authedPost({
         surface: "q5",
         field_mask: "places.rating,places.formattedAddress",
-        lat: 1.0,
-        lng: 2.0,
+        lat: 1,
+        lng: 2,
         radius_meters: 100,
         filters: { target_open_time: { day: 3, hour: 19, minute: 0 } },
       }),
-    }),
-    {
-      env: { ...envOk(), FOURSQUARE_API_KEY: "" },
-      buildCacheAdapter: memoryCache,
-      fetch: stubFetch as typeof fetch,
-    },
-  );
+      {
+        env: envOk(),
+        fetch: stubFetch as typeof fetch,
+      },
+    ));
 
   assertEquals(res.status, 200);
   assertEquals(fetchCalls.length, 1);
@@ -223,9 +159,8 @@ Deno.test("handleRequest — q5 uses Google name-only contract and ignores clien
       text: "Powered by Google",
     },
   });
-  const serialized = JSON.stringify(body);
-  assertEquals(serialized.includes("rating"), false);
-  assertEquals(serialized.includes("Hidden address"), false);
+  assertEquals(JSON.stringify(body).includes("rating"), false);
+  assertEquals(JSON.stringify(body).includes("Hidden address"), false);
 });
 
 Deno.test("handleRequest - q5 debug trace returns raw Google candidate attributes", async () => {
@@ -233,58 +168,46 @@ Deno.test("handleRequest - q5 debug trace returns raw Google candidate attribute
   const stubFetch = (url: string | URL, init?: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
     return Promise.resolve(
-      new Response(
-        JSON.stringify({
-          places: [{
-            id: "google-1",
-            displayName: { text: "Only Name" },
-            currentOpeningHours: { openNow: true },
-            regularOpeningHours: {
-              periods: [
-                {
-                  open: { day: 3, hour: 18, minute: 0 },
-                  close: { day: 3, hour: 22, minute: 0 },
-                },
-              ],
-            },
-            dineIn: true,
-            rating: 4.7,
-            formattedAddress: "Hidden address",
-          }],
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+      Response.json({
+        places: [{
+          id: "google-1",
+          displayName: { text: "Only Name" },
+          regularOpeningHours: {
+            periods: [
+              {
+                open: { day: 3, hour: 18, minute: 0 },
+                close: { day: 3, hour: 22, minute: 0 },
+              },
+            ],
+          },
+          dineIn: true,
+          rating: 4.7,
+          formattedAddress: "Hidden address",
+        }],
+      }),
     );
   };
 
-  const res = await handleRequest(
-    new Request("https://example/places-proxy", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer test-jwt",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+  const res = await withMutedConsole(["info"], () =>
+    handleRequest(
+      authedPost({
         surface: "q5",
         debug_trace: "expo_dev_run",
-        lat: 1.0,
-        lng: 2.0,
+        lat: 1,
+        lng: 2,
         radius_meters: 100,
         filters: {
           target_open_time: { day: 3, hour: 19, minute: 0 },
           service_shape: "dineIn",
         },
       }),
-    }),
-    {
-      env: { ...envOk(), FOURSQUARE_API_KEY: "" },
-      buildCacheAdapter: memoryCache,
-      fetch: stubFetch as typeof fetch,
-    },
-  );
+      {
+        env: envOk(),
+        fetch: stubFetch as typeof fetch,
+      },
+    ));
 
   assertEquals(res.status, 200);
-  assertEquals(fetchCalls.length, 1);
   const headers = fetchCalls[0].init?.headers as Record<string, string>;
   assertEquals(headers["X-Goog-FieldMask"], GOOGLE_Q5_DEBUG_FIELD_MASK);
   const body = await res.json();
@@ -296,8 +219,8 @@ Deno.test("handleRequest - q5 debug trace returns raw Google candidate attribute
     entry.event === "places_proxy.google_q5.response"
   );
   assertEquals(
-    ((responseEvent?.payload.body as { places?: Array<{ rating?: number }> })
-      .places?.[0]?.rating),
+    (responseEvent?.payload.body as { places?: Array<{ rating?: number }> })
+      .places?.[0]?.rating,
     4.7,
   );
   const evaluationsEvent = trace.find((entry) =>
@@ -313,40 +236,29 @@ Deno.test("handleRequest - q5 debug trace returns raw Google candidate attribute
   assertEquals(evaluations[0].strictRejectionReasons, []);
 });
 
-Deno.test("handleRequest — verdict display refetches by Place ID without lat/radius", async () => {
+Deno.test("handleRequest - verdict display refetches by Place ID", async () => {
   const fetchCalls: { url: string; init?: RequestInit }[] = [];
   const stubFetch = (url: string | URL, init?: RequestInit) => {
     fetchCalls.push({ url: String(url), init });
     return Promise.resolve(
-      new Response(
-        JSON.stringify({
-          id: "google-1",
-          displayName: { text: "Pico's" },
-          googleMapsUri: "https://maps.google.example/picos",
-          formattedAddress: "1 Main St",
-          rating: 4.8,
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
+      Response.json({
+        id: "google-1",
+        displayName: { text: "Pico's" },
+        googleMapsUri: "https://maps.google.example/picos",
+        formattedAddress: "1 Main St",
+        rating: 4.8,
+      }),
     );
   };
 
   const res = await handleRequest(
-    new Request("https://example/places-proxy", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer test-jwt",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        surface: "verdict_display",
-        google_place_id: "google-1",
-        field_mask: "rating",
-      }),
+    authedPost({
+      surface: "verdict_display",
+      google_place_id: "google-1",
+      field_mask: "rating",
     }),
     {
-      env: { ...envOk(), FOURSQUARE_API_KEY: "" },
-      buildCacheAdapter: memoryCache,
+      env: envOk(),
       fetch: stubFetch as typeof fetch,
     },
   );

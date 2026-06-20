@@ -204,7 +204,7 @@ export default function TermsPage() {
         <p style={pStyle}>
           Restaurant data shown in the Service (names, addresses, hours,
           categories, dietary tags, and similar attributes) is supplied by
-          third-party data providers, primarily Foursquare. We do not
+          third-party data providers, including Google Places. We do not
           control this data and do not warrant that it is accurate, current,
           or complete. Hours can be wrong. Restaurants can close. Dietary
           tags can be incorrect or out of date. You are responsible for

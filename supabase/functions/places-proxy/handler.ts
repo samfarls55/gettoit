@@ -1,18 +1,9 @@
-// HTTP handler for the PlacesProxy Edge Function, independent of the
-// Supabase JS client. Splitting this out so the test file can exercise
-// the handler without pulling supabase-js (and its transitive
-// `@types/node`) into the deno-check graph.
-//
-// `index.ts` composes this handler with the real Supabase cache
-// adapter and the real `Deno.serve` entry point.
+// HTTP handler for the PlacesProxy Edge Function, independent of Deno.serve.
 
 import {
-  type CacheAdapter,
-  FoursquareUpstreamError,
   GooglePlacesGuardrailError,
   handleGoogleQ5PlacesProxy,
   handleGoogleVerdictDisplayProxy,
-  handlePlacesProxy,
   isGoogleQ5Input,
   isGoogleVerdictDisplayInput,
   PlacesProxyInputError,
@@ -24,24 +15,12 @@ import {
 } from "../_shared/local-test-run-logger.ts";
 
 export interface HandlerEnv {
-  /** Foursquare service key — server-only secret. */
-  FOURSQUARE_API_KEY?: string;
-  /** Google Places service key — server-only secret. */
   GOOGLE_PLACES_API_KEY?: string;
-  /** Supabase project URL — present on every Edge invocation. */
-  SUPABASE_URL?: string;
-  /** Supabase service-role key — bypasses RLS for cache writes. */
-  SUPABASE_SERVICE_ROLE_KEY?: string;
 }
 
 export interface HandlerDeps {
   env: HandlerEnv;
-  /** Override for the upstream fetch (tests inject a stub). */
   fetch?: typeof fetch;
-  /** Required: how the handler obtains a cache adapter. `index.ts`
-   *  binds this to the supabase-js adapter; tests bind it to an
-   *  in-memory map. */
-  buildCacheAdapter: (env: HandlerEnv) => CacheAdapter;
 }
 
 function corsHeaders(): Record<string, string> {
@@ -53,16 +32,6 @@ function corsHeaders(): Record<string, string> {
   };
 }
 
-function jsonResponse(body: unknown, init?: ResponseInit): Response {
-  return new Response(JSON.stringify(body), {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
-}
-
 export async function handleRequest(
   req: Request,
   deps: HandlerDeps,
@@ -71,30 +40,16 @@ export async function handleRequest(
     return new Response(null, { status: 204, headers: corsHeaders() });
   }
   if (req.method !== "POST") {
-    return jsonResponse({ error: "method_not_allowed" }, {
+    return Response.json({ error: "method_not_allowed" }, {
       status: 405,
       headers: { ...corsHeaders(), Allow: "POST" },
     });
   }
 
-  // Auth — the Supabase Edge Runtime forwards the caller's JWT via
-  // the Authorization header. Any authenticated user (including anon)
-  // can call the proxy; the function itself uses the service-role
-  // key to write the cache.
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
-    return jsonResponse({ error: "unauthorized" }, {
+    return Response.json({ error: "unauthorized" }, {
       status: 401,
-      headers: corsHeaders(),
-    });
-  }
-
-  const supabaseUrl = deps.env.SUPABASE_URL ?? "";
-  const serviceRoleKey = deps.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error("Supabase service-role credentials are not set");
-    return jsonResponse({ error: "places_proxy_misconfigured" }, {
-      status: 500,
       headers: corsHeaders(),
     });
   }
@@ -103,7 +58,7 @@ export async function handleRequest(
   try {
     body = await req.json();
   } catch (_e) {
-    return jsonResponse({ error: "invalid_json" }, {
+    return Response.json({ error: "invalid_json" }, {
       status: 400,
       headers: corsHeaders(),
     });
@@ -127,24 +82,23 @@ async function dispatchPlacesProxyRequest(
   fetch: typeof globalThis.fetch,
   debugTrace: boolean,
 ): Promise<Response> {
-  const isGoogleVerdictDisplayRequest = isGoogleVerdictDisplayInput(body);
-  if (isGoogleVerdictDisplayRequest) {
+  if (isGoogleVerdictDisplayInput(body)) {
     try {
       const result = await handleGoogleVerdictDisplayProxy(body, {
         fetch,
         googleApiKey: deps.env.GOOGLE_PLACES_API_KEY ?? "",
       });
-      return jsonResponse(result, { headers: corsHeaders() });
+      return Response.json(result, { headers: corsHeaders() });
     } catch (e) {
       if (e instanceof PlacesProxyInputError) {
-        return jsonResponse({ error: "invalid_input", detail: e.message }, {
+        return Response.json({ error: "invalid_input", detail: e.message }, {
           status: 400,
           headers: corsHeaders(),
         });
       }
       if (e instanceof GooglePlacesGuardrailError) {
         console.error("Google Places verdict display guardrail:", e.code);
-        return jsonResponse({ error: e.code }, {
+        return Response.json({ error: e.code }, {
           status: 200,
           headers: corsHeaders(),
         });
@@ -158,7 +112,7 @@ async function dispatchPlacesProxyRequest(
     input = validateInput(body);
   } catch (e) {
     if (e instanceof PlacesProxyInputError) {
-      return jsonResponse({ error: "invalid_input", detail: e.message }, {
+      return Response.json({ error: "invalid_input", detail: e.message }, {
         status: 400,
         headers: corsHeaders(),
       });
@@ -166,57 +120,33 @@ async function dispatchPlacesProxyRequest(
     throw e;
   }
 
-  const isGoogleQ5Request = isGoogleQ5Input(body);
-  if (!isGoogleQ5Request && !deps.env.FOURSQUARE_API_KEY) {
-    console.error("FOURSQUARE_API_KEY is not set on the Edge Function");
-    return jsonResponse({ error: "places_proxy_misconfigured" }, {
-      status: 500,
+  if (!isGoogleQ5Input(body)) {
+    return Response.json({ error: "unsupported_surface" }, {
+      status: 400,
       headers: corsHeaders(),
     });
   }
 
   try {
-    if (isGoogleQ5Request) {
-      const result = await handleGoogleQ5PlacesProxy(input, {
-        fetch,
-        googleApiKey: deps.env.GOOGLE_PLACES_API_KEY ?? "",
-        debugTrace,
-      });
-      return jsonResponse(result, { headers: corsHeaders() });
-    }
-
-    const result = await handlePlacesProxy(input, {
-      cache: deps.buildCacheAdapter(deps.env),
+    const result = await handleGoogleQ5PlacesProxy(input, {
       fetch,
-      apiKey: deps.env.FOURSQUARE_API_KEY ?? "",
+      googleApiKey: deps.env.GOOGLE_PLACES_API_KEY ?? "",
+      debugTrace,
     });
-    return jsonResponse(result, { headers: corsHeaders() });
+    return Response.json(result, { headers: corsHeaders() });
   } catch (e) {
     if (e instanceof GooglePlacesGuardrailError) {
       console.error("Google Places Q5 guardrail:", e.code);
-      return jsonResponse({ error: e.code }, {
+      return Response.json({ error: e.code }, {
         status: 200,
         headers: corsHeaders(),
       });
     }
-    if (e instanceof FoursquareUpstreamError && e.status === 410) {
-      console.error("Foursquare 410:", e.message);
-      return jsonResponse({
-        places: [],
-        disclaimers: [],
-        is_thin: true,
-        served_from_cache: false,
-        error: "foursquare_version_pin_outdated",
-      }, { status: 200, headers: corsHeaders() });
-    }
     console.error("places-proxy unexpected failure:", e);
-    return jsonResponse({
-      places: [],
-      disclaimers: [],
-      is_thin: true,
-      served_from_cache: false,
-      error: "places_proxy_unexpected_error",
-    }, { status: 200, headers: corsHeaders() });
+    return Response.json({ error: "places_proxy_unexpected_error" }, {
+      status: 200,
+      headers: corsHeaders(),
+    });
   }
 }
 
@@ -246,8 +176,7 @@ async function responseWithDebugTrace(
   }
 
   const headers = new Headers(response.headers);
-  headers.set("Content-Type", "application/json");
-  return new Response(JSON.stringify({ ...body, debugTrace }), {
+  return Response.json({ ...body, debugTrace }, {
     status: response.status,
     statusText: response.statusText,
     headers,

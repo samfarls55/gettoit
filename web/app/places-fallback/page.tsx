@@ -2,11 +2,8 @@
 // nearby" message when the PlacesProxy Edge Function returns a thin
 // response or errors on the web client.
 //
-// Why a standalone route: per ADR 0002, the web fallback does NOT
-// have a MapKit escape hatch (MapKit is native mobile only). When the
-// proxy fails on web, the entire candidate-pool path is dead, so
-// the experience degrades to a clear copy state rather than an
-// indefinite spinner.
+// Why a standalone route: when the proxy fails on web, the candidate
+// path degrades to a clear copy state rather than an indefinite spinner.
 //
 // TB-15 (the full web fallback build) consumes the `PlacesEmptyState`
 // component below to render this state inline in the web quiz flow.

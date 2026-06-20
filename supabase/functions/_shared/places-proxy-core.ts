@@ -1,25 +1,15 @@
-// Legacy mobile note: references to iOS/Swift/TestFlight here refer to the retired Swift app unless they describe Apple platform/APNs behavior; active mobile app is React Native / Expo in mobile/.
 // PlacesProxy core orchestrator.
 //
-// This module is independent of Supabase and Deno's HTTP server so it
-// can be exercised by the Deno test suite without any network roundtrip.
-// `places-proxy/index.ts` injects the real Supabase cache adapter + a
-// real `fetch` wrapper at runtime.
+// This module is independent of Supabase and Deno's HTTP server so it can be
+// exercised by the Deno test suite without any network roundtrip.
 
+import { googlePrimaryTypesForQ1Cuisines } from "./google-cuisine-primary-types.ts";
 import {
-  applyPostFilters,
-  buildFoursquareQuery,
-  buildQuerySignature,
-  computeGeoBucket,
-  FOURSQUARE_API_VERSION,
-  FOURSQUARE_BASE_URL,
-  type FoursquareSearchResponse,
-  OPEN_AT_PATTERN,
-  type PlacesProxyInput,
-  type ShapedPlace,
-  shapeFoursquareResult,
-  THIN_RESULTS_THRESHOLD,
-} from "./foursquare.ts";
+  type GoogleOpeningPeriod,
+  type GoogleTargetOpenTime,
+  isOpenAtGoogleTargetTime,
+  normalizeGoogleTargetOpenTime,
+} from "./google-opening-hours.ts";
 import {
   buildGoogleProviderNearbySearchRequest,
   buildGoogleProviderPlaceDetailsRequest,
@@ -27,81 +17,29 @@ import {
   GOOGLE_PROVIDER_ATTRIBUTION,
   GOOGLE_PROVIDER_FIELD_MASKS,
 } from "./google-provider-runtime.ts";
-import { googlePrimaryTypesForQ1Cuisines } from "./google-cuisine-primary-types.ts";
-import {
-  type GoogleOpeningPeriod,
-  isOpenAtGoogleTargetTime,
-  normalizeGoogleTargetOpenTime,
-} from "./google-opening-hours.ts";
 import { logLocalTestEvent } from "./local-test-run-logger.ts";
+
 export { redactGoogleObservabilityValue } from "./google-provider-runtime.ts";
 
-/** Cache record persisted under `(geo_h3, query_signature)`. */
-export interface CacheRow {
-  geo_h3: string;
-  query_signature: string;
-  payload: CachePayload;
-  cached_at: string; // ISO-8601 timestamp
-}
-
-export interface CachePayload {
-  places: ShapedPlace[];
-  /** Disclaimers carried over from the original query â€” preserved so
-   *  the client can render the rule chip even on a cache hit. */
-  disclaimers: string[];
-}
-
-/** Storage adapter â€” abstracted so unit tests can plug an in-memory
- *  Map and the production Edge Function can plug supabase-js. */
-export interface CacheAdapter {
-  get(geo_h3: string, query_signature: string): Promise<CacheRow | null>;
-  put(row: CacheRow): Promise<void>;
-}
-
-/** Fetch wrapper â€” same `fetch` signature so tests can stub a
- *  recorded Foursquare response. */
 export type FetchFn = (
   input: string | URL,
   init?: RequestInit,
 ) => Promise<Response>;
 
-export interface ProxyDeps {
-  cache: CacheAdapter;
-  fetch: FetchFn;
-  apiKey: string;
-  /** Time-source override for deterministic tests. */
-  now?: () => Date;
-  /** Hot-zone TTL â€” applied when the cached row has the
-   *  `hot_zone: true` flag. Currently marks every zone hot until the
-   *  zone-detection heuristic lands; see follow-up note in TB-05. */
-  hotZoneTtlMs?: number;
-  /** Cold-zone TTL â€” applied when `hot_zone: false`. */
-  coldZoneTtlMs?: number;
-}
+export type GoogleServiceShape = "dineIn" | "takeout";
 
-export const DEFAULT_HOT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-export const DEFAULT_COLD_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-/** Output emitted to the iOS / web client. */
-export interface ProxyResponse {
-  places: ShapedPlace[];
-  /** Disclaimers â€” chip ids that had no Foursquare signal. The verdict
-   *  rule chip surfaces these per the dietary-tag research Â§spec-change-proposal. */
-  disclaimers: string[];
-  /** True when fewer than THIN_RESULTS_THRESHOLD usable rows came back.
-   *  iOS uses this signal to trigger its MapKit fallback per ADR 0002.
-   *  Web uses it to render the "couldn't load options nearby" empty state. */
-  is_thin: boolean;
-  /** Whether this response was served from cache. Informational for
-   *  observability â€” clients should not branch behavior on it. */
-  served_from_cache: boolean;
-  /** Set when Foursquare was reached but answered a non-2xx the proxy
-   *  degrades over (a 4xx/5xx other than the hard-failing 410). The
-   *  value is `foursquare_upstream_<status>` â€” e.g. `foursquare_upstream_429`
-   *  on credit exhaustion. Absent on a healthy response. Lets the client
-   *  and the deploy diagnostic tell an upstream fault apart from a
-   *  genuine empty result set. */
-  error?: string;
+export interface PlacesProxyInput {
+  lat: number;
+  lng: number;
+  radius_meters: number;
+  filters?: {
+    dietary?: string[];
+    price_tier?: number;
+    target_open_time?: GoogleTargetOpenTime;
+    cuisine?: string;
+    cuisines?: string[];
+    service_shape?: GoogleServiceShape;
+  };
 }
 
 export interface GoogleQ5Place {
@@ -139,11 +77,9 @@ interface GooglePlacesProxyDeps {
 }
 
 export type PlacesProxyResponse =
-  | ProxyResponse
   | GoogleQ5Response
   | GoogleVerdictDisplayResponse;
 
-/** Returned when validation rejects the input. */
 export class PlacesProxyInputError extends Error {
   status = 400;
 }
@@ -154,14 +90,7 @@ export class GooglePlacesGuardrailError extends Error {
   }
 }
 
-/** Returned when Foursquare returns a non-2xx the proxy doesn't handle. */
-export class FoursquareUpstreamError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
-
-function isGoogleServiceShape(value: unknown): value is "dineIn" | "takeout" {
+function isGoogleServiceShape(value: unknown): value is GoogleServiceShape {
   return value === "dineIn" || value === "takeout";
 }
 
@@ -169,17 +98,20 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   if (!raw || typeof raw !== "object") {
     throw new PlacesProxyInputError("body must be a JSON object");
   }
+
   const obj = raw as Record<string, unknown>;
   const lat = obj.lat;
   const lng = obj.lng;
   const radius = obj.radius_meters;
+
   if (
     typeof lat !== "number" || !Number.isFinite(lat) || lat < -90 || lat > 90
   ) {
     throw new PlacesProxyInputError("lat must be a finite number in [-90, 90]");
   }
   if (
-    typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 || lng > 180
+    typeof lng !== "number" || !Number.isFinite(lng) || lng < -180 ||
+    lng > 180
   ) {
     throw new PlacesProxyInputError(
       "lng must be a finite number in [-180, 180]",
@@ -192,9 +124,10 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     radius > 100_000
   ) {
     throw new PlacesProxyInputError(
-      "radius_meters must be a finite positive number â‰¤ 100000",
+      "radius_meters must be a finite positive number <= 100000",
     );
   }
+
   const filters = (obj.filters ?? {}) as Record<string, unknown>;
   const dietary = Array.isArray(filters.dietary)
     ? (filters.dietary.filter((x) => typeof x === "string") as string[])
@@ -209,10 +142,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
     filters,
     "target_open_time",
   );
-  if (
-    hasTargetOpenTime &&
-    target_open_time === undefined
-  ) {
+  if (hasTargetOpenTime && target_open_time === undefined) {
     throw new PlacesProxyInputError(
       "filters.target_open_time must be a Google opening-hours point " +
         "{ day: 0..6, hour: 0..23, minute: 0..59 }",
@@ -223,24 +153,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
       "filters.target_open_time is required for q5",
     );
   }
-  // `open_at` is Foursquare's `[1-7]THHMM` weekday + local-time token.
-  // A present-but-malformed value is a client bug â€” reject it loudly
-  // (400) rather than swallowing it, the same failure mode that hid the
-  // epoch-format outage. An absent value is fine: the filter is optional.
-  let open_at: string | undefined;
-  if (typeof filters.open_at === "string") {
-    if (!OPEN_AT_PATTERN.test(filters.open_at)) {
-      throw new PlacesProxyInputError(
-        "filters.open_at must be a Foursquare [1-7]THHMM token " +
-          `(weekday 1-7 + local wall-clock HHMM), got: ${filters.open_at}`,
-      );
-    }
-    open_at = filters.open_at;
-  }
-  // Cuisine advisory tag (tb-17) â€” a `QuizCuisine` id on a per-cuisine
-  // call, absent on the general call. A non-string / missing value
-  // drops to undefined: decode stays tolerant, the call degrades to
-  // the general query rather than erroring.
+
   const cuisine = typeof filters.cuisine === "string"
     ? filters.cuisine
     : undefined;
@@ -250,6 +163,7 @@ export function validateInput(raw: unknown): PlacesProxyInput {
   const service_shape = isGoogleServiceShape(filters.service_shape)
     ? filters.service_shape
     : undefined;
+
   return {
     lat,
     lng,
@@ -258,7 +172,6 @@ export function validateInput(raw: unknown): PlacesProxyInput {
       dietary,
       price_tier,
       target_open_time,
-      open_at,
       cuisine,
       cuisines,
       service_shape,
@@ -274,147 +187,6 @@ export function isGoogleQ5Input(raw: unknown): boolean {
 export function isGoogleVerdictDisplayInput(raw: unknown): boolean {
   return !!raw && typeof raw === "object" &&
     (raw as Record<string, unknown>).surface === "verdict_display";
-}
-
-function ttlForRow(_row: CacheRow, deps: ProxyDeps): number {
-  // The original release ships with a single TTL band. Hot/cold detection is a follow-up
-  // (see Adjacencies on the TB-05 ticket). When the heuristic lands,
-  // store the band on the row and switch here.
-  return deps.hotZoneTtlMs ?? DEFAULT_HOT_TTL_MS;
-}
-
-export function isCacheRowFresh(row: CacheRow, deps: ProxyDeps): boolean {
-  const now = (deps.now ?? (() => new Date()))().getTime();
-  const cachedAt = Date.parse(row.cached_at);
-  if (!Number.isFinite(cachedAt)) return false;
-  return now - cachedAt < ttlForRow(row, deps);
-}
-
-/** Core entry point. Composes cache lookup â†’ Foursquare fetch â†’ cache
- *  write â†’ response shaping. Pure with respect to its `deps` argument. */
-export async function handlePlacesProxy(
-  input: PlacesProxyInput,
-  deps: ProxyDeps,
-): Promise<ProxyResponse> {
-  const geo_h3 = computeGeoBucket(input.lat, input.lng);
-  const query_signature = buildQuerySignature(input);
-
-  // 1. Cache check.
-  const cached = await deps.cache.get(geo_h3, query_signature);
-  if (cached && isCacheRowFresh(cached, deps)) {
-    const places = cached.payload.places;
-    return {
-      places,
-      disclaimers: cached.payload.disclaimers,
-      is_thin: places.length < THIN_RESULTS_THRESHOLD,
-      served_from_cache: true,
-    };
-  }
-
-  // 2. Cache miss â€” call Foursquare.
-  const plan = buildFoursquareQuery(input);
-  const url = `${FOURSQUARE_BASE_URL}/places/search?${plan.query.toString()}`;
-  logLocalTestEvent("places_proxy.foursquare.request", {
-    input,
-    url,
-    query: Object.fromEntries(plan.query.entries()),
-    emittedTags: plan.emitted_tags,
-    postFilters: plan.post_filters,
-  });
-  const response = await deps.fetch(url, {
-    headers: {
-      "Authorization": `Bearer ${deps.apiKey}`,
-      "X-Places-Api-Version": FOURSQUARE_API_VERSION,
-      "Accept": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    // Surface upstream errors as a thin response â€” the client decides
-    // whether to MapKit-fallback (iOS) or empty-state (web). We log
-    // the upstream status for observability without 500ing.
-    const body = await response.text().catch(() => "");
-    logLocalTestEvent("places_proxy.foursquare.response_error", {
-      input,
-      status: response.status,
-      body,
-    });
-    if (response.status === 410) {
-      // Hard signal that the API version pin slipped â€” fail loud so a
-      // human notices in CI / logs. Per ADR 0002, the legacy host
-      // returns 410 and the new host can return 410 if the version
-      // header is unset.
-      throw new FoursquareUpstreamError(
-        410,
-        `Foursquare returned 410 (likely missing/invalid X-Places-Api-Version header): ${
-          body.slice(0, 200)
-        }`,
-      );
-    }
-    // Non-410 upstream failure. Degrade to a thin response, but surface
-    // the upstream status as a named error + a loud log â€” a swallowed
-    // 4xx is what hid the 2026-05-16 credit-exhaustion outage (the proxy
-    // answered an unmarked empty 200 and looked like "no venues here").
-    console.error(
-      `Foursquare upstream ${response.status}: ${body.slice(0, 200)}`,
-    );
-    return {
-      places: [],
-      disclaimers: plan.post_filters.disclaimers,
-      is_thin: true,
-      served_from_cache: false,
-      error: `foursquare_upstream_${response.status}`,
-    };
-  }
-
-  const body = (await response.json()) as FoursquareSearchResponse;
-  const rawResults = body.results ?? [];
-  const postFiltered = applyPostFilters(
-    rawResults,
-    plan.post_filters.require_taste_tokens,
-  );
-  const places: ShapedPlace[] = [];
-  for (const r of postFiltered) {
-    const shaped = shapeFoursquareResult(r, plan.emitted_tags);
-    if (shaped) places.push(shaped);
-  }
-
-  const payload: CachePayload = {
-    places,
-    disclaimers: plan.post_filters.disclaimers,
-  };
-  logLocalTestEvent("places_proxy.foursquare.response", {
-    input,
-    status: response.status,
-    body,
-    rawResultCount: rawResults.length,
-    rawResults,
-    postFilteredCount: postFiltered.length,
-    postFiltered,
-    shapedCount: places.length,
-    places,
-  });
-
-  // 3. Write through to cache. Failures here are not fatal â€” a cache
-  // write error must not break the user's session; we'll re-query
-  // Foursquare on the next request.
-  try {
-    await deps.cache.put({
-      geo_h3,
-      query_signature,
-      payload,
-      cached_at: (deps.now ?? (() => new Date()))().toISOString(),
-    });
-  } catch (_err) {
-    // Swallow â€” observability is the Edge Function's runtime concern.
-  }
-
-  return {
-    places,
-    disclaimers: plan.post_filters.disclaimers,
-    is_thin: places.length < THIN_RESULTS_THRESHOLD,
-    served_from_cache: false,
-  };
 }
 
 export const GOOGLE_Q5_FIELD_MASK_VERSION =
@@ -464,6 +236,7 @@ export type GoogleOutcomeLabel = typeof GOOGLE_OUTCOME_LABELS[number];
 export type GoogleOperationalReceiptCode =
   typeof GOOGLE_OPERATIONAL_RECEIPT_CODES[number];
 export type GoogleReasonCode = typeof GOOGLE_REASON_CODES[number];
+
 function isStringInList<TValue extends string>(
   value: unknown,
   values: readonly TValue[],
@@ -714,12 +487,14 @@ function validateGoogleVerdictDisplayInput(raw: unknown): string {
   if (!raw || typeof raw !== "object") {
     throw new PlacesProxyInputError("body must be a JSON object");
   }
+
   const placeId = (raw as Record<string, unknown>).google_place_id;
   if (typeof placeId !== "string" || placeId.trim().length === 0) {
     throw new PlacesProxyInputError(
       "google_place_id must be a non-empty string",
     );
   }
+
   return placeId.trim();
 }
 
@@ -931,6 +706,7 @@ function buildGoogleQ5RequestBody(
 ): Record<string, unknown> {
   const cuisines = input.filters?.cuisines ??
     (input.filters?.cuisine ? [input.filters.cuisine] : undefined);
+
   return {
     includedPrimaryTypes: googlePrimaryTypesForQ1Cuisines(cuisines),
     maxResultCount: GOOGLE_Q5_MAX_RESULTS,
