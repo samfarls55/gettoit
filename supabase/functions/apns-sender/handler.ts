@@ -177,6 +177,7 @@ export async function handleRequest(
       headers: corsHeaders(),
     });
   }
+  const apnsTopic = deps.env.APNS_TOPIC;
 
   let parsed: unknown;
   try {
@@ -239,20 +240,19 @@ export async function handleRequest(
   // Fan out one POST per token. Failures are logged and recorded in
   // the response but do not abort the batch â€” APNs returns per-token
   // errors and we want partial-success semantics.
-  const deliveries: Array<{
+  const deliveries = await Promise.all(tokens.map(async (t): Promise<{
     user_id: string;
     device_token: string;
     status: number;
     apns_id: string | null;
     error?: string;
-  }> = [];
-  for (const t of tokens) {
+  }> => {
     let result: ApnsDeliveryResult;
     try {
       result = await delivery.send({
         deviceToken: t.device_token,
         jwt,
-        topic: deps.env.APNS_TOPIC,
+        topic: apnsTopic,
         payload: apsPayload,
       });
     } catch (e) {
@@ -265,14 +265,14 @@ export async function handleRequest(
         `apns-sender delivery failed user=${t.user_id} status=${result.status} error=${result.error ?? ""}`,
       );
     }
-    deliveries.push({
+    return {
       user_id: t.user_id,
       device_token: t.device_token,
       status: result.status,
       apns_id: result.apnsId,
       ...(result.error ? { error: result.error } : {}),
-    });
-  }
+    };
+  }));
 
   return jsonResponse({ deliveries }, {
     status: 200,

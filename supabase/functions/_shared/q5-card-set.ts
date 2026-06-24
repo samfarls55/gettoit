@@ -342,12 +342,12 @@ function selectProbedCuisines(
   }
 
   return uniqueMemberCuisines
-    .map((cuisine, pickOrder) => ({
-      cuisine,
-      pickOrder,
-      support: support.get(cuisine) ?? 0,
-    }))
-    .filter((entry) => entry.support > 0)
+    .flatMap((cuisine, pickOrder) => {
+      const cuisineSupport = support.get(cuisine) ?? 0;
+      return cuisineSupport > 0
+        ? [{ cuisine, pickOrder, support: cuisineSupport }]
+        : [];
+    })
     .sort((left, right) => {
       if (left.support !== right.support) {
         return right.support - left.support;

@@ -17,12 +17,14 @@ import { describe, expect, it } from "vitest";
 import JoinPage from "./page";
 
 describe("JoinPage layout", () => {
-  it("does not use position:fixed on <main> so the global Footer stays visible", () => {
+  it("does not use position:fixed on <main> so the global Footer stays visible", async () => {
     // JoinPage is a server component returning a JSX tree. We inspect
     // the returned element directly rather than rendering — InviteShell
     // booting under jsdom needs supabase mocks the layout test does
     // not own, and the layout assertion only needs the <main> style.
-    const tree = JoinPage({ params: { roomId: "room-1" } }) as {
+    const tree = (await JoinPage({
+      params: Promise.resolve({ roomId: "room-1" }),
+    })) as {
       type: string;
       props: { style?: { position?: string } };
     };

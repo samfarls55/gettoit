@@ -18,7 +18,6 @@ import { type CSSProperties } from "react";
 import {
   BUDGET_TIERS,
   CUISINE_OPTIONS,
-  REPUTATION_NO_PREFERENCE,
   REPUTATION_OPTIONS,
   VIBE_LABELS,
   type CuisineSelection,
@@ -51,6 +50,163 @@ const contentWrap: CSSProperties = {
   paddingTop: 56,
   paddingBottom: 32,
 };
+
+const budgetListStyle: CSSProperties = {
+  marginTop: 20,
+  padding: "0 22px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 10,
+};
+
+const budgetTierButtonBaseStyle: CSSProperties = {
+  appearance: "none",
+  border: 0,
+  cursor: "pointer",
+  textAlign: "left",
+  padding: "16px 20px",
+  borderRadius: 16,
+  display: "flex",
+  alignItems: "baseline",
+  justifyContent: "space-between",
+  transition:
+    "background 220ms var(--ease-out), color 220ms var(--ease-out), box-shadow 220ms var(--ease-out), transform 220ms var(--ease-out)",
+};
+
+const budgetTierLabelStyle: CSSProperties = {
+  fontFamily: "var(--ff-display)",
+  fontWeight: 900,
+  fontSize: 32,
+  letterSpacing: "-0.02em",
+  lineHeight: 1,
+};
+
+const vibeStageStyle: CSSProperties = {
+  flex: 1,
+  padding: "40px 22px 0",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "flex-start",
+};
+
+const vibeScaleStyle: CSSProperties = {
+  width: "100%",
+  display: "flex",
+  gap: 6,
+  marginTop: 22,
+};
+
+const vibeEndpointsStyle: CSSProperties = {
+  marginTop: 16,
+  width: "100%",
+  display: "flex",
+  justifyContent: "space-between",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: 0.12,
+  textTransform: "uppercase",
+  color: "rgba(255,255,255,0.7)",
+};
+
+const q5CenteredStateStyle: CSSProperties = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 14,
+  padding: "0 32px",
+  textAlign: "center",
+};
+
+const q5CandidateListStyle: CSSProperties = {
+  marginTop: 22,
+  padding: "0 22px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+};
+
+const q5CandidateMetaStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  marginTop: 3,
+  color: "rgba(255,255,255,0.7)",
+  letterSpacing: 0.08,
+  textTransform: "uppercase",
+};
+
+const q5RatingScaleStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginTop: 6,
+  fontSize: 12,
+  fontWeight: 700,
+  opacity: 0.6,
+  letterSpacing: 0.12,
+  textTransform: "uppercase",
+  color: "var(--paper)",
+};
+
+function budgetTierButtonStyle(selected: boolean): CSSProperties {
+  return {
+    ...budgetTierButtonBaseStyle,
+    background: selected ? "var(--sun)" : "rgba(255,255,255,0.06)",
+    color: selected ? "var(--ink)" : "var(--paper)",
+    boxShadow: selected
+      ? "0 14px 30px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.4)"
+      : "inset 0 0 0 1.5px rgba(255,255,255,0.45)",
+    transform: selected ? "scale(1.015)" : "scale(1)",
+  };
+}
+
+function budgetTierSubStyle(selected: boolean): CSSProperties {
+  return {
+    fontWeight: 700,
+    fontSize: 13,
+    letterSpacing: 0.08,
+    textTransform: "uppercase",
+    opacity: selected ? 0.8 : 0.78,
+  };
+}
+
+function vibeStepStyle(selected: boolean): CSSProperties {
+  return {
+    appearance: "none",
+    border: 0,
+    cursor: "pointer",
+    flex: 1,
+    height: 12,
+    borderRadius: 999,
+    background: selected ? "var(--sun)" : "rgba(255,255,255,0.22)",
+    boxShadow: selected ? "0 0 18px rgba(255,210,63,0.6)" : "none",
+    transition:
+      "background 200ms var(--ease-out), box-shadow 200ms var(--ease-out), transform 200ms var(--ease-out)",
+    transform: selected ? "scaleY(1.4)" : "scaleY(1)",
+  };
+}
+
+function q5RatingButtonStyle(selected: boolean): CSSProperties {
+  return {
+    appearance: "none",
+    border: 0,
+    cursor: "pointer",
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 10,
+    background: selected ? "var(--sun)" : "rgba(255,255,255,0.10)",
+    color: selected ? "var(--ink)" : "var(--paper)",
+    fontFamily: "var(--ff-body)",
+    fontWeight: 800,
+    fontSize: 14,
+    boxShadow: selected
+      ? "0 8px 18px rgba(255,210,63,0.32)"
+      : "inset 0 0 0 1px rgba(255,255,255,0.22)",
+    transition:
+      "background 180ms var(--ease-out), color 180ms var(--ease-out), box-shadow 180ms var(--ease-out)",
+  };
+}
 
 // ───────────────────────────────────────────────────────────────────────
 // Q1 — Cuisine craving (capped multi-select chips)
@@ -149,15 +305,7 @@ export function QuizQ2Budget({
             title="What's your max?"
             sub="Pick the ceiling — we won't suggest above it."
           />
-          <div
-            style={{
-              marginTop: 20,
-              padding: "0 22px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
+          <div style={budgetListStyle}>
             {BUDGET_TIERS.map((t) => {
               const selected = tier === t.tier;
               return (
@@ -166,46 +314,15 @@ export function QuizQ2Budget({
                   key={t.tier}
                   onClick={() => onSelect(t.tier)}
                   aria-pressed={selected}
-                  style={{
-                    appearance: "none",
-                    border: 0,
-                    cursor: "pointer",
-                    textAlign: "left",
-                    padding: "16px 20px",
-                    borderRadius: 16,
-                    background: selected
-                      ? "var(--sun)"
-                      : "rgba(255,255,255,0.06)",
-                    color: selected ? "var(--ink)" : "var(--paper)",
-                    boxShadow: selected
-                      ? "0 14px 30px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.4)"
-                      : "inset 0 0 0 1.5px rgba(255,255,255,0.45)",
-                    display: "flex",
-                    alignItems: "baseline",
-                    justifyContent: "space-between",
-                    transition: "all 220ms var(--ease-out)",
-                    transform: selected ? "scale(1.015)" : "scale(1)",
-                  }}
+                  style={budgetTierButtonStyle(selected)}
                 >
                   <span
-                    style={{
-                      fontFamily: "var(--ff-display)",
-                      fontWeight: 900,
-                      fontSize: 32,
-                      letterSpacing: "-0.02em",
-                      lineHeight: 1,
-                    }}
+                    style={budgetTierLabelStyle}
                   >
                     {t.label}
                   </span>
                   <span
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 13,
-                      letterSpacing: 0.08,
-                      textTransform: "uppercase",
-                      opacity: selected ? 0.8 : 0.78,
-                    }}
+                    style={budgetTierSubStyle(selected)}
                   >
                     {t.sub}
                   </span>
@@ -305,16 +422,7 @@ export function QuizQ4Vibe({
             title="What's the energy tonight?"
             sub="Slide it to where the group lands."
           />
-          <div
-            style={{
-              flex: 1,
-              padding: "40px 22px 0",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "flex-start",
-            }}
-          >
+          <div style={vibeStageStyle}>
             <div
               style={{
                 height: 124,
@@ -340,54 +448,20 @@ export function QuizQ4Vibe({
               </div>
             </div>
             <div
-              style={{
-                width: "100%",
-                display: "flex",
-                gap: 6,
-                marginTop: 22,
-              }}
+              style={vibeScaleStyle}
             >
               {VIBE_LABELS.map((_, i) => (
                 <button
                   type="button"
-                  key={i}
+                  key={VIBE_LABELS[i]}
                   onClick={() => onSelect(i)}
                   aria-label={`vibe ${VIBE_LABELS[i]}`}
                   aria-pressed={i === value}
-                  style={{
-                    appearance: "none",
-                    border: 0,
-                    cursor: "pointer",
-                    flex: 1,
-                    height: 12,
-                    borderRadius: 999,
-                    background:
-                      i === value
-                        ? "var(--sun)"
-                        : "rgba(255,255,255,0.22)",
-                    boxShadow:
-                      i === value
-                        ? "0 0 18px rgba(255,210,63,0.6)"
-                        : "none",
-                    transition: "all 200ms var(--ease-out)",
-                    transform: i === value ? "scaleY(1.4)" : "scaleY(1)",
-                  }}
+                  style={vibeStepStyle(i === value)}
                 />
               ))}
             </div>
-            <div
-              style={{
-                marginTop: 16,
-                width: "100%",
-                display: "flex",
-                justifyContent: "space-between",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: 0.12,
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.7)",
-              }}
-            >
+            <div style={vibeEndpointsStyle}>
               <span>{VIBE_LABELS[0]}</span>
               <span>{VIBE_LABELS[VIBE_LABELS.length - 1]}</span>
             </div>
@@ -456,16 +530,7 @@ function Q5Loading() {
   return (
     <div
       data-testid="quiz-q5-loading"
-      style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 14,
-        padding: "0 32px",
-        textAlign: "center",
-      }}
+      style={q5CenteredStateStyle}
     >
       <p
         style={{
@@ -509,16 +574,7 @@ function Q5NoResults({
     <>
       <div
         data-testid="quiz-q5-no-results"
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 14,
-          padding: "0 32px",
-          textAlign: "center",
-        }}
+        style={q5CenteredStateStyle}
       >
         <h2
           className="gti-display"
@@ -579,13 +635,7 @@ function Q5Default({
         sub="Three real spots near you. Rate each."
       />
       <div
-        style={{
-          marginTop: 22,
-          padding: "0 22px",
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-        }}
+        style={q5CandidateListStyle}
       >
         {candidates.map((p) => (
           <Glass key={p.id} soft style={{ padding: 14, borderRadius: 18 }}>
@@ -610,14 +660,7 @@ function Q5Default({
                   {p.name}
                 </div>
                 <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    marginTop: 3,
-                    color: "rgba(255,255,255,0.7)",
-                    letterSpacing: 0.08,
-                    textTransform: "uppercase",
-                  }}
+                  style={q5CandidateMetaStyle}
                 >
                   {p.meta}
                 </div>
@@ -633,25 +676,7 @@ function Q5Default({
                     onClick={() => onRate(p.id, n)}
                     aria-label={`${p.name} excitement ${n}`}
                     aria-pressed={sel}
-                    style={{
-                      appearance: "none",
-                      border: 0,
-                      cursor: "pointer",
-                      flex: 1,
-                      minHeight: 44,
-                      borderRadius: 10,
-                      background: sel
-                        ? "var(--sun)"
-                        : "rgba(255,255,255,0.10)",
-                      color: sel ? "var(--ink)" : "var(--paper)",
-                      fontFamily: "var(--ff-body)",
-                      fontWeight: 800,
-                      fontSize: 14,
-                      boxShadow: sel
-                        ? "0 8px 18px rgba(255,210,63,0.32)"
-                        : "inset 0 0 0 1px rgba(255,255,255,0.22)",
-                      transition: "all 180ms var(--ease-out)",
-                    }}
+                    style={q5RatingButtonStyle(sel)}
                   >
                     {n}
                   </button>
@@ -659,17 +684,7 @@ function Q5Default({
               })}
             </div>
             <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginTop: 6,
-                fontSize: 9,
-                fontWeight: 700,
-                opacity: 0.6,
-                letterSpacing: 0.12,
-                textTransform: "uppercase",
-                color: "var(--paper)",
-              }}
+              style={q5RatingScaleStyle}
             >
               <span>Not for me</span>
               <span>Can&apos;t wait</span>
@@ -688,5 +703,3 @@ function Q5Default({
     </>
   );
 }
-
-export { REPUTATION_NO_PREFERENCE };

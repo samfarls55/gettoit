@@ -18,6 +18,10 @@ import { InviteShell } from "../../../components/InviteShell";
 
 export const dynamic = "force-dynamic";
 
+type JoinPageProps = {
+  params: Promise<{ roomId: string }>;
+};
+
 // Build OG/Twitter metadata at render time so iMessage and other
 // unfurlers see a card. The roomId is opaque so we don't leak
 // any session content into the unfurl preview.
@@ -34,13 +38,12 @@ export const dynamic = "force-dynamic";
 // URL, which iMessage requires.
 export async function generateMetadata({
   params,
-}: {
-  params: { roomId: string };
-}): Promise<Metadata> {
+}: JoinPageProps): Promise<Metadata> {
+  const { roomId } = await params;
   const title = "GetToIt — Where we're eating tonight";
   const description =
     "Answer 5 questions. The verdict drops when everyone's in.";
-  const canonical = `https://gettoit.app/join/${params.roomId}`;
+  const canonical = `https://gettoit.app/join/${roomId}`;
   const ogImage = "/og/invite.png";
   return {
     title,
@@ -71,11 +74,10 @@ export async function generateMetadata({
   };
 }
 
-export default function JoinPage({
+export default async function JoinPage({
   params,
-}: {
-  params: { roomId: string };
-}) {
+}: JoinPageProps) {
+  const { roomId } = await params;
   // wfr-30 — <main> flows as a flex child of the body column instead of
   // sitting `position: fixed; inset: 0` over the page. The wfr-10 global
   // Footer is a sibling below this <main> in the body's flex column; a
@@ -93,7 +95,7 @@ export default function JoinPage({
         minHeight: 0,
       }}
     >
-      <InviteShell roomId={params.roomId} />
+      <InviteShell roomId={roomId} />
     </main>
   );
 }

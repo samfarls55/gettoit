@@ -80,7 +80,7 @@ export function radiusLabel(radiusMiles: number): string {
   return `${formatRadiusMiles(radiusMiles)} MI RADIUS`;
 }
 
-export function clampRadiusMiles(radiusMiles: number): number {
+function clampRadiusMiles(radiusMiles: number): number {
   return Math.min(
     searchAreaRadiusBounds.maxMiles,
     Math.max(searchAreaRadiusBounds.minMiles, radiusMiles),
@@ -190,30 +190,3 @@ export function isSearchAreaDraftDirty(
     draft.radiusMiles !== committedSearchArea.radiusMiles
   );
 }
-
-export const deterministicSearchAreaAdapter: SearchAreaAdapter = {
-  async getCurrentLocation() {
-    return {
-      latitude: 37.7897,
-      longitude: -122.3972,
-      label: "Current location",
-    };
-  },
-  async searchPlace(query) {
-    const trimmedQuery = query.trim();
-
-    return {
-      latitude: 37.7609,
-      longitude: -122.435,
-      label: trimmedQuery.length > 0 ? trimmedQuery : "Typed place",
-    };
-  },
-  async fetchDensityPreviewPins(searchArea) {
-    return Array.from({ length: 6 }, (_, index) => ({
-      id: `preview-${index + 1}`,
-      latitude: searchArea.center.latitude + (index - 2) * 0.002,
-      longitude: searchArea.center.longitude + (index - 2) * 0.002,
-      label: `Preview ${index + 1}`,
-    }));
-  },
-};

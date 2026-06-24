@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
@@ -16,7 +16,7 @@ import type { QuizSubmissionRepository } from "./quizSubmissionRepository";
 type QuizScreenProps = {
   progressRepository: QuizProgressRepository;
   q5CandidateRepository: Q5CandidateRepository;
-  role: "initiator" | "joiner";
+  participantRole: "initiator" | "joiner";
   roomId: string;
   onExited: () => void;
   onSubmitted?: () => void;
@@ -43,6 +43,47 @@ type QuestionConfig = {
 };
 
 type Q5Status = "idle" | "loading" | "ready" | "noResults";
+
+type Q5State = {
+  candidates: Q5Candidate[];
+  ratings: Record<string, number>;
+  status: Q5Status;
+};
+
+type Q5Action =
+  | { type: "loading" }
+  | { type: "noResults" }
+  | { type: "ready"; candidates: Q5Candidate[] }
+  | { type: "ratingChanged"; candidateId: string; score: number };
+
+const initialQ5State: Q5State = {
+  candidates: [],
+  ratings: {},
+  status: "idle",
+};
+
+function q5Reducer(state: Q5State, action: Q5Action): Q5State {
+  switch (action.type) {
+    case "loading":
+      return { ...state, status: "loading" };
+    case "noResults":
+      return { candidates: [], ratings: {}, status: "noResults" };
+    case "ready":
+      return {
+        candidates: action.candidates,
+        ratings: initialQ5Ratings(action.candidates),
+        status: "ready",
+      };
+    case "ratingChanged":
+      return {
+        ...state,
+        ratings: {
+          ...state.ratings,
+          [action.candidateId]: action.score,
+        },
+      };
+  }
+}
 
 const noPreferenceValue = "noPreference";
 const maxMultiSelectValues = 3;
@@ -188,7 +229,7 @@ function nextMultiSelectValues(
 export function QuizScreen({
   progressRepository,
   q5CandidateRepository,
-  role,
+  participantRole,
   roomId,
   onExited,
   onSubmitted,
@@ -198,16 +239,19 @@ export function QuizScreen({
     useState<QuizQuestionId>("q1");
   const [answers, setAnswers] = useState<QuizAnswers>({});
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
-  const [q5Candidates, setQ5Candidates] = useState<Q5Candidate[]>([]);
-  const [q5Status, setQ5Status] = useState<Q5Status>("idle");
-  const [q5Ratings, setQ5Ratings] = useState<Record<string, number>>({});
+  const [q5State, dispatchQ5] = useReducer(q5Reducer, initialQ5State);
+  const {
+    candidates: q5Candidates,
+    ratings: q5Ratings,
+    status: q5Status,
+  } = q5State;
   const currentQuestion =
     questionConfigs[questionIndex(currentQuestionId)] ?? questionConfigs[0];
-  const exitLabel = role === "joiner" ? "Leave" : "Exit";
+  const exitLabel = participantRole === "joiner" ? "Leave" : "Exit";
   const currentSelectedValues = selectedValues(answers, currentQuestion);
 
-  async function loadQ5Candidates(nextQuizAnswers: QuizAnswers) {
-    setQ5Status("loading");
+  const loadQ5Candidates = useCallback(async (nextQuizAnswers: QuizAnswers) => {
+    dispatchQ5({ type: "loading" });
 
     try {
       const candidates = await q5CandidateRepository.loadCandidates({
@@ -216,19 +260,15 @@ export function QuizScreen({
       });
 
       if (candidates.length === 0) {
-        setQ5Candidates([]);
-        setQ5Status("noResults");
+        dispatchQ5({ type: "noResults" });
         return;
       }
 
-      setQ5Candidates(candidates);
-      setQ5Ratings(initialQ5Ratings(candidates));
-      setQ5Status("ready");
+      dispatchQ5({ type: "ready", candidates });
     } catch {
-      setQ5Candidates([]);
-      setQ5Status("noResults");
+      dispatchQ5({ type: "noResults" });
     }
-  }
+  }, [q5CandidateRepository, roomId]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -249,7 +289,7 @@ export function QuizScreen({
     return () => {
       isCurrent = false;
     };
-  }, [progressRepository, roomId]);
+  }, [loadQ5Candidates, progressRepository, roomId]);
 
   const handleOptionPress = (value: AnswerValue) => {
     setAnswers((currentAnswers) => {
@@ -353,10 +393,7 @@ export function QuizScreen({
           candidates={q5Candidates}
           onNoResultsSubmit={handleQ5NoResultsSubmit}
           onRatingPress={(candidateId, score) =>
-            setQ5Ratings((currentRatings) => ({
-              ...currentRatings,
-              [candidateId]: score,
-            }))
+            dispatchQ5({ type: "ratingChanged", candidateId, score })
           }
           onSubmit={handleQ5Submit}
           ratings={q5Ratings}
@@ -405,10 +442,10 @@ export function QuizScreen({
       {isExitConfirmOpen ? (
         <View style={styles.confirmCard}>
           <Text style={styles.confirmTitle}>
-            {role === "joiner" ? "Leave this plan?" : "Exit this plan?"}
+            {participantRole === "joiner" ? "Leave this plan?" : "Exit this plan?"}
           </Text>
           <Text style={styles.confirmBody}>
-            {role === "joiner"
+            {participantRole === "joiner"
               ? "Your answers will be discarded. The host and others can still finish."
               : "Your answers will be discarded. Others can still finish without you."}
           </Text>

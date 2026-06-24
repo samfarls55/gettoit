@@ -33,8 +33,6 @@ jobs:
     defaults:
       run:
         working-directory: mobile
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,7 +44,14 @@ jobs:
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
+      - run: npm ci --ignore-scripts
+      - run: npm run verify
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@latest --ignore-scripts
+
       - name: Require EXPO_TOKEN
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
           if [ -z "${EXPO_TOKEN:-}" ]; then
@@ -54,10 +59,9 @@ jobs:
             exit 1
           fi
 
-      - run: npm ci
-      - run: npm run verify
-
       - name: Require remote EAS build numbering
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
           if [ "$(jq -r '.cli.appVersionSource // empty' eas.json)" != "remote" ]; then
@@ -70,7 +74,7 @@ jobs:
             echo "EAS remote versioning is the TestFlight build-number source of truth." >&2
             exit 1
           fi
-          npx --yes eas-cli@latest build:version:get \
+          eas build:version:get \
             --platform ios \
             --profile production \
             --json
@@ -93,9 +97,11 @@ jobs:
 
       - name: EAS build and submit to TestFlight
         if: ${{ inputs.submit }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes eas-cli@latest build \
+          eas build \
             --platform ios \
             --profile production \
             --non-interactive \
@@ -105,9 +111,11 @@ jobs:
 
       - name: EAS build only
         if: ${{ !inputs.submit }}
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes eas-cli@latest build \
+          eas build \
             --platform ios \
             --profile production \
             --non-interactive \

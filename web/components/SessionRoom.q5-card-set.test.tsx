@@ -27,6 +27,7 @@ const USER_ID = "anon-user-1";
 function makeClient() {
   const tableWrites: string[] = [];
   const functionInvokes: string[] = [];
+  const rpcInvokes: string[] = [];
 
   const builder = (table: string) => {
     const rows = (): unknown[] => {
@@ -80,8 +81,13 @@ function makeClient() {
   return {
     tableWrites,
     functionInvokes,
+    rpcInvokes,
     client: {
       from: (table: string) => builder(table),
+      rpc: (functionName: string) => {
+        rpcInvokes.push(functionName);
+        return Promise.resolve({ error: null });
+      },
       channel: () => channel,
       functions: {
         invoke: vi.fn((functionName: string) => {
@@ -124,7 +130,7 @@ beforeEach(() => {
 
 describe("SessionRoom Q5 card set", () => {
   it("loads assigned Google Q5 cards without writing member_fetches", async () => {
-    const { client, functionInvokes, tableWrites } = makeClient();
+    const { client, functionInvokes, rpcInvokes, tableWrites } = makeClient();
     getSupabaseClient.mockReturnValue(client);
 
     render(
@@ -148,7 +154,7 @@ describe("SessionRoom Q5 card set", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Drop the verdict" }));
 
-    await waitFor(() => expect(tableWrites).toContain("votes"));
+    await waitFor(() => expect(rpcInvokes).toContain("votes_submit_self"));
     expect(tableWrites).not.toContain("member_fetches");
   });
 });

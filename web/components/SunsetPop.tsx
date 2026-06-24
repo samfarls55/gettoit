@@ -4,32 +4,142 @@
 
 import Link from "next/link";
 import { type CSSProperties, type ReactNode } from "react";
+import { GTI_GRADIENTS, type GradientStop } from "./sunset-pop-data";
+
+const topBarStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 3,
+  display: "flex",
+  alignItems: "center",
+  gap: 14,
+  padding: "0 22px",
+};
+
+const topBarCloseStyle: CSSProperties = {
+  appearance: "none",
+  border: 0,
+  background: "transparent",
+  color: "var(--paper)",
+  padding: 4,
+  cursor: "pointer",
+  fontFamily: "var(--ff-body)",
+  fontWeight: 800,
+  fontSize: 22,
+  lineHeight: 1,
+  opacity: 0.85,
+};
+
+const topBarLeaveStyle: CSSProperties = {
+  ...topBarCloseStyle,
+  fontWeight: 700,
+  fontSize: "var(--fz-eyebrow)",
+  letterSpacing: "var(--tr-eyebrow)",
+  textTransform: "uppercase",
+  whiteSpace: "nowrap",
+};
+
+const progressRailStyle: CSSProperties = {
+  flex: 1,
+  display: "flex",
+  gap: 5,
+  alignItems: "center",
+};
+
+const chipBaseStyle: CSSProperties = {
+  appearance: "none",
+  fontFamily: "var(--ff-body)",
+  fontSize: 15,
+  fontWeight: 700,
+  padding: "14px 22px",
+  borderRadius: 999,
+  minHeight: 48,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 8,
+  transition:
+    "background 180ms var(--ease-out), color 180ms var(--ease-out), border-color 180ms var(--ease-out), box-shadow 180ms var(--ease-out), transform 180ms var(--ease-out)",
+};
+
+const pillFills: Record<PillFill, { bg: string; fg: string }> = {
+  white: { bg: "var(--paper)", fg: "var(--ink)" },
+  sun: { bg: "var(--sun)", fg: "var(--ink)" },
+  ink: { bg: "var(--ink)", fg: "var(--paper)" },
+  ghost: { bg: "transparent", fg: "var(--paper)" },
+};
+
+const pillButtonBaseStyle: CSSProperties = {
+  appearance: "none",
+  border: 0,
+  width: "100%",
+  height: 60,
+  borderRadius: 999,
+  fontFamily: "var(--ff-body)",
+  fontWeight: 900,
+  fontSize: 14,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase",
+  transition: "transform 140ms var(--ease-out), opacity 200ms",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 10,
+};
+
+const receiptChipTextStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 800,
+  color: "var(--paper)",
+  letterSpacing: 0.1,
+};
+
+const receiptChipActionStyle: CSSProperties = {
+  ...receiptChipTextStyle,
+  fontWeight: 500,
+  color: "rgba(255,255,255,0.82)",
+};
+
+const avatarAnsweredBadgeStyle: CSSProperties = {
+  position: "absolute",
+  bottom: -2,
+  right: -2,
+  width: 16,
+  height: 16,
+  borderRadius: "50%",
+  background: "var(--sun)",
+  border: "2px solid var(--paper)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  fontSize: 12,
+  color: "var(--ink)",
+  fontWeight: 900,
+};
+
+const glassBaseStyle: CSSProperties = {
+  backdropFilter: "blur(8px) saturate(160%)",
+  WebkitBackdropFilter: "blur(8px) saturate(160%)",
+  border: "0.75px solid rgba(255,255,255,0.32)",
+  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)",
+  borderRadius: "var(--r-card)",
+};
+
+const gtiMarkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 10,
+  color: "var(--paper)",
+  fontFamily: "var(--ff-body)",
+  textDecoration: "none",
+};
 
 // The 4-stop gradient map.
 //
 // under `gradient.surfaces.<stop>`. They live here too because the
 // Drift is gated by `verify.mjs` — every hex below must be present in
 // tokens.json or the sweep fails.
-export const GTI_GRADIENTS: Record<string, [string, string, string, string]> = {
-  initiator: ["#FF8868", "#FF9F6B", "#FFB855", "#FFD23F"],
-  q1: ["#FF6B5E", "#FF8A5F", "#FFB256", "#FFD23F"],
-  q2: ["#FF5878", "#FF7A66", "#FFA15A", "#FFC75A"],
-  q3: ["#E04F8B", "#B855B0", "#8A5BD0", "#6E63E0"],
-  q4: ["#2F3380", "#3F47A6", "#5E59C9", "#7C68E4"],
-  q5: ["#0E1450", "#181B5E", "#252A6E", "#363B82"],
-  waiting: ["#1B1F66", "#2A2A7C", "#4A3F9F", "#7256C4"],
-  verdict: ["#FFC548", "#FF8A5A", "#C24F7E", "#2A2068"],
-  checkin: ["#FFDB6B", "#FFA86D", "#FF7F88", "#9F4C9F"],
-  midnight: ["#0A0B1A", "#10112A", "#161836", "#1F2244"],
-};
-
-export type GradientStop = keyof typeof GTI_GRADIENTS;
-
 // Avatar colors. Mirrors `color.member-identity` in tokens.json.
 // The "self" color is the `--sun` token; the other three are the
 // rotating identity palette.
-export const MEMBER_COLORS = ["#FFD23F", "#7DDFB5", "#FF8DA1", "#9BC0FF"] as const;
-
 export function GradientSurface({
   stop,
   children,
@@ -75,37 +185,16 @@ export function TopBar({
   onLeave?: () => void;
 }) {
   return (
-    <div
-      style={{
-        position: "relative",
-        zIndex: 3,
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-        padding: "0 22px",
-      }}
-    >
+    <div style={topBarStyle}>
       <button
         type="button"
         onClick={onClose}
         aria-label="Close session"
-        style={{
-          appearance: "none",
-          border: 0,
-          background: "transparent",
-          color: "var(--paper)",
-          padding: 4,
-          cursor: "pointer",
-          fontFamily: "var(--ff-body)",
-          fontWeight: 800,
-          fontSize: 22,
-          lineHeight: 1,
-          opacity: 0.85,
-        }}
+        style={topBarCloseStyle}
       >
         ×
       </button>
-      <div style={{ flex: 1, display: "flex", gap: 5, alignItems: "center" }}>
+      <div style={progressRailStyle}>
         {Array.from({ length: total }).map((_, i) => (
           <div
             key={i}
@@ -124,22 +213,7 @@ export function TopBar({
         <button
           type="button"
           onClick={onLeave}
-          style={{
-            appearance: "none",
-            border: 0,
-            background: "transparent",
-            color: "var(--paper)",
-            padding: 4,
-            cursor: "pointer",
-            fontFamily: "var(--ff-body)",
-            fontWeight: 700,
-            fontSize: "var(--fz-eyebrow)",
-            letterSpacing: "var(--tr-eyebrow)",
-            textTransform: "uppercase",
-            lineHeight: 1,
-            opacity: 0.85,
-            whiteSpace: "nowrap",
-          }}
+          style={topBarLeaveStyle}
         >
           Leave
         </button>
@@ -207,18 +281,8 @@ export function Chip({
   style?: CSSProperties;
 }) {
   const base: CSSProperties = {
-    appearance: "none",
-    fontFamily: "var(--ff-body)",
-    fontSize: 15,
-    fontWeight: 700,
-    padding: "14px 22px",
-    borderRadius: 999,
+    ...chipBaseStyle,
     cursor: disabled ? "not-allowed" : "pointer",
-    transition: "all 180ms var(--ease-out)",
-    minHeight: 48,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
     ...style,
   };
   // C-04 `disabled` — the unselected chip dimmed to 0.4 white text on
@@ -300,46 +364,27 @@ export function PillCTA({
   prefix?: ReactNode;
   type?: "button" | "submit";
 }) {
-  const fills: Record<PillFill, { bg: string; fg: string }> = {
-    white: { bg: "var(--paper)", fg: "var(--ink)" },
-    sun: { bg: "var(--sun)", fg: "var(--ink)" },
-    ink: { bg: "var(--ink)", fg: "var(--paper)" },
-    ghost: { bg: "transparent", fg: "var(--paper)" },
+  const { bg, fg } = pillFills[fill];
+  const buttonStyle: CSSProperties = {
+    ...pillButtonBaseStyle,
+    background: bg,
+    color: fg,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.45 : 1,
+    boxShadow:
+      fill === "sun"
+        ? "0 12px 32px rgba(255,210,63,0.4), inset 0 1px 0 rgba(255,255,255,0.45)"
+        : fill === "ghost"
+          ? "inset 0 0 0 1.5px rgba(255,255,255,0.55)"
+          : "0 12px 32px rgba(0,0,0,0.18)",
+    ...style,
   };
-  const { bg, fg } = fills[fill];
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      style={{
-        appearance: "none",
-        border: 0,
-        width: "100%",
-        height: 60,
-        borderRadius: 999,
-        background: bg,
-        color: fg,
-        fontFamily: "var(--ff-body)",
-        fontWeight: 900,
-        fontSize: 14,
-        letterSpacing: "0.14em",
-        textTransform: "uppercase",
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.45 : 1,
-        boxShadow:
-          fill === "sun"
-            ? "0 12px 32px rgba(255,210,63,0.4), inset 0 1px 0 rgba(255,255,255,0.45)"
-            : fill === "ghost"
-              ? "inset 0 0 0 1.5px rgba(255,255,255,0.55)"
-              : "0 12px 32px rgba(0,0,0,0.18)",
-        transition: "transform 140ms var(--ease-out), opacity 200ms",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-        ...style,
-      }}
+      style={buttonStyle}
     >
       {prefix}
       {label}
@@ -347,7 +392,7 @@ export function PillCTA({
   );
 }
 
-export function ReceiptChip({
+function ReceiptChip({
   name,
   action,
   delay = 0,
@@ -358,42 +403,29 @@ export function ReceiptChip({
   delay?: number;
   style?: CSSProperties;
 }) {
+  const chipStyle: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "baseline",
+    gap: 5,
+    padding: "7px 13px 8px",
+    borderRadius: 999,
+    background: "rgba(255,255,255,0.18)",
+    backdropFilter: "blur(8px) saturate(160%)",
+    WebkitBackdropFilter: "blur(8px) saturate(160%)",
+    border: "0.75px solid rgba(255,255,255,0.32)",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 10px rgba(0,0,0,0.08)",
+    animation: `gti-stagger-in 480ms var(--ease-out-soft) ${delay}ms both`,
+    ...style,
+  };
   return (
     <div
-      style={{
-        display: "inline-flex",
-        alignItems: "baseline",
-        gap: 5,
-        padding: "7px 13px 8px",
-        borderRadius: 999,
-        background: "rgba(255,255,255,0.18)",
-        backdropFilter: "blur(14px) saturate(160%)",
-        WebkitBackdropFilter: "blur(14px) saturate(160%)",
-        border: "0.75px solid rgba(255,255,255,0.32)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 10px rgba(0,0,0,0.08)",
-        animation: `gti-stagger-in 480ms var(--ease-out-soft) ${delay}ms both`,
-        ...style,
-      }}
+      style={chipStyle}
     >
-      <span
-        style={{
-          fontSize: 12,
-          fontWeight: 800,
-          color: "var(--paper)",
-          letterSpacing: 0.1,
-        }}
-      >
+      <span style={receiptChipTextStyle}>
         {name}
       </span>
-      <span
-        style={{
-          fontSize: 12,
-          fontWeight: 500,
-          color: "rgba(255,255,255,0.82)",
-          letterSpacing: 0.1,
-        }}
-      >
+      <span style={receiptChipActionStyle}>
         {action}
       </span>
     </div>
@@ -412,49 +444,32 @@ export function AvatarDot({
   size?: number;
 }) {
   const initial = (name || "?").charAt(0).toUpperCase();
+  const avatarStyle: CSSProperties = {
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    background: color,
+    color: "var(--ink)",
+    fontFamily: "var(--ff-body)",
+    fontWeight: 900,
+    fontSize: size * 0.42,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+    boxShadow: answered
+      ? "0 0 0 2.5px rgba(255,255,255,0.85), 0 8px 22px rgba(0,0,0,0.18)"
+      : "inset 0 0 0 1px rgba(255,255,255,0.25)",
+    opacity: answered ? 1 : 0.55,
+    filter: answered ? "none" : "grayscale(0.5)",
+    transition:
+      "opacity 320ms var(--ease-out), filter 320ms var(--ease-out), box-shadow 320ms var(--ease-out)",
+  };
   return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: color,
-        color: "var(--ink)",
-        fontFamily: "var(--ff-body)",
-        fontWeight: 900,
-        fontSize: size * 0.42,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        position: "relative",
-        boxShadow: answered
-          ? "0 0 0 2.5px rgba(255,255,255,0.85), 0 8px 22px rgba(0,0,0,0.18)"
-          : "inset 0 0 0 1px rgba(255,255,255,0.25)",
-        opacity: answered ? 1 : 0.55,
-        filter: answered ? "none" : "grayscale(0.5)",
-        transition: "all 320ms var(--ease-out)",
-      }}
-    >
+    <div style={avatarStyle}>
       {initial}
       {answered ? (
-        <div
-          style={{
-            position: "absolute",
-            bottom: -2,
-            right: -2,
-            width: 14,
-            height: 14,
-            borderRadius: "50%",
-            background: "var(--sun)",
-            border: "2px solid var(--paper)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 8,
-            color: "var(--ink)",
-            fontWeight: 900,
-          }}
-        >
+        <div style={avatarAnsweredBadgeStyle}>
           ✓
         </div>
       ) : null}
@@ -512,20 +527,15 @@ export function Glass({
   style?: CSSProperties;
   soft?: boolean;
 }) {
+  const glassStyle: CSSProperties = {
+    ...glassBaseStyle,
+    background: soft
+      ? "rgba(255,255,255,0.10)"
+      : "rgba(255,255,255,0.18)",
+    ...style,
+  };
   return (
-    <div
-      style={{
-        background: soft
-          ? "rgba(255,255,255,0.10)"
-          : "rgba(255,255,255,0.18)",
-        backdropFilter: "blur(16px) saturate(160%)",
-        WebkitBackdropFilter: "blur(16px) saturate(160%)",
-        border: "0.75px solid rgba(255,255,255,0.32)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)",
-        borderRadius: "var(--r-card)",
-        ...style,
-      }}
-    >
+    <div style={glassStyle}>
       {children}
     </div>
   );
@@ -540,39 +550,34 @@ export function GTIMark({ size = 18 }: { size?: number }) {
   // unchanged; we only swap the outer <div> for an <a>-shaped <Link>
   // and reset the inherited anchor styles so the wordmark looks
   // identical to its pre-link form.
+  const tileStyle: CSSProperties = {
+    width: size * 0.9,
+    height: size * 0.9,
+    borderRadius: 5,
+    background: "var(--sun)",
+    color: "var(--ink)",
+    fontWeight: 900,
+    fontSize: size * 0.55,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxShadow: "0 4px 12px rgba(255,210,63,0.4)",
+  };
+  const textStyle: CSSProperties = {
+    fontWeight: 800,
+    fontSize: size * 0.78,
+    letterSpacing: 0.6,
+  };
   return (
     <Link
       href="/"
       aria-label="GetToIt — home"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        color: "var(--paper)",
-        fontFamily: "var(--ff-body)",
-        textDecoration: "none",
-      }}
+      style={gtiMarkStyle}
     >
-      <div
-        style={{
-          width: size * 0.9,
-          height: size * 0.9,
-          borderRadius: 5,
-          background: "var(--sun)",
-          color: "var(--ink)",
-          fontWeight: 900,
-          fontSize: size * 0.55,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 4px 12px rgba(255,210,63,0.4)",
-        }}
-      >
+      <div style={tileStyle}>
         g
       </div>
-      <span
-        style={{ fontWeight: 800, fontSize: size * 0.78, letterSpacing: 0.6 }}
-      >
+      <span style={textStyle}>
         GetToIt
       </span>
     </Link>

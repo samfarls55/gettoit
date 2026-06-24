@@ -4,12 +4,12 @@
 // drive its first-landing state machine:
 //   * `findMembership` — does this anon user already have a `members`
 //     row for the room? Drives name-entry vs. resume routing.
-//   * `createMembership` — insert the `members` row carrying the
+//   * `createMembership` — call the server-owned join RPC carrying the
 //     `display_name` the invitee typed on the name-entry surface.
 //
 // These wrap supabase-js PostgREST calls; the tests exercise them
 // against a hand-rolled fake client so the wire shape (table, columns,
-// filters, the `display_name` write) is pinned without a live Postgres.
+// filters, the `display_name` RPC arg) is pinned without a live Postgres.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,13 +29,13 @@ type SelectResult = { data: unknown; error: unknown };
 
 function fakeClient(opts: {
   selectResult?: SelectResult;
-  insertError?: unknown;
+  rpcError?: unknown;
 }) {
   const calls: {
     table: string;
     select?: string;
     eqs: Array<[string, unknown]>;
-    inserted?: unknown;
+    rpc?: { name: string; args: unknown };
   }[] = [];
 
   const from = vi.fn((table: string) => {
@@ -55,14 +55,14 @@ function fakeClient(opts: {
     builder.maybeSingle = vi.fn(() =>
       Promise.resolve(opts.selectResult ?? { data: null, error: null }),
     );
-    builder.insert = vi.fn((row: unknown) => {
-      record.inserted = row;
-      return Promise.resolve({ error: opts.insertError ?? null });
-    });
     return builder;
   });
+  const rpc = vi.fn((name: string, args: unknown) => {
+    calls.push({ table: "rpc", eqs: [], rpc: { name, args } });
+    return Promise.resolve({ error: opts.rpcError ?? null });
+  });
 
-  return { client: { from }, calls };
+  return { client: { from, rpc }, calls };
 }
 
 describe("findMembership", () => {
@@ -107,39 +107,38 @@ describe("findMembership", () => {
 });
 
 describe("createMembership", () => {
-  it("inserts a members row carrying room_id, user_id, role, and display_name", async () => {
+  it("calls members_join_self with room_id and display_name", async () => {
     const { client, calls } = fakeClient({});
     await createMembership(client as never, {
       roomId: "room-1",
-      userId: "u1",
       displayName: "Maya",
     });
-    expect(calls[0].table).toBe("members");
-    expect(calls[0].inserted).toMatchObject({
-      room_id: "room-1",
-      user_id: "u1",
-      display_name: "Maya",
+    expect(calls[0].rpc).toEqual({
+      name: "members_join_self",
+      args: {
+        p_room_id: "room-1",
+        p_display_name: "Maya",
+      },
     });
   });
 
-  it("inserts the invitee as a participant, not an owner", async () => {
+  it("does not send user_id or role from the client", async () => {
     const { client, calls } = fakeClient({});
     await createMembership(client as never, {
       roomId: "room-1",
-      userId: "u1",
       displayName: "Maya",
     });
-    expect((calls[0].inserted as { role?: string }).role).toBe("participant");
+    expect(calls[0].rpc?.args).not.toHaveProperty("user_id");
+    expect(calls[0].rpc?.args).not.toHaveProperty("role");
   });
 
-  it("throws when the insert is rejected", async () => {
+  it("throws when the join is rejected", async () => {
     const { client } = fakeClient({
-      insertError: { message: "insert denied" },
+      rpcError: { message: "join denied" },
     });
     await expect(
       createMembership(client as never, {
         roomId: "room-1",
-        userId: "u1",
         displayName: "Maya",
       }),
     ).rejects.toThrow();

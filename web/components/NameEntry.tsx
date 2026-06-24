@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type CSSProperties, type FormEvent } from "react";
 
 import { Eyebrow, GTIMark, GradientSurface, PillCTA } from "./SunsetPop";
 
@@ -22,6 +22,62 @@ import { Eyebrow, GTIMark, GradientSurface, PillCTA } from "./SunsetPop";
 // hard-stops input at 30 via `maxLength`; there is no counter chip and
 // no error state — the cap is enforced silently.
 const NAME_MAX_LENGTH = 30;
+
+const formStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  padding: "22px 22px 24px",
+  display: "flex",
+  flexDirection: "column",
+  color: "var(--paper)",
+};
+
+const contentColumnStyle: CSSProperties = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  width: "100%",
+  maxWidth: 360,
+  marginInline: "auto",
+};
+
+const titleStyle: CSSProperties = {
+  fontSize: 38,
+  margin: "10px 0 0",
+  textWrap: "balance",
+};
+
+const inputStyle: CSSProperties = {
+  marginTop: 24,
+  width: "100%",
+  height: 56,
+  boxSizing: "border-box",
+  padding: "0 18px",
+  borderRadius: "var(--r-row)",
+  background: "var(--glass-fill-soft)",
+  border: "1px solid var(--glass-stroke)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+  color: "var(--paper)",
+  fontFamily: "var(--ff-body)",
+  fontSize: 16,
+  fontWeight: 600,
+  outline: "2px solid transparent",
+  outlineOffset: 2,
+  boxShadow: "none",
+  transition: "border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out)",
+};
+
+const errorStyle: CSSProperties = {
+  margin: "12px 0 0",
+  fontFamily: "var(--ff-body)",
+  fontSize: 13,
+  fontWeight: 600,
+  lineHeight: 1.4,
+  color: "rgba(255,255,255,0.78)",
+  textWrap: "balance",
+};
 
 export type NameEntryProps = {
   /** Called with the trimmed, non-empty name when the invitee taps the
@@ -62,41 +118,19 @@ export function NameEntry({
         onSubmit={handleSubmit}
         className="gti-fade-up"
         data-testid="name-entry"
-        style={{
-          position: "absolute",
-          inset: 0,
-          // Wordmark top-leading at 22px from the leading + top edge,
-          // centered content column max-width 360, h-padding 22 — the
-          // shared shell chrome from the surface doc.
-          padding: "22px 22px 24px",
-          display: "flex",
-          flexDirection: "column",
-          color: "var(--paper)",
-        }}
+        style={formStyle}
       >
         <GTIMark size={20} />
 
         <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            width: "100%",
-            maxWidth: 360,
-            marginInline: "auto",
-          }}
+          style={contentColumnStyle}
         >
           {/* eyebrow → 10 → headline → 24 → input → 16 → CTA */}
           <Eyebrow>You&apos;re invited</Eyebrow>
 
           <h1
             className="gti-display"
-            style={{
-              fontSize: 38,
-              margin: "10px 0 0",
-              textWrap: "balance",
-            }}
+            style={titleStyle}
           >
             What should we call you?
           </h1>
@@ -108,36 +142,19 @@ export function NameEntry({
             placeholder="Your name"
             aria-label="Your name"
             maxLength={NAME_MAX_LENGTH}
-            autoFocus
             autoCapitalize="words"
             autoComplete="off"
             disabled={submitting}
             data-testid="name-entry-input"
-            style={{
-              marginTop: 24,
-              width: "100%",
-              height: 56,
-              boxSizing: "border-box",
-              padding: "0 18px",
-              borderRadius: "var(--r-row)",
-              background: "var(--glass-fill-soft)",
-              border: "1px solid var(--glass-stroke)",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              color: "var(--paper)",
-              fontFamily: "var(--ff-body)",
-              fontSize: 16,
-              fontWeight: 600,
-              outline: "none",
-              // Focus ring → sun: the "system registered your input"
-              // signal, 140ms ease-out (surface doc §"Name input").
-              transition: "border-color 140ms var(--ease-out)",
-            }}
+            style={inputStyle}
             onFocus={(event) => {
               event.currentTarget.style.borderColor = "var(--sun)";
+              event.currentTarget.style.boxShadow =
+                "0 0 0 3px rgba(255,210,63,0.24)";
             }}
             onBlur={(event) => {
               event.currentTarget.style.borderColor = "var(--glass-stroke)";
+              event.currentTarget.style.boxShadow = "none";
             }}
           />
 
@@ -154,15 +171,7 @@ export function NameEntry({
             <p
               role="alert"
               data-testid="name-entry-error"
-              style={{
-                margin: "12px 0 0",
-                fontFamily: "var(--ff-body)",
-                fontSize: 13,
-                fontWeight: 600,
-                lineHeight: 1.4,
-                color: "rgba(255,255,255,0.78)",
-                textWrap: "balance",
-              }}
+              style={errorStyle}
             >
               {errorMessage}
             </p>

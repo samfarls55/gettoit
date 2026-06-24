@@ -261,34 +261,40 @@ export function createSupabaseWaitingRepository({
           throw new Error(`Verdict fire failed: ${rpcError}`);
         }
 
-        let snapshot = await loadSnapshot(roomId);
+        const pollSnapshot = async (
+          snapshot: WaitingSnapshot,
+          attempt: number,
+        ): Promise<WaitingSnapshot> => {
+          if (attempt >= verdictPollAttempts || snapshot.status !== "waiting") {
+            return snapshot;
+          }
+
+          await delay(verdictPollDelayMs);
+          const nextSnapshot = await loadSnapshot(roomId);
+          log("verdict.fire.poll", {
+            roomId,
+            attempt: attempt + 1,
+            snapshot: nextSnapshot,
+            durationMs: durationMs(startedAt, now),
+          });
+          return pollSnapshot(nextSnapshot, attempt + 1);
+        };
+
+        const snapshot = await loadSnapshot(roomId);
         log("verdict.fire.poll", {
           roomId,
           attempt: 0,
           snapshot,
           durationMs: durationMs(startedAt, now),
         });
-        for (
-          let attempt = 0;
-          attempt < verdictPollAttempts && snapshot.status === "waiting";
-          attempt += 1
-        ) {
-          await delay(verdictPollDelayMs);
-          snapshot = await loadSnapshot(roomId);
-          log("verdict.fire.poll", {
-            roomId,
-            attempt: attempt + 1,
-            snapshot,
-            durationMs: durationMs(startedAt, now),
-          });
-        }
+        const finalSnapshot = await pollSnapshot(snapshot, 0);
 
         log("verdict.fire.result", {
           roomId,
-          snapshot,
+          snapshot: finalSnapshot,
           durationMs: durationMs(startedAt, now),
         });
-        return snapshot;
+        return finalSnapshot;
       } catch (error) {
         log("verdict.fire.error", {
           roomId,

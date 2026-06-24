@@ -89,30 +89,34 @@ async function search(ll: string, categoryId: string): Promise<RawResult[]> {
 
 const venues = new Map<string, SampledVenue>(); // dedupe by fsq_place_id
 
-for (const metro of METROS) {
-  for (const cat of CATEGORIES) {
-    let results: RawResult[];
-    try {
-      results = await search(metro.ll, cat.id);
-    } catch (err) {
-      console.error(`  ! ${metro.name} / ${cat.name}: ${err}`);
-      continue;
-    }
-    for (const r of results) {
-      if (!r.fsq_place_id) continue;
-      if (venues.has(r.fsq_place_id)) continue; // first sighting wins
-      venues.set(r.fsq_place_id, {
-        fsq_place_id: r.fsq_place_id,
-        name: r.name ?? "(unnamed)",
-        metro: metro.name,
-        query_category: cat.name,
-        categories: (r.categories ?? []).map((c) => c.name),
-        tastes: r.tastes ?? [],
-        has_tastes: Array.isArray(r.tastes) && r.tastes.length > 0,
-      });
-    }
-    console.error(`  ${metro.name} / ${cat.name}: ${results.length} results`);
+const searchResults = await Promise.all(
+  METROS.flatMap((metro) =>
+    CATEGORIES.map((cat) =>
+      search(metro.ll, cat.id)
+        .then((results) => ({ metro, cat, results }))
+        .catch((err) => {
+          console.error(`  ! ${metro.name} / ${cat.name}: ${err}`);
+          return { metro, cat, results: [] };
+        })
+    )
+  ),
+);
+
+for (const { metro, cat, results } of searchResults) {
+  for (const r of results) {
+    if (!r.fsq_place_id) continue;
+    if (venues.has(r.fsq_place_id)) continue; // first sighting wins
+    venues.set(r.fsq_place_id, {
+      fsq_place_id: r.fsq_place_id,
+      name: r.name ?? "(unnamed)",
+      metro: metro.name,
+      query_category: cat.name,
+      categories: (r.categories ?? []).map((c) => c.name),
+      tastes: r.tastes ?? [],
+      has_tastes: Array.isArray(r.tastes) && r.tastes.length > 0,
+    });
   }
+  console.error(`  ${metro.name} / ${cat.name}: ${results.length} results`);
 }
 
 const sample = [...venues.values()];

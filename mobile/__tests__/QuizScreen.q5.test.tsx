@@ -69,8 +69,8 @@ describe("QuizScreen Q1", () => {
           saveProgress: jest.fn(async () => undefined),
           exitPlan: jest.fn(async () => undefined),
         }}
+        participantRole="initiator"
         q5CandidateRepository={makeCandidateRepository([])}
-        role="initiator"
         roomId="room-q1"
         submissionRepository={makeSubmissionRepository()}
       />,
@@ -111,9 +111,9 @@ describe("QuizScreen Q5", () => {
     render(
       <QuizScreen
         onExited={jest.fn()}
+        participantRole="initiator"
         progressRepository={progressRepository}
         q5CandidateRepository={q5CandidateRepository}
-        role="initiator"
         roomId="room-q5"
         submissionRepository={makeSubmissionRepository()}
       />,
@@ -148,9 +148,9 @@ describe("QuizScreen Q5", () => {
     render(
       <QuizScreen
         onExited={jest.fn()}
+        participantRole="initiator"
         progressRepository={makeProgressRepository()}
         q5CandidateRepository={makeCandidateRepository([])}
-        role="initiator"
         roomId="room-q5"
         submissionRepository={makeSubmissionRepository()}
       />,
@@ -181,9 +181,9 @@ describe("QuizScreen Q5", () => {
       <QuizScreen
         onExited={jest.fn()}
         onSubmitted={onSubmitted}
+        participantRole="initiator"
         progressRepository={makeProgressRepository()}
         q5CandidateRepository={makeCandidateRepository(candidatePool)}
-        role="initiator"
         roomId="room-q5"
         submissionRepository={submissionRepository}
       />,
@@ -267,7 +267,7 @@ describe("QuizScreen Q5", () => {
             droppedAxis: "vibe",
           },
         ])}
-        role="initiator"
+        participantRole="initiator"
         roomId="room-q5"
         submissionRepository={makeSubmissionRepository()}
       />,

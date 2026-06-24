@@ -125,6 +125,7 @@ function makeClient(state: FakeState) {
   return {
     client: {
       from: (table: string) => builder(table),
+      rpc: () => Promise.resolve({ error: null }),
       channel: () => channel,
       functions: { invoke: vi.fn() },
     },

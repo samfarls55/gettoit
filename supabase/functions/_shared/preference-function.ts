@@ -200,9 +200,9 @@ function dropCardScore(axis: Axis, q5Ratings: Q5Rating[]): number | null {
 /** The ratings of the cards that keep `axis` (the factorial cards whose
  *  `droppedAxis` is some *other* axis â€” each of them keeps this axis). */
 function keepCardScores(axis: Axis, q5Ratings: Q5Rating[]): number[] {
-  return q5Ratings
-    .filter((r) => r.droppedAxis !== axis)
-    .map((r) => r.score);
+  return q5Ratings.flatMap((r) =>
+    r.droppedAxis !== axis ? [r.score] : []
+  );
 }
 
 /** An axis's marginal value: the average of its two keep-card ratings

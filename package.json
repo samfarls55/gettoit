@@ -17,7 +17,8 @@
     "mobile:verify": "npm run verify --prefix mobile",
     "typecheck": "npm run mobile:typecheck",
     "test": "npm run mobile:test",
-    "sandcastle": "npx tsx .sandcastle/main.mts"
+    "sandcastle": "npx tsx .sandcastle/main.mts",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@ai-hero/sandcastle": "^0.7.0",

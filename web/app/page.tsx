@@ -1,20 +1,22 @@
 // GetToIt web fallback — root surface.
 
+import type { CSSProperties } from "react";
+
+const mainStyle: CSSProperties = {
+  minHeight: "72vh",
+  display: "grid",
+  placeItems: "center",
+  background:
+    "linear-gradient(180deg, var(--g1) 0%, var(--g2) 32%, var(--g3) 66%, var(--g4) 100%)",
+  color: "var(--paper)",
+  fontFamily: "var(--ff-display)",
+  padding: "var(--sp-6)",
+  textAlign: "center",
+};
+
 export default function Page() {
   return (
-    <main
-      style={{
-        minHeight: "72vh",
-        display: "grid",
-        placeItems: "center",
-        background:
-          "linear-gradient(180deg, var(--g1) 0%, var(--g2) 32%, var(--g3) 66%, var(--g4) 100%)",
-        color: "var(--paper)",
-        fontFamily: "var(--ff-display)",
-        padding: "var(--sp-6)",
-        textAlign: "center",
-      }}
-    >
+    <main style={mainStyle}>
       <div style={{ maxWidth: "34rem" }}>
         <p
           style={{

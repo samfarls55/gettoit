@@ -62,9 +62,7 @@ export function SearchAreaPickerPreview({
   const [pins, setPins] = useState<DensityPreviewPin[]>([]);
   const [showDirtyPrompt, setShowDirtyPrompt] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [didSeedCurrentLocation, setDidSeedCurrentLocation] = useState(
-    initialSearchArea !== null,
-  );
+  const didSeedCurrentLocationRef = useRef(initialSearchArea !== null);
   const mapRef = useRef<SearchAreaMapHandle | null>(null);
   const dirty = isSearchAreaDraftDirty(draft, initialSearchArea);
   const cameraPosition = useMemo(() => mapCameraForSearchArea(draft), [draft]);
@@ -91,7 +89,7 @@ export function SearchAreaPickerPreview({
   };
 
   useEffect(() => {
-    if (didSeedCurrentLocation) {
+    if (didSeedCurrentLocationRef.current) {
       return;
     }
 
@@ -107,19 +105,19 @@ export function SearchAreaPickerPreview({
         const nextDraft = { center, radiusMiles: defaultSearchArea.radiusMiles };
 
         dispatch({ type: "jumpToCurrentLocation", center });
-        syncMapCamera(nextDraft);
+        mapRef.current?.setSearchArea(nextDraft);
       })
       .catch(() => undefined)
       .finally(() => {
         if (isCurrent) {
-          setDidSeedCurrentLocation(true);
+          didSeedCurrentLocationRef.current = true;
         }
       });
 
     return () => {
       isCurrent = false;
     };
-  }, [adapter, didSeedCurrentLocation]);
+  }, [adapter]);
 
   useEffect(() => {
     let isCurrent = true;

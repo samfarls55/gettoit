@@ -13,11 +13,15 @@ export const metadata = {
   description: "Answer 5 questions, see the verdict.",
 };
 
-export default function SessionPage({
+type SessionPageProps = {
+  params: Promise<{ sessionId: string }>;
+};
+
+export default async function SessionPage({
   params,
-}: {
-  params: { sessionId: string };
-}) {
+}: SessionPageProps) {
+  const { sessionId } = await params;
+
   return (
     <main
       style={{
@@ -25,7 +29,7 @@ export default function SessionPage({
         inset: 0,
       }}
     >
-      <SessionRoom roomId={params.sessionId} />
+      <SessionRoom roomId={sessionId} />
     </main>
   );
 }

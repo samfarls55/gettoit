@@ -9,6 +9,7 @@
 // the quiz coordinator.
 
 import type { CSSProperties } from "react";
+import Link from "next/link";
 
 import { APP_STORE_URL } from "../lib/app-store";
 
@@ -117,9 +118,9 @@ export function PlacesEmptyState({ onRetry }: PlacesEmptyStateProps) {
           Try again
         </button>
       ) : (
-        <a href="/" style={ctaStyle} data-testid="places-empty-retry">
+        <Link href="/" style={ctaStyle} data-testid="places-empty-retry">
           Start over
-        </a>
+        </Link>
       )}
     </section>
   );

@@ -49,7 +49,7 @@
 
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { ensureAnonSession, getSupabaseClient } from "../lib/supabase";
 import { mintClaimCode } from "../lib/claim-code";
@@ -71,6 +71,42 @@ import { NameEntry } from "./NameEntry";
 import { SessionRoom } from "./SessionRoom";
 import { GradientSurface, GTIMark } from "./SunsetPop";
 
+const shellErrorWrapStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  padding: "22px 22px 24px",
+  display: "flex",
+  flexDirection: "column",
+  color: "var(--paper)",
+};
+
+const shellErrorColumnStyle: CSSProperties = {
+  flex: 1,
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  width: "100%",
+  maxWidth: 360,
+  marginInline: "auto",
+};
+
+const shellErrorTitleStyle: CSSProperties = {
+  fontSize: 32,
+  margin: "10px 0 0",
+  textWrap: "balance",
+};
+
+const shellErrorMessageStyle: CSSProperties = {
+  margin: "12px 0 0",
+  fontFamily: "var(--ff-body)",
+  fontSize: 15,
+  fontWeight: 600,
+  lineHeight: 1.4,
+  color: "rgba(255,255,255,0.78)",
+  maxWidth: 280,
+  textWrap: "balance",
+};
+
 // The shell's state machine. tb-WF-11 shipped booting / name-entry /
 // quiz / error; tb-WF-12 adds the re-click destinations: the §C decided
 // card, the §D closed terminal, and the §E "you left" terminal.
@@ -91,7 +127,7 @@ type Phase =
 
 export function InviteShell({ roomId }: { roomId: string }) {
   const [phase, setPhase] = useState<Phase>({ kind: "booting" });
-  const [userId, setUserId] = useState<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
   // Surfaced on the name-entry surface when the `members` insert fails.
   const [submitError, setSubmitError] = useState<string | undefined>(
     undefined,
@@ -108,7 +144,7 @@ export function InviteShell({ roomId }: { roomId: string }) {
         // invitee with an intact `localStorage` session reuses it.
         const uid = await ensureAnonSession();
         if (cancelled) return;
-        setUserId(uid);
+        userIdRef.current = uid;
 
         const client = getSupabaseClient();
 
@@ -176,6 +212,7 @@ export function InviteShell({ roomId }: { roomId: string }) {
   //    is a read-only observer; they take no action.
   const decided = phase.kind === "decided";
   useEffect(() => {
+    const userId = userIdRef.current;
     if (!decided || !userId) return;
     const client = getSupabaseClient();
     // The test / SSR fake client may not expose `.channel` — skip the
@@ -221,12 +258,13 @@ export function InviteShell({ roomId }: { roomId: string }) {
       cancelled = true;
       void channel.unsubscribe();
     };
-  }, [decided, roomId, userId]);
+  }, [decided, roomId]);
 
   // Guard against a double-submit racing the phase flip.
   const submitInFlight = useRef(false);
 
   async function handleNameSubmit(name: string) {
+    const userId = userIdRef.current;
     if (!userId || submitInFlight.current) return;
     submitInFlight.current = true;
     setSubmitting(true);
@@ -236,13 +274,10 @@ export function InviteShell({ roomId }: { roomId: string }) {
       // first real `display_name` source (tb-WF-11 migration).
       await createMembership(getSupabaseClient(), {
         roomId,
-        userId,
         displayName: name,
       });
-      // Hand into the quiz at a fresh start. `SessionRoom`'s own member
-      // upsert is idempotent (`ignoreDuplicates` on the (room_id,
-      // user_id) PK), so it is a harmless no-op now that the row
-      // exists — it will not clobber the `display_name` just written.
+      // Hand into the quiz at a fresh start. `SessionRoom`'s own join RPC
+      // is idempotent, so it will not clobber the `display_name` just written.
       setPhase({ kind: "quiz", progress: freshProgress() });
     } catch (err) {
       const message = err instanceof Error
@@ -264,6 +299,7 @@ export function InviteShell({ roomId }: { roomId: string }) {
   // the failure surfaced rather than faking a successful leave — but
   // the shell routes to the terminal only on success.
   async function handleLeave() {
+    const userId = userIdRef.current;
     if (!userId) return;
     await leaveMembership(getSupabaseClient(), roomId, userId);
     setPhase({ kind: "left" });
@@ -374,47 +410,21 @@ function ShellErrorSurface({ message }: { message: string }) {
     <GradientSurface stop="initiator">
       <div
         data-testid="invite-shell-error"
-        style={{
-          position: "absolute",
-          inset: 0,
-          padding: "22px 22px 24px",
-          display: "flex",
-          flexDirection: "column",
-          color: "var(--paper)",
-        }}
+        style={shellErrorWrapStyle}
       >
         <GTIMark size={20} />
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            width: "100%",
-            maxWidth: 360,
-            marginInline: "auto",
-          }}
-        >
+        <div style={shellErrorColumnStyle}>
           <div className="gti-eyebrow" style={{ opacity: 0.6 }}>
             This plan
           </div>
           <h1
             className="gti-display"
-            style={{ fontSize: 32, margin: "10px 0 0", textWrap: "balance" }}
+            style={shellErrorTitleStyle}
           >
             Couldn&apos;t open this plan
           </h1>
           <p
-            style={{
-              margin: "12px 0 0",
-              fontFamily: "var(--ff-body)",
-              fontSize: 15,
-              fontWeight: 600,
-              lineHeight: 1.4,
-              color: "rgba(255,255,255,0.78)",
-              maxWidth: 280,
-              textWrap: "balance",
-            }}
+            style={shellErrorMessageStyle}
           >
             {message}
           </p>

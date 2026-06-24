@@ -29,7 +29,8 @@ import {
   GettingTheAppAffordance,
   type MintClaimCode,
 } from "./GettingTheAppAffordance";
-import { AvatarDot, GTIMark, GradientSurface, MEMBER_COLORS, PillCTA } from "./SunsetPop";
+import { AvatarDot, GTIMark, GradientSurface, PillCTA } from "./SunsetPop";
+import { MEMBER_COLORS } from "./sunset-pop-data";
 
 export type WaitingMemberView = {
   id: string;
@@ -72,6 +73,12 @@ export type WaitingScreenProps = {
   onMintClaimCode?: MintClaimCode;
 };
 
+function colorForMember(member: WaitingMemberView, index: number): string {
+  if (member.isSelf) return "var(--sun)";
+  const palette = MEMBER_COLORS.slice(1);
+  return palette[index % palette.length];
+}
+
 const canvasWrap: CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -86,6 +93,39 @@ const contentWrap: CSSProperties = {
   flexDirection: "column",
   paddingTop: 56,
   paddingBottom: 32,
+};
+
+const countdownStyle: CSSProperties = {
+  padding: "0 22px",
+  textAlign: "center",
+  fontFamily: "var(--ff-mono)",
+  fontSize: 12,
+  fontWeight: 500,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase",
+  color: "rgba(255,255,255,0.6)",
+  marginBottom: 14,
+};
+
+const downloadDockStyle: CSSProperties = {
+  padding: "0 22px 18px",
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+
+const downloadSubscriptStyle: CSSProperties = {
+  fontFamily: "var(--ff-body)",
+  fontSize: 12,
+  fontWeight: 700,
+  letterSpacing: "0.18em",
+  textTransform: "uppercase",
+  color: "rgba(255,255,255,0.6)",
+  textAlign: "center",
+};
+
+const mintDockStyle: CSSProperties = {
+  padding: "0 22px 18px",
 };
 
 export function WaitingScreen({
@@ -107,14 +147,6 @@ export function WaitingScreen({
     : null;
   const countdownLabel =
     mm != null && ss != null ? `Auto-fires in ${mm}:${ss}` : null;
-
-  // Pick a color per member; the current user gets `--sun`, others
-  // cycle the identity palette.
-  const colorFor = (member: WaitingMemberView, index: number) => {
-    if (member.isSelf) return "var(--sun)";
-    const palette = MEMBER_COLORS.slice(1); // exclude --sun
-    return palette[index % palette.length];
-  };
 
   return (
     <GradientSurface stop="waiting">
@@ -187,7 +219,7 @@ export function WaitingScreen({
                 >
                   <AvatarDot
                     name={m.initial}
-                    color={colorFor(m, i)}
+                    color={colorForMember(m, i)}
                     answered={m.answered}
                     size={48}
                   />
@@ -214,17 +246,7 @@ export function WaitingScreen({
 
           {countdownLabel ? (
             <div
-              style={{
-                padding: "0 22px",
-                textAlign: "center",
-                fontFamily: "var(--ff-mono)",
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase",
-                color: "rgba(255,255,255,0.6)",
-                marginBottom: 14,
-              }}
+              style={countdownStyle}
               data-testid="waiting-countdown"
             >
               {countdownLabel}
@@ -243,12 +265,7 @@ export function WaitingScreen({
           */}
           {isAnonymous && onDownloadApp ? (
             <div
-              style={{
-                padding: "0 22px 18px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
+              style={downloadDockStyle}
               data-testid="waiting-download-dock"
             >
               <PillCTA
@@ -257,15 +274,7 @@ export function WaitingScreen({
                 onClick={onDownloadApp}
               />
               <div
-                style={{
-                  fontFamily: "var(--ff-body)",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.6)",
-                  textAlign: "center",
-                }}
+                style={downloadSubscriptStyle}
                 data-testid="waiting-download-subscript"
               >
                 Then your votes save with you
@@ -283,7 +292,7 @@ export function WaitingScreen({
           */}
           {onMintClaimCode ? (
             <div
-              style={{ padding: "0 22px 18px" }}
+              style={mintDockStyle}
               data-testid="waiting-getting-the-app-dock"
             >
               <GettingTheAppAffordance onMint={onMintClaimCode} />

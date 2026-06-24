@@ -24,7 +24,11 @@
 "use client";
 
 import Link from "next/link";
-import { type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  type CSSProperties,
+} from "react";
 
 import {
   GettingTheAppAffordance,
@@ -54,6 +58,140 @@ const shellWrap: CSSProperties = {
   flexDirection: "column",
   color: "var(--paper)",
 };
+
+const verdictTitleStyle: CSSProperties = {
+  fontSize: 32,
+  margin: "10px 0 0",
+  textWrap: "balance",
+};
+
+const verdictVenueStyle: CSSProperties = {
+  fontFamily: "var(--ff-body)",
+  fontWeight: 800,
+  fontSize: 22,
+  color: "var(--paper)",
+  textAlign: "center",
+  lineHeight: 1.2,
+  animation: "gti-fade-up 320ms var(--ease-out) both",
+};
+
+const verdictMintStyle: CSSProperties = {
+  ...shellColumn,
+  flex: "0 0 auto",
+  paddingTop: 20,
+};
+
+const terminalTitleStyle: CSSProperties = {
+  fontSize: 32,
+  margin: "10px 0 0",
+  textWrap: "balance",
+};
+
+const terminalBodyStyle: CSSProperties = {
+  margin: "12px auto 0",
+  fontFamily: "var(--ff-body)",
+  fontSize: 15,
+  fontWeight: 600,
+  lineHeight: 1.4,
+  color: "rgba(255,255,255,0.78)",
+  maxWidth: 280,
+  textWrap: "balance",
+};
+
+const terminalHomeLinkStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  alignSelf: "center",
+  minHeight: 44,
+  marginTop: 20,
+  padding: "0 12px",
+  fontFamily: "var(--ff-body)",
+  fontWeight: 700,
+  fontSize: "var(--fz-eyebrow)",
+  letterSpacing: "var(--tr-eyebrow)",
+  textTransform: "uppercase",
+  color: "rgba(255,255,255,0.6)",
+  textDecoration: "none",
+};
+
+const leaveDialogStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 50,
+  width: "100vw",
+  maxWidth: "none",
+  height: "100dvh",
+  maxHeight: "none",
+  margin: 0,
+  border: 0,
+  background: "rgba(0,0,0,0.42)",
+  display: "grid",
+  placeItems: "center",
+  padding: "0 22px",
+};
+
+const leaveSheetStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
+  width: "100%",
+  maxWidth: 340,
+  background: "rgba(16,17,42,0.92)",
+  backdropFilter: "blur(8px)",
+  WebkitBackdropFilter: "blur(8px)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  borderRadius: "var(--r-sheet)",
+  padding: "24px 22px 18px",
+  color: "var(--paper)",
+};
+
+const leaveBackdropButtonStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  width: "100%",
+  height: "100%",
+  padding: 0,
+  border: 0,
+  background: "transparent",
+  cursor: "default",
+};
+
+const leaveSheetTitleStyle: CSSProperties = {
+  margin: 0,
+  fontFamily: "var(--ff-body)",
+  fontWeight: 800,
+  fontSize: 18,
+  textAlign: "center",
+};
+
+const leaveSheetBodyStyle: CSSProperties = {
+  margin: "10px 0 20px",
+  fontFamily: "var(--ff-body)",
+  fontWeight: 600,
+  fontSize: 14,
+  lineHeight: 1.4,
+  color: "rgba(255,255,255,0.78)",
+  textAlign: "center",
+  textWrap: "balance",
+};
+
+function leaveDismissButtonStyle(leaving: boolean): CSSProperties {
+  return {
+    appearance: "none",
+    border: 0,
+    background: "transparent",
+    cursor: leaving ? "not-allowed" : "pointer",
+    width: "100%",
+    minHeight: 44,
+    marginTop: 4,
+    fontFamily: "var(--ff-body)",
+    fontWeight: 700,
+    fontSize: "var(--fz-eyebrow)",
+    letterSpacing: "var(--tr-eyebrow)",
+    textTransform: "uppercase",
+    color: "rgba(255,255,255,0.6)",
+  };
+}
 
 // ───────────────────────────────────────────────────────────────────
 // §C — Read-only verdict card
@@ -100,11 +238,7 @@ export function WebVerdictCard({
           </div>
           <h1
             className="gti-display"
-            style={{
-              fontSize: 32,
-              margin: "10px 0 0",
-              textWrap: "balance",
-            }}
+            style={verdictTitleStyle}
           >
             {planName}
           </h1>
@@ -113,17 +247,7 @@ export function WebVerdictCard({
               // `key` on the venue so a reroll-driven live update
               // re-mounts the line and the fade plays (§C cross-fade).
               key={verdictPlaceName}
-              style={{
-                fontFamily: "var(--ff-body)",
-                fontWeight: 800,
-                fontSize: 22,
-                color: "var(--paper)",
-                textAlign: "center",
-                lineHeight: 1.2,
-                // §C — the venue cross-fades to a new value when a
-                // reroll changes the verdict while the card is open.
-                animation: "gti-fade-up 320ms var(--ease-out) both",
-              }}
+              style={verdictVenueStyle}
               data-testid="web-verdict-venue"
             >
               {verdictPlaceName}
@@ -139,7 +263,7 @@ export function WebVerdictCard({
         */}
         {onMintClaimCode ? (
           <div
-            style={{ ...shellColumn, flex: "0 0 auto", paddingTop: 20 }}
+            style={verdictMintStyle}
             data-testid="web-verdict-getting-the-app"
           >
             <GettingTheAppAffordance onMint={onMintClaimCode} />
@@ -239,48 +363,18 @@ function PostFlowTerminal({
           </div>
           <h1
             className="gti-display"
-            style={{
-              fontSize: 32,
-              margin: "10px 0 0",
-              textWrap: "balance",
-            }}
+            style={terminalTitleStyle}
           >
             {headline}
           </h1>
-          <p
-            style={{
-              margin: "12px auto 0",
-              fontFamily: "var(--ff-body)",
-              fontSize: 15,
-              fontWeight: 600,
-              lineHeight: 1.4,
-              color: "rgba(255,255,255,0.78)",
-              maxWidth: 280,
-              textWrap: "balance",
-            }}
-          >
+          <p style={terminalBodyStyle}>
             {body}
           </p>
           <Link
             href="/"
             data-testid={`${testId}-home-link`}
             aria-label="Back to GetToIt — home"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              alignSelf: "center",
-              minHeight: 44,
-              marginTop: 20,
-              padding: "0 12px",
-              fontFamily: "var(--ff-body)",
-              fontWeight: 700,
-              fontSize: "var(--fz-eyebrow)",
-              letterSpacing: "var(--tr-eyebrow)",
-              textTransform: "uppercase",
-              color: "rgba(255,255,255,0.6)",
-              textDecoration: "none",
-            }}
+            style={terminalHomeLinkStyle}
           >
             Back to GetToIt
           </Link>
@@ -312,60 +406,53 @@ export function LeaveConfirmSheet({
    *  actions so the invitee can't double-fire the leave. */
   leaving?: boolean;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dismissStyle = leaveDismissButtonStyle(leaving);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || dialog.open) return;
+
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+
+    return () => {
+      if (dialog.open && typeof dialog.close === "function") {
+        dialog.close();
+      }
+    };
+  }, []);
+
   return (
-    <div
-      data-testid="leave-confirm-backdrop"
-      onClick={onDismiss}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 50,
-        background: "rgba(0,0,0,0.42)",
-        display: "grid",
-        placeItems: "center",
-        padding: "0 22px",
+    <dialog
+      ref={dialogRef}
+      aria-label="Leave this plan?"
+      onCancel={(event) => {
+        event.preventDefault();
+        onDismiss();
       }}
+      style={leaveDialogStyle}
     >
+      <button
+        type="button"
+        data-testid="leave-confirm-backdrop"
+        aria-label="Dismiss leave confirmation"
+        onClick={onDismiss}
+        style={leaveBackdropButtonStyle}
+      />
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Leave this plan?"
-        // Stop the card from bubbling the backdrop's dismiss handler.
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          width: "100%",
-          maxWidth: 340,
-          background: "rgba(16,17,42,0.92)",
-          backdropFilter: "blur(16px)",
-          WebkitBackdropFilter: "blur(16px)",
-          border: "1px solid rgba(255,255,255,0.10)",
-          borderRadius: "var(--r-sheet)",
-          padding: "24px 22px 18px",
-          color: "var(--paper)",
-        }}
+        style={leaveSheetStyle}
       >
         <h2
-          style={{
-            margin: 0,
-            fontFamily: "var(--ff-body)",
-            fontWeight: 800,
-            fontSize: 18,
-            textAlign: "center",
-          }}
+          style={leaveSheetTitleStyle}
         >
           Leave this plan?
         </h2>
         <p
-          style={{
-            margin: "10px 0 20px",
-            fontFamily: "var(--ff-body)",
-            fontWeight: 600,
-            fontSize: 14,
-            lineHeight: 1.4,
-            color: "rgba(255,255,255,0.78)",
-            textAlign: "center",
-            textWrap: "balance",
-          }}
+          style={leaveSheetBodyStyle}
         >
           Your answers will be removed. The room continues for everyone else.
         </p>
@@ -379,25 +466,11 @@ export function LeaveConfirmSheet({
           type="button"
           onClick={onDismiss}
           disabled={leaving}
-          style={{
-            appearance: "none",
-            border: 0,
-            background: "transparent",
-            cursor: leaving ? "not-allowed" : "pointer",
-            width: "100%",
-            minHeight: 44,
-            marginTop: 4,
-            fontFamily: "var(--ff-body)",
-            fontWeight: 700,
-            fontSize: "var(--fz-eyebrow)",
-            letterSpacing: "var(--tr-eyebrow)",
-            textTransform: "uppercase",
-            color: "rgba(255,255,255,0.6)",
-          }}
+          style={dismissStyle}
         >
           STAY
         </button>
       </div>
-    </div>
+    </dialog>
   );
 }

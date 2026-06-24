@@ -92,9 +92,8 @@ export function PlanListScreen({
           {planBuckets.map((bucket) => (
             <View key={bucket.key} style={styles.bucket}>
               <Text style={styles.bucketTitle}>{bucket.title}</Text>
-              {plans[bucket.key]
-                .filter((plan) => !locallyDeletedCreatedPlanIds.has(plan.id))
-                .map((plan) => (
+              {plans[bucket.key].flatMap((plan) =>
+                locallyDeletedCreatedPlanIds.has(plan.id) ? [] : [
                   <View key={plan.id} style={styles.planRow}>
                     <Pressable
                       accessibilityLabel={`Open ${bucket.title} Plan ${plan.title}`}
@@ -147,8 +146,9 @@ export function PlanListScreen({
                         </Pressable>
                       </View>
                     ) : null}
-                  </View>
-                ))}
+                  </View>,
+                ]
+              )}
             </View>
           ))}
         </View>

@@ -95,7 +95,6 @@ describe("InviteShell — first landing", () => {
     expect(createMembership).toHaveBeenCalledTimes(1);
     expect(createMembership).toHaveBeenCalledWith(expect.anything(), {
       roomId: ROOM_ID,
-      userId: "anon-user-1",
       displayName: "Maya",
     });
   });

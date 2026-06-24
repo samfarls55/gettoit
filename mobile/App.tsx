@@ -1,8 +1,6 @@
 import { StatusBar } from "expo-status-bar";
-import { type Dispatch, useEffect, useReducer, useRef, useState } from "react";
+import { type Dispatch, useEffect, useReducer, useState } from "react";
 import {
-  Animated,
-  Easing,
   Platform,
   Pressable,
   StyleSheet,
@@ -10,6 +8,13 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from "react-native-reanimated";
 
 import { mobileTokens } from "./src/design/tokens";
 import type { InviteRouteResolution } from "./src/invites/inviteLinks";
@@ -53,6 +58,7 @@ import type { QuizProgressRepository } from "./src/quiz/quizProgressRepository";
 import type { QuizSubmissionRepository } from "./src/quiz/quizSubmissionRepository";
 import { VerdictScreen } from "./src/verdict/VerdictScreen";
 import type {
+  RerollInput,
   VerdictFlavor,
   VerdictRepository,
   VerdictViewModel,
@@ -145,6 +151,12 @@ type RouteContent = {
 
 type PlanListStatus = "idle" | "loading" | "loaded" | "error";
 
+type PlanListLoadState = {
+  requestKey: string | null;
+  snapshot: PlanListSnapshot;
+  status: Exclude<PlanListStatus, "loading">;
+};
+
 type PlanListContentProps = {
   notice?: string | null;
   onDeletePlan?: (plan: PlanListItem) => Promise<void> | void;
@@ -159,6 +171,12 @@ type QuizSession = {
   roomId: string;
   participantScope: PlanParticipantScope;
   role: "initiator" | "joiner";
+};
+
+type VerdictLoadState = {
+  requestKey: string | null;
+  verdict: VerdictViewModel | null;
+  failed: boolean;
 };
 
 function routeAfterQuizSubmission(participantScope: PlanParticipantScope) {
@@ -246,8 +264,6 @@ const defaultNativeLinkBoundary: NativeLinkBoundary = {
   getInitialUrl: async () => null,
   subscribe: () => () => undefined,
 };
-
-const shouldUseNativeAnimationDriver = Platform.OS !== "web";
 
 function isWebDevLoginEnabled(): boolean {
   return (
@@ -350,6 +366,10 @@ function defaultSetupPlan(participantScope: PlanParticipantScope): PlanSetup {
   };
 }
 
+function deletedPlanIdsKey(ids: Set<string>): string {
+  return JSON.stringify([...ids].sort());
+}
+
 function editSetupPlan(plan: PlanListItem): PlanSetup {
   return (
     plan.setup ?? {
@@ -398,7 +418,7 @@ export default function App({
     appStateRouterReducer,
     initialRouterState ?? initialAppStateRouterState,
   );
-  const [setupPlan, setSetupPlan] = useState<PlanSetup>(
+  const [setupPlan, setSetupPlan] = useState<PlanSetup>(() =>
     defaultSetupPlan("group"),
   );
   const [quizSession, setQuizSession] = useState<QuizSession>({
@@ -598,21 +618,41 @@ export function MobileAppShell({
   waitingRepository = unconfiguredWaitingRepository,
 }: MobileAppShellProps) {
   const route = routeForAppState(routerState);
-  const [planSnapshot, setPlanSnapshot] = useState<PlanListSnapshot>(
-    emptyPlanListSnapshot,
-  );
-  const [planListStatus, setPlanListStatus] =
-    useState<PlanListStatus>("idle");
-  const [verdict, setVerdict] = useState<VerdictViewModel | null>(null);
-  const [verdictLoadFailed, setVerdictLoadFailed] = useState(false);
+  const [planListLoad, setPlanListLoad] = useState<PlanListLoadState>({
+    requestKey: null,
+    snapshot: emptyPlanListSnapshot,
+    status: "idle",
+  });
+  const [verdictLoad, setVerdictLoad] = useState<VerdictLoadState>({
+    requestKey: null,
+    verdict: null,
+    failed: false,
+  });
   const [verdictLoadAttempt, setVerdictLoadAttempt] = useState(0);
-  const verdictFlavor: VerdictFlavor =
-    quizSession.participantScope === "solo" ? "solo" : "group";
   const [deletedCreatedPlanIds, setDeletedCreatedPlanIds] = useState<
     Set<string>
   >(
     () => new Set(),
   );
+  const verdictFlavor: VerdictFlavor =
+    quizSession.participantScope === "solo" ? "solo" : "group";
+  const planListRequestKey = deletedPlanIdsKey(deletedCreatedPlanIds);
+  const planSnapshot =
+    planListLoad.requestKey === planListRequestKey
+      ? planListLoad.snapshot
+      : emptyPlanListSnapshot;
+  const planListStatus: PlanListStatus =
+    route.name === "planList" && planListLoad.requestKey !== planListRequestKey
+      ? "loading"
+      : planListLoad.status;
+  const verdictRequestKey =
+    route.name === "verdict" || route.name === "readOnlyVerdict"
+      ? `${route.name}:${quizSession.roomId}:${verdictFlavor}:${verdictLoadAttempt}`
+      : null;
+  const verdict =
+    verdictLoad.requestKey === verdictRequestKey ? verdictLoad.verdict : null;
+  const verdictLoadFailed =
+    verdictLoad.requestKey === verdictRequestKey && verdictLoad.failed;
 
   const handleDeletePlan = async (plan: PlanListItem) => {
     await planRepository.deletePlan({ planId: plan.id });
@@ -621,12 +661,14 @@ export function MobileAppShell({
     );
 
     setDeletedCreatedPlanIds(nextDeletedCreatedPlanIds);
-    setPlanSnapshot(
-      filterDeletedCreatedPlans(
+    setPlanListLoad({
+      requestKey: deletedPlanIdsKey(nextDeletedCreatedPlanIds),
+      snapshot: filterDeletedCreatedPlans(
         await planRepository.listPlans(),
         nextDeletedCreatedPlanIds,
       ),
-    );
+      status: "loaded",
+    });
     onPlanDeleted?.();
   };
 
@@ -636,7 +678,7 @@ export function MobileAppShell({
     }
 
     let isCurrent = true;
-    setPlanListStatus("loading");
+    const requestKey = planListRequestKey;
 
     planRepository
       .listPlans()
@@ -645,30 +687,34 @@ export function MobileAppShell({
           return;
         }
 
-        setPlanSnapshot(
-          filterDeletedCreatedPlans(snapshot, deletedCreatedPlanIds),
-        );
-        setPlanListStatus("loaded");
+        setPlanListLoad({
+          requestKey,
+          snapshot: filterDeletedCreatedPlans(snapshot, deletedCreatedPlanIds),
+          status: "loaded",
+        });
       })
       .catch(() => {
         if (isCurrent) {
-          setPlanListStatus("error");
+          setPlanListLoad((current) => ({
+            ...current,
+            requestKey,
+            status: "error",
+          }));
         }
       });
 
     return () => {
       isCurrent = false;
     };
-  }, [deletedCreatedPlanIds, planRepository, route.name]);
+  }, [deletedCreatedPlanIds, planListRequestKey, planRepository, route.name]);
 
   useEffect(() => {
-    if (route.name !== "verdict" && route.name !== "readOnlyVerdict") {
+    if (!verdictRequestKey) {
       return;
     }
 
     let isCurrent = true;
-    setVerdict(null);
-    setVerdictLoadFailed(false);
+    const requestKey = verdictRequestKey;
 
     const verdictRequest =
       route.name === "readOnlyVerdict"
@@ -684,12 +730,20 @@ export function MobileAppShell({
     verdictRequest
       .then((nextVerdict) => {
         if (isCurrent) {
-          setVerdict(nextVerdict);
+          setVerdictLoad({
+            requestKey,
+            verdict: nextVerdict,
+            failed: false,
+          });
         }
       })
       .catch(() => {
         if (isCurrent) {
-          setVerdictLoadFailed(true);
+          setVerdictLoad({
+            requestKey,
+            verdict: null,
+            failed: true,
+          });
         }
       });
 
@@ -697,11 +751,11 @@ export function MobileAppShell({
       isCurrent = false;
     };
   }, [
-    quizSession.roomId,
     route.name,
-    verdictFlavor,
-    verdictLoadAttempt,
+    quizSession.roomId,
     verdictRepository,
+    verdictFlavor,
+    verdictRequestKey,
   ]);
 
   if (route.name === "setup") {
@@ -739,9 +793,9 @@ export function MobileAppShell({
         <QuizScreen
           onExited={onQuizExited ?? (() => undefined)}
           onSubmitted={onQuizSubmitted}
+          participantRole={quizSession.role}
           progressRepository={quizProgressRepository}
           q5CandidateRepository={q5CandidateRepository}
-          role={quizSession.role}
           roomId={quizSession.roomId}
           submissionRepository={quizSubmissionRepository}
         />
@@ -768,30 +822,13 @@ export function MobileAppShell({
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
-        {verdict ? (
-          <VerdictScreen
-            mode={route.name === "readOnlyVerdict" ? "readOnly" : "live"}
-            onReroll={verdictRepository.reroll}
-            verdict={verdict}
-          />
-        ) : verdictLoadFailed ? (
-          <View style={styles.surface}>
-            <Text style={styles.routeTitle}>Verdict unavailable</Text>
-            <Text style={styles.subtitle}>Try again in a moment.</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setVerdictLoadAttempt((attempt) => attempt + 1)}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonLabel}>Try again</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <View style={styles.surface}>
-            <Text style={styles.routeTitle}>Loading verdict</Text>
-            <Text style={styles.subtitle}>Pulling the recommendation.</Text>
-          </View>
-        )}
+        <VerdictRouteContent
+          failed={verdictLoadFailed}
+          mode={route.name === "readOnlyVerdict" ? "readOnly" : "live"}
+          onReroll={verdictRepository.reroll}
+          onRetry={() => setVerdictLoadAttempt((attempt) => attempt + 1)}
+          verdict={verdict}
+        />
       </View>
     );
   }
@@ -834,6 +871,49 @@ export function MobileAppShell({
         <Text style={styles.routeTitle}>{content.title}</Text>
         <Text style={styles.subtitle}>{content.body}</Text>
       </View>
+    </View>
+  );
+}
+
+type VerdictRouteContentProps = {
+  failed: boolean;
+  mode: "live" | "readOnly";
+  onReroll: (input: RerollInput) => Promise<void>;
+  onRetry: () => void;
+  verdict: VerdictViewModel | null;
+};
+
+function VerdictRouteContent({
+  failed,
+  mode,
+  onReroll,
+  onRetry,
+  verdict,
+}: VerdictRouteContentProps) {
+  if (verdict) {
+    return <VerdictScreen mode={mode} onReroll={onReroll} verdict={verdict} />;
+  }
+
+  if (failed) {
+    return (
+      <View style={styles.surface}>
+        <Text style={styles.routeTitle}>Verdict unavailable</Text>
+        <Text style={styles.subtitle}>Try again in a moment.</Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onRetry}
+          style={styles.secondaryButton}
+        >
+          <Text style={styles.secondaryButtonLabel}>Try again</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.surface}>
+      <Text style={styles.routeTitle}>Loading verdict</Text>
+      <Text style={styles.subtitle}>Pulling the recommendation.</Text>
     </View>
   );
 }
@@ -994,20 +1074,57 @@ type SignInGateProps = {
   onClaimCodeRedeemed?: () => void;
 };
 
+type SignInGateState = {
+  appleSignInFailed: boolean;
+  claimCode: string;
+  claimRedeemFailed: boolean;
+  claimRedeemed: boolean;
+  devEmail: string;
+  devPassword: string;
+  devSignInFailed: boolean;
+  isClaimPanelOpen: boolean;
+  isSubmitting: boolean;
+};
+
+const initialSignInGateState: SignInGateState = {
+  appleSignInFailed: false,
+  claimCode: "",
+  claimRedeemFailed: false,
+  claimRedeemed: false,
+  devEmail: "",
+  devPassword: "",
+  devSignInFailed: false,
+  isClaimPanelOpen: false,
+  isSubmitting: false,
+};
+
+function signInGateReducer(
+  state: SignInGateState,
+  patch: Partial<SignInGateState>,
+): SignInGateState {
+  return { ...state, ...patch };
+}
+
 function SignInGate({
   authBoundary,
   onAppleSignInSucceeded,
   onClaimCodeRedeemed,
 }: SignInGateProps) {
-  const [claimCode, setClaimCode] = useState("");
-  const [claimRedeemFailed, setClaimRedeemFailed] = useState(false);
-  const [isClaimPanelOpen, setIsClaimPanelOpen] = useState(false);
-  const [claimRedeemed, setClaimRedeemed] = useState(false);
-  const [appleSignInFailed, setAppleSignInFailed] = useState(false);
-  const [devEmail, setDevEmail] = useState("");
-  const [devPassword, setDevPassword] = useState("");
-  const [devSignInFailed, setDevSignInFailed] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [signInState, updateSignInState] = useReducer(
+    signInGateReducer,
+    initialSignInGateState,
+  );
+  const {
+    appleSignInFailed,
+    claimCode,
+    claimRedeemFailed,
+    claimRedeemed,
+    devEmail,
+    devPassword,
+    devSignInFailed,
+    isClaimPanelOpen,
+    isSubmitting,
+  } = signInState;
   const trimmedClaimCode = claimCode.trim();
   const trimmedDevEmail = devEmail.trim();
   const isClaimRedeemDisabled = !trimmedClaimCode || isSubmitting;
@@ -1015,37 +1132,41 @@ function SignInGate({
     !trimmedDevEmail || !devPassword || isSubmitting;
   const canUseWebDevLogin =
     isWebDevLoginEnabled() && Boolean(authBoundary.signInWithDevPassword);
-  const heroIntro = useRef(new Animated.Value(0)).current;
-  const actionIntro = useRef(new Animated.Value(0)).current;
+  const heroIntro = useSharedValue(0);
+  const actionIntro = useSharedValue(0);
 
   useEffect(() => {
-    Animated.stagger(90, [
-      Animated.timing(heroIntro, {
-        duration: 520,
-        easing: Easing.out(Easing.cubic),
-        toValue: 1,
-        useNativeDriver: shouldUseNativeAnimationDriver,
-      }),
-      Animated.timing(actionIntro, {
+    heroIntro.value = withTiming(1, {
+      duration: 520,
+      easing: Easing.out(Easing.cubic),
+    });
+    actionIntro.value = withDelay(
+      90,
+      withTiming(1, {
         duration: 420,
         easing: Easing.out(Easing.cubic),
-        toValue: 1,
-        useNativeDriver: shouldUseNativeAnimationDriver,
       }),
-    ]).start();
+    );
   }, [actionIntro, heroIntro]);
+  const heroIntroStyle = useAnimatedStyle(() => ({
+    opacity: heroIntro.value,
+    transform: [{ translateY: 18 * (1 - heroIntro.value) }],
+  }));
+  const actionIntroStyle = useAnimatedStyle(() => ({
+    opacity: actionIntro.value,
+    transform: [{ translateY: 12 * (1 - actionIntro.value) }],
+  }));
 
   const handleAppleSignInPress = async () => {
-    setAppleSignInFailed(false);
-    setIsSubmitting(true);
+    updateSignInState({ appleSignInFailed: false, isSubmitting: true });
 
     try {
       await authBoundary.signInWithApple();
       onAppleSignInSucceeded?.();
     } catch {
-      setAppleSignInFailed(true);
+      updateSignInState({ appleSignInFailed: true });
     } finally {
-      setIsSubmitting(false);
+      updateSignInState({ isSubmitting: false });
     }
   };
 
@@ -1054,17 +1175,16 @@ function SignInGate({
       return;
     }
 
-    setClaimRedeemFailed(false);
-    setIsSubmitting(true);
+    updateSignInState({ claimRedeemFailed: false, isSubmitting: true });
 
     try {
       await authBoundary.redeemClaimCode(trimmedClaimCode);
-      setClaimRedeemed(true);
+      updateSignInState({ claimRedeemed: true });
       onClaimCodeRedeemed?.();
     } catch {
-      setClaimRedeemFailed(true);
+      updateSignInState({ claimRedeemFailed: true });
     } finally {
-      setIsSubmitting(false);
+      updateSignInState({ isSubmitting: false });
     }
   };
 
@@ -1077,8 +1197,7 @@ function SignInGate({
       return;
     }
 
-    setDevSignInFailed(false);
-    setIsSubmitting(true);
+    updateSignInState({ devSignInFailed: false, isSubmitting: true });
 
     try {
       await authBoundary.signInWithDevPassword({
@@ -1087,9 +1206,9 @@ function SignInGate({
       });
       onAppleSignInSucceeded?.();
     } catch {
-      setDevSignInFailed(true);
+      updateSignInState({ devSignInFailed: true });
     } finally {
-      setIsSubmitting(false);
+      updateSignInState({ isSubmitting: false });
     }
   };
 
@@ -1102,17 +1221,7 @@ function SignInGate({
         <Animated.View
           style={[
             styles.signInHero,
-            {
-              opacity: heroIntro,
-              transform: [
-                {
-                  translateY: heroIntro.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [18, 0],
-                  }),
-                },
-              ],
-            },
+            heroIntroStyle,
           ]}
         >
           <View accessibilityLabel="GetToIt logo" style={styles.logoMark}>
@@ -1125,19 +1234,7 @@ function SignInGate({
             Save your taste profile and turn group indecision into a locked pick.
           </Text>
         </Animated.View>
-        <Animated.View
-          style={{
-            opacity: actionIntro,
-            transform: [
-              {
-                translateY: actionIntro.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [12, 0],
-                }),
-              },
-            ],
-          }}
-        >
+        <Animated.View style={actionIntroStyle}>
           {appleSignInFailed ? (
             <Text style={styles.signInInlineError}>
               Couldn't reach Apple. Try again.
@@ -1168,7 +1265,7 @@ function SignInGate({
                 autoCapitalize="none"
                 autoCorrect={false}
                 inputMode="email"
-                onChangeText={setDevEmail}
+                onChangeText={(devEmail) => updateSignInState({ devEmail })}
                 placeholder="Dev email"
                 placeholderTextColor={mobileTokens.color.textTertiaryOnGradient}
                 style={styles.claimInput}
@@ -1179,7 +1276,9 @@ function SignInGate({
                 accessibilityLabel="Dev login password"
                 autoCapitalize="none"
                 autoCorrect={false}
-                onChangeText={setDevPassword}
+                onChangeText={(devPassword) =>
+                  updateSignInState({ devPassword })
+                }
                 placeholder="Dev password"
                 placeholderTextColor={mobileTokens.color.textTertiaryOnGradient}
                 secureTextEntry
@@ -1218,7 +1317,9 @@ function SignInGate({
                 accessibilityLabel="Claim code"
                 autoCapitalize="characters"
                 autoCorrect={false}
-                onChangeText={setClaimCode}
+                onChangeText={(claimCode) =>
+                  updateSignInState({ claimCode })
+                }
                 placeholder="Enter your code"
                 placeholderTextColor={mobileTokens.color.textTertiaryOnGradient}
                 style={styles.claimInput}
@@ -1246,7 +1347,7 @@ function SignInGate({
             <Pressable
               accessibilityLabel="Voted on the web?"
               accessibilityRole="button"
-              onPress={() => setIsClaimPanelOpen(true)}
+              onPress={() => updateSignInState({ isClaimPanelOpen: true })}
               style={styles.signInWebButton}
             >
               <Text style={styles.signInWebButtonLabel}>Voted on the Web?</Text>

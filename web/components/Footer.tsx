@@ -4,6 +4,7 @@
 // canonical Privacy + Terms legal links.
 
 import type { CSSProperties } from "react";
+import Link from "next/link";
 
 const footerStyle: CSSProperties = {
   // Token-driven. tokens.css provides --paper, --sun, --sp-*, --fz-sm,
@@ -45,15 +46,15 @@ const separatorStyle: CSSProperties = {
 export function Footer() {
   return (
     <footer style={footerStyle}>
-      <a href="/privacy" style={linkStyle}>
+      <Link href="/privacy" style={linkStyle}>
         Privacy
-      </a>
+      </Link>
       <span aria-hidden="true" style={separatorStyle}>
         {"\u00b7"}
       </span>
-      <a href="/terms" style={linkStyle}>
+      <Link href="/terms" style={linkStyle}>
         Terms
-      </a>
+      </Link>
     </footer>
   );
 }

@@ -8,6 +8,7 @@
 // without forcing a long-form-text surface into the locked spec.
 
 import type { CSSProperties } from "react";
+import Link from "next/link";
 
 import { GTIMark } from "../../components/SunsetPop";
 
@@ -224,9 +225,9 @@ export default function TermsPage() {
         <h2 style={h2Style}>8. Your data and privacy</h2>
         <p style={pStyle}>
           Our handling of your data is described in the{" "}
-          <a href="/privacy" style={linkStyle}>
+          <Link href="/privacy" style={linkStyle}>
             Privacy Policy
-          </a>
+          </Link>
           , which is incorporated into these Terms by reference.
         </p>
 

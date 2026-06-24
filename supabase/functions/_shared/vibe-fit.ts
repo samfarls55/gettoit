@@ -415,17 +415,16 @@ export function extractVibeEvidenceSpans(
 ): VibeEvidenceSpan[] {
   const spans = candidate.summaryTexts
     .flatMap((source, sourceIndex) =>
-      splitSourceText(source.text).map((text, chunkIndex) => ({
-        text,
-        sourcePriority: source.priority,
-        sourceIndex,
-        chunkIndex,
-      }))
+      splitSourceText(source.text).flatMap((text, chunkIndex) => {
+        const span = buildEvidenceSpan({
+          text,
+          sourcePriority: source.priority,
+          sourceIndex,
+          chunkIndex,
+        }, candidate.mealTimeContext);
+        return span ? [span] : [];
+      })
     )
-    .map((span) => buildEvidenceSpan(span, candidate.mealTimeContext))
-    .filter((
-      span,
-    ): span is SortableVibeEvidenceSpan => span !== null)
     .sort((a, b) =>
       a.sourcePriority - b.sourcePriority ||
       a.sourceIndex - b.sourceIndex ||
@@ -1097,9 +1096,9 @@ function dedupeReceiptCodes(
 }
 
 function hasNumericConflict(scores: Record<VibeBandId, number>): boolean {
-  const activePositions = VIBE_BAND_IDS
-    .filter((bandId) => scores[bandId] > 0)
-    .map((bandId) => BAND_POSITIONS.get(bandId) ?? 3);
+  const activePositions = VIBE_BAND_IDS.flatMap((bandId) =>
+    scores[bandId] > 0 ? [BAND_POSITIONS.get(bandId) ?? 3] : []
+  );
   if (activePositions.length < 2) return false;
   return Math.max(...activePositions) - Math.min(...activePositions) >=
     VIBE_FIT_CONFIG.conflictDistance;

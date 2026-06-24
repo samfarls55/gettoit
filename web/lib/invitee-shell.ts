@@ -5,8 +5,8 @@
 // scaffold:
 //   1. ensures the anonymous Supabase session (`ensureAnonSession`),
 //   2. checks for an existing `members` row (`findMembership`),
-//   3. shows the name-entry surface when there is none, then writes the
-//      row carrying the typed name (`createMembership`),
+//   3. shows the name-entry surface when there is none, then calls the
+//      server-owned join RPC carrying the typed name (`createMembership`),
 //   4. hands the invitee into the quiz.
 //
 // Identity is the anonymous Supabase session held in `localStorage`
@@ -60,24 +60,18 @@ export async function findMembership(
   return (data as MembershipRow | null) ?? null;
 }
 
-/** Insert the caller's `members` row, carrying the `display_name` the
+/** Create the caller's `members` row, carrying the `display_name` the
  *  invitee typed on the name-entry surface. The Web invitee is a
- *  joiner — `role` is always `participant`.
- *
- *  The existing `members_insert_self` RLS policy admits this INSERT
- *  (it gates on `user_id = auth.uid()` and does not constrain which
- *  columns are written), so no new policy is needed for the
- *  `display_name` write. Throws on a rejected insert so the shell can
+ *  joiner, so the RPC always creates a participant membership and pins
+ *  `user_id` to `auth.uid()`. Throws on a rejected join so the shell can
  *  surface an error on the name-entry surface. */
 export async function createMembership(
   client: SupabaseClient,
-  args: { roomId: string; userId: string; displayName: string },
+  args: { roomId: string; displayName: string },
 ): Promise<void> {
-  const { error } = await client.from("members").insert({
-    room_id: args.roomId,
-    user_id: args.userId,
-    role: "participant",
-    display_name: args.displayName,
+  const { error } = await client.rpc("members_join_self", {
+    p_room_id: args.roomId,
+    p_display_name: args.displayName,
   });
   if (error) {
     throw new Error(

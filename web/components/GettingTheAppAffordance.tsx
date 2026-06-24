@@ -61,6 +61,51 @@ const quietLine: CSSProperties = {
   textAlign: "center",
 };
 
+const quietMintingLine: CSSProperties = {
+  ...quietLine,
+  cursor: "default",
+};
+
+const errorTextStyle: CSSProperties = {
+  margin: "0 auto",
+  maxWidth: 280,
+  fontFamily: "var(--ff-body)",
+  fontSize: 13,
+  fontWeight: 600,
+  lineHeight: 1.4,
+  color: "rgba(255,255,255,0.7)",
+  textAlign: "center",
+};
+
+const revealedWrapStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+  animation: "gti-fade-up 320ms var(--ease-out-soft) both",
+};
+
+const revealedCodeStyle: CSSProperties = {
+  fontFamily: "var(--ff-mono)",
+  fontSize: 22,
+  fontWeight: 500,
+  letterSpacing: "0.22em",
+  textTransform: "uppercase",
+  color: "var(--paper)",
+  textAlign: "center",
+  paddingLeft: "0.22em",
+};
+
+const revealedInstructionsStyle: CSSProperties = {
+  margin: 0,
+  fontFamily: "var(--ff-body)",
+  fontSize: 13,
+  fontWeight: 600,
+  lineHeight: 1.4,
+  color: "rgba(255,255,255,0.78)",
+  textAlign: "center",
+  textWrap: "balance",
+};
+
 export function GettingTheAppAffordance({
   onMint,
 }: {
@@ -110,7 +155,7 @@ export function GettingTheAppAffordance({
     return (
       <div data-testid="getting-the-app-affordance">
         <div
-          style={{ ...quietLine, cursor: "default" }}
+          style={quietMintingLine}
           data-testid="getting-the-app-minting"
         >
           Getting your code&hellip;
@@ -125,16 +170,7 @@ export function GettingTheAppAffordance({
       <div data-testid="getting-the-app-affordance">
         <p
           data-testid="getting-the-app-error"
-          style={{
-            margin: "0 auto",
-            maxWidth: 280,
-            fontFamily: "var(--ff-body)",
-            fontSize: 13,
-            fontWeight: 600,
-            lineHeight: 1.4,
-            color: "rgba(255,255,255,0.7)",
-            textAlign: "center",
-          }}
+          style={errorTextStyle}
         >
           Couldn&apos;t get a code just now.
         </p>
@@ -157,12 +193,7 @@ export function GettingTheAppAffordance({
   return (
     <div
       data-testid="getting-the-app-affordance"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        animation: "gti-fade-up 320ms var(--ease-out-soft) both",
-      }}
+      style={revealedWrapStyle}
     >
       <Glass soft style={{ padding: "16px 18px" }}>
         <div
@@ -170,37 +201,14 @@ export function GettingTheAppAffordance({
           // entrance fade replays for the fresh value.
           key={state.code}
           data-testid="getting-the-app-code"
-          style={{
-            fontFamily: "var(--ff-mono)",
-            fontSize: 22,
-            fontWeight: 500,
-            // The `mono-tag` token treatment — UPPERCASE, generous
-            // tracking — scaled up so an opaque token reads
-            // character-by-character.
-            letterSpacing: "0.22em",
-            textTransform: "uppercase",
-            color: "var(--paper)",
-            textAlign: "center",
-            // Pull the tracking off the trailing edge so the block
-            // stays optically centered.
-            paddingLeft: "0.22em",
-          }}
+          style={revealedCodeStyle}
         >
           {state.code}
         </div>
       </Glass>
       <p
         data-testid="getting-the-app-instructions"
-        style={{
-          margin: 0,
-          fontFamily: "var(--ff-body)",
-          fontSize: 13,
-          fontWeight: 600,
-          lineHeight: 1.4,
-          color: "rgba(255,255,255,0.78)",
-          textAlign: "center",
-          textWrap: "balance",
-        }}
+        style={revealedInstructionsStyle}
       >
         Enter this code in the app under &ldquo;Voted on the web?&rdquo; to
         bring this Plan with you.

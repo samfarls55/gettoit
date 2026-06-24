@@ -151,7 +151,11 @@ const mergerHooks = createHooks({ installDependencies: false });
 // Main loop
 // ---------------------------------------------------------------------------
 
-for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
+async function runIteration(iteration: number): Promise<void> {
+  if (iteration > MAX_ITERATIONS) {
+    return;
+  }
+
   console.log(`\n=== Iteration ${iteration}/${MAX_ITERATIONS} ===\n`);
 
   // -------------------------------------------------------------------------
@@ -184,7 +188,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   if (issues.length === 0) {
     // No unblocked work — either everything is done or everything is blocked.
     console.log("No unblocked issues to work on. Exiting.");
-    break;
+    return;
   }
 
   console.log(
@@ -272,14 +276,11 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
 
   // Only pass branches that actually produced commits to the merge phase.
   // An agent that ran successfully but made no commits has nothing to merge.
-  const completedIssues = settled
-    .map((outcome, i) => ({ outcome, issue: issues[i]! }))
-    .filter(
-      (entry) =>
-        entry.outcome.status === "fulfilled" &&
-        entry.outcome.value.commits.length > 0,
-    )
-    .map((entry) => entry.issue);
+  const completedIssues = settled.flatMap((outcome, i) =>
+    outcome.status === "fulfilled" && outcome.value.commits.length > 0
+      ? [issues[i]!]
+      : []
+  );
 
   const completedBranches = completedIssues.map((i) => i.branch);
 
@@ -293,7 +294,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   if (completedBranches.length === 0) {
     // All agents ran but none made commits — nothing to merge this cycle.
     console.log("No commits produced. Nothing to merge.");
-    continue;
+    await runIteration(iteration + 1);
+    return;
   }
 
   // -------------------------------------------------------------------------
@@ -321,6 +323,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   });
 
   console.log("\nBranches merged.");
+  await runIteration(iteration + 1);
 }
+
+await runIteration(1);
 
 console.log("\nAll done.");

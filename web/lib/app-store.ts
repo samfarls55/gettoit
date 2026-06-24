@@ -1,6 +1,6 @@
 // GetToIt web — optional App Store URL for mobile-app CTAs.
 
-export function normalizeAppStoreUrl(value?: string | null): string | null {
+function normalizeAppStoreUrl(value?: string | null): string | null {
   const url = value?.trim();
   return url ? url : null;
 }

@@ -24,7 +24,18 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 
 import {
   buildVoteRow,
@@ -33,7 +44,6 @@ import {
   toggleCuisine,
   toggleCuisineNoPreference,
   type CuisineSelection,
-  type VoteRow,
 } from "../lib/quiz";
 
 import {
@@ -78,6 +88,8 @@ type Phase =
   | { kind: "waiting" }
   | { kind: "verdict"; view: VerdictView };
 
+type QuizStep = Extract<Phase, { kind: "quiz" }>["step"];
+
 type MembersRow = { room_id: string; user_id: string; role: string };
 type VotesPresenceRow = { room_id: string; user_id: string };
 type RoomsRow = {
@@ -109,6 +121,234 @@ type Q5CardSetFetchResult = {
   source: "fetched" | "no-results";
 };
 
+type SupabaseClient = ReturnType<typeof getSupabaseClient>;
+type RoomChannel = ReturnType<SupabaseClient["channel"]>;
+
+type QuizFormState = {
+  cuisine: CuisineSelection;
+  budget: number;
+  reputation: string;
+  vibe: number;
+};
+
+type QuizFormAction =
+  | { type: "toggle-cuisine"; id: string }
+  | { type: "toggle-no-preference" }
+  | { type: "budget"; value: 1 | 2 | 3 | 4 }
+  | { type: "reputation"; value: string }
+  | { type: "vibe"; value: number };
+
+type Q5Model = {
+  state: Q5State;
+  candidates: QuizCandidate[];
+  ratings: Record<string, number>;
+};
+
+type Q5Action =
+  | { type: "loading" }
+  | { type: "loaded"; result: Q5CardSetFetchResult }
+  | { type: "rate"; id: string; score: number };
+
+type RoomRuntimeState = {
+  members: MembersRow[];
+  answeredIds: Set<string>;
+  deadlineAt: string | null;
+};
+
+type RoomRuntimeAction =
+  | {
+      type: "seed";
+      members: MembersRow[];
+      votes: VotesPresenceRow[];
+      deadlineAt: string | null;
+    }
+  | { type: "member-inserted"; row: MembersRow }
+  | { type: "vote-inserted"; row: VotesPresenceRow }
+  | { type: "deadline"; deadlineAt: string | null };
+
+type LeaveState = {
+  confirmOpen: boolean;
+  leaving: boolean;
+};
+
+type LeaveAction =
+  | { type: "open" }
+  | { type: "dismiss" }
+  | { type: "leaving"; value: boolean };
+
+const initialQ5Model: Q5Model = {
+  state: "loading",
+  candidates: [],
+  ratings: {},
+};
+
+const initialRoomRuntime: RoomRuntimeState = {
+  members: [],
+  answeredIds: new Set(),
+  deadlineAt: null,
+};
+
+const initialLeaveState: LeaveState = {
+  confirmOpen: false,
+  leaving: false,
+};
+
+const fullScreenMainStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  display: "grid",
+  placeItems: "center",
+  background:
+    "linear-gradient(180deg, var(--g1) 0%, var(--g2) 32%, var(--g3) 66%, var(--g4) 100%)",
+  color: "var(--paper)",
+  fontFamily: "var(--ff-display)",
+  padding: "var(--sp-6)",
+  textAlign: "center",
+};
+
+const fullScreenEyebrowStyle: CSSProperties = {
+  fontFamily: "var(--ff-body)",
+  fontWeight: 700,
+  fontSize: "var(--fz-eyebrow)",
+  letterSpacing: "var(--tr-eyebrow)",
+  textTransform: "uppercase",
+  opacity: 0.78,
+  marginBottom: "var(--sp-3)",
+};
+
+const fullScreenBodyStyle: CSSProperties = {
+  fontFamily: "var(--ff-body)",
+  fontWeight: 600,
+  fontSize: "var(--fz-body)",
+  margin: 0,
+  opacity: 0.86,
+};
+
+function createQuizFormState(
+  initialProgress?: QuizProgressState,
+): QuizFormState {
+  return {
+    cuisine: {
+      cuisines: new Set(initialProgress?.cuisines ?? []),
+      noPreference: initialProgress?.noPreference ?? false,
+    },
+    budget: initialProgress?.budget ?? QUIZ_DEFAULTS.budget,
+    reputation: initialProgress?.reputation ?? QUIZ_DEFAULTS.reputation,
+    vibe: initialProgress?.vibe ?? QUIZ_DEFAULTS.vibe,
+  };
+}
+
+function quizFormReducer(
+  state: QuizFormState,
+  action: QuizFormAction,
+): QuizFormState {
+  switch (action.type) {
+    case "toggle-cuisine":
+      return { ...state, cuisine: toggleCuisine(state.cuisine, action.id) };
+    case "toggle-no-preference":
+      return {
+        ...state,
+        cuisine: toggleCuisineNoPreference(state.cuisine),
+      };
+    case "budget":
+      return { ...state, budget: action.value };
+    case "reputation":
+      return { ...state, reputation: action.value };
+    case "vibe":
+      return { ...state, vibe: action.value };
+  }
+}
+
+function q5Reducer(state: Q5Model, action: Q5Action): Q5Model {
+  switch (action.type) {
+    case "loading":
+      return { ...state, state: "loading" };
+    case "loaded":
+      if (action.result.source === "no-results") {
+        return { state: "no-results", candidates: [], ratings: {} };
+      }
+      return {
+        state: "default",
+        candidates: action.result.candidates,
+        ratings: seedRatings(action.result.candidates),
+      };
+    case "rate":
+      return {
+        ...state,
+        ratings: { ...state.ratings, [action.id]: action.score },
+      };
+  }
+}
+
+function roomRuntimeReducer(
+  state: RoomRuntimeState,
+  action: RoomRuntimeAction,
+): RoomRuntimeState {
+  switch (action.type) {
+    case "seed":
+      return {
+        members: action.members,
+        answeredIds: new Set(action.votes.map((v) => v.user_id)),
+        deadlineAt: action.deadlineAt,
+      };
+    case "member-inserted":
+      if (state.members.some((m) => m.user_id === action.row.user_id)) {
+        return state;
+      }
+      return { ...state, members: [...state.members, action.row] };
+    case "vote-inserted": {
+      if (state.answeredIds.has(action.row.user_id)) return state;
+      const answeredIds = new Set(state.answeredIds);
+      answeredIds.add(action.row.user_id);
+      return { ...state, answeredIds };
+    }
+    case "deadline":
+      return { ...state, deadlineAt: action.deadlineAt };
+  }
+}
+
+function leaveReducer(state: LeaveState, action: LeaveAction): LeaveState {
+  switch (action.type) {
+    case "open":
+      return { ...state, confirmOpen: true };
+    case "dismiss":
+      return state.leaving ? state : { ...state, confirmOpen: false };
+    case "leaving":
+      return { ...state, leaving: action.value };
+  }
+}
+
+function isDecidedStatus(status: string | undefined): boolean {
+  return status === "verdict_ready" || status === "locked";
+}
+
+async function loadVerdictView(
+  client: SupabaseClient,
+  roomId: string,
+  userId: string,
+): Promise<VerdictView | null> {
+  const [{ data: verdictRows }, planState] = await Promise.all([
+    client
+      .from("verdicts")
+      .select("id, room_id, option_id, computed_at, method, rule_text")
+      .eq("room_id", roomId)
+      .limit(1),
+    readRoomPlanState(client, roomId, userId),
+  ]);
+  const verdict = (verdictRows as VerdictRow[] | null)?.[0];
+  if (!verdict) return null;
+
+  const planName = planState.kind === "decided" ? planState.planName : "";
+  const verdictPlaceName =
+    planState.kind === "decided" ? planState.verdictPlaceName : "";
+
+  return shapeVerdictView({
+    verdict,
+    planName,
+    verdictPlaceName,
+  });
+}
+
 export function SessionRoom({
   roomId,
   initialProgress,
@@ -128,374 +368,52 @@ export function SessionRoom({
   onLeave?: () => Promise<void> | void;
 }) {
   const [phase, setPhase] = useState<Phase>({ kind: "booting" });
-  const [userId, setUserId] = useState<string | null>(null);
+  const userIdRef = useRef<string | null>(null);
 
   // Quiz state — quiz redesign. Seeded from `initialProgress` when the shell
   // handed a resume payload (web-01 §B); otherwise the quiz defaults.
-  const [cuisine, setCuisine] = useState<CuisineSelection>(() => ({
-    cuisines: new Set(initialProgress?.cuisines ?? []),
-    noPreference: initialProgress?.noPreference ?? false,
-  }));
-  const [budget, setBudget] = useState<number>(
-    initialProgress?.budget ?? QUIZ_DEFAULTS.budget,
-  );
-  const [reputation, setReputation] = useState<string>(
-    initialProgress?.reputation ?? QUIZ_DEFAULTS.reputation,
-  );
-  const [vibe, setVibe] = useState<number>(
-    initialProgress?.vibe ?? QUIZ_DEFAULTS.vibe,
+  const [quiz, dispatchQuiz] = useReducer(
+    quizFormReducer,
+    initialProgress,
+    createQuizFormState,
   );
 
   // §E — the leave-confirm sheet open state + in-flight flag.
-  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
-  const [leaving, setLeaving] = useState(false);
+  const [leaveState, dispatchLeave] = useReducer(
+    leaveReducer,
+    initialLeaveState,
+  );
 
   // The resume payload is read once by the shell and is stable for the
   // life of this mount; a ref keeps it out of the boot effect's deps.
   const initialProgressRef = useRef(initialProgress);
 
   // Q5 candidate-fetch state.
-  const [q5State, setQ5State] = useState<Q5State>("loading");
-  const [candidates, setCandidates] = useState<QuizCandidate[]>([]);
-  const [q5Ratings, setQ5Ratings] = useState<Record<string, number>>({});
-
-  // The in-flight Q5 card-set fetch, so a resume / re-render folds into
-  // the running fetch instead of firing the Edge Function twice.
-  const fetchPromiseRef = useRef<Promise<Q5CardSetFetchResult> | null>(null);
+  const [q5, dispatchQ5] = useReducer(q5Reducer, initialQ5Model);
 
   // Realtime + room state.
-  const [members, setMembers] = useState<MembersRow[]>([]);
-  const [answeredIds, setAnsweredIds] = useState<Set<string>>(() => new Set());
-  const [roomStatus, setRoomStatus] = useState<string>("open");
-  const [deadlineAt, setDeadlineAt] = useState<string | null>(null);
-  const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
+  const [roomRuntime, dispatchRoomRuntime] = useReducer(
+    roomRuntimeReducer,
+    initialRoomRuntime,
+  );
 
-  // bug-20 — a monotonic re-fetch signal for the §C verdict live-update.
-  // An initiator reroll re-runs the verdict in place: room status stays
-  // `verdict_ready`, so a `verdict_ready` rebroadcast (or a `rooms`
-  // UPDATE that keeps the status decided) sets `roomStatus` to its
-  // current value and React bails — the verdict-fetch effect, keyed on
-  // room id / status / user id, would never re-fire. The broadcast +
-  // UPDATE handlers bump this counter instead; the counter always
-  // changes, so folding it into the effect's deps re-runs the fetch on
-  // every rebroadcast. It starts at 0 and the effect's status guard
-  // still gates the first load, so there is no double-fetch on mount.
-  const [verdictRefetchSignal, setVerdictRefetchSignal] = useState(0);
+  const channelRef = useRef<RoomChannel | null>(null);
 
-  const channelRef = useRef<ReturnType<
-    ReturnType<typeof getSupabaseClient>["channel"]
-  > | null>(null);
+  const loadAndShowVerdict = useVerdictLoader(roomId, userIdRef, setPhase);
+  const startCandidateFetch = useQ5CandidateFetch(roomId, dispatchQ5);
 
-  // ----------------------------------------------------------------
-  // Boot — anon auth + member insert + initial fetches + Realtime.
-  // ----------------------------------------------------------------
-  useEffect(() => {
-    let cancelled = false;
-    async function boot() {
-      try {
-        setPhase({ kind: "joining" });
-        const uid = await ensureAnonSession();
-        if (cancelled) return;
-        setUserId(uid);
+  useSessionRoomBoot({
+    roomId,
+    channelRef,
+    userIdRef,
+    initialProgressRef,
+    loadAndShowVerdict,
+    setPhase,
+    startCandidateFetch,
+    dispatchRoomRuntime,
+  });
 
-        const client = getSupabaseClient();
-
-        // Member insert (idempotent — PK on (room_id, user_id)).
-        const { error: memberErr } = await client.from("members").upsert(
-          {
-            room_id: roomId,
-            user_id: uid,
-            role: "participant",
-          },
-          { onConflict: "room_id,user_id", ignoreDuplicates: true },
-        );
-        if (memberErr) {
-          throw memberErr;
-        }
-
-        // Hydrate the avatar row + answered set + room context.
-        const [{ data: memberRows }, { data: voteRows }, { data: roomRows }] =
-          await Promise.all([
-            client
-              .from("members")
-              .select("room_id, user_id, role")
-              .eq("room_id", roomId),
-            client
-              .from("votes")
-              .select("room_id, user_id")
-              .eq("room_id", roomId),
-            client
-              .from("rooms")
-              .select(
-                "id, status, deadline_at, location_lat, location_lng, " +
-                  "location_tz, radius_meters, session_params",
-              )
-              .eq("id", roomId)
-              .limit(1),
-          ]);
-        if (cancelled) return;
-        setMembers((memberRows as MembersRow[] | null) ?? []);
-        setAnsweredIds(
-          new Set(
-            ((voteRows as VotesPresenceRow[] | null) ?? []).map(
-              (v) => v.user_id,
-            ),
-          ),
-        );
-        const room = (roomRows as RoomsRow[] | null)?.[0];
-        if (room) {
-          setRoomStatus(room.status);
-          setDeadlineAt(room.deadline_at);
-        }
-
-        // Realtime — broadcast (verdict_ready) + postgres_changes.
-        const channel = client
-          .channel(`room:${roomId}`)
-          .on(
-            "postgres_changes",
-            {
-              event: POSTGRES_CHANGE_INSERT,
-              schema: "public",
-              table: "members",
-              filter: `room_id=eq.${roomId}`,
-            },
-            (payload) => {
-              const row = payload.new as MembersRow;
-              setMembers((prev) =>
-                prev.some((m) => m.user_id === row.user_id)
-                  ? prev
-                  : [...prev, row],
-              );
-            },
-          )
-          .on(
-            "postgres_changes",
-            {
-              event: POSTGRES_CHANGE_INSERT,
-              schema: "public",
-              table: "votes",
-              filter: `room_id=eq.${roomId}`,
-            },
-            (payload) => {
-              const row = payload.new as VotesPresenceRow;
-              setAnsweredIds((prev) => {
-                if (prev.has(row.user_id)) return prev;
-                const next = new Set(prev);
-                next.add(row.user_id);
-                return next;
-              });
-            },
-          )
-          .on(
-            "postgres_changes",
-            {
-              event: "UPDATE",
-              schema: "public",
-              table: "rooms",
-              filter: `id=eq.${roomId}`,
-            },
-            (payload) => {
-              const row = payload.new as RoomsRow;
-              setRoomStatus(row.status);
-              setDeadlineAt(row.deadline_at);
-              // bug-20 — a `rooms` UPDATE that keeps the room decided
-              // (an in-place reroll fires as an UPDATE that does not
-              // move the status off `verdict_ready` / `locked`) must
-              // still re-fetch the §C verdict; the status set above is
-              // a no-op so the effect deps would not change on their
-              // own. Bump the re-fetch signal.
-              if (row.status === "verdict_ready" || row.status === "locked") {
-                setVerdictRefetchSignal((n) => n + 1);
-              }
-            },
-          )
-          .on("broadcast", { event: "verdict_ready" }, () => {
-            setRoomStatus("verdict_ready");
-            // bug-20 — the rebroadcast re-sets `roomStatus` to its
-            // current value on an in-place reroll, so React bails and
-            // the verdict-fetch effect's deps do not change. Bump the
-            // monotonic re-fetch signal so the §C card live-updates.
-            setVerdictRefetchSignal((n) => n + 1);
-          });
-
-        channel.subscribe();
-        channelRef.current = channel;
-
-        // Did the caller already vote on a prior visit? Skip ahead to
-        // Waiting/Verdict (idempotent — votes has a unique PK). This is
-        // the web-01 §B "already voted ? Waiting" resume case.
-        if (
-          ((voteRows as VotesPresenceRow[] | null) ?? []).some(
-            (v) => v.user_id === uid,
-          )
-        ) {
-          setPhase({ kind: "waiting" });
-        } else if (
-          room?.status === "verdict_ready" ||
-          room?.status === "locked"
-        ) {
-          // Verdict already shipped; treat the user as a late-joiner.
-          // web-01 §B "verdict ? Verdict" resume case.
-          setPhase({ kind: "waiting" });
-        } else {
-          // web-01 §B mid-quiz resume — start on the last-answered
-          // question the shell read off `members.quiz_progress`. A
-          // fresh first-landing has `initialProgress` absent / at
-          // `lastIndex` 1, so this still starts at Q1 for new
-          // invitees. `clampStep` guards a malformed payload.
-          setPhase({
-            kind: "quiz",
-            step: clampStep(initialProgressRef.current?.lastIndex),
-          });
-        }
-      } catch (err) {
-        if (cancelled) return;
-        const message =
-          err instanceof Error ? err.message : "Failed to join the session.";
-        setPhase({ kind: "error", message });
-      }
-    }
-    void boot();
-    return () => {
-      cancelled = true;
-      const ch = channelRef.current;
-      if (ch) {
-        void ch.unsubscribe();
-      }
-      channelRef.current = null;
-    };
-  }, [roomId]);
-
-  // Countdown tick.
-  useEffect(() => {
-    if (!deadlineAt) {
-      setSecondsRemaining(null);
-      return;
-    }
-    const target = new Date(deadlineAt).getTime();
-    function tick() {
-      const remaining = Math.max(
-        0,
-        Math.floor((target - Date.now()) / 1000),
-      );
-      setSecondsRemaining(remaining);
-    }
-    tick();
-    const interval = window.setInterval(tick, 1000);
-    return () => window.clearInterval(interval);
-  }, [deadlineAt]);
-
-  // Fetch the verdict when the room flips to verdict_ready — and
-  // re-fetch on every subsequent `verdict_ready` rebroadcast.
-  //
-  // bug-20 — `web-01-invitee-shell` §C "Live update": while the §C
-  // verdict card is open, an initiator reroll that changes the verdict
-  // must live-update the card. A reroll re-runs the verdict in place,
-  // so `roomStatus` stays `verdict_ready` — folding `verdictRefetchSignal`
-  // (bumped by the broadcast / UPDATE handlers) into the deps re-runs
-  // this effect on every rebroadcast. The re-fetch flows through the
-  // existing shaping path, so a reroll that swaps the default and
-  // no-survivor variants updates the card across both. The venue-name
-  // cross-fade is already wired in `WebVerdictCard` (a keyed re-mount +
-  // a 320ms `var(--ease-out)` animation) and plays automatically once
-  // the rendered venue name changes.
-  //
-  // bug-17 — the web invitee verdict surface conforms to the locked
-  // `web-01-invitee-shell` §C: plan name + verdict venue only. So the
-  // verdict read needs just two things — the verdict `method` (default
-  // vs `no_survivor`) and the plan name + winning venue name. It no
-  // longer loads `option_cuts` or `votes`: §C carries no receipts and
-  // no per-axis cuts.
-  //
-  // `plans` carries a creator-only SELECT policy, so a web invitee
-  // cannot read `plans.name` directly. `readRoomPlanState` resolves the
-  // plan name + verdict place name through the joiner-readable
-  // `plans_decided_for_user` / `plans_history_for_user` RPCs — the same
-  // path the `/join/<roomId>` shell uses for its §C decided card.
-  useEffect(() => {
-    if (
-      roomStatus !== "verdict_ready" &&
-      roomStatus !== "locked"
-    ) {
-      return;
-    }
-    if (!userId) return;
-    let cancelled = false;
-    async function loadVerdict() {
-      try {
-        const client = getSupabaseClient();
-        const [{ data: verdictRows }, planState] = await Promise.all([
-          client
-            .from("verdicts")
-            .select("id, room_id, option_id, computed_at, method, rule_text")
-            .eq("room_id", roomId)
-            .limit(1),
-          readRoomPlanState(client, roomId, userId as string),
-        ]);
-        const verdict = (verdictRows as VerdictRow[] | null)?.[0];
-        if (!verdict) return;
-
-        // The joiner RPC inlines the plan name + the winning venue
-        // name. A room with no linked Plan (a pre-workflow-overhaul
-        // leftover) resolves `open` — fall back to an empty plan name;
-        // §C still renders a venue-only card.
-        const planName =
-          planState.kind === "decided" ? planState.planName : "";
-        const verdictPlaceName =
-          planState.kind === "decided" ? planState.verdictPlaceName : "";
-
-        if (cancelled) return;
-        const view = shapeVerdictView({
-          verdict,
-          planName,
-          verdictPlaceName,
-        });
-        if (view) setPhase({ kind: "verdict", view });
-      } catch {
-        // Realtime will retry — don't surface a transient error here.
-      }
-    }
-    void loadVerdict();
-    return () => {
-      cancelled = true;
-    };
-  }, [roomId, roomStatus, userId, verdictRefetchSignal]);
-
-  // ----------------------------------------------------------------
-  // Q5 card-set fetch.
-  // ----------------------------------------------------------------
-
-  /** Request the server-assigned Q5 card set and fold its result into
-   *  Q5 state. Idempotent within a session — a fetch already in flight
-   *  (or resolved) is reused rather than re-firing the Edge Function.
-   *
-   *  This runs both on the Q4 -> Q5 advance AND on a resume that lands
-   *  the user directly on Q5 (the issue's resume-into-Q5 requirement):
-   *  Q5 cannot render the rater without cards, so the fetch must fire
-   *  whenever Q5 is entered, regardless of how. */
-  const startCandidateFetch = useCallback(() => {
-    if (fetchPromiseRef.current) return; // already running / resolved
-    setQ5State("loading");
-    const promise = fetchQ5CardSet(roomId);
-    fetchPromiseRef.current = promise;
-    void promise.then((result) => {
-      setCandidates(result.candidates);
-      setQ5Ratings(seedRatings(result.candidates));
-      setQ5State(result.source === "fetched" ? "default" : "no-results");
-    }).catch(() => {
-      setCandidates([]);
-      setQ5Ratings({});
-      setQ5State("no-results");
-    });
-  }, [roomId]);
-
-  // When the quiz lands on Q5 — by advancing OR by resume — request
-  // the card set if it has not already loaded.
-  useEffect(() => {
-    if (phase.kind === "quiz" && phase.step === 5) {
-      startCandidateFetch();
-    }
-  }, [phase, startCandidateFetch]);
+  const secondsRemaining = useDeadlineCountdown(roomRuntime.deadlineAt);
 
   // ----------------------------------------------------------------
   // Quiz handlers.
@@ -507,19 +425,20 @@ export function SessionRoom({
   const snapshotProgress = useCallback(
     (lastIndex: number): QuizProgressState => ({
       lastIndex,
-      cuisines: cuisine.noPreference
+      cuisines: quiz.cuisine.noPreference
         ? []
-        : Array.from(cuisine.cuisines).sort(),
-      noPreference: cuisine.noPreference,
-      budget,
-      reputation,
-      vibe,
+        : Array.from(quiz.cuisine.cuisines).sort(),
+      noPreference: quiz.cuisine.noPreference,
+      budget: quiz.budget,
+      reputation: quiz.reputation,
+      vibe: quiz.vibe,
     }),
-    [budget, cuisine, reputation, vibe],
+    [quiz],
   );
 
   const handleAdvance = useCallback(
     (nextStep: 1 | 2 | 3 | 4 | 5) => {
+      if (nextStep === 5) startCandidateFetch();
       setPhase({ kind: "quiz", step: nextStep });
       // Persist the in-flight progress so a re-click resumes here.
       // Best-effort (`writeQuizProgress` swallows failures) — the
@@ -530,36 +449,42 @@ export function SessionRoom({
         snapshotProgress(nextStep),
       );
     },
-    [roomId, snapshotProgress],
+    [roomId, snapshotProgress, startCandidateFetch],
   );
 
   const handleSubmit = useCallback(async () => {
+    const userId = userIdRef.current;
     if (!userId) return;
     setPhase({ kind: "submitting" });
     try {
       const client = getSupabaseClient();
 
-      const row: VoteRow = buildVoteRow({
+      const row = buildVoteRow({
         roomId,
         userId,
-        cuisines: cuisine.cuisines,
-        noPreference: cuisine.noPreference,
-        budget,
-        reputation,
-        vibe,
+        cuisines: quiz.cuisine.cuisines,
+        noPreference: quiz.cuisine.noPreference,
+        budget: quiz.budget,
+        reputation: quiz.reputation,
+        vibe: quiz.vibe,
         // The factorial probe — one `{ droppedAxis, score }` entry per
         // card. Empty on the no-results path (no cards were shown).
-        q5Ratings: buildQ5Ratings(candidates, q5Ratings),
+        q5Ratings: buildQ5Ratings(q5.candidates, q5.ratings),
       });
-      const { error } = await client.from("votes").insert(row);
-      if (error && !isUniqueViolation(error)) {
+      const { error } = await client.rpc("votes_submit_self", {
+        p_room_id: row.room_id,
+        p_q1: row.q1,
+        p_q2: row.q2,
+        p_q3: row.q3,
+        p_q4: row.q4,
+        p_q5: row.q5,
+      });
+      if (error) {
         throw error;
       }
-      setAnsweredIds((prev) => {
-        if (prev.has(userId)) return prev;
-        const next = new Set(prev);
-        next.add(userId);
-        return next;
+      dispatchRoomRuntime({
+        type: "vote-inserted",
+        row: { room_id: roomId, user_id: userId },
       });
       setPhase({ kind: "waiting" });
     } catch (err) {
@@ -567,7 +492,7 @@ export function SessionRoom({
         err instanceof Error ? err.message : "Failed to submit your vote.";
       setPhase({ kind: "error", message });
     }
-  }, [budget, candidates, cuisine, q5Ratings, reputation, roomId, userId, vibe]);
+  }, [q5, quiz, roomId]);
 
   // ----------------------------------------------------------------
   // §E — Leave (web-01 §E, decision doc §Q7).
@@ -578,8 +503,8 @@ export function SessionRoom({
    *  the error swallowed silently — the invitee can retry or dismiss;
    *  routing to the terminal as if the leave succeeded would be a lie. */
   const handleLeaveConfirm = useCallback(async () => {
-    if (!onLeave || leaving) return;
-    setLeaving(true);
+    if (!onLeave || leaveState.leaving) return;
+    dispatchLeave({ type: "leaving", value: true });
     try {
       await onLeave();
       // On success the shell unmounts this `SessionRoom` for the
@@ -588,29 +513,22 @@ export function SessionRoom({
       // Delete failed — keep the invitee on the quiz with the sheet
       // open. `leaving` resets so they can retry or dismiss.
     } finally {
-      setLeaving(false);
+      dispatchLeave({ type: "leaving", value: false });
     }
-  }, [leaving, onLeave]);
+  }, [leaveState.leaving, onLeave]);
 
   // The Q1–Q5 chrome only gets a `Leave` affordance when the shell
   // wired `onLeave` (the web invitee shell). Off that host it is
   // omitted — the `/s/` session route has no leave verb.
   const quizLeaveHandler = onLeave
-    ? () => setLeaveConfirmOpen(true)
+    ? () => dispatchLeave({ type: "open" })
     : undefined;
 
   // ----------------------------------------------------------------
   // Render
   // ----------------------------------------------------------------
 
-  const memberViews = useMemo<WaitingMemberView[]>(() => {
-    return members.map((m, i) => ({
-      id: m.user_id,
-      initial: `${i + 1}`,
-      answered: answeredIds.has(m.user_id),
-      isSelf: m.user_id === userId,
-    }));
-  }, [answeredIds, members, userId]);
+  const memberViews = useWaitingMemberViews(roomRuntime, userIdRef);
 
   if (phase.kind === "booting" || phase.kind === "joining") {
     return (
@@ -631,85 +549,33 @@ export function SessionRoom({
   }
 
   if (phase.kind === "quiz") {
-    let screen: JSX.Element | null = null;
-    switch (phase.step) {
-      case 1:
-        screen = (
-          <QuizQ1Cuisine
-            selection={cuisine}
-            onToggleCuisine={(id) =>
-              setCuisine((prev) => toggleCuisine(prev, id))
-            }
-            onToggleNoPreference={() =>
-              setCuisine((prev) => toggleCuisineNoPreference(prev))
-            }
-            onAdvance={() => handleAdvance(2)}
-            onLeave={quizLeaveHandler}
-          />
-        );
-        break;
-      case 2:
-        screen = (
-          <QuizQ2Budget
-            tier={budget}
-            onSelect={(tier) => setBudget(tier)}
-            onAdvance={() => handleAdvance(3)}
-            onLeave={quizLeaveHandler}
-          />
-        );
-        break;
-      case 3:
-        screen = (
-          <QuizQ3Reputation
-            value={reputation}
-            onSelect={(id) => setReputation(id)}
-            onAdvance={() => handleAdvance(4)}
-            onLeave={quizLeaveHandler}
-          />
-        );
-        break;
-      case 4:
-        screen = (
-          <QuizQ4Vibe
-            value={vibe}
-            onSelect={(idx) => setVibe(idx)}
-            onAdvance={() => handleAdvance(5)}
-            onLeave={quizLeaveHandler}
-          />
-        );
-        break;
-      case 5:
-        screen = (
-          <QuizQ5
-            state={q5State}
-            candidates={candidates}
-            ratings={q5Ratings}
-            onRate={(id, score) =>
-              setQ5Ratings((prev) => ({ ...prev, [id]: score }))
-            }
-            onSubmit={handleSubmit}
-            onLeave={quizLeaveHandler}
-          />
-        );
-        break;
-    }
     return (
-      <>
-        {screen}
-        {/* §E — the leave-confirm sheet overlays the quiz when the
-            chrome `Leave` affordance is tapped. The web invitee shell
-            is the only host that wires `onLeave`. */}
-        {leaveConfirmOpen ? (
-          <LeaveConfirmSheet
-            leaving={leaving}
-            onConfirm={handleLeaveConfirm}
-            onDismiss={() => {
-              if (leaving) return;
-              setLeaveConfirmOpen(false);
-            }}
-          />
-        ) : null}
-      </>
+      <SessionQuizScreens
+        step={phase.step}
+        quiz={quiz}
+        q5={q5}
+        leaveConfirmOpen={leaveState.confirmOpen}
+        leaving={leaveState.leaving}
+        onToggleCuisine={(id) =>
+          dispatchQuiz({ type: "toggle-cuisine", id })
+        }
+        onToggleNoPreference={() =>
+          dispatchQuiz({ type: "toggle-no-preference" })
+        }
+        onSelectBudget={(value) =>
+          dispatchQuiz({ type: "budget", value })
+        }
+        onSelectReputation={(value) =>
+          dispatchQuiz({ type: "reputation", value })
+        }
+        onSelectVibe={(value) => dispatchQuiz({ type: "vibe", value })}
+        onRateQ5={(id, score) => dispatchQ5({ type: "rate", id, score })}
+        onAdvance={handleAdvance}
+        onSubmit={handleSubmit}
+        onLeave={quizLeaveHandler}
+        onConfirmLeave={handleLeaveConfirm}
+        onDismissLeave={() => dispatchLeave({ type: "dismiss" })}
+      />
     );
   }
 
@@ -734,7 +600,7 @@ export function SessionRoom({
         onDownloadApp={
           appStoreUrl
             ? () => {
-                void emitDownloadCtaEvent({ roomId, userId });
+                void emitDownloadCtaEvent({ roomId });
                 if (typeof window !== "undefined") {
                   window.open(appStoreUrl, "_blank", "noopener,noreferrer");
                 }
@@ -763,6 +629,357 @@ export function SessionRoom({
       view={phase.view}
       onMintClaimCode={() => mintClaimCode()}
     />
+  );
+}
+
+function useVerdictLoader(
+  roomId: string,
+  userIdRef: MutableRefObject<string | null>,
+  setPhase: Dispatch<SetStateAction<Phase>>,
+) {
+  return useCallback(
+    async (client: SupabaseClient) => {
+      const userId = userIdRef.current;
+      if (!userId) return;
+      try {
+        const view = await loadVerdictView(client, roomId, userId);
+        if (view) setPhase({ kind: "verdict", view });
+      } catch {
+        // Realtime will retry — don't surface a transient error here.
+      }
+    },
+    [roomId, setPhase, userIdRef],
+  );
+}
+
+function useQ5CandidateFetch(
+  roomId: string,
+  dispatchQ5: Dispatch<Q5Action>,
+) {
+  const fetchPromiseRef = useRef<Promise<Q5CardSetFetchResult> | null>(null);
+
+  return useCallback(() => {
+    if (fetchPromiseRef.current) return; // already running / resolved
+    dispatchQ5({ type: "loading" });
+    const promise = fetchQ5CardSet(roomId);
+    fetchPromiseRef.current = promise;
+    void promise
+      .then((result) => {
+        dispatchQ5({ type: "loaded", result });
+      })
+      .catch(() => {
+        dispatchQ5({
+          type: "loaded",
+          result: { candidates: [], source: "no-results" },
+        });
+      });
+  }, [dispatchQ5, roomId]);
+}
+
+function useDeadlineCountdown(deadlineAt: string | null): number | null {
+  const now = useSecondClock();
+
+  return useMemo(() => {
+    if (!deadlineAt) return null;
+    const target = new Date(deadlineAt).getTime();
+    return Math.max(0, Math.floor((target - now) / 1000));
+  }, [deadlineAt, now]);
+}
+
+function useSecondClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+
+    function tick() {
+      setNow(Date.now());
+    }
+  }, []);
+
+  return now;
+}
+
+function useWaitingMemberViews(
+  roomRuntime: RoomRuntimeState,
+  userIdRef: MutableRefObject<string | null>,
+): WaitingMemberView[] {
+  return useMemo(() => {
+    const userId = userIdRef.current;
+    return roomRuntime.members.map((m, i) => ({
+      id: m.user_id,
+      initial: `${i + 1}`,
+      answered: roomRuntime.answeredIds.has(m.user_id),
+      isSelf: m.user_id === userId,
+    }));
+  }, [roomRuntime, userIdRef]);
+}
+
+function useSessionRoomBoot({
+  roomId,
+  channelRef,
+  userIdRef,
+  initialProgressRef,
+  loadAndShowVerdict,
+  setPhase,
+  startCandidateFetch,
+  dispatchRoomRuntime,
+}: {
+  roomId: string;
+  channelRef: MutableRefObject<RoomChannel | null>;
+  userIdRef: MutableRefObject<string | null>;
+  initialProgressRef: MutableRefObject<QuizProgressState | undefined>;
+  loadAndShowVerdict: (client: SupabaseClient) => Promise<void>;
+  setPhase: Dispatch<SetStateAction<Phase>>;
+  startCandidateFetch: () => void;
+  dispatchRoomRuntime: Dispatch<RoomRuntimeAction>;
+}) {
+  useEffect(() => {
+    let cancelled = false;
+    async function boot() {
+      try {
+        setPhase({ kind: "joining" });
+        const uid = await ensureAnonSession();
+        if (cancelled) return;
+        userIdRef.current = uid;
+
+        const client = getSupabaseClient();
+
+        // Member join is idempotent; the RPC pins user_id and role server-side.
+        const { error: memberErr } = await client.rpc("members_join_self", {
+          p_room_id: roomId,
+        });
+        if (memberErr) {
+          throw memberErr;
+        }
+
+        const [{ data: memberRows }, { data: voteRows }, { data: roomRows }] =
+          await Promise.all([
+            client
+              .from("members")
+              .select("room_id, user_id, role")
+              .eq("room_id", roomId),
+            client
+              .from("votes")
+              .select("room_id, user_id")
+              .eq("room_id", roomId),
+            client
+              .from("rooms")
+              .select(
+                "id, status, deadline_at, location_lat, location_lng, " +
+                  "location_tz, radius_meters, session_params",
+              )
+              .eq("id", roomId)
+              .limit(1),
+          ]);
+        if (cancelled) return;
+        const memberRowsTyped = (memberRows as MembersRow[] | null) ?? [];
+        const voteRowsTyped = (voteRows as VotesPresenceRow[] | null) ?? [];
+        const room = (roomRows as RoomsRow[] | null)?.[0];
+        dispatchRoomRuntime({
+          type: "seed",
+          members: memberRowsTyped,
+          votes: voteRowsTyped,
+          deadlineAt: room?.deadline_at ?? null,
+        });
+
+        const channel = client
+          .channel(`room:${roomId}`)
+          .on(
+            "postgres_changes",
+            {
+              event: POSTGRES_CHANGE_INSERT,
+              schema: "public",
+              table: "members",
+              filter: `room_id=eq.${roomId}`,
+            },
+            (payload) => {
+              const row = payload.new as MembersRow;
+              dispatchRoomRuntime({ type: "member-inserted", row });
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: POSTGRES_CHANGE_INSERT,
+              schema: "public",
+              table: "votes",
+              filter: `room_id=eq.${roomId}`,
+            },
+            (payload) => {
+              const row = payload.new as VotesPresenceRow;
+              dispatchRoomRuntime({ type: "vote-inserted", row });
+            },
+          )
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "rooms",
+              filter: `id=eq.${roomId}`,
+            },
+            (payload) => {
+              const row = payload.new as RoomsRow;
+              dispatchRoomRuntime({
+                type: "deadline",
+                deadlineAt: row.deadline_at,
+              });
+              if (isDecidedStatus(row.status)) {
+                void loadAndShowVerdict(client);
+              }
+            },
+          )
+          .on("broadcast", { event: "verdict_ready" }, () => {
+            void loadAndShowVerdict(client);
+          });
+
+        channel.subscribe();
+        channelRef.current = channel;
+
+        if (isDecidedStatus(room?.status)) {
+          const view = await loadVerdictView(client, roomId, uid);
+          if (cancelled) return;
+          setPhase(view ? { kind: "verdict", view } : { kind: "waiting" });
+        } else if (voteRowsTyped.some((v) => v.user_id === uid)) {
+          setPhase({ kind: "waiting" });
+        } else {
+          const step = clampStep(initialProgressRef.current?.lastIndex);
+          if (step === 5) startCandidateFetch();
+          setPhase({ kind: "quiz", step });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        const message =
+          err instanceof Error ? err.message : "Failed to join the session.";
+        setPhase({ kind: "error", message });
+      }
+    }
+    void boot();
+    return () => {
+      cancelled = true;
+      const ch = channelRef.current;
+      if (ch) {
+        void ch.unsubscribe();
+      }
+      channelRef.current = null;
+    };
+  }, [
+    channelRef,
+    dispatchRoomRuntime,
+    initialProgressRef,
+    loadAndShowVerdict,
+    roomId,
+    setPhase,
+    startCandidateFetch,
+    userIdRef,
+  ]);
+}
+
+function SessionQuizScreens({
+  step,
+  quiz,
+  q5,
+  leaveConfirmOpen,
+  leaving,
+  onToggleCuisine,
+  onToggleNoPreference,
+  onSelectBudget,
+  onSelectReputation,
+  onSelectVibe,
+  onRateQ5,
+  onAdvance,
+  onSubmit,
+  onLeave,
+  onConfirmLeave,
+  onDismissLeave,
+}: {
+  step: QuizStep;
+  quiz: QuizFormState;
+  q5: Q5Model;
+  leaveConfirmOpen: boolean;
+  leaving: boolean;
+  onToggleCuisine: (id: string) => void;
+  onToggleNoPreference: () => void;
+  onSelectBudget: (value: 1 | 2 | 3 | 4) => void;
+  onSelectReputation: (value: string) => void;
+  onSelectVibe: (value: number) => void;
+  onRateQ5: (id: string, score: number) => void;
+  onAdvance: (nextStep: QuizStep) => void;
+  onSubmit: () => void;
+  onLeave?: () => void;
+  onConfirmLeave: () => void;
+  onDismissLeave: () => void;
+}) {
+  let screen: JSX.Element | null = null;
+  switch (step) {
+    case 1:
+      screen = (
+        <QuizQ1Cuisine
+          selection={quiz.cuisine}
+          onToggleCuisine={onToggleCuisine}
+          onToggleNoPreference={onToggleNoPreference}
+          onAdvance={() => onAdvance(2)}
+          onLeave={onLeave}
+        />
+      );
+      break;
+    case 2:
+      screen = (
+        <QuizQ2Budget
+          tier={quiz.budget}
+          onSelect={onSelectBudget}
+          onAdvance={() => onAdvance(3)}
+          onLeave={onLeave}
+        />
+      );
+      break;
+    case 3:
+      screen = (
+        <QuizQ3Reputation
+          value={quiz.reputation}
+          onSelect={onSelectReputation}
+          onAdvance={() => onAdvance(4)}
+          onLeave={onLeave}
+        />
+      );
+      break;
+    case 4:
+      screen = (
+        <QuizQ4Vibe
+          value={quiz.vibe}
+          onSelect={onSelectVibe}
+          onAdvance={() => onAdvance(5)}
+          onLeave={onLeave}
+        />
+      );
+      break;
+    case 5:
+      screen = (
+        <QuizQ5
+          state={q5.state}
+          candidates={q5.candidates}
+          ratings={q5.ratings}
+          onRate={onRateQ5}
+          onSubmit={onSubmit}
+          onLeave={onLeave}
+        />
+      );
+      break;
+  }
+
+  return (
+    <>
+      {screen}
+      {leaveConfirmOpen ? (
+        <LeaveConfirmSheet
+          leaving={leaving}
+          onConfirm={onConfirmLeave}
+          onDismiss={onDismissLeave}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -795,43 +1012,12 @@ function FullScreenMessage({
   body: string;
 }) {
   return (
-    <main
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "grid",
-        placeItems: "center",
-        background:
-          "linear-gradient(180deg, var(--g1) 0%, var(--g2) 32%, var(--g3) 66%, var(--g4) 100%)",
-        color: "var(--paper)",
-        fontFamily: "var(--ff-display)",
-        padding: "var(--sp-6)",
-        textAlign: "center",
-      }}
-    >
+    <main style={fullScreenMainStyle}>
       <div>
-        <p
-          style={{
-            fontFamily: "var(--ff-body)",
-            fontWeight: 700,
-            fontSize: "var(--fz-eyebrow)",
-            letterSpacing: "var(--tr-eyebrow)",
-            textTransform: "uppercase",
-            opacity: 0.78,
-            marginBottom: "var(--sp-3)",
-          }}
-        >
+        <p style={fullScreenEyebrowStyle}>
           {eyebrow}
         </p>
-        <p
-          style={{
-            fontFamily: "var(--ff-body)",
-            fontWeight: 600,
-            fontSize: "var(--fz-body)",
-            margin: 0,
-            opacity: 0.86,
-          }}
-        >
+        <p style={fullScreenBodyStyle}>
           {body}
         </p>
       </div>
@@ -843,18 +1029,15 @@ function FullScreenMessage({
 // into the Supabase `events` table per ADR 0005. Fire-and-forget.
 async function emitDownloadCtaEvent({
   roomId,
-  userId,
 }: {
   roomId: string;
-  userId: string | null;
 }): Promise<void> {
   try {
     const client = getSupabaseClient();
-    await client.from("events").insert({
-      event_type: "waiting_download_cta_tapped",
-      room_id: roomId,
-      user_id: userId,
-      properties: {},
+    await client.rpc("events_insert_self", {
+      p_event_type: "waiting_download_cta_tapped",
+      p_room_id: roomId,
+      p_properties: {},
     });
   } catch {
     // Swallow — telemetry must never block the App Store handoff.
@@ -869,17 +1052,6 @@ function clampStep(value: number | undefined): 1 | 2 | 3 | 4 | 5 {
   if (typeof value !== "number" || !Number.isFinite(value)) return 1;
   const clamped = Math.min(5, Math.max(1, Math.round(value)));
   return clamped as 1 | 2 | 3 | 4 | 5;
-}
-
-// Lightweight duplicate-key detection for the votes insert. Mirrors
-// Legacy Swift `QuizCoordinator.isUniqueViolation`; active app lives in `mobile/`.
-function isUniqueViolation(error: unknown): boolean {
-  if (!error) return false;
-  const description = JSON.stringify(error);
-  return (
-    description.includes("23505") ||
-    description.includes("duplicate key value")
-  );
 }
 
 export { REPUTATION_NO_PREFERENCE };

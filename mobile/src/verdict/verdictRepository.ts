@@ -251,9 +251,13 @@ function logVerdictEvent(
 }
 
 function latestVerdict(rows: SupabaseVerdictRow[]): SupabaseVerdictRow | null {
-  return [...rows].sort((left, right) =>
-    right.computed_at.localeCompare(left.computed_at),
-  )[0] ?? null;
+  return rows.reduce<SupabaseVerdictRow | null>((latest, row) => {
+    if (latest === null || row.computed_at.localeCompare(latest.computed_at) > 0) {
+      return row;
+    }
+
+    return latest;
+  }, null);
 }
 
 function dollarsForTier(tier: number): string {
@@ -380,9 +384,20 @@ export async function advanceVerdictSlate({
   );
   const startIndex = currentIndex >= 0 ? currentIndex + 1 : 0;
   const skippedPlaceIds: string[] = [];
+  const remainingEntries = slate.slice(startIndex);
+  const displayResults = await Promise.allSettled(
+    remainingEntries.map((entry) => refetch(entry.googlePlaceId)),
+  );
 
-  for (const entry of slate.slice(startIndex)) {
-    const display = await refetch(entry.googlePlaceId);
+  for (let index = 0; index < remainingEntries.length; index += 1) {
+    const entry = remainingEntries[index];
+    const displayResult = displayResults[index];
+    if (!entry || !displayResult) continue;
+    if (displayResult.status === "rejected") {
+      throw displayResult.reason;
+    }
+
+    const display = displayResult.value;
     if (!display) {
       skippedPlaceIds.push(entry.googlePlaceId);
       continue;
@@ -521,7 +536,14 @@ export function createSupabaseVerdictRepository({
   const loadLiveLatestVerdictAndSlate = async (
     roomId: string,
   ): Promise<LatestVerdictAndSlate> => {
-    for (const retryDelayMs of [0, ...LIVE_VERDICT_PENDING_RETRY_DELAYS_MS]) {
+    const loadAttempt = async (
+      attemptIndex: number,
+    ): Promise<LatestVerdictAndSlate> => {
+      const retryDelayMs = [0, ...LIVE_VERDICT_PENDING_RETRY_DELAYS_MS][attemptIndex];
+      if (retryDelayMs === undefined) {
+        throw new VerdictPendingError("Verdict read failed: no row returned");
+      }
+
       if (retryDelayMs > 0) {
         await delay(retryDelayMs);
       }
@@ -532,10 +554,11 @@ export function createSupabaseVerdictRepository({
         if (!(error instanceof VerdictPendingError)) {
           throw error;
         }
+        return loadAttempt(attemptIndex + 1);
       }
-    }
+    };
 
-    throw new VerdictPendingError("Verdict read failed: no row returned");
+    return loadAttempt(0);
   };
 
   const loadPlanHistoryContext = async (
