@@ -1,0 +1,20 @@
+﻿[
+    {
+        "route":  "/join/30000000-0000-4000-8000-000000000002",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-supabase-smoke-delayed-join-active-room.png",
+        "screenshot_bytes":  280386,
+        "chrome_exit":  0,
+        "has_missing_env":  false,
+        "has_loading":  false,
+        "title":  "GetToIt — Where we\u0027re eating tonight"
+    },
+    {
+        "route":  "/s/30000000-0000-4000-8000-000000000002",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-supabase-smoke-delayed-session-active-room.png",
+        "screenshot_bytes":  381518,
+        "chrome_exit":  0,
+        "has_missing_env":  false,
+        "has_loading":  false,
+        "title":  "GetToIt — Session"
+    }
+]

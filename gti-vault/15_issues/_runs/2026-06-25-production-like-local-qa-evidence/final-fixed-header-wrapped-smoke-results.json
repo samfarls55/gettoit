@@ -1,0 +1,32 @@
+﻿[
+    {
+        "route":  "/",
+        "status":  200,
+        "ok":  true
+    },
+    {
+        "route":  "/privacy",
+        "status":  200,
+        "ok":  true
+    },
+    {
+        "route":  "/terms",
+        "status":  200,
+        "ok":  true
+    },
+    {
+        "route":  "/places-fallback",
+        "status":  200,
+        "ok":  true
+    },
+    {
+        "route":  "/join/30000000-0000-4000-8000-000000000002",
+        "status":  200,
+        "ok":  true
+    },
+    {
+        "route":  "/s/30000000-0000-4000-8000-000000000002",
+        "status":  200,
+        "ok":  true
+    }
+]

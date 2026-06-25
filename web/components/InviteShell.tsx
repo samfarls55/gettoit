@@ -93,6 +93,7 @@ const shellErrorColumnStyle: CSSProperties = {
 const shellErrorTitleStyle: CSSProperties = {
   fontSize: 32,
   margin: "10px 0 0",
+  overflowWrap: "break-word",
   textWrap: "balance",
 };
 
@@ -104,6 +105,7 @@ const shellErrorMessageStyle: CSSProperties = {
   lineHeight: 1.4,
   color: "rgba(255,255,255,0.78)",
   maxWidth: 280,
+  overflowWrap: "anywhere",
   textWrap: "balance",
 };
 

@@ -1,0 +1,62 @@
+[
+    {
+        "route":  "/",
+        "status":  200,
+        "expectedText":  "GetToIt",
+        "foundExpectedText":  true,
+        "screenshotExists":  true,
+        "screenshotBytes":  25372,
+        "bodyPreview":  " GetToIt GetToIt Decide where to eat together. Open a GetToIt invite link to vote with your group and see the verdict when everyone is in. Privacy · Terms (self.__next_f=self.__next_f||[]).push([0]) self.__next_f.push([1,\"5:I[\\\"(app-pages-b",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\root.png"
+    },
+    {
+        "route":  "/privacy",
+        "status":  200,
+        "expectedText":  "Privacy",
+        "foundExpectedText":  true,
+        "screenshotExists":  true,
+        "screenshotBytes":  42510,
+        "bodyPreview":  " Privacy Policy - GetToIt g GetToIt GetToIt Privacy Policy Effective May 14, 2026 GetToIt helps small groups stop arguing about where to eat. This policy explains, in plain language, what data the app handles, what we share, how long we kee",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\privacy.png"
+    },
+    {
+        "route":  "/terms",
+        "status":  200,
+        "expectedText":  "Terms",
+        "foundExpectedText":  true,
+        "screenshotExists":  true,
+        "screenshotBytes":  41074,
+        "bodyPreview":  " Terms of Service - GetToIt g GetToIt GetToIt Terms of Service Effective May 14, 2026 These Terms of Service (the \u0026quot;Terms\u0026quot;) govern your use of the GetToIt mobile app and the gettoit.app website (together, the \u0026quot;Service\u0026quot;). ",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\terms.png"
+    },
+    {
+        "route":  "/places-fallback",
+        "status":  200,
+        "expectedText":  "places",
+        "foundExpectedText":  true,
+        "screenshotExists":  true,
+        "screenshotBytes":  27658,
+        "bodyPreview":  " GetToIt — Couldn\u0026#x27;t load options Nearby Couldn\u0026#x27;t load options nearby. We hit a snag pulling places nearby. Try again in a moment . Start over Privacy · Terms (self.__next_f=self.__next_f||[]).push([0]) self.__next_f.push([1,\"5:I[\\",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\places-fallback.png"
+    },
+    {
+        "route":  "/join/30000000-0000-4000-8000-000000000001",
+        "status":  200,
+        "expectedText":  "GetToIt",
+        "foundExpectedText":  true,
+        "screenshotExists":  true,
+        "screenshotBytes":  297468,
+        "bodyPreview":  " Picking up where you left off… Privacy · Terms requestAnimationFrame(function(){$RT=performance.now()}); $RB=[];$RV=function(a){$RT=performance.now();for(var b=0;b a\u0026\u00262E3 GetToIt — Where we\u0026#x27;re eating tonight $RC(\"B:0\",\"S:0\") (self.__n",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\join.png"
+    },
+    {
+        "route":  "/s/30000000-0000-4000-8000-000000000001",
+        "status":  200,
+        "expectedText":  "GetToIt",
+        "foundExpectedText":  true,
+        "screenshotExists":  true,
+        "screenshotBytes":  25000,
+        "bodyPreview":  " GetToIt — Session Joining Connecting you to the room… Privacy · Terms (self.__next_f=self.__next_f||[]).push([0]) self.__next_f.push([1,\"5:I[\\\"(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/segment-explorer-node.j",
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\session.png"
+    }
+]

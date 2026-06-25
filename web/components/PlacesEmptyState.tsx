@@ -26,6 +26,7 @@ const containerStyle: CSSProperties = {
   textAlign: "center",
   color: "var(--paper)",
   fontFamily: "var(--ff-display)",
+  width: "100%",
   maxWidth: "32rem",
 };
 
@@ -45,6 +46,8 @@ const headlineStyle: CSSProperties = {
   letterSpacing: "var(--tr-display)",
   lineHeight: 0.92,
   margin: 0,
+  overflowWrap: "break-word",
+  textWrap: "balance",
 };
 
 const bodyStyle: CSSProperties = {
@@ -53,7 +56,8 @@ const bodyStyle: CSSProperties = {
   fontSize: "var(--fz-body)",
   lineHeight: 1.45,
   opacity: 0.86,
-  margin: 0,
+  maxWidth: 320,
+  margin: "0 auto",
 };
 
 const appLinkStyle: CSSProperties = {
@@ -64,6 +68,7 @@ const appLinkStyle: CSSProperties = {
 const ctaStyle: CSSProperties = {
   marginTop: "var(--sp-4)",
   display: "inline-flex",
+  justifySelf: "center",
   alignItems: "center",
   justifyContent: "center",
   fontFamily: "var(--ff-body)",

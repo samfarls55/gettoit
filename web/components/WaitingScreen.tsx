@@ -155,15 +155,28 @@ export function WaitingScreen({
           <div
             style={{
               padding: "0 22px",
-              display: "flex",
-              justifyContent: "space-between",
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              columnGap: 12,
               alignItems: "center",
             }}
           >
-            <GTIMark size={16} />
+            <div style={{ minWidth: 0, overflow: "hidden" }}>
+              <GTIMark size={16} />
+            </div>
             <div
               className="gti-eyebrow"
-              style={{ color: "var(--paper)", opacity: 0.6 }}
+              style={{
+                color: "var(--paper)",
+                opacity: 0.6,
+                justifySelf: "end",
+                maxWidth: "min(140px, 38vw)",
+                minWidth: 0,
+                overflow: "hidden",
+                textAlign: "right",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
             >
               You&apos;re in
             </div>
@@ -206,7 +219,16 @@ export function WaitingScreen({
               are in
             </div>
 
-            <div style={{ display: "flex", gap: 14, marginTop: 36 }}>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                gap: 14,
+                marginTop: 36,
+                maxWidth: "100%",
+              }}
+            >
               {members.map((m, i) => (
                 <div
                   key={m.id}

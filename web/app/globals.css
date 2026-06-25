@@ -41,7 +41,7 @@
 
   --tr-eyebrow: 0.18em;
   --tr-cta: 0.14em;
-  --tr-display: -0.025em;
+  --tr-display: 0;
 
   /* spacing */
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
@@ -66,6 +66,13 @@
 
   /* shadow — C-26 Floating Action Button (T1 ink-fill, bug-23) */
   --shadow-fab: 0 12px 32px rgba(255,210,63,0.32), inset 0 1px 0 rgba(255,255,255,0.08);
+}
+
+@media (max-width: 480px) {
+  :root {
+    --fz-display-m: 36px;
+    --fz-display-s: 30px;
+  }
 }
 
 html, body {
@@ -124,6 +131,9 @@ html, body {
   font-weight: var(--display-weight);
   letter-spacing: var(--tr-display);
   line-height: 0.92;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  text-wrap: balance;
 }
 
 /* ── Motion primitives ──────────────────────────────────── */

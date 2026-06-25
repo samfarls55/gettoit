@@ -20,4 +20,21 @@ describe("PlacesEmptyState", () => {
       /start over/i,
     );
   });
+
+  it("keeps the fallback headline inside narrow mobile viewports", () => {
+    render(<PlacesEmptyState />);
+
+    const headline = screen.getByRole("heading", {
+      name: /couldn't load options nearby/i,
+    });
+
+    expect(headline).toHaveStyle({
+      overflowWrap: "break-word",
+      textWrap: "balance",
+    });
+    expect(screen.getByTestId("places-empty-state")).toHaveStyle({
+      width: "100%",
+      maxWidth: "32rem",
+    });
+  });
 });

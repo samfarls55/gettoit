@@ -222,6 +222,12 @@ const fullScreenBodyStyle: CSSProperties = {
   fontSize: "var(--fz-body)",
   margin: 0,
   opacity: 0.86,
+  overflowWrap: "anywhere",
+};
+
+const fullScreenContentStyle: CSSProperties = {
+  width: "100%",
+  maxWidth: 360,
 };
 
 function createQuizFormState(
@@ -1013,7 +1019,7 @@ function FullScreenMessage({
 }) {
   return (
     <main style={fullScreenMainStyle}>
-      <div>
+      <div style={fullScreenContentStyle}>
         <p style={fullScreenEyebrowStyle}>
           {eyebrow}
         </p>

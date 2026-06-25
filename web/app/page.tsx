@@ -17,7 +17,7 @@ const mainStyle: CSSProperties = {
 export default function Page() {
   return (
     <main style={mainStyle}>
-      <div style={{ maxWidth: "34rem" }}>
+      <div style={{ width: "100%", maxWidth: "34rem" }}>
         <p
           style={{
             fontFamily: "var(--ff-body)",
@@ -39,6 +39,8 @@ export default function Page() {
             letterSpacing: "var(--tr-display)",
             lineHeight: 0.92,
             margin: 0,
+            overflowWrap: "break-word",
+            textWrap: "balance",
           }}
         >
           Decide where to eat together.

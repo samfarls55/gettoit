@@ -62,6 +62,7 @@ const shellWrap: CSSProperties = {
 const verdictTitleStyle: CSSProperties = {
   fontSize: 32,
   margin: "10px 0 0",
+  overflowWrap: "break-word",
   textWrap: "balance",
 };
 
@@ -72,6 +73,7 @@ const verdictVenueStyle: CSSProperties = {
   color: "var(--paper)",
   textAlign: "center",
   lineHeight: 1.2,
+  overflowWrap: "break-word",
   animation: "gti-fade-up 320ms var(--ease-out) both",
 };
 
@@ -84,6 +86,7 @@ const verdictMintStyle: CSSProperties = {
 const terminalTitleStyle: CSSProperties = {
   fontSize: 32,
   margin: "10px 0 0",
+  overflowWrap: "break-word",
   textWrap: "balance",
 };
 
@@ -95,6 +98,7 @@ const terminalBodyStyle: CSSProperties = {
   lineHeight: 1.4,
   color: "rgba(255,255,255,0.78)",
   maxWidth: 280,
+  overflowWrap: "break-word",
   textWrap: "balance",
 };
 

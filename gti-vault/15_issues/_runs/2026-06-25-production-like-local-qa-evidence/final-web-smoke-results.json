@@ -1,0 +1,44 @@
+﻿[
+    {
+        "route":  "/",
+        "status":  200,
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-smoke-home.png",
+        "screenshot_bytes":  25372,
+        "chrome_exit":  0
+    },
+    {
+        "route":  "/privacy",
+        "status":  200,
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-smoke-privacy.png",
+        "screenshot_bytes":  42510,
+        "chrome_exit":  0
+    },
+    {
+        "route":  "/terms",
+        "status":  200,
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-smoke-terms.png",
+        "screenshot_bytes":  41074,
+        "chrome_exit":  0
+    },
+    {
+        "route":  "/places-fallback",
+        "status":  200,
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-smoke-places-fallback.png",
+        "screenshot_bytes":  27658,
+        "chrome_exit":  0
+    },
+    {
+        "route":  "/join/30000000-0000-4000-8000-000000000002",
+        "status":  200,
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-smoke-join-active-room.png",
+        "screenshot_bytes":  297468,
+        "chrome_exit":  0
+    },
+    {
+        "route":  "/s/30000000-0000-4000-8000-000000000002",
+        "status":  200,
+        "screenshot":  "C:\\development\\gettoit\\gti-vault\\15_issues\\_runs\\2026-06-25-production-like-local-qa-evidence\\final-smoke-session-active-room.png",
+        "screenshot_bytes":  25000,
+        "chrome_exit":  0
+    }
+]
