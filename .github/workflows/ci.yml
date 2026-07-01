@@ -372,9 +372,11 @@ jobs:
           version: v2.105.0
       - name: supabase secrets set (Edge Function runtime secrets)
         # The places-proxy handler reads GOOGLE_PLACES_API_KEY from the
-        # function runtime environment; a missing key makes it return
-        # `google_places_misconfigured`. We push the Google key before
-        # the deploy so the function is live and configured in one CI run.
+        # function runtime environment; a missing runtime key makes it
+        # return `google_places_misconfigured`. When the GitHub mirror is
+        # present, refresh the Supabase runtime secret before deploy. When
+        # absent, leave the existing write-only Supabase secret unchanged;
+        # the live integration checks below prove whether it is configured.
         #
         # tb-WF-13 / tb-WF-14 — CLAIM_CODE_ENC_KEY (the AES-GCM key the
         # mint-claim-code function encrypts the web refresh token under
@@ -388,14 +390,15 @@ jobs:
         if: steps.gate.outputs.skip == 'false'
         run: |
           set -euo pipefail
-          if [ -z "${GOOGLE_PLACES_API_KEY:-}" ]; then
-            echo "GOOGLE_PLACES_API_KEY secret is not set — places-proxy would" >&2
-            echo "return google_places_misconfigured. Set the repo secret." >&2
-            exit 1
+          if [ -n "${GOOGLE_PLACES_API_KEY:-}" ]; then
+            supabase secrets set \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              GOOGLE_PLACES_API_KEY="$GOOGLE_PLACES_API_KEY"
+          else
+            echo "GOOGLE_PLACES_API_KEY repo secret is not set -" >&2
+            echo "leaving existing Supabase runtime secret unchanged." >&2
+            echo "Live integration checks below will fail if it is missing." >&2
           fi
-          supabase secrets set \
-            --project-ref "$SUPABASE_PROJECT_REF" \
-            GOOGLE_PLACES_API_KEY="$GOOGLE_PLACES_API_KEY"
           if [ -n "${VOYAGE_API_KEY:-}" ]; then
             supabase secrets set \
               --project-ref "$SUPABASE_PROJECT_REF" \

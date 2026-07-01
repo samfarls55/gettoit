@@ -28,6 +28,7 @@ GitHub Issues and CI are remote; Codex runs in its own sandbox and does not need
 | `SUPABASE_ANON_KEY` | iOS tests, Edge live integration tests | Supabase project API settings |
 | `SUPABASE_SERVICE_ROLE_KEY` | CI seeds private `app_config` rows | Supabase project API settings |
 | `FOURSQUARE_API_KEY` | `places-proxy` Edge Function runtime secret push | Foursquare developer dashboard |
+| `GOOGLE_PLACES_API_KEY` | Optional CI mirror for `places-proxy`; required as a Supabase Edge Function runtime secret | Google Cloud Console |
 | `VOYAGE_API_KEY` | Future Vibe embedding smoke/deploy gates; mirrors the Supabase Edge secret without exposing it to clients | Voyage AI dashboard |
 | `VIBE_EMBEDDINGS_ENABLED` | Vibe embedding kill switch mirrored into Supabase Edge Function secrets during Edge deploy | App-owned config value |
 | `CLAIM_CODE_ENC_KEY` | Claim-code Edge Functions | `openssl rand -base64 32` |
@@ -48,6 +49,7 @@ gh secret set SUPABASE_PROJECT_URL --body "$SUPABASE_PROJECT_URL"
 gh secret set SUPABASE_ANON_KEY --body "$SUPABASE_ANON_KEY"
 gh secret set SUPABASE_SERVICE_ROLE_KEY --body "$SUPABASE_SERVICE_ROLE_KEY"
 gh secret set FOURSQUARE_API_KEY --body "$FOURSQUARE_API_KEY"
+gh secret set GOOGLE_PLACES_API_KEY --body "$GOOGLE_PLACES_API_KEY"
 gh secret set VOYAGE_API_KEY --body "$VOYAGE_API_KEY"
 gh secret set VIBE_EMBEDDINGS_ENABLED --body "true"
 gh secret set CLAIM_CODE_ENC_KEY --body "$CLAIM_CODE_ENC_KEY"
@@ -82,6 +84,7 @@ Secrets are write-only in GitHub. To prove they are populated, run the relevant 
 ## Notes
 
 - `SUPABASE_SERVICE_ROLE_KEY` must never ship to a client.
+- `GOOGLE_PLACES_API_KEY` must exist in Supabase Edge Function secrets. The GitHub repo secret is only a mirror for refreshing it during CI deploys; when absent, CI leaves the existing Supabase runtime secret unchanged and the live smoke tests prove it is still configured.
 - `VOYAGE_API_KEY` must remain server-only. Do not prefix it with `NEXT_PUBLIC_` or `EXPO_PUBLIC_`.
 - `VIBE_EMBEDDINGS_ENABLED` is currently `true` after the 2026-06-12 operator override. Set it back to `false` to disable Voyage calls.
 - `EXPO_TOKEN` is the active Expo mobile release secret. The legacy App Store Connect secrets are historical Swift/TestFlight release material unless a human explicitly reopens that path.

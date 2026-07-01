@@ -69,6 +69,21 @@ Deno.test("ci.yml - edge-deploy sets the GOOGLE_PLACES_API_KEY secret", () => {
   );
 });
 
+Deno.test("ci.yml - edge-deploy tolerates a missing GitHub Google mirror", () => {
+  const wf = loadWorkflow();
+  const text = jobStepsText(wf?.jobs?.["edge-deploy"]);
+  assertStringIncludes(
+    text,
+    "leaving existing Supabase runtime secret unchanged",
+    "edge-deploy should not fail solely because the write-only GitHub mirror is absent.",
+  );
+  assertStringIncludes(
+    text,
+    "Live integration checks below will fail if it is missing",
+    "edge-deploy must still prove the Supabase runtime secret is configured.",
+  );
+});
+
 Deno.test("ci.yml - edge-deploy is gated on credentials being present", () => {
   const wf = loadWorkflow();
   const text = jobStepsText(wf?.jobs?.["edge-deploy"]);
