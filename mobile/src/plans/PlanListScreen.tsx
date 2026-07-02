@@ -12,6 +12,7 @@ import {
 import { mobileTokens } from "../design/tokens";
 import type {
   PlanListItem,
+  PlanMealTime,
   PlanListSnapshot,
   PlanParticipantScope,
 } from "./planRepository";
@@ -77,6 +78,12 @@ const livePlanBuckets: LivePlanBucket[] = [
 const pastPlanBucket: PlanBucket = { key: "history", title: "Closed" };
 const materialIconFont = "Material Symbols Outlined";
 const isWeb = Platform.OS === "web";
+const recentPastPlanLimit = 3;
+
+type WebPressableState = {
+  focused?: boolean;
+  pressed: boolean;
+};
 
 function ensureDashboardFonts() {
   if (typeof document === "undefined") {
@@ -124,6 +131,7 @@ export function PlanListScreen({
     useState<PlanListItem | null>(null);
   const [deletingPlanId, setDeletingPlanId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showAllPastPlans, setShowAllPastPlans] = useState(false);
   const [
     locallyDeletedCreatedPlanIds,
     setLocallyDeletedCreatedPlanIds,
@@ -146,6 +154,17 @@ export function PlanListScreen({
     }
   }
   const pastPlans = plans.history;
+  const visiblePastPlans = showAllPastPlans
+    ? pastPlans
+    : pastPlans.slice(0, recentPastPlanLimit);
+  const hiddenPastPlanCount = Math.max(
+    pastPlans.length - visiblePastPlans.length,
+    0,
+  );
+  const secondaryLivePlanCount = secondaryLiveBuckets.reduce(
+    (total, bucket) => total + bucket.plans.length,
+    0,
+  );
   const handleCreateGroupPlan = () => onCreatePlan?.("group");
 
   const handleConfirmDelete = async (plan: PlanListItem) => {
@@ -167,12 +186,16 @@ export function PlanListScreen({
 
   return (
     <View style={styles.root}>
-      <View style={styles.topAppBar}>
+      <View role="banner" style={styles.topAppBar}>
         <Pressable
           accessibilityLabel="Open Settings"
           accessibilityRole="button"
           onPress={onOpenSettings}
-          style={styles.iconButton}
+          style={(state) => [
+            styles.iconButton,
+            state.pressed && styles.pressedAction,
+            webFocusRing(state),
+          ]}
         >
           <DashboardIcon
             color={mobileTokens.color.gold}
@@ -197,13 +220,17 @@ export function PlanListScreen({
       </View>
 
       <ScrollView
+        accessibilityLabel="Plans dashboard"
         contentContainerStyle={styles.content}
         contentInsetAdjustmentBehavior="automatic"
+        role="main"
         showsVerticalScrollIndicator={false}
         style={styles.scroller}
       >
         <View style={styles.hero}>
-          <Text style={styles.title}>Your Plans</Text>
+          <Text accessibilityRole="header" role="heading" style={styles.title}>
+            Your Plans
+          </Text>
           <Text style={styles.subtitle}>The next decision lives here.</Text>
         </View>
 
@@ -225,12 +252,30 @@ export function PlanListScreen({
         ) : null}
 
         {secondaryLiveBuckets.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, styles.sectionLabelInset]}>
-              Other active Plans
-            </Text>
+          <View
+            accessibilityLabel={`Other active Plans, ${formatPlanCount(
+              secondaryLivePlanCount,
+            )}`}
+            role="region"
+            style={styles.section}
+          >
+            <View style={[styles.sectionHeader, styles.sectionHeaderInset]}>
+              <Text
+                accessibilityRole="header"
+                role="heading"
+                style={styles.sectionLabel}
+              >
+                Other active Plans
+              </Text>
+              <Text style={styles.sectionCount}>
+                {formatPlanCount(secondaryLivePlanCount)}
+              </Text>
+            </View>
             <View
-              accessibilityLabel="Other active Plans"
+              accessibilityLabel={`Other active Plans list, ${formatPlanCount(
+                secondaryLivePlanCount,
+              )}`}
+              role="list"
               style={styles.liveList}
             >
               {secondaryLiveBuckets.flatMap((bucket) =>
@@ -254,19 +299,75 @@ export function PlanListScreen({
           </View>
         ) : null}
 
-        <View style={styles.pastSection}>
-          <Text style={styles.sectionLabel}>Closed Plans</Text>
+        <View
+          accessibilityLabel={`Closed Plans, showing ${visiblePastPlans.length} of ${pastPlans.length}`}
+          role="region"
+          style={styles.pastSection}
+        >
+          <View style={styles.sectionHeader}>
+            <Text
+              accessibilityRole="header"
+              role="heading"
+              style={styles.sectionLabel}
+            >
+              Closed Plans
+            </Text>
+            {pastPlans.length > 0 ? (
+              <Text style={styles.sectionCount}>
+                {formatPlanCount(pastPlans.length)}
+              </Text>
+            ) : null}
+          </View>
           {pastPlans.length > 0 ? (
-            <View style={styles.pastList}>
-              {pastPlans.map((plan) => (
-                <PastPlanCard
-                  bucket={pastPlanBucket}
-                  key={plan.id}
-                  onOpenPlan={onOpenPlan}
-                  plan={plan}
-                />
-              ))}
-            </View>
+            <>
+              <View
+                accessibilityLabel={`Closed Plans list, showing ${visiblePastPlans.length} of ${pastPlans.length}`}
+                role="list"
+                style={styles.pastList}
+              >
+                {visiblePastPlans.map((plan) => (
+                  <PastPlanCard
+                    bucket={pastPlanBucket}
+                    key={plan.id}
+                    onOpenPlan={onOpenPlan}
+                    plan={plan}
+                  />
+                ))}
+              </View>
+              {hiddenPastPlanCount > 0 || showAllPastPlans ? (
+                <Pressable
+                  accessibilityHint="Expands or collapses the closed Plans list"
+                  accessibilityLabel={
+                    showAllPastPlans
+                      ? "Show recent closed Plans"
+                      : `See all ${pastPlans.length} closed Plans`
+                  }
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showAllPastPlans }}
+                  aria-expanded={showAllPastPlans}
+                  onPress={() =>
+                    setShowAllPastPlans((isShowingAll) => !isShowingAll)
+                  }
+                  style={(state) => [
+                    styles.archiveToggleButton,
+                    state.pressed && styles.pressedAction,
+                    webFocusRing(state),
+                  ]}
+                >
+                  <Text style={styles.archiveToggleButtonLabel}>
+                    {showAllPastPlans
+                      ? "Show recent closed Plans"
+                      : `See all ${pastPlans.length} closed Plans`}
+                  </Text>
+                  <DashboardIcon
+                    color={mobileTokens.color.copper}
+                    fallback={showAllPastPlans ? "^" : "v"}
+                    name={showAllPastPlans ? "expand_less" : "expand_more"}
+                    size={20}
+                  />
+                </Pressable>
+              ) : null}
+            </>
           ) : (
             <Text style={styles.emptyBody}>Closed Plans will land here.</Text>
           )}
@@ -282,22 +383,20 @@ export function PlanListScreen({
         )}
       </ScrollView>
 
-      <View style={styles.bottomActions}>
-        <View
-          aria-selected
-          accessibilityLabel="Plans current section"
-          accessibilityRole="tab"
-          accessibilityState={{ selected: true }}
-          style={styles.bottomActionCopy}
-        >
-          <Text style={styles.bottomActionEyebrow}>Plans</Text>
-          <Text style={styles.bottomActionTitle}>Ready when you are.</Text>
-        </View>
+      <View
+        accessibilityLabel="Plan actions"
+        role="toolbar"
+        style={styles.bottomActions}
+      >
         <Pressable
           accessibilityLabel="Create group Plan"
           accessibilityRole="button"
           onPress={handleCreateGroupPlan}
-          style={styles.startPlanButton}
+          style={(state) => [
+            styles.startPlanButton,
+            state.pressed && styles.pressedAction,
+            webFocusRing(state),
+          ]}
         >
           <DashboardIcon
             color={mobileTokens.color.ink}
@@ -332,8 +431,21 @@ function NextUpPlanCard({
   plan: PlanListItem;
 }) {
   return (
-    <View style={styles.nextUpSection}>
-      <Text style={styles.nextUpEyebrow}>Needs you now</Text>
+    <View
+      accessibilityLabel={`Needs you now, ${bucket.title} Plan ${plan.title}`}
+      role="region"
+      style={styles.nextUpSection}
+    >
+      <Text
+        accessibilityRole="header"
+        role="heading"
+        style={styles.nextUpEyebrow}
+      >
+        Needs you now
+      </Text>
+      <Text style={styles.nextUpReason}>
+        First active Plan waiting on your action.
+      </Text>
       <View style={styles.nextUpCard}>
         <View style={styles.nextUpHeader}>
           <View style={styles.nextUpTitleGroup}>
@@ -363,7 +475,12 @@ function NextUpPlanCard({
           accessibilityLabel={`Open Needs you now Plan ${plan.title}`}
           accessibilityRole="button"
           onPress={() => onOpenPlan?.(plan)}
-          style={[styles.voteButton, styles.nextUpAction]}
+          style={(state) => [
+            styles.voteButton,
+            styles.nextUpAction,
+            state.pressed && styles.pressedAction,
+            webFocusRing(state),
+          ]}
         >
           <Text style={[styles.voteButtonLabel, styles.nextUpActionLabel]}>
             {bucket.actionLabel}
@@ -409,38 +526,46 @@ function LivePlanCard({
   plan: PlanListItem;
 }) {
   return (
-    <View style={styles.liveCardShell}>
+    <View role="listitem" style={styles.liveCardShell}>
       <View style={styles.liveCard}>
-        <View style={styles.liveCardOpenArea}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardTitleGroup}>
-              <Text style={styles.bucketTitle}>{bucket.title}</Text>
-              <Text numberOfLines={2} style={styles.planTitle}>
-                {plan.title}
-              </Text>
-            </View>
-            <View style={styles.cardHeaderActions}>
-              {bucket.key === "created" ? (
-                <DeletePlanButton
-                  bucket={bucket}
-                  isDeleting={isDeleting}
-                  onRequestDelete={onRequestDelete}
-                  plan={plan}
-                />
-              ) : null}
-            </View>
-          </View>
-
-          <Text numberOfLines={2} style={styles.stateBody}>
+        <View style={styles.liveRowCopy}>
+          <Text style={styles.bucketTitle}>{bucket.title}</Text>
+          <Text numberOfLines={1} style={styles.planTitle}>
+            {plan.title}
+          </Text>
+          <Text numberOfLines={1} style={styles.stateBody}>
             {bucket.stateBody}
           </Text>
+        </View>
+
+        <View style={styles.liveRowActions}>
+          {bucket.key === "created" ? (
+            <DeletePlanButton
+              bucket={bucket}
+              isDeleting={isDeleting}
+              onRequestDelete={onRequestDelete}
+              plan={plan}
+            />
+          ) : null}
           <Pressable
             accessibilityLabel={`Open ${bucket.title} Plan ${plan.title}`}
             accessibilityRole="button"
             onPress={() => onOpenPlan?.(plan)}
-            style={styles.voteButton}
+            style={(state) => [
+              styles.secondaryOpenButton,
+              state.pressed && styles.pressedAction,
+              webFocusRing(state),
+            ]}
           >
-            <Text style={styles.voteButtonLabel}>{bucket.actionLabel}</Text>
+            <Text style={styles.secondaryOpenButtonLabel}>
+              {bucket.actionLabel}
+            </Text>
+            <DashboardIcon
+              color={mobileTokens.color.copper}
+              fallback=">"
+              name="chevron_right"
+              size={18}
+            />
           </Pressable>
         </View>
       </View>
@@ -476,7 +601,12 @@ function DeletePlanButton({
       disabled={isDeleting}
       hitSlop={8}
       onPress={() => onRequestDelete(plan)}
-      style={[styles.deleteIconButton, isDeleting && styles.disabledAction]}
+      style={(state) => [
+        styles.deleteIconButton,
+        state.pressed && styles.pressedAction,
+        webFocusRing(state),
+        isDeleting && styles.disabledAction,
+      ]}
     >
       <DashboardIcon
         color={mobileTokens.color.danger}
@@ -518,8 +648,10 @@ function DeleteConfirmationCard({
           accessibilityRole="button"
           disabled={isDeleting}
           onPress={() => onRequestDelete(null)}
-          style={[
+          style={(state) => [
             styles.confirmGhostButton,
+            state.pressed && styles.pressedAction,
+            webFocusRing(state),
             isDeleting && styles.disabledAction,
           ]}
         >
@@ -530,8 +662,10 @@ function DeleteConfirmationCard({
           accessibilityRole="button"
           disabled={isDeleting}
           onPress={() => void onConfirmDelete(plan)}
-          style={[
+          style={(state) => [
             styles.confirmDeleteButton,
+            state.pressed && styles.pressedAction,
+            webFocusRing(state),
             isDeleting && styles.disabledAction,
           ]}
         >
@@ -553,6 +687,75 @@ function getNextUpPlan(liveBuckets: PlanBucketWithPlans[]): NextUpPlan | null {
 
   return { bucket, plan: bucket.plans[0] };
 }
+
+function webFocusRing(state: { pressed: boolean }) {
+  return isWeb && (state as WebPressableState).focused
+    ? styles.webFocusRing
+    : null;
+}
+
+function formatPlanCount(count: number): string {
+  return `${count} Plan${count === 1 ? "" : "s"}`;
+}
+
+function formatPastPlanDetail(plan: PlanListItem): string {
+  const details = [
+    formatClosedDate(plan.closedAt),
+    plan.setup?.searchArea?.center.label,
+    plan.setup ? participantScopeLabels[plan.setup.participantScope] : null,
+    plan.setup ? mealTimeLabels[plan.setup.mealTime] : null,
+  ].filter((detail): detail is string => Boolean(detail));
+
+  if (details.length > 0) {
+    return details.join(" / ");
+  }
+
+  if (!isGenericPastSubtitle(plan.subtitle)) {
+    return plan.subtitle;
+  }
+
+  return "Verdict record";
+}
+
+const pastDateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "numeric",
+  month: "short",
+});
+
+function formatClosedDate(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return pastDateFormatter.format(date);
+}
+
+function isGenericPastSubtitle(subtitle: string): boolean {
+  const normalizedSubtitle = subtitle.trim().toLowerCase();
+
+  return (
+    normalizedSubtitle === "closed verdict" || normalizedSubtitle === "history"
+  );
+}
+
+const participantScopeLabels: Record<PlanParticipantScope, string> = {
+  duo: "Duo",
+  group: "Group",
+  solo: "Solo",
+};
+
+const mealTimeLabels: Record<PlanMealTime, string> = {
+  breakfast: "Breakfast",
+  dinner: "Dinner",
+  lateNight: "Late night",
+  lunch: "Lunch",
+};
 
 function DashboardIcon({
   color = mobileTokens.color.paper,
@@ -588,12 +791,19 @@ function PastPlanCard({
   onOpenPlan?: (plan: PlanListItem) => void;
   plan: PlanListItem;
 }) {
+  const detail = formatPastPlanDetail(plan);
+
   return (
     <Pressable
+      accessibilityHint={detail}
       accessibilityLabel={`Open ${bucket.title} Plan ${plan.title}`}
       accessibilityRole="button"
       onPress={() => onOpenPlan?.(plan)}
-      style={styles.pastCard}
+      style={(state) => [
+        styles.pastCard,
+        state.pressed && styles.pressedAction,
+        webFocusRing(state),
+      ]}
     >
       <View style={styles.pastIcon}>
         <DashboardIcon fallback="*" name="event_note" size={18} />
@@ -602,9 +812,8 @@ function PastPlanCard({
         <Text numberOfLines={1} style={styles.pastCardTitle}>
           {plan.title}
         </Text>
-        <Text style={styles.pastBucket}>{bucket.title}</Text>
         <Text numberOfLines={1} style={styles.pastMeta}>
-          {plan.subtitle}
+          {detail}
         </Text>
       </View>
       <DashboardIcon
@@ -675,7 +884,7 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: mobileTokens.spacing[8],
-    paddingBottom: 160,
+    paddingBottom: 128,
     paddingTop: mobileTokens.spacing[10],
   },
   hero: {
@@ -706,7 +915,7 @@ const styles = StyleSheet.create({
     padding: mobileTokens.spacing[3],
   },
   nextUpSection: {
-    gap: mobileTokens.spacing[3],
+    gap: mobileTokens.spacing[2],
     paddingHorizontal: mobileTokens.spacing[5],
   },
   nextUpEyebrow: {
@@ -716,6 +925,12 @@ const styles = StyleSheet.create({
     fontWeight: mobileTokens.typography.eyebrow.weight,
     letterSpacing: 0,
     textTransform: "uppercase",
+  },
+  nextUpReason: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: bodyFont,
+    fontSize: 13,
+    lineHeight: 18,
   },
   nextUpCard: {
     backgroundColor: mobileTokens.color.surfaceContainerLow,
@@ -761,6 +976,14 @@ const styles = StyleSheet.create({
   section: {
     gap: mobileTokens.spacing[2],
   },
+  sectionHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  sectionHeaderInset: {
+    paddingHorizontal: mobileTokens.spacing[5],
+  },
   sectionLabel: {
     color: mobileTokens.color.textSecondaryOnGradient,
     fontFamily: labelFont,
@@ -769,11 +992,14 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     textTransform: "uppercase",
   },
-  sectionLabelInset: {
-    paddingHorizontal: mobileTokens.spacing[5],
+  sectionCount: {
+    color: mobileTokens.color.outline,
+    fontFamily: labelFont,
+    fontSize: 12,
+    lineHeight: 16,
   },
   liveList: {
-    gap: mobileTokens.spacing[4],
+    gap: mobileTokens.spacing[3],
     paddingHorizontal: mobileTokens.spacing[5],
   },
   liveCardShell: {
@@ -781,29 +1007,28 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   liveCard: {
+    alignItems: "center",
     backgroundColor: mobileTokens.color.surfaceContainerLow,
     borderColor: mobileTokens.color.glassStroke,
     borderRadius: mobileTokens.radius.default,
     borderTopColor: mobileTokens.color.glassTop,
     borderWidth: 1,
-    minHeight: 168,
-  },
-  liveCardOpenArea: {
-    gap: mobileTokens.spacing[4],
-    minHeight: 168,
-    padding: mobileTokens.spacing[4],
-  },
-  cardHeader: {
     flexDirection: "row",
     gap: mobileTokens.spacing[3],
-    justifyContent: "space-between",
+    minHeight: 96,
+    padding: mobileTokens.spacing[3],
   },
   cardHeaderActions: {
     alignItems: "flex-end",
     gap: mobileTokens.spacing[2],
   },
-  cardTitleGroup: {
+  liveRowCopy: {
     flex: 1,
+    gap: 2,
+    minWidth: 0,
+  },
+  liveRowActions: {
+    alignItems: "flex-end",
     gap: mobileTokens.spacing[2],
   },
   bucketTitle: {
@@ -816,9 +1041,9 @@ const styles = StyleSheet.create({
   planTitle: {
     color: mobileTokens.color.paper,
     fontFamily: bodyFont,
-    fontSize: mobileTokens.typography.title.size,
-    fontWeight: mobileTokens.typography.title.weight,
-    lineHeight: mobileTokens.typography.title.lineHeight,
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 22,
   },
   statusChip: {
     alignItems: "center",
@@ -850,15 +1075,32 @@ const styles = StyleSheet.create({
     borderColor: mobileTokens.color.danger,
     borderRadius: mobileTokens.radius.md,
     borderWidth: 1,
-    height: 44,
+    height: 40,
     justifyContent: "center",
-    width: 44,
+    width: 40,
   },
   stateBody: {
     color: mobileTokens.color.textSecondaryOnGradient,
     fontFamily: bodyFont,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  secondaryOpenButton: {
+    alignItems: "center",
+    borderColor: mobileTokens.color.copper,
+    borderRadius: mobileTokens.radius.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: mobileTokens.spacing[2],
+    justifyContent: "center",
+    minHeight: 40,
+    paddingHorizontal: mobileTokens.spacing[3],
+  },
+  secondaryOpenButtonLabel: {
+    color: mobileTokens.color.copper,
+    fontFamily: labelFont,
+    fontSize: 12,
+    fontWeight: "700",
   },
   voteButton: {
     alignItems: "center",
@@ -876,11 +1118,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   pastSection: {
-    gap: mobileTokens.spacing[4],
+    gap: mobileTokens.spacing[3],
     paddingHorizontal: mobileTokens.spacing[5],
   },
   pastList: {
-    gap: mobileTokens.spacing[3],
+    gap: mobileTokens.spacing[2],
   },
   pastCard: {
     alignItems: "center",
@@ -891,7 +1133,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     gap: mobileTokens.spacing[3],
-    minHeight: 88,
+    minHeight: 72,
     padding: mobileTokens.spacing[3],
   },
   pastIcon: {
@@ -915,17 +1157,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 20,
   },
-  pastBucket: {
-    color: mobileTokens.color.textSecondaryOnGradient,
-    fontFamily: labelFont,
-    fontSize: 12,
-    lineHeight: 16,
-  },
   pastMeta: {
-    color: mobileTokens.color.outline,
+    color: mobileTokens.color.textSecondaryOnGradient,
     fontFamily: bodyFont,
     fontSize: 12,
     lineHeight: 16,
+  },
+  archiveToggleButton: {
+    alignItems: "center",
+    borderColor: mobileTokens.color.copper,
+    borderRadius: mobileTokens.radius.md,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: mobileTokens.spacing[2],
+    justifyContent: "center",
+    minHeight: 44,
+    paddingHorizontal: mobileTokens.spacing[3],
+  },
+  archiveToggleButtonLabel: {
+    color: mobileTokens.color.copper,
+    fontFamily: labelFont,
+    fontSize: 12,
+    fontWeight: "700",
   },
   confirmCard: {
     backgroundColor: mobileTokens.color.surfaceContainer,
@@ -1018,9 +1271,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: mobileTokens.radius.default,
     borderTopWidth: 1,
     bottom: 0,
-    flexDirection: "row",
-    gap: mobileTokens.spacing[4],
-    minHeight: 96,
+    minHeight: 84,
     justifyContent: "space-between",
     left: 0,
     paddingBottom: mobileTokens.spacing[4],
@@ -1029,32 +1280,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
   },
-  bottomActionCopy: {
-    flex: 1,
-    gap: mobileTokens.spacing[2],
-  },
-  bottomActionEyebrow: {
-    color: mobileTokens.color.gold,
-    fontFamily: labelFont,
-    fontSize: 12,
-    fontWeight: "700",
-    lineHeight: 16,
-    textTransform: "uppercase",
-  },
-  bottomActionTitle: {
-    color: mobileTokens.color.textSecondaryOnGradient,
-    fontFamily: bodyFont,
-    fontSize: 14,
-    lineHeight: 20,
-  },
   startPlanButton: {
     alignItems: "center",
     backgroundColor: mobileTokens.color.gold,
     borderRadius: mobileTokens.radius.md,
+    flex: 1,
     flexDirection: "row",
     gap: mobileTokens.spacing[2],
     justifyContent: "center",
-    minHeight: 44,
+    minHeight: 48,
     paddingHorizontal: mobileTokens.spacing[3],
   },
   startPlanButtonLabel: {
@@ -1066,5 +1300,14 @@ const styles = StyleSheet.create({
   },
   disabledAction: {
     opacity: 0.5,
+  },
+  pressedAction: {
+    opacity: 0.84,
+  },
+  webFocusRing: {
+    outlineColor: mobileTokens.color.gold,
+    outlineOffset: 3,
+    outlineStyle: "solid",
+    outlineWidth: 2,
   },
 });

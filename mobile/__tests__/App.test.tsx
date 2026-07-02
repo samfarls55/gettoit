@@ -561,7 +561,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(signInWithApple).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("Plans")).toBeOnTheScreen();
+      expect(screen.getByText("Your Plans")).toBeOnTheScreen();
     });
   });
 
@@ -598,7 +598,7 @@ describe("App", () => {
           email: "dev@example.com",
           password: "test-password",
         });
-        expect(screen.getByText("Plans")).toBeOnTheScreen();
+        expect(screen.getByText("Your Plans")).toBeOnTheScreen();
       });
     } finally {
       Object.defineProperty(Platform, "OS", {
@@ -745,7 +745,7 @@ describe("App", () => {
     expect(screen.getAllByText("Setup needed")).toHaveLength(1);
     expect(screen.getAllByText("Answer needed")).toHaveLength(1);
     expect(screen.getAllByText("Verdict ready")).toHaveLength(1);
-    expect(screen.getAllByText("Closed")).toHaveLength(1);
+    expect(screen.getAllByText("Closed Plans")).toHaveLength(1);
     expect(screen.queryByLabelText("Open Setup needed Plan Brunch plan")).toBeNull();
     expect(screen.getByText("Birthday dinner")).toBeOnTheScreen();
     expect(screen.getByText("Sushi night")).toBeOnTheScreen();
@@ -1075,7 +1075,7 @@ describe("App", () => {
         mealTime: "dinner",
         serviceShape: "dineIn",
       });
-      expect(screen.getByText("Plans")).toBeOnTheScreen();
+      expect(screen.getByText("Your Plans")).toBeOnTheScreen();
     });
   });
 
@@ -1230,7 +1230,7 @@ describe("App", () => {
       expect(quizProgressRepository.exitPlan).toHaveBeenCalledWith({
         roomId: "joined-morgan-birthday",
       });
-      expect(screen.getByText("Plans")).toBeOnTheScreen();
+      expect(screen.getByText("Your Plans")).toBeOnTheScreen();
     });
   });
 

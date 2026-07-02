@@ -318,6 +318,7 @@ describe("planRepository", () => {
       ],
       history: [
         {
+          closedAt: "2026-06-04T12:00:00Z",
           id: "history-plan",
           roomId: "room-history",
           title: "Taco crawl",

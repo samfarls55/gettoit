@@ -48,6 +48,7 @@ const serviceShapes: readonly PlanServiceShape[] = [
 ];
 
 export type PlanListItem = {
+  closedAt?: string;
   id: string;
   roomId?: string;
   title: string;
@@ -450,13 +451,17 @@ function historyItem(
   isJoinedByUser: boolean,
   roomId: string | undefined,
 ): PlanListItem {
+  const hasSetupSource = Boolean(plan.scope || plan.location || plan.session_params);
+
   return {
+    closedAt: plan.expired_at ?? plan.verdict_fired_at ?? plan.created_at,
     id: plan.id,
     ...(roomId ? { roomId } : {}),
     title: plan.name,
     subtitle: "Closed verdict",
     badge: isJoinedByUser ? "Joined" : "History",
     routeTarget: "history",
+    ...(hasSetupSource ? { setup: setupFromPlanRow(plan) } : {}),
   };
 }
 

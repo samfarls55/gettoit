@@ -67,6 +67,7 @@ const planListWithLegacyBadges: PlanListSnapshot = {
 const planListWithManyClosedPlans: PlanListSnapshot = {
   ...emptyPlanListSnapshot,
   history: Array.from({ length: 6 }, (_, index) => ({
+    closedAt: `2026-06-0${index + 1}T12:00:00Z`,
     id: `closed-plan-${index + 1}`,
     title: `Closed plan ${index + 1}`,
     subtitle: "Closed verdict",
@@ -246,7 +247,7 @@ describe("PlanListScreen on web", () => {
     await unmount();
   });
 
-  it("keeps all closed Plans selectable from the dashboard", async () => {
+  it("keeps closed Plans bounded until the user expands the list", async () => {
     const onOpenPlan = jest.fn();
     const { container, unmount } = await renderPlanListScreen({
       onOpenPlan,
@@ -254,7 +255,23 @@ describe("PlanListScreen on web", () => {
     });
 
     expect(container.textContent).toContain("Closed plan 1");
+    expect(container.textContent).toContain("Jun 1");
+    expect(container.textContent).not.toContain("Closed verdict");
+    expect(container.textContent).not.toContain("Closed plan 6");
+    expect(container.textContent).toContain("See all 6 closed Plans");
+
+    const seeAllButton = container.querySelector<HTMLElement>(
+      '[aria-label="See all 6 closed Plans"]',
+    );
+
+    expect(seeAllButton).not.toBeNull();
+
+    await act(async () => {
+      seeAllButton?.click();
+    });
+
     expect(container.textContent).toContain("Closed plan 6");
+    expect(container.textContent).toContain("Show recent closed Plans");
 
     const closedPlanButton = container.querySelector<HTMLElement>(
       '[aria-label="Open Closed Plan Closed plan 6"]',
@@ -269,6 +286,16 @@ describe("PlanListScreen on web", () => {
     expect(onOpenPlan).toHaveBeenCalledWith(
       planListWithManyClosedPlans.history[5],
     );
+
+    const showRecentButton = container.querySelector<HTMLElement>(
+      '[aria-label="Show recent closed Plans"]',
+    );
+
+    await act(async () => {
+      showRecentButton?.click();
+    });
+
+    expect(container.textContent).not.toContain("Closed plan 6");
 
     await unmount();
   });
@@ -288,13 +315,13 @@ describe("PlanListScreen on web", () => {
       container,
       '[aria-label="Account avatar"]',
     );
-    const currentPlansTab = getRequiredElement(
+    const planActions = getRequiredElement(
       container,
-      '[aria-label="Plans current section"]',
+      '[aria-label="Plan actions"]',
     );
     const plansInMotionRail = getRequiredElement(
       container,
-      '[aria-label="Other active Plans"]',
+      '[aria-label="Other active Plans, 2 Plans"]',
     );
     const nextUpButton = getRequiredElement(
       container,
@@ -304,7 +331,11 @@ describe("PlanListScreen on web", () => {
     expect(getComputedStyle(settingsButton).width).toBe("44px");
     expect(getComputedStyle(settingsButton).height).toBe("44px");
     expect(accountAvatar.getAttribute("role")).toBe("img");
-    expect(currentPlansTab.getAttribute("aria-selected")).toBe("true");
+    expect(planActions.getAttribute("role")).toBe("toolbar");
+    expect(container.querySelector('[role="main"]')).not.toBeNull();
+    expect(container.querySelectorAll('[role="heading"]').length).toBeGreaterThan(
+      1,
+    );
     expect(plansInMotionRail).toBeDefined();
     expect(nextUpButton.getAttribute("tabindex")).toBe("0");
 
