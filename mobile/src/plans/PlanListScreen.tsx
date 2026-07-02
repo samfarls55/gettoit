@@ -111,6 +111,7 @@ export function PlanListScreen({
   }));
   const nextUp = getNextUpPlan(liveBuckets);
   const pastPlans = plans.history;
+  const handleCreateGroupPlan = () => onCreatePlan?.("group");
 
   const handleConfirmDelete = async (plan: PlanListItem) => {
     setDeleteError(null);
@@ -199,7 +200,7 @@ export function PlanListScreen({
             <Pressable
               accessibilityLabel="Create group Plan"
               accessibilityRole="button"
-              onPress={() => onCreatePlan?.("group")}
+              onPress={handleCreateGroupPlan}
               style={styles.createCard}
             >
               <View style={styles.createIcon}>
@@ -238,44 +239,20 @@ export function PlanListScreen({
         )}
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        <View accessibilityLabel="Plans" style={styles.activeNavItem}>
-          <DashboardIcon fallback="▣" name="event_note" size={28} />
-          <Text style={styles.activeNavLabel}>Plans</Text>
+      <View style={styles.bottomActions}>
+        <View style={styles.bottomActionCopy}>
+          <Text style={styles.bottomActionEyebrow}>Plans</Text>
+          <Text style={styles.bottomActionTitle}>Ready when you are.</Text>
         </View>
-        <View
-          aria-disabled={true}
-          accessible
-          accessibilityLabel="Groups unavailable"
+        <Pressable
+          accessibilityLabel="Start a group Plan"
           accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          style={styles.navItem}
+          onPress={handleCreateGroupPlan}
+          style={styles.startPlanButton}
         >
-          <DashboardIcon fallback="♟" name="group" size={26} />
-          <Text style={styles.navLabel}>Groups</Text>
-        </View>
-        <View
-          aria-disabled={true}
-          accessible
-          accessibilityLabel="Activity unavailable"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          style={styles.navItem}
-        >
-          <DashboardIcon fallback="●" name="notifications" size={26} />
-          <Text style={styles.navLabel}>Activity</Text>
-        </View>
-        <View
-          aria-disabled={true}
-          accessible
-          accessibilityLabel="Profile unavailable"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          style={styles.navItem}
-        >
-          <DashboardIcon fallback="♟" name="person" size={26} />
-          <Text style={styles.navLabel}>Profile</Text>
-        </View>
+          <DashboardIcon fallback="+" name="add" size={20} />
+          <Text style={styles.startPlanButtonLabel}>Start a Plan</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -620,7 +597,7 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: mobileTokens.spacing[8],
-    paddingBottom: 154,
+    paddingBottom: 132,
     paddingTop: mobileTokens.spacing[10],
   },
   hero: {
@@ -1062,7 +1039,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
   },
-  bottomNav: {
+  bottomActions: {
     alignItems: "center",
     backgroundColor: mobileTokens.color.surfaceContainerLow,
     borderColor: mobileTokens.color.divider,
@@ -1071,42 +1048,51 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     bottom: 0,
     flexDirection: "row",
-    height: 89,
-    justifyContent: "space-around",
+    gap: mobileTokens.spacing[4],
+    minHeight: 96,
+    justifyContent: "space-between",
     left: 0,
-    paddingBottom: mobileTokens.spacing[3],
+    paddingBottom: mobileTokens.spacing[4],
     paddingHorizontal: mobileTokens.spacing[4],
+    paddingTop: mobileTokens.spacing[3],
     position: "absolute",
     right: 0,
   },
-  activeNavItem: {
+  bottomActionCopy: {
+    flex: 1,
+    gap: mobileTokens.spacing[2],
+  },
+  bottomActionEyebrow: {
+    color: mobileTokens.color.gold,
+    fontFamily: labelFont,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 16,
+    textTransform: "uppercase",
+  },
+  bottomActionTitle: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: bodyFont,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  startPlanButton: {
     alignItems: "center",
     backgroundColor: "#6F6100",
     borderRadius: mobileTokens.radius.full,
-    justifyContent: "center",
-    minWidth: 130,
-    paddingHorizontal: mobileTokens.spacing[5],
-    paddingVertical: mobileTokens.spacing[2],
-  },
-  navItem: {
-    alignItems: "center",
-    flex: 1,
+    flexDirection: "row",
+    gap: mobileTokens.spacing[2],
     justifyContent: "center",
     minHeight: 44,
+    minWidth: 160,
+    paddingHorizontal: mobileTokens.spacing[4],
   },
-  activeNavLabel: {
+  startPlanButtonLabel: {
     color: mobileTokens.color.paper,
     fontFamily: labelFont,
-    fontSize: 12,
-    fontWeight: "600",
-    lineHeight: 16,
-  },
-  navLabel: {
-    color: mobileTokens.color.outline,
-    fontFamily: labelFont,
-    fontSize: 12,
-    fontWeight: "500",
-    lineHeight: 16,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 18,
   },
   disabledAction: {
     opacity: 0.5,
