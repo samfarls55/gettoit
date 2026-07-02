@@ -58,9 +58,9 @@ const avatarUri =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuB4NvCz-ozIWJU7CwGn1cPLKTB43XheUlbFFiwpeUSpz8Taqn7yz6CQksaWf4rJBOySVc3aHw5JxLmj9m-65SRAZwqtxa2-OxK_ca4fqnnC7OW2DZMik90bR_WzgHdvefPS9JRZuzy7dNkYIUmvjd2mdc8Dx5N9PqxU-8bUalxH0q1y4y1_2-uZjXLaItL7sJTatwEliCKD_TX2qifg0HsH19i_en7GD5CfAJB9iiO8Gvbmo1v3lVy1Mw";
 
 const livePlanBuckets: LivePlanBucket[] = [
-  { key: "created", title: "Created" },
-  { key: "joined", title: "Joined" },
-  { key: "decided", title: "Decided" },
+  { key: "created", title: "Needs setup" },
+  { key: "joined", title: "Quiz open" },
+  { key: "decided", title: "Pick ready" },
 ];
 
 const livePlanCopyByBucket: Record<LivePlanBucketKey, LivePlanBucketCopy> = {
@@ -75,13 +75,13 @@ const livePlanCopyByBucket: Record<LivePlanBucketKey, LivePlanBucketCopy> = {
     stateTitle: "Quiz open",
   },
   decided: {
-    actionLabel: "Open Plan",
+    actionLabel: "Open verdict",
     stateBody: "Open the live verdict.",
     stateTitle: "Pick ready",
   },
 };
 
-const pastPlanBucket: PlanBucket = { key: "history", title: "History" };
+const pastPlanBucket: PlanBucket = { key: "history", title: "Closed" };
 const materialIconFont = "Material Symbols Outlined";
 const isWeb = Platform.OS === "web";
 
@@ -206,7 +206,7 @@ export function PlanListScreen({
         ) : null}
 
         <View style={styles.section}>
-          <Text style={styles.liveTitle}>Live Plans</Text>
+          <Text style={styles.liveTitle}>Plans in motion</Text>
           <ScrollView
             contentContainerStyle={styles.liveRail}
             horizontal
@@ -244,7 +244,7 @@ export function PlanListScreen({
         </View>
 
         <View style={styles.pastSection}>
-          <Text style={styles.pastTitle}>Past Plans</Text>
+          <Text style={styles.pastTitle}>Closed Plans</Text>
           {pastPlans.length > 0 ? (
             <View style={styles.pastGrid}>
               {pastPlans.map((plan) => (
@@ -257,7 +257,7 @@ export function PlanListScreen({
               ))}
             </View>
           ) : (
-            <Text style={styles.emptyBody}>Closed decisions will land here.</Text>
+            <Text style={styles.emptyBody}>Closed Plans will land here.</Text>
           )}
         </View>
 
@@ -303,9 +303,9 @@ function NextUpPlanCard({
 
   return (
     <View style={styles.nextUpSection}>
-      <Text style={styles.nextUpEyebrow}>Next up</Text>
+      <Text style={styles.nextUpEyebrow}>Needs you now</Text>
       <Pressable
-        accessibilityLabel={`Open Next up Plan ${plan.title}`}
+        accessibilityLabel={`Open Needs you now Plan ${plan.title}`}
         accessibilityRole="button"
         onPress={() => onOpenPlan?.(plan)}
         style={styles.nextUpCard}
@@ -319,7 +319,7 @@ function NextUpPlanCard({
           </View>
           <View style={styles.statusChip}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>{plan.badge}</Text>
+            <Text style={styles.statusText}>{bucket.title}</Text>
           </View>
         </View>
         <Text numberOfLines={2} style={styles.nextUpSubtitle}>
@@ -382,7 +382,7 @@ function LivePlanCard({
             </View>
             <View style={styles.statusChip}>
               <View style={styles.statusDot} />
-              <Text style={styles.statusText}>{plan.badge}</Text>
+              <Text style={styles.statusText}>{bucket.title}</Text>
             </View>
           </View>
 
@@ -412,7 +412,7 @@ function LivePlanCard({
 
         {bucket.key === "created" ? (
           <Pressable
-            accessibilityLabel={`Delete Created Plan ${plan.title}`}
+            accessibilityLabel={`Delete ${bucket.title} Plan ${plan.title}`}
             accessibilityRole="button"
             disabled={isDeleting}
             hitSlop={8}

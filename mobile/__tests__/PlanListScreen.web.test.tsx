@@ -51,6 +51,19 @@ const mixedPlanList: PlanListSnapshot = {
   ],
 };
 
+const actionLanguagePlanList: PlanListSnapshot = {
+  ...mixedPlanList,
+  history: [
+    {
+      id: "closed-plan",
+      title: "Taco Tuesday",
+      subtitle: "Closed last night",
+      badge: "History",
+      routeTarget: "history",
+    },
+  ],
+};
+
 async function renderPlanListScreen(
   props: ComponentProps<typeof PlanListScreen>,
 ) {
@@ -85,16 +98,20 @@ describe("PlanListScreen on web", () => {
     });
   });
 
-  it("does not nest the Created delete action inside the open-card button", async () => {
+  it("does not nest the setup delete action inside the open-card button", async () => {
     const { container, unmount } = await renderPlanListScreen({
       plans: createdPlanList,
     });
 
     expect(
-      container.querySelector('[aria-label="Open Created Plan Brunch plan"]'),
+      container.querySelector(
+        '[aria-label="Open Needs setup Plan Brunch plan"]',
+      ),
     ).not.toBeNull();
     expect(
-      container.querySelector('[aria-label="Delete Created Plan Brunch plan"]'),
+      container.querySelector(
+        '[aria-label="Delete Needs setup Plan Brunch plan"]',
+      ),
     ).not.toBeNull();
     expect(container.querySelector("button button")).toBeNull();
     expect(container.textContent).toContain("Finish setup");
@@ -155,6 +172,52 @@ describe("PlanListScreen on web", () => {
     );
     expect(container.textContent).toContain("Open the live verdict.");
     expect(container.textContent).not.toContain("□ Dinner");
+
+    await unmount();
+  });
+
+  it("uses Plan action language and still opens the selected Plan", async () => {
+    const onOpenPlan = jest.fn();
+    const { container, unmount } = await renderPlanListScreen({
+      onOpenPlan,
+      plans: actionLanguagePlanList,
+    });
+
+    expect(container.textContent).toContain("Needs you now");
+    expect(container.textContent).toContain("Plans in motion");
+    expect(container.textContent).toContain("Closed Plans");
+    expect(container.textContent).toContain("Needs setup");
+    expect(container.textContent).toContain("Quiz open");
+    expect(container.textContent).toContain("Pick ready");
+    expect(container.textContent).toContain("Closed");
+    expect(container.textContent).not.toContain("Created");
+    expect(container.textContent).not.toContain("Joined");
+    expect(container.textContent).not.toContain("Decided");
+    expect(container.textContent).not.toContain("History");
+
+    const joinedPlanButton = container.querySelector<HTMLElement>(
+      '[aria-label="Open Quiz open Plan Birthday dinner"]',
+    );
+    const closedPlanButton = container.querySelector<HTMLElement>(
+      '[aria-label="Open Closed Plan Taco Tuesday"]',
+    );
+
+    expect(joinedPlanButton).not.toBeNull();
+    expect(closedPlanButton).not.toBeNull();
+
+    await act(async () => {
+      joinedPlanButton?.click();
+      closedPlanButton?.click();
+    });
+
+    expect(onOpenPlan).toHaveBeenNthCalledWith(
+      1,
+      actionLanguagePlanList.joined[0],
+    );
+    expect(onOpenPlan).toHaveBeenNthCalledWith(
+      2,
+      actionLanguagePlanList.history[0],
+    );
 
     await unmount();
   });
