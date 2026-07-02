@@ -1,45 +1,89 @@
 {
   "color": {
-    "ink": "#0E1011",
-    "paper": "#FFFFFF",
-    "sun": "#FFD23F",
+    "ink": "#0F0F0F",
+    "surface": "#131313",
+    "surface-container-low": "#1C1B1B",
+    "surface-container": "#201F1F",
+    "surface-container-high": "#2A2A2A",
+    "surface-container-highest": "#353534",
+    "paper": "#E5E2E1",
+    "sun": "#F2CA50",
+    "gold": "#D4AF37",
+    "copper": "#FFB77B",
+    "outline": "#99907C",
+    "divider": "rgba(255,255,255,0.05)",
+    "glow": "rgba(212,175,55,0.15)",
+    "danger": "#FFB4AB",
     "glass": {
-      "stroke": "rgba(255,255,255,0.42)"
+      "stroke": "rgba(255,255,255,0.10)",
+      "top": "rgba(255,255,255,0.16)"
     },
     "text": {
       "on-gradient": {
-        "secondary": "rgba(255,255,255,0.78)",
-        "tertiary": "rgba(255,255,255,0.6)"
+        "secondary": "#D0C5AF",
+        "tertiary": "#99907C"
       }
     }
   },
   "spacing": {
+    "2": 8,
     "3": 12,
     "4": 16,
-    "8": 32
+    "5": 20,
+    "6": 24,
+    "8": 32,
+    "10": 40,
+    "12": 48
+  },
+  "radius": {
+    "sm": 2,
+    "default": 4,
+    "md": 6,
+    "lg": 8,
+    "xl": 12,
+    "full": 9999
   },
   "typography": {
+    "family": {
+      "display": "Playfair Display, Georgia, serif",
+      "body": "Manrope, Inter, system-ui, sans-serif",
+      "label": "JetBrains Mono, Menlo, monospace"
+    },
     "scale": {
       "body": {
         "size": 16,
+        "weight": 400,
+        "tracking": "0",
+        "line-height": 1.6,
+        "family": "body"
+      },
+      "display-s": {
+        "size": 36,
+        "weight": 700,
+        "tracking": "0",
+        "line-height": 1.1,
+        "family": "display"
+      },
+      "headline": {
+        "size": 32,
+        "weight": 600,
+        "tracking": "0",
+        "line-height": 1.2,
+        "family": "display"
+      },
+      "title": {
+        "size": 20,
         "weight": 600,
         "tracking": "0",
         "line-height": 1.4,
         "family": "body"
       },
-      "display-s": {
-        "size": 32,
-        "weight": 900,
-        "tracking": "-0.02em",
-        "line-height": 0.95,
-        "family": "display"
-      },
       "eyebrow": {
-        "size": 11,
-        "weight": 700,
-        "tracking": "0.18em",
+        "size": 12,
+        "weight": 500,
+        "tracking": "0",
         "line-height": 1,
-        "family": "body",
+        "family": "label",
         "case": "upper"
       }
     }

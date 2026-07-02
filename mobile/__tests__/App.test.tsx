@@ -410,7 +410,7 @@ describe("App", () => {
   );
 
   it("uses the mobile token adapter", () => {
-    expect(mobileTokens.color.sun).toBe("#FFD23F");
+    expect(mobileTokens.color.sun).toBe("#F2CA50");
   });
 
   it.each<{
@@ -720,7 +720,7 @@ describe("App", () => {
     expect(screen.getAllByText("Created")).toHaveLength(2);
     expect(screen.getAllByText("Joined")).toHaveLength(2);
     expect(screen.getAllByText("Decided")).toHaveLength(2);
-    expect(screen.getAllByText("History")).toHaveLength(2);
+    expect(screen.getAllByText("History")).toHaveLength(1);
     expect(screen.getByText("Birthday dinner")).toBeOnTheScreen();
     expect(screen.getByText("Sushi night")).toBeOnTheScreen();
     expect(screen.getByText("Noodle crawl")).toBeOnTheScreen();
@@ -897,7 +897,8 @@ describe("App", () => {
       expect(screen.getByText("No Plans yet")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Create solo Plan"));
+    fireEvent.press(screen.getByLabelText("Create group Plan"));
+    fireEvent.press(screen.getByText("Just me"));
 
     expect(screen.getByText("Start a new plan")).toBeOnTheScreen();
     expect(screen.getByText("Just me")).toBeOnTheScreen();
@@ -981,10 +982,11 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Create solo Plan")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Create group Plan")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Create solo Plan"));
+    fireEvent.press(screen.getByLabelText("Create group Plan"));
+    fireEvent.press(screen.getByText("Just me"));
     fireEvent.changeText(screen.getByLabelText("Name this plan"), "Solo ramen");
     fireEvent.press(screen.getByText("Set search area"));
     fireEvent.press(screen.getByText("USE THIS AREA"));
@@ -1301,10 +1303,11 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Create solo Plan")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Create group Plan")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Create solo Plan"));
+    fireEvent.press(screen.getByLabelText("Create group Plan"));
+    fireEvent.press(screen.getByText("Just me"));
     fireEvent.changeText(screen.getByLabelText("Name this plan"), "Solo ramen");
     fireEvent.press(screen.getByText("Set search area"));
     fireEvent.press(screen.getByText("USE THIS AREA"));

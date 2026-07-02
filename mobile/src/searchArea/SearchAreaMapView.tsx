@@ -3,6 +3,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import type MapView from "react-native-maps";
 import type { Region } from "react-native-maps";
 
+import { mobileTokens } from "../design/tokens";
 import {
   type DensityPreviewPin,
   maximumSearchAreaZoom,
@@ -89,7 +90,7 @@ export function SearchAreaMapView({
   };
 
   if (Platform.OS === "web") {
-    return <SearchAreaMapPreview pins={pins} searchArea={searchArea} />;
+    return <SearchAreaMapPreview pins={pins} />;
   }
 
   const { default: NativeMapView, Circle, Marker } = getNativeMaps();
@@ -111,16 +112,16 @@ export function SearchAreaMapView({
     >
       <Circle
         center={searchArea.center}
-        fillColor="rgba(47, 123, 100, 0.18)"
+        fillColor="rgba(212, 175, 55, 0.16)"
         radius={milesToMeters(searchArea.radiusMiles)}
-        strokeColor="rgba(23, 94, 73, 0.78)"
+        strokeColor="rgba(255, 183, 123, 0.78)"
         strokeWidth={2}
       />
       {pins.map((pin) => (
         <Marker
           key={pin.id}
           coordinate={pin}
-          pinColor="#E2B04A"
+          pinColor={mobileTokens.color.sun}
           title={pin.label}
         />
       ))}
@@ -130,13 +131,13 @@ export function SearchAreaMapView({
 
 function SearchAreaMapPreview({
   pins,
-  searchArea,
 }: {
   pins: DensityPreviewPin[];
-  searchArea: SearchArea;
 }) {
   return (
     <View style={styles.webRoot}>
+      <View style={styles.webGridHorizontal} />
+      <View style={styles.webGridVertical} />
       <View style={styles.webRadius}>
         <View style={styles.webInnerRadius} />
       </View>
@@ -152,18 +153,6 @@ function SearchAreaMapPreview({
           ]}
         />
       ))}
-      <View style={styles.webSummary}>
-        <Text style={styles.webPrimaryText}>
-          {searchArea.radiusMiles.toFixed(1)} mi
-        </Text>
-        <Text style={styles.webSecondaryText}>
-          {searchArea.center.latitude.toFixed(4)},{" "}
-          {searchArea.center.longitude.toFixed(4)}
-        </Text>
-        <Text style={styles.webSecondaryText}>
-          {pins.length} nearby options
-        </Text>
-      </View>
     </View>
   );
 }
@@ -178,7 +167,7 @@ const styles = StyleSheet.create({
   },
   webRoot: {
     alignItems: "center",
-    backgroundColor: "#DDE8DF",
+    backgroundColor: mobileTokens.color.ink,
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -187,50 +176,47 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
   },
+  webGridHorizontal: {
+    backgroundColor: mobileTokens.color.divider,
+    height: 1,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: "37%",
+  },
+  webGridVertical: {
+    backgroundColor: mobileTokens.color.divider,
+    bottom: 0,
+    left: "58%",
+    position: "absolute",
+    top: 0,
+    width: 1,
+  },
   webRadius: {
     alignItems: "center",
     aspectRatio: 1,
-    backgroundColor: "rgba(47, 123, 100, 0.16)",
-    borderColor: "#2F7B64",
-    borderRadius: 999,
+    backgroundColor: mobileTokens.color.glow,
+    borderColor: mobileTokens.color.copper,
+    borderRadius: mobileTokens.radius.full,
     borderWidth: 2,
     justifyContent: "center",
     width: "64%",
   },
   webInnerRadius: {
     aspectRatio: 1,
-    backgroundColor: "rgba(226, 176, 74, 0.18)",
-    borderColor: "#E2B04A",
-    borderRadius: 999,
+    backgroundColor: "rgba(255, 183, 123, 0.14)",
+    borderColor: mobileTokens.color.sun,
+    borderRadius: mobileTokens.radius.full,
     borderWidth: 1,
     width: "36%",
   },
   webPin: {
-    backgroundColor: "#E2B04A",
-    borderColor: "#14141E",
-    borderRadius: 8,
+    backgroundColor: mobileTokens.color.sun,
+    borderColor: mobileTokens.color.ink,
+    borderRadius: mobileTokens.radius.sm,
     borderWidth: 2,
     height: 12,
     position: "absolute",
     width: 12,
-  },
-  webSummary: {
-    backgroundColor: "rgba(20, 20, 30, 0.82)",
-    borderRadius: 8,
-    bottom: 16,
-    left: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    position: "absolute",
-  },
-  webPrimaryText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  webSecondaryText: {
-    color: "#F4F2EA",
-    fontSize: 12,
-    marginTop: 2,
   },
 });

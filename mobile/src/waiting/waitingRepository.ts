@@ -187,7 +187,7 @@ export function createSupabaseWaitingRepository({
           .from<SupabaseMemberRow>("members")
           .select("user_id, display_name")
           .eq("room_id", roomId)
-          .order("created_at", { ascending: true }),
+          .order("joined_at", { ascending: true }),
         supabase
           .from<SupabaseVoteRow>("votes")
           .select("user_id")

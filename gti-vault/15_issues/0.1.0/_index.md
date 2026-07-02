@@ -55,6 +55,18 @@ Decomposed from the 2026-06-17 architecture review after comparing active code a
 | tb-32 | [[issues/tb-32-shared-hard-eligibility-core|Share hard eligibility between Vibe Fit and Verdict]] | AFK | [#372](https://github.com/samfarls55/gettoit/issues/372) | None |
 | tb-33 | [[issues/tb-33-deepen-verdict-run-execution|Deepen Verdict Run execution]] | AFK | [#373](https://github.com/samfarls55/gettoit/issues/373) | tb-32 |
 
+## Dashboard polish issues
+
+Decomposed from the 2026-07-02 `$impeccable critique app dashboard page` run after the Plan dashboard score moved from 19/40 to 20/40. These slices keep the work AFK-sized and require the named `$impeccable` command in each ticket body.
+
+| # | Title | Type | GitHub | Blocked by |
+|---|---|---|---|---|
+| tb-34 | [[issues/tb-34-dashboard-next-up-primary-path|Dashboard Next Up primary path]] | AFK | [#374](https://github.com/samfarls55/gettoit/issues/374) | None |
+| tb-35 | [[issues/tb-35-dashboard-honest-social-state|Dashboard honest social state]] | AFK | [#376](https://github.com/samfarls55/gettoit/issues/376) | tb-34 |
+| tb-36 | [[issues/tb-36-dashboard-real-bottom-actions|Dashboard real bottom actions]] | AFK | [#375](https://github.com/samfarls55/gettoit/issues/375) | None |
+| tb-37 | [[issues/tb-37-dashboard-user-action-language|Dashboard user-action language]] | AFK | [#377](https://github.com/samfarls55/gettoit/issues/377) | tb-34 |
+| tb-38 | [[issues/tb-38-dashboard-mobile-accessibility-pass|Dashboard mobile accessibility pass]] | AFK | [#378](https://github.com/samfarls55/gettoit/issues/378) | tb-34, tb-36 |
+
 ## Founder pre-launch HITL bucket
 
 Founder-flagged pre-launch must-addresses captured 2026-05-26. All `status: needs-triage`, `type: HITL`, deferred to future grills.

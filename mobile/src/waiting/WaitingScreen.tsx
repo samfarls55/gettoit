@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
 import type {
@@ -55,7 +55,11 @@ export function WaitingScreen({
   };
 
   return (
-    <View style={styles.root}>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+      style={styles.root}
+    >
       <Text style={styles.eyebrow}>Waiting</Text>
       <Text style={styles.title}>Waiting for the group</Text>
       <Text style={styles.subtitle}>
@@ -81,7 +85,7 @@ export function WaitingScreen({
           <Text style={styles.primaryButtonLabel}>Close voting</Text>
         </Pressable>
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -106,24 +110,31 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: mobileTokens.color.ink,
+  },
+  content: {
+    flexGrow: 1,
     gap: mobileTokens.spacing[4],
-    padding: mobileTokens.spacing[8],
+    padding: mobileTokens.spacing[5],
+    paddingTop: mobileTokens.spacing[10],
   },
   eyebrow: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
   title: {
     color: mobileTokens.color.paper,
-    fontSize: 30,
-    fontWeight: "800",
-    lineHeight: 36,
+    fontFamily: mobileTokens.typography.family.display,
+    fontSize: mobileTokens.typography.headline.size,
+    fontWeight: mobileTokens.typography.headline.weight,
+    lineHeight: mobileTokens.typography.headline.lineHeight,
   },
   subtitle: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
@@ -131,29 +142,31 @@ const styles = StyleSheet.create({
     gap: mobileTokens.spacing[3],
   },
   memberRow: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: mobileTokens.color.surfaceContainerLow,
     borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 12,
+    borderRadius: mobileTokens.radius.lg,
     borderWidth: 1,
     gap: mobileTokens.spacing[3],
     padding: mobileTokens.spacing[4],
   },
   memberName: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
   },
   memberStatus: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
   primaryButton: {
     alignItems: "center",
     backgroundColor: mobileTokens.color.sun,
-    borderRadius: 999,
+    borderRadius: mobileTokens.radius.md,
     minHeight: 56,
     justifyContent: "center",
     marginTop: mobileTokens.spacing[4],
@@ -164,6 +177,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
     textTransform: "uppercase",

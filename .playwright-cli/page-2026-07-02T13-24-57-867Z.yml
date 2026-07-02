@@ -1,0 +1,21 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic "GetToIt logo" [ref=e7]:
+        - generic [ref=e8]: G
+      - generic [ref=e9]: Decide Dinner. Get To It.
+      - generic [ref=e10]: Save your taste profile and turn group indecision into a locked pick.
+    - generic [ref=e11]:
+      - button "Sign in with Apple" [ref=e12] [cursor=pointer]:
+        - generic [ref=e13]: Continue with Apple
+      - generic [ref=e14]:
+        - textbox "Dev login email" [ref=e15]:
+          - /placeholder: Dev email
+        - textbox "Dev login password" [ref=e16]:
+          - /placeholder: Dev password
+        - button "Sign in for web testing" [disabled]:
+          - generic [ref=e17]: Sign in for web testing
+      - button "Voted on the web?" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: Voted on the Web?
+  - generic:
+    - img

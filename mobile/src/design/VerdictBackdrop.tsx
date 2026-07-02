@@ -3,31 +3,39 @@ import { StyleSheet, View } from "react-native";
 export function VerdictBackdrop() {
   return (
     <>
-      <View style={styles.sunGlow} />
-      <View style={styles.emberGlow} />
+      <View style={styles.topHighlight} />
+      <View style={styles.leftRail} />
+      <View style={styles.bottomRule} />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  sunGlow: {
-    position: "absolute",
+  topHighlight: {
+    backgroundColor: "rgba(212,175,55,0.08)",
+    height: 112,
+    left: 0,
     pointerEvents: "none",
-    right: -54,
-    top: -64,
-    width: 188,
-    height: 188,
-    borderRadius: 94,
-    backgroundColor: "rgba(255,210,63,0.18)",
+    position: "absolute",
+    right: 0,
+    top: 0,
   },
-  emberGlow: {
-    position: "absolute",
+  leftRail: {
+    backgroundColor: "rgba(255,183,123,0.10)",
+    bottom: 0,
+    left: 0,
     pointerEvents: "none",
-    left: -84,
+    position: "absolute",
+    top: 0,
+    width: 1,
+  },
+  bottomRule: {
+    backgroundColor: "rgba(255,255,255,0.06)",
     bottom: 96,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: "rgba(255,122,61,0.12)",
+    height: 1,
+    left: 24,
+    pointerEvents: "none",
+    position: "absolute",
+    right: 24,
   },
 });

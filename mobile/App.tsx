@@ -367,7 +367,7 @@ function defaultSetupPlan(participantScope: PlanParticipantScope): PlanSetup {
 }
 
 function deletedPlanIdsKey(ids: Set<string>): string {
-  return JSON.stringify([...ids].sort());
+  return JSON.stringify(Array.from(ids).sort());
 }
 
 function editSetupPlan(plan: PlanListItem): PlanSetup {
@@ -825,6 +825,7 @@ export function MobileAppShell({
         <VerdictRouteContent
           failed={verdictLoadFailed}
           mode={route.name === "readOnlyVerdict" ? "readOnly" : "live"}
+          onPrimaryAction={onQuizExited ?? (() => undefined)}
           onReroll={verdictRepository.reroll}
           onRetry={() => setVerdictLoadAttempt((attempt) => attempt + 1)}
           verdict={verdict}
@@ -878,6 +879,7 @@ export function MobileAppShell({
 type VerdictRouteContentProps = {
   failed: boolean;
   mode: "live" | "readOnly";
+  onPrimaryAction: () => void;
   onReroll: (input: RerollInput) => Promise<void>;
   onRetry: () => void;
   verdict: VerdictViewModel | null;
@@ -886,12 +888,20 @@ type VerdictRouteContentProps = {
 function VerdictRouteContent({
   failed,
   mode,
+  onPrimaryAction,
   onReroll,
   onRetry,
   verdict,
 }: VerdictRouteContentProps) {
   if (verdict) {
-    return <VerdictScreen mode={mode} onReroll={onReroll} verdict={verdict} />;
+    return (
+      <VerdictScreen
+        mode={mode}
+        onPrimaryAction={onPrimaryAction}
+        onReroll={onReroll}
+        verdict={verdict}
+      />
+    );
   }
 
   if (failed) {
@@ -1255,7 +1265,6 @@ function SignInGate({
               isSubmitting && styles.disabledButton,
             ]}
           >
-            <Text style={styles.appleSignInLogo}>{"\uF8FF"}</Text>
             <Text style={styles.appleSignInLabel}>Continue with Apple</Text>
           </Pressable>
           {canUseWebDevLogin ? (
@@ -1373,7 +1382,7 @@ const styles = StyleSheet.create({
   signInSurface: {
     flex: 1,
     justifyContent: "flex-end",
-    padding: mobileTokens.spacing[8],
+    padding: mobileTokens.spacing[5],
     paddingBottom: mobileTokens.spacing[4],
   },
   signInTopSpace: {
@@ -1386,51 +1395,50 @@ const styles = StyleSheet.create({
   },
   logoMark: {
     alignItems: "center",
-    backgroundColor: mobileTokens.color.paper,
-    borderRadius: 22,
+    backgroundColor: mobileTokens.color.surfaceContainer,
+    borderColor: mobileTokens.color.glassTop,
+    borderRadius: mobileTokens.radius.lg,
+    borderWidth: 1,
     height: 68,
     justifyContent: "center",
     marginBottom: mobileTokens.spacing[4],
     width: 68,
   },
   logoMarkText: {
-    color: mobileTokens.color.ink,
+    color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.display,
     fontSize: 32,
-    fontWeight: "900",
+    fontWeight: "700",
   },
   signInTitle: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.display,
     fontSize: 36,
-    fontWeight: "900",
+    fontWeight: "700",
     lineHeight: 40,
     marginBottom: mobileTokens.spacing[4],
     textAlign: "center",
   },
   signInSubtitle: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: 16,
-    fontWeight: "600",
     lineHeight: 23,
     textAlign: "center",
   },
   appleSignInButton: {
     alignItems: "center",
-    backgroundColor: mobileTokens.color.paper,
-    borderRadius: 999,
+    backgroundColor: mobileTokens.color.sun,
+    borderRadius: mobileTokens.radius.md,
     flexDirection: "row",
     gap: 10,
     justifyContent: "center",
     minHeight: 56,
     paddingHorizontal: mobileTokens.spacing[4],
   },
-  appleSignInLogo: {
-    color: "#000000",
-    fontSize: 21,
-    fontWeight: "700",
-    lineHeight: 24,
-  },
   appleSignInLabel: {
-    color: "#000000",
+    color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: 17,
     fontWeight: "700",
   },
@@ -1441,16 +1449,19 @@ const styles = StyleSheet.create({
     marginTop: mobileTokens.spacing[3],
   },
   signInWebButtonLabel: {
-    color: mobileTokens.color.textSecondaryOnGradient,
+    color: mobileTokens.color.copper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 14,
     fontWeight: "700",
+    textTransform: "uppercase",
   },
   devLoginPanel: {
     gap: mobileTokens.spacing[3],
     marginTop: mobileTokens.spacing[3],
   },
   signInInlineError: {
-    color: mobileTokens.color.textSecondaryOnGradient,
+    color: mobileTokens.color.danger,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: 13,
     fontWeight: "600",
     marginBottom: mobileTokens.spacing[3],
@@ -1458,6 +1469,7 @@ const styles = StyleSheet.create({
   },
   signInInlineSuccess: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: 13,
     fontWeight: "600",
     marginBottom: mobileTokens.spacing[3],
@@ -1465,28 +1477,30 @@ const styles = StyleSheet.create({
   },
   homeIndicator: {
     alignSelf: "center",
-    backgroundColor: "rgba(255,255,255,0.72)",
-    borderRadius: 999,
+    backgroundColor: mobileTokens.color.glassTop,
+    borderRadius: mobileTokens.radius.full,
     height: 5,
     marginTop: mobileTokens.spacing[4],
     width: 134,
   },
   surface: {
+    backgroundColor: mobileTokens.color.ink,
     flex: 1,
     justifyContent: "center",
     padding: mobileTokens.spacing[8],
-    backgroundColor: mobileTokens.color.ink,
   },
   eyebrow: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
+    letterSpacing: 0,
     marginBottom: mobileTokens.spacing[3],
     textTransform: "uppercase",
   },
   title: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.display,
     fontSize: mobileTokens.typography.display.size,
     fontWeight: mobileTokens.typography.display.weight,
     lineHeight: mobileTokens.typography.display.lineHeight,
@@ -1494,13 +1508,15 @@ const styles = StyleSheet.create({
   },
   routeTitle: {
     color: mobileTokens.color.paper,
-    fontSize: mobileTokens.typography.body.size,
+    fontFamily: mobileTokens.typography.family.body,
+    fontSize: mobileTokens.typography.title.size,
     fontWeight: "700",
-    lineHeight: mobileTokens.typography.body.lineHeight,
+    lineHeight: mobileTokens.typography.title.lineHeight,
     marginBottom: mobileTokens.spacing[3],
   },
   subtitle: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: mobileTokens.typography.body.weight,
     lineHeight: mobileTokens.typography.body.lineHeight,
@@ -1513,15 +1529,18 @@ const styles = StyleSheet.create({
   },
   claimTeaching: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: mobileTokens.typography.body.weight,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
   claimInput: {
+    backgroundColor: mobileTokens.color.surfaceContainerLow,
     borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 12,
+    borderRadius: mobileTokens.radius.md,
     borderWidth: 1,
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "600",
     minHeight: 56,
@@ -1530,7 +1549,7 @@ const styles = StyleSheet.create({
   closeButton: {
     alignItems: "center",
     borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 999,
+    borderRadius: mobileTokens.radius.md,
     borderWidth: 1,
     minHeight: 44,
     justifyContent: "center",
@@ -1539,13 +1558,14 @@ const styles = StyleSheet.create({
   },
   closeButtonLabel: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 16,
     fontWeight: "800",
   },
   confirmCard: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: mobileTokens.color.surfaceContainer,
     borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 8,
+    borderRadius: mobileTokens.radius.lg,
     borderWidth: 1,
     gap: mobileTokens.spacing[3],
     marginBottom: mobileTokens.spacing[3],
@@ -1553,8 +1573,8 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: mobileTokens.color.paper,
-    borderRadius: 999,
+    backgroundColor: mobileTokens.color.sun,
+    borderRadius: mobileTokens.radius.md,
     minHeight: 56,
     justifyContent: "center",
     marginTop: mobileTokens.spacing[3],
@@ -1562,14 +1582,15 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
     textTransform: "uppercase",
   },
   secondaryButton: {
     alignItems: "center",
-    borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 999,
+    borderColor: mobileTokens.color.copper,
+    borderRadius: mobileTokens.radius.md,
     borderWidth: 1,
     minHeight: 52,
     justifyContent: "center",
@@ -1577,7 +1598,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: mobileTokens.spacing[4],
   },
   secondaryButtonLabel: {
-    color: mobileTokens.color.paper,
+    color: mobileTokens.color.copper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -1586,13 +1608,15 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   inlineError: {
-    color: mobileTokens.color.textSecondaryOnGradient,
+    color: mobileTokens.color.danger,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: 13,
     fontWeight: "600",
     marginBottom: mobileTokens.spacing[3],
   },
   inlineSuccess: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: 13,
     fontWeight: "600",
     marginBottom: mobileTokens.spacing[3],

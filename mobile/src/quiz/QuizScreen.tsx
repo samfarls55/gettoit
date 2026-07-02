@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { mobileTokens } from "../design/tokens";
 import type { Q5CandidateRepository } from "./q5CandidateRepository";
@@ -352,7 +352,11 @@ export function QuizScreen({
   };
 
   return (
-    <View style={styles.root}>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      contentInsetAdjustmentBehavior="automatic"
+      style={styles.root}
+    >
       <View style={styles.chrome}>
         {currentQuestionId === "q1" ? (
           <View style={styles.chromeAction} />
@@ -466,7 +470,7 @@ export function QuizScreen({
           </Pressable>
         </View>
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -589,7 +593,11 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: mobileTokens.color.ink,
-    padding: mobileTokens.spacing[8],
+  },
+  content: {
+    flexGrow: 1,
+    padding: mobileTokens.spacing[5],
+    paddingTop: mobileTokens.spacing[6],
   },
   chrome: {
     flexDirection: "row",
@@ -602,10 +610,11 @@ const styles = StyleSheet.create({
     minWidth: 64,
   },
   chromeLabel: {
-    color: mobileTokens.color.textSecondaryOnGradient,
+    color: mobileTokens.color.copper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
   progressRow: {
@@ -615,23 +624,25 @@ const styles = StyleSheet.create({
   },
   progressSegment: {
     backgroundColor: mobileTokens.color.glassStroke,
-    borderRadius: 999,
+    borderRadius: mobileTokens.radius.full,
     flex: 1,
     height: 4,
   },
   activeProgressSegment: {
-    backgroundColor: mobileTokens.color.paper,
+    backgroundColor: mobileTokens.color.sun,
   },
   question: {
     gap: mobileTokens.spacing[4],
   },
   noResultsBody: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
   q5Subtitle: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
@@ -639,27 +650,30 @@ const styles = StyleSheet.create({
     gap: mobileTokens.spacing[3],
   },
   candidateCard: {
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: mobileTokens.color.surfaceContainerLow,
     borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 12,
+    borderRadius: mobileTokens.radius.lg,
     borderWidth: 1,
     gap: mobileTokens.spacing[3],
     padding: mobileTokens.spacing[4],
   },
   candidateName: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
   },
   candidateMeta: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
+    letterSpacing: 0,
   },
   q5Attribution: {
     alignSelf: "center",
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
     letterSpacing: 0,
@@ -670,9 +684,9 @@ const styles = StyleSheet.create({
   },
   ratingButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.10)",
+    backgroundColor: mobileTokens.color.surfaceContainer,
     borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 10,
+    borderRadius: mobileTokens.radius.md,
     borderWidth: 1,
     flex: 1,
     minHeight: 44,
@@ -684,6 +698,7 @@ const styles = StyleSheet.create({
   },
   ratingLabel: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
   },
@@ -692,16 +707,18 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
   title: {
     color: mobileTokens.color.paper,
-    fontSize: 30,
-    fontWeight: "800",
-    lineHeight: 36,
+    fontFamily: mobileTokens.typography.family.display,
+    fontSize: mobileTokens.typography.headline.size,
+    fontWeight: mobileTokens.typography.headline.weight,
+    lineHeight: mobileTokens.typography.headline.lineHeight,
   },
   optionGrid: {
     flexDirection: "row",
@@ -709,19 +726,20 @@ const styles = StyleSheet.create({
     gap: mobileTokens.spacing[3],
   },
   option: {
-    borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 999,
+    borderColor: mobileTokens.color.copper,
+    borderRadius: mobileTokens.radius.md,
     borderWidth: 1,
     minHeight: 48,
     justifyContent: "center",
     paddingHorizontal: mobileTokens.spacing[4],
   },
   selectedOption: {
-    backgroundColor: mobileTokens.color.paper,
-    borderColor: mobileTokens.color.paper,
+    backgroundColor: mobileTokens.color.sun,
+    borderColor: mobileTokens.color.sun,
   },
   optionLabel: {
-    color: mobileTokens.color.paper,
+    color: mobileTokens.color.copper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
   },
@@ -730,8 +748,8 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     alignItems: "center",
-    backgroundColor: mobileTokens.color.paper,
-    borderRadius: 999,
+    backgroundColor: mobileTokens.color.sun,
+    borderRadius: mobileTokens.radius.md,
     minHeight: 56,
     justifyContent: "center",
     marginTop: mobileTokens.spacing[4],
@@ -739,6 +757,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonLabel: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
     textTransform: "uppercase",
@@ -746,7 +765,7 @@ const styles = StyleSheet.create({
   sunButton: {
     alignItems: "center",
     backgroundColor: mobileTokens.color.sun,
-    borderRadius: 999,
+    borderRadius: mobileTokens.radius.md,
     minHeight: 56,
     justifyContent: "center",
     marginTop: mobileTokens.spacing[4],
@@ -754,6 +773,7 @@ const styles = StyleSheet.create({
   },
   sunButtonLabel: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
     textTransform: "uppercase",
@@ -764,14 +784,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   secondaryButtonLabel: {
-    color: mobileTokens.color.paper,
+    color: mobileTokens.color.copper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
   },
   confirmCard: {
-    backgroundColor: "rgba(20,20,30,0.92)",
+    backgroundColor: mobileTokens.color.surfaceContainer,
     borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 12,
+    borderRadius: mobileTokens.radius.lg,
     borderWidth: 1,
     gap: mobileTokens.spacing[3],
     marginTop: mobileTokens.spacing[8],
@@ -779,11 +800,13 @@ const styles = StyleSheet.create({
   },
   confirmTitle: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
   },
   confirmBody: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },

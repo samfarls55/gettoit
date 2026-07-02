@@ -42,7 +42,7 @@ describe("VerdictScreen", () => {
     expect(screen.getByText("Tonight at 7:00 PM")).toBeOnTheScreen();
     expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
     expect(screen.getByText("1 Main St")).toBeOnTheScreen();
-    expect(screen.getByText("https://maps.google.example/picos")).toBeOnTheScreen();
+    expect(screen.getByText("Open in Maps")).toBeOnTheScreen();
     expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
     expect(screen.queryByText("4.8")).toBeNull();
     expect(screen.queryByText("Open now")).toBeNull();
@@ -131,6 +131,7 @@ describe("VerdictScreen", () => {
     expect(
       screen.getByText("Start a new Plan with a wider search area."),
     ).toBeOnTheScreen();
+    expect(screen.getByText("Start a new Plan")).toBeOnTheScreen();
     expect(screen.queryByLabelText("Widen search area")).toBeNull();
     expect(screen.queryByText(/Re-run/)).toBeNull();
   });
@@ -142,7 +143,7 @@ describe("VerdictScreen", () => {
     expect(screen.getByText("Closed record")).toBeOnTheScreen();
     expect(screen.getByText("PICO'S\nTAQUERIA")).toBeOnTheScreen();
     expect(screen.getByText("1 Main St")).toBeOnTheScreen();
-    expect(screen.getByText("https://maps.google.example/picos")).toBeOnTheScreen();
+    expect(screen.getByText("Open in Maps")).toBeOnTheScreen();
     expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
     expect(screen.getByText("Rule proof")).toBeOnTheScreen();
     expect(screen.getByText("Best fit for the table.")).toBeOnTheScreen();
@@ -179,7 +180,7 @@ describe("VerdictScreen", () => {
     expect(screen.getByText("Taco crawl")).toBeOnTheScreen();
     expect(screen.getByText("CURRENT\nTACO")).toBeOnTheScreen();
     expect(screen.getByText("9 Fresh St")).toBeOnTheScreen();
-    expect(screen.getByText("https://maps.google.example/current")).toBeOnTheScreen();
+    expect(screen.getByText("Open in Maps")).toBeOnTheScreen();
     expect(screen.getByText("Powered by Google")).toBeOnTheScreen();
   });
 

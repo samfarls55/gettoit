@@ -1,4 +1,11 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { mobileTokens } from "../design/tokens";
 import { VerdictBackdrop } from "../design/VerdictBackdrop";
@@ -9,21 +16,23 @@ import type {
 
 type VerdictScreenProps = {
   mode?: "live" | "readOnly";
+  onPrimaryAction?: () => void;
   onReroll?: (input: RerollInput) => Promise<void>;
   verdict: VerdictViewModel;
 };
 
 export function VerdictScreen({
   mode = "live",
+  onPrimaryAction,
   onReroll = async () => undefined,
   verdict,
 }: VerdictScreenProps) {
   if (verdict.kind === "history") {
-    return <HistoryVerdict verdict={verdict} />;
+    return <HistoryVerdict onPrimaryAction={onPrimaryAction} verdict={verdict} />;
   }
 
   if (verdict.kind === "noSurvivor") {
-    return <NoSurvivorVerdict />;
+    return <NoSurvivorVerdict onPrimaryAction={onPrimaryAction} />;
   }
 
   const isSolo = verdict.flavor === "solo";
@@ -45,6 +54,7 @@ export function VerdictScreen({
     <ScrollView
       style={styles.root}
       contentContainerStyle={styles.verdictContent}
+      contentInsetAdjustmentBehavior="automatic"
     >
       <VerdictBackdrop />
 
@@ -79,7 +89,7 @@ export function VerdictScreen({
         {verdict.formattedAddress ? (
           <Text style={styles.metaLine}>{verdict.formattedAddress}</Text>
         ) : null}
-        <Text style={styles.mapsLink}>{verdict.googleMapsUri}</Text>
+        <MapsLink uri={verdict.googleMapsUri} />
         <Text style={styles.attribution}>{verdict.attributionText}</Text>
         {isReadOnly ? (
           <Text style={styles.recordCopy}>
@@ -103,7 +113,7 @@ export function VerdictScreen({
       <View style={styles.proofStack}>
         <View style={styles.ruleCard}>
           <Text style={styles.proofLabel}>Rule proof</Text>
-          <Text style={styles.ruleText}>{verdict.ruleText}</Text>
+          <Text style={styles.ruleText}>{cleanDisplayText(verdict.ruleText)}</Text>
         </View>
         {verdict.receipts.length > 0 ? (
           <View style={styles.receiptBlock}>
@@ -122,7 +132,11 @@ export function VerdictScreen({
       </View>
 
       <View style={styles.actionStack}>
-        <Pressable accessibilityRole="button" style={styles.primaryButton}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPrimaryAction}
+          style={styles.primaryButton}
+        >
           <Text style={styles.primaryButtonLabel}>{primaryActionLabel}</Text>
         </Pressable>
         {isReadOnly ? null : verdict.reroll.isEligible ? (
@@ -146,6 +160,7 @@ export function VerdictScreen({
 }
 
 type HistoryVerdictProps = {
+  onPrimaryAction?: () => void;
   verdict: Extract<VerdictViewModel, { kind: "history" }>;
 };
 
@@ -179,7 +194,11 @@ function liveKickerFor(
   return `Tonight at ${verdict.timeBadge.time}`;
 }
 
-function NoSurvivorVerdict() {
+function NoSurvivorVerdict({
+  onPrimaryAction,
+}: {
+  onPrimaryAction?: () => void;
+}) {
   return (
     <View style={styles.noSurvivorRoot}>
       <Text style={styles.eyebrow}>Try a wider search</Text>
@@ -190,15 +209,23 @@ function NoSurvivorVerdict() {
       <Text style={styles.subtitle}>
         Start a new Plan with a wider search area.
       </Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPrimaryAction}
+        style={styles.primaryButton}
+      >
+        <Text style={styles.primaryButtonLabel}>Start a new Plan</Text>
+      </Pressable>
     </View>
   );
 }
 
-function HistoryVerdict({ verdict }: HistoryVerdictProps) {
+function HistoryVerdict({ onPrimaryAction, verdict }: HistoryVerdictProps) {
   return (
     <ScrollView
       style={styles.root}
       contentContainerStyle={styles.verdictContent}
+      contentInsetAdjustmentBehavior="automatic"
     >
       <VerdictBackdrop />
       <View style={styles.topbar}>
@@ -222,7 +249,7 @@ function HistoryVerdict({ verdict }: HistoryVerdictProps) {
         ) : null}
         {verdict.display.status === "available" ? (
           <>
-            <Text style={styles.mapsLink}>{verdict.display.googleMapsUri}</Text>
+            <MapsLink uri={verdict.display.googleMapsUri} />
             <Text style={styles.attribution}>
               {verdict.display.attributionText}
             </Text>
@@ -233,12 +260,36 @@ function HistoryVerdict({ verdict }: HistoryVerdictProps) {
       </View>
 
       <View style={styles.actionStack}>
-        <Pressable accessibilityRole="button" style={styles.primaryButton}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPrimaryAction}
+          style={styles.primaryButton}
+        >
           <Text style={styles.primaryButtonLabel}>Start a new decision</Text>
         </Pressable>
       </View>
     </ScrollView>
   );
+}
+
+function MapsLink({ uri }: { uri: string }) {
+  return (
+    <Pressable
+      accessibilityLabel="Open in Maps"
+      accessibilityRole="button"
+      onPress={() => void Linking.openURL(uri)}
+      style={styles.mapsButton}
+    >
+      <Text style={styles.mapsButtonLabel}>Open in Maps</Text>
+    </Pressable>
+  );
+}
+
+function cleanDisplayText(value: string): string {
+  return value
+    .replaceAll("â€”", "-")
+    .replaceAll("â€“", "-")
+    .replaceAll("â€™", "'");
 }
 
 const styles = StyleSheet.create({
@@ -250,13 +301,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     gap: mobileTokens.spacing[4],
     overflow: "hidden",
-    padding: mobileTokens.spacing[8],
+    padding: mobileTokens.spacing[5],
   },
   noSurvivorRoot: {
     flex: 1,
     backgroundColor: mobileTokens.color.ink,
     gap: mobileTokens.spacing[4],
-    padding: mobileTokens.spacing[8],
+    padding: mobileTokens.spacing[5],
+    paddingTop: mobileTokens.spacing[10],
   },
   topbar: {
     alignItems: "center",
@@ -266,16 +318,17 @@ const styles = StyleSheet.create({
   },
   liveChip: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderColor: "rgba(255,255,255,0.24)",
-    borderRadius: 999,
+    backgroundColor: mobileTokens.color.surfaceContainerLow,
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: mobileTokens.radius.full,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 36,
     paddingHorizontal: mobileTokens.spacing[3],
   },
   liveChipText: {
-    color: mobileTokens.color.paper,
+    color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: "800",
   },
@@ -285,9 +338,9 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: mobileTokens.color.paper,
-    borderColor: "rgba(0,0,0,0.52)",
-    borderRadius: 16,
+    backgroundColor: mobileTokens.color.surfaceContainerHighest,
+    borderColor: mobileTokens.color.ink,
+    borderRadius: mobileTokens.radius.full,
     borderWidth: 2,
     height: 32,
     justifyContent: "center",
@@ -295,14 +348,15 @@ const styles = StyleSheet.create({
     width: 32,
   },
   avatarText: {
-    color: mobileTokens.color.ink,
+    color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 12,
     fontWeight: "900",
   },
   poster: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderColor: "rgba(255,255,255,0.2)",
-    borderRadius: 18,
+    backgroundColor: mobileTokens.color.surface,
+    borderColor: mobileTokens.color.glassTop,
+    borderRadius: mobileTokens.radius.xl,
     borderWidth: 1,
     gap: mobileTokens.spacing[3],
     marginTop: mobileTokens.spacing[3],
@@ -312,7 +366,7 @@ const styles = StyleSheet.create({
   seal: {
     alignItems: "center",
     borderColor: mobileTokens.color.sun,
-    borderRadius: 36,
+    borderRadius: mobileTokens.radius.full,
     borderWidth: 2,
     height: 72,
     justifyContent: "center",
@@ -324,40 +378,57 @@ const styles = StyleSheet.create({
   },
   sealText: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 10,
     fontWeight: "900",
   },
   posterKicker: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: "900",
   },
   venueTitle: {
     color: mobileTokens.color.paper,
-    fontSize: 46,
-    fontWeight: "900",
-    lineHeight: 42,
+    fontFamily: mobileTokens.typography.family.display,
+    fontSize: 40,
+    fontWeight: "700",
+    lineHeight: 40,
     marginTop: mobileTokens.spacing[3],
   },
   historyPlanName: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
   },
   metaLine: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 20,
   },
-  mapsLink: {
-    color: mobileTokens.color.paper,
+  mapsButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderColor: mobileTokens.color.copper,
+    borderRadius: mobileTokens.radius.md,
+    borderWidth: 1,
+    minHeight: 38,
+    justifyContent: "center",
+    paddingHorizontal: mobileTokens.spacing[3],
+  },
+  mapsButtonLabel: {
+    color: mobileTokens.color.copper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 13,
     fontWeight: "800",
-    lineHeight: 18,
+    textTransform: "uppercase",
   },
   attribution: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 16,
@@ -365,7 +436,7 @@ const styles = StyleSheet.create({
   timeBlock: {
     alignItems: "center",
     backgroundColor: mobileTokens.color.sun,
-    borderRadius: 14,
+    borderRadius: mobileTokens.radius.lg,
     flexDirection: "row",
     gap: mobileTokens.spacing[3],
     justifyContent: "space-between",
@@ -374,12 +445,14 @@ const styles = StyleSheet.create({
   },
   timeMain: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 30,
     fontWeight: "900",
     lineHeight: 32,
   },
   timeSub: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 11,
     fontWeight: "900",
     marginTop: 2,
@@ -388,57 +461,64 @@ const styles = StyleSheet.create({
     gap: mobileTokens.spacing[3],
   },
   ruleCard: {
-    backgroundColor: "rgba(255,255,255,0.1)",
-    borderColor: "rgba(255,255,255,0.22)",
-    borderRadius: 14,
+    backgroundColor: mobileTokens.color.surfaceContainerLow,
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: mobileTokens.radius.lg,
     borderWidth: 1,
     gap: 8,
     padding: mobileTokens.spacing[4],
   },
   proofLabel: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: "900",
   },
   eyebrow: {
     color: mobileTokens.color.sun,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.eyebrow.size,
     fontWeight: mobileTokens.typography.eyebrow.weight,
-    letterSpacing: 1.5,
+    letterSpacing: 0,
     textTransform: "uppercase",
   },
   title: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.display,
     fontSize: mobileTokens.typography.display.size,
     fontWeight: mobileTokens.typography.display.weight,
     lineHeight: mobileTokens.typography.display.lineHeight,
   },
   subtitle: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
   timeAudience: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 11,
     fontWeight: "900",
     textAlign: "right",
   },
   ruleText: {
     color: mobileTokens.color.paper,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
   recordCopy: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     lineHeight: mobileTokens.typography.body.lineHeight,
   },
   receiptBlock: {
-    backgroundColor: "rgba(255,255,255,0.07)",
-    borderColor: "rgba(255,255,255,0.18)",
-    borderRadius: 14,
+    backgroundColor: mobileTokens.color.surfaceContainerLow,
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: mobileTokens.radius.lg,
     borderWidth: 1,
     gap: mobileTokens.spacing[3],
     padding: mobileTokens.spacing[4],
@@ -449,15 +529,16 @@ const styles = StyleSheet.create({
     gap: mobileTokens.spacing[3],
   },
   receiptChip: {
-    backgroundColor: "rgba(255,255,255,0.09)",
-    borderColor: "rgba(255,255,255,0.18)",
-    borderRadius: 999,
+    backgroundColor: mobileTokens.color.surfaceContainer,
+    borderColor: mobileTokens.color.glassStroke,
+    borderRadius: mobileTokens.radius.full,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   receiptText: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: 13,
     fontWeight: "800",
   },
@@ -468,33 +549,36 @@ const styles = StyleSheet.create({
   primaryButton: {
     alignItems: "center",
     backgroundColor: mobileTokens.color.sun,
-    borderRadius: 999,
+    borderRadius: mobileTokens.radius.md,
     minHeight: 56,
     justifyContent: "center",
     paddingHorizontal: mobileTokens.spacing[4],
   },
   primaryButtonLabel: {
     color: mobileTokens.color.ink,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
   },
   secondaryButton: {
     alignItems: "center",
-    borderColor: mobileTokens.color.glassStroke,
-    borderRadius: 999,
+    borderColor: mobileTokens.color.copper,
+    borderRadius: mobileTokens.radius.md,
     borderWidth: 1,
     minHeight: 52,
     justifyContent: "center",
     paddingHorizontal: mobileTokens.spacing[4],
   },
   secondaryButtonLabel: {
-    color: mobileTokens.color.paper,
+    color: mobileTokens.color.copper,
+    fontFamily: mobileTokens.typography.family.label,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "800",
     textAlign: "center",
   },
   rerollUnavailable: {
     color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: mobileTokens.typography.family.body,
     fontSize: mobileTokens.typography.body.size,
     fontWeight: "700",
     lineHeight: mobileTokens.typography.body.lineHeight,

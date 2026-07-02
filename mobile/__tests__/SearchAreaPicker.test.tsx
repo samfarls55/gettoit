@@ -163,7 +163,7 @@ describe("SearchAreaPickerPreview", () => {
     await waitFor(() => expect(screen.getByText("Current location")).toBeOnTheScreen());
 
     fireEvent.changeText(
-      screen.getByPlaceholderText("Search city, neighborhood, or address"),
+      screen.getByPlaceholderText("Search city or address"),
       "Brooklyn",
     );
     fireEvent.press(screen.getByText("Jump"));
