@@ -51,7 +51,7 @@ const mixedPlanList: PlanListSnapshot = {
   ],
 };
 
-const actionLanguagePlanList: PlanListSnapshot = {
+const planListWithLegacyBadges: PlanListSnapshot = {
   ...mixedPlanList,
   history: [
     {
@@ -180,20 +180,21 @@ describe("PlanListScreen on web", () => {
     const onOpenPlan = jest.fn();
     const { container, unmount } = await renderPlanListScreen({
       onOpenPlan,
-      plans: actionLanguagePlanList,
+      plans: planListWithLegacyBadges,
     });
+    const dashboardText = container.textContent ?? "";
 
-    expect(container.textContent).toContain("Needs you now");
-    expect(container.textContent).toContain("Plans in motion");
-    expect(container.textContent).toContain("Closed Plans");
-    expect(container.textContent).toContain("Needs setup");
-    expect(container.textContent).toContain("Quiz open");
-    expect(container.textContent).toContain("Pick ready");
-    expect(container.textContent).toContain("Closed");
-    expect(container.textContent).not.toContain("Created");
-    expect(container.textContent).not.toContain("Joined");
-    expect(container.textContent).not.toContain("Decided");
-    expect(container.textContent).not.toContain("History");
+    expect(dashboardText).toContain("Needs you now");
+    expect(dashboardText).toContain("Plans in motion");
+    expect(dashboardText).toContain("Closed Plans");
+    expect(dashboardText).toContain("Needs setup");
+    expect(dashboardText).toContain("Quiz open");
+    expect(dashboardText).toContain("Pick ready");
+    expect(dashboardText).toContain("Closed");
+    expect(dashboardText).not.toContain("Created");
+    expect(dashboardText).not.toContain("Joined");
+    expect(dashboardText).not.toContain("Decided");
+    expect(dashboardText).not.toContain("History");
 
     const joinedPlanButton = container.querySelector<HTMLElement>(
       '[aria-label="Open Quiz open Plan Birthday dinner"]',
@@ -212,11 +213,11 @@ describe("PlanListScreen on web", () => {
 
     expect(onOpenPlan).toHaveBeenNthCalledWith(
       1,
-      actionLanguagePlanList.joined[0],
+      planListWithLegacyBadges.joined[0],
     );
     expect(onOpenPlan).toHaveBeenNthCalledWith(
       2,
-      actionLanguagePlanList.history[0],
+      planListWithLegacyBadges.history[0],
     );
 
     await unmount();
