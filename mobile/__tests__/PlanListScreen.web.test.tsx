@@ -29,6 +29,28 @@ const createdPlanList: PlanListSnapshot = {
   ],
 };
 
+const mixedPlanList: PlanListSnapshot = {
+  ...createdPlanList,
+  joined: [
+    {
+      id: "joined-plan",
+      title: "Birthday dinner",
+      subtitle: "Quiz in progress",
+      badge: "Joined",
+      routeTarget: "joined",
+    },
+  ],
+  decided: [
+    {
+      id: "decided-plan",
+      title: "Sushi night",
+      subtitle: "Live verdict",
+      badge: "Decided",
+      routeTarget: "decided",
+    },
+  ],
+};
+
 async function renderPlanListScreen(
   props: ComponentProps<typeof PlanListScreen>,
 ) {
@@ -106,6 +128,31 @@ describe("PlanListScreen on web", () => {
     });
 
     expect(onCreatePlan).toHaveBeenCalledWith("group");
+
+    await unmount();
+  });
+
+  it("replaces fake social card state with honest Plan action copy", async () => {
+    const { container, unmount } = await renderPlanListScreen({
+      plans: mixedPlanList,
+    });
+
+    const exactTextNodes = Array.from(
+      container.querySelectorAll("span, div"),
+      (element) => element.textContent,
+    );
+
+    expect(exactTextNodes).not.toContain("A");
+    expect(exactTextNodes).not.toContain("M");
+    expect(exactTextNodes).not.toContain("+3");
+    expect(container.textContent).toContain(
+      "Finish setup, then invite the group.",
+    );
+    expect(container.textContent).toContain(
+      "Answer the quiz or check whether the group is waiting.",
+    );
+    expect(container.textContent).toContain("Open the live verdict.");
+    expect(container.textContent).not.toContain("□ Dinner");
 
     await unmount();
   });

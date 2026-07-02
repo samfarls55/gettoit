@@ -325,6 +325,7 @@ function LivePlanCard({
 }) {
   const isDecided = bucket.key === "decided";
   const actionLabel = actionLabelFor(bucket);
+  const stateCopy = stateCopyFor(bucket);
 
   return (
     <View style={styles.liveCardShell}>
@@ -356,19 +357,18 @@ function LivePlanCard({
 
           {isDecided ? (
             <View style={styles.detailStack}>
-              <Text style={styles.detailLine}>□ Dinner</Text>
-              <Text numberOfLines={1} style={styles.detailLine}>
-                ◇ {plan.subtitle}
+              <Text style={styles.stateTitle}>{stateCopy.title}</Text>
+              <Text numberOfLines={2} style={styles.detailLine}>
+                {stateCopy.body}
               </Text>
             </View>
           ) : (
             <>
-              <View style={styles.avatarStack}>
-                <Avatar label="A" tone="gold" />
-                <Avatar label="M" tone="copper" />
-                <View style={styles.avatarCount}>
-                  <Text style={styles.avatarCountText}>+3</Text>
-                </View>
+              <View style={styles.stateCopyStack}>
+                <Text style={styles.stateTitle}>{stateCopy.title}</Text>
+                <Text numberOfLines={2} style={styles.stateBody}>
+                  {stateCopy.body}
+                </Text>
               </View>
               <View style={styles.voteButton}>
                 <Text style={styles.voteButtonLabel}>{actionLabel}</Text>
@@ -456,6 +456,27 @@ function actionLabelFor(bucket: PlanBucket) {
   return "Open Plan";
 }
 
+function stateCopyFor(bucket: PlanBucket) {
+  if (bucket.key === "created") {
+    return {
+      title: "Needs setup",
+      body: "Finish setup, then invite the group.",
+    };
+  }
+
+  if (bucket.key === "joined") {
+    return {
+      title: "Quiz open",
+      body: "Answer the quiz or check whether the group is waiting.",
+    };
+  }
+
+  return {
+    title: "Pick ready",
+    body: "Open the live verdict.",
+  };
+}
+
 function getNextUpPlan(liveBuckets: PlanBucketWithPlans[]): NextUpPlan | null {
   const bucket = liveBuckets.find((planBucket) => planBucket.plans.length > 0);
 
@@ -464,19 +485,6 @@ function getNextUpPlan(liveBuckets: PlanBucketWithPlans[]): NextUpPlan | null {
   }
 
   return { bucket, plan: bucket.plans[0] };
-}
-
-function Avatar({ label, tone }: { label: string; tone: "gold" | "copper" }) {
-  return (
-    <View
-      style={[
-        styles.memberAvatar,
-        tone === "gold" ? styles.goldAvatar : styles.copperAvatar,
-      ]}
-    >
-      <Text style={styles.memberAvatarText}>{label}</Text>
-    </View>
-  );
 }
 
 function DashboardIcon({
@@ -796,46 +804,21 @@ const styles = StyleSheet.create({
     width: 44,
     zIndex: 1,
   },
-  avatarStack: {
-    flexDirection: "row",
+  stateCopyStack: {
+    gap: mobileTokens.spacing[2],
     marginTop: mobileTokens.spacing[3],
   },
-  memberAvatar: {
-    alignItems: "center",
-    borderColor: mobileTokens.color.glassStroke,
-    borderRadius: mobileTokens.radius.full,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: "center",
-    marginRight: -8,
-    width: 32,
-  },
-  goldAvatar: {
-    backgroundColor: "rgba(212, 175, 55, 0.24)",
-  },
-  copperAvatar: {
-    backgroundColor: "rgba(255, 183, 123, 0.24)",
-  },
-  memberAvatarText: {
+  stateTitle: {
     color: mobileTokens.color.paper,
     fontFamily: labelFont,
     fontSize: 14,
     fontWeight: "700",
   },
-  avatarCount: {
-    alignItems: "center",
-    backgroundColor: mobileTokens.color.surfaceContainer,
-    borderColor: mobileTokens.color.glassStroke,
-    borderRadius: mobileTokens.radius.full,
-    borderWidth: 1,
-    height: 32,
-    justifyContent: "center",
-    width: 32,
-  },
-  avatarCountText: {
+  stateBody: {
     color: mobileTokens.color.textSecondaryOnGradient,
-    fontFamily: labelFont,
+    fontFamily: bodyFont,
     fontSize: 14,
+    lineHeight: 20,
   },
   voteButton: {
     alignItems: "center",
