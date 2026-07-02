@@ -64,6 +64,17 @@ const planListWithLegacyBadges: PlanListSnapshot = {
   ],
 };
 
+const planListWithManyClosedPlans: PlanListSnapshot = {
+  ...emptyPlanListSnapshot,
+  history: Array.from({ length: 6 }, (_, index) => ({
+    id: `closed-plan-${index + 1}`,
+    title: `Closed plan ${index + 1}`,
+    subtitle: "Closed verdict",
+    badge: "History",
+    routeTarget: "history",
+  })),
+};
+
 async function renderPlanListScreen(
   props: ComponentProps<typeof PlanListScreen>,
 ) {
@@ -115,12 +126,12 @@ describe("PlanListScreen on web", () => {
 
     expect(
       container.querySelector(
-        '[aria-label="Open Needs setup Plan Brunch plan"]',
+        '[aria-label="Open Needs you now Plan Brunch plan"]',
       ),
     ).not.toBeNull();
     expect(
       container.querySelector(
-        '[aria-label="Delete Needs setup Plan Brunch plan"]',
+        '[aria-label="Delete Setup needed Plan Brunch plan"]',
       ),
     ).not.toBeNull();
     expect(container.querySelector("button button")).toBeNull();
@@ -144,7 +155,7 @@ describe("PlanListScreen on web", () => {
     });
 
     const startPlanButton = container.querySelector<HTMLElement>(
-      '[aria-label="Start a group Plan"]',
+      '[aria-label="Create group Plan"]',
     );
 
     expect(startPlanButton).not.toBeNull();
@@ -175,12 +186,14 @@ describe("PlanListScreen on web", () => {
     expect(renderedElementTexts).not.toContain("M");
     expect(renderedElementTexts).not.toContain("+3");
     expect(container.textContent).toContain(
-      "Finish setup, then invite the group.",
+      "Lock the basics, then send the quiz link.",
     );
     expect(container.textContent).toContain(
-      "Answer the quiz or check whether the group is waiting.",
+      "Your answers unblock the group's pick.",
     );
-    expect(container.textContent).toContain("Open the live verdict.");
+    expect(container.textContent).toContain(
+      "Review the verdict and share the plan.",
+    );
     expect(container.textContent).not.toContain("□ Dinner");
 
     await unmount();
@@ -195,11 +208,11 @@ describe("PlanListScreen on web", () => {
     const dashboardText = container.textContent ?? "";
 
     expect(dashboardText).toContain("Needs you now");
-    expect(dashboardText).toContain("Plans in motion");
+    expect(dashboardText).toContain("Other active Plans");
     expect(dashboardText).toContain("Closed Plans");
-    expect(dashboardText).toContain("Needs setup");
-    expect(dashboardText).toContain("Quiz open");
-    expect(dashboardText).toContain("Pick ready");
+    expect(dashboardText).toContain("Setup needed");
+    expect(dashboardText).toContain("Answer needed");
+    expect(dashboardText).toContain("Verdict ready");
     expect(dashboardText).toContain("Closed");
     expect(dashboardText).not.toContain("Created");
     expect(dashboardText).not.toContain("Joined");
@@ -207,7 +220,7 @@ describe("PlanListScreen on web", () => {
     expect(dashboardText).not.toContain("History");
 
     const joinedPlanButton = container.querySelector<HTMLElement>(
-      '[aria-label="Open Quiz open Plan Birthday dinner"]',
+      '[aria-label="Open Answer needed Plan Birthday dinner"]',
     );
     const closedPlanButton = container.querySelector<HTMLElement>(
       '[aria-label="Open Closed Plan Taco Tuesday"]',
@@ -228,6 +241,33 @@ describe("PlanListScreen on web", () => {
     expect(onOpenPlan).toHaveBeenNthCalledWith(
       2,
       planListWithLegacyBadges.history[0],
+    );
+
+    await unmount();
+  });
+
+  it("keeps all closed Plans selectable from the dashboard", async () => {
+    const onOpenPlan = jest.fn();
+    const { container, unmount } = await renderPlanListScreen({
+      onOpenPlan,
+      plans: planListWithManyClosedPlans,
+    });
+
+    expect(container.textContent).toContain("Closed plan 1");
+    expect(container.textContent).toContain("Closed plan 6");
+
+    const closedPlanButton = container.querySelector<HTMLElement>(
+      '[aria-label="Open Closed Plan Closed plan 6"]',
+    );
+
+    expect(closedPlanButton).not.toBeNull();
+
+    await act(async () => {
+      closedPlanButton?.click();
+    });
+
+    expect(onOpenPlan).toHaveBeenCalledWith(
+      planListWithManyClosedPlans.history[5],
     );
 
     await unmount();
@@ -254,7 +294,7 @@ describe("PlanListScreen on web", () => {
     );
     const plansInMotionRail = getRequiredElement(
       container,
-      '[aria-label="Plans in motion secondary browsing"]',
+      '[aria-label="Other active Plans"]',
     );
     const nextUpButton = getRequiredElement(
       container,

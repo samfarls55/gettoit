@@ -742,10 +742,11 @@ describe("App", () => {
       expectAnyTextOnScreen("Brunch plan");
     });
 
-    expect(screen.getAllByText("Needs setup")).toHaveLength(5);
-    expect(screen.getAllByText("Quiz open")).toHaveLength(3);
-    expect(screen.getAllByText("Pick ready")).toHaveLength(3);
+    expect(screen.getAllByText("Setup needed")).toHaveLength(1);
+    expect(screen.getAllByText("Answer needed")).toHaveLength(1);
+    expect(screen.getAllByText("Verdict ready")).toHaveLength(1);
     expect(screen.getAllByText("Closed")).toHaveLength(1);
+    expect(screen.queryByLabelText("Open Setup needed Plan Brunch plan")).toBeNull();
     expect(screen.getByText("Birthday dinner")).toBeOnTheScreen();
     expect(screen.getByText("Sushi night")).toBeOnTheScreen();
     expect(screen.getByText("Noodle crawl")).toBeOnTheScreen();
@@ -807,7 +808,7 @@ describe("App", () => {
       expectAnyTextOnScreen("Brunch plan");
     });
 
-    fireEvent.press(screen.getByLabelText("Delete Needs setup Plan Brunch plan"));
+    fireEvent.press(screen.getByLabelText("Delete Setup needed Plan Brunch plan"));
     expect(screen.getByText("Delete Brunch plan?")).toBeOnTheScreen();
 
     await act(async () => {
@@ -819,7 +820,7 @@ describe("App", () => {
       expect(repository.deletePlan).toHaveBeenCalledWith({
         planId: "pending-brunch",
       });
-      expect(screen.queryByLabelText("Open Needs setup Plan Brunch plan")).toBeNull();
+      expect(screen.queryByLabelText("Open Needs you now Plan Brunch plan")).toBeNull();
       expectAnyTextOnScreen("Morgan's birthday");
       expect(screen.getByText("Plan deleted.")).toBeOnTheScreen();
     });
@@ -897,9 +898,9 @@ describe("App", () => {
   });
 
   it.each([
-    ["Open Needs setup Plan Brunch plan", "Edit your plan"],
-    ["Open Quiz open Plan Birthday dinner", "Q1"],
-    ["Open Pick ready Plan Sushi night", "Live verdict"],
+    ["Open Needs you now Plan Brunch plan", "Edit your plan"],
+    ["Open Answer needed Plan Birthday dinner", "Q1"],
+    ["Open Verdict ready Plan Sushi night", "Live verdict"],
     ["Open Closed Plan Noodle crawl", "Verdict record"],
   ])("routes %s to %s", async (accessibilityLabel, visibleRoute) => {
     render(
@@ -1000,10 +1001,10 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Open Needs setup Plan Brunch plan")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Open Needs you now Plan Brunch plan")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Open Needs setup Plan Brunch plan"));
+    fireEvent.press(screen.getByLabelText("Open Needs you now Plan Brunch plan"));
 
     expect(screen.getByText("Edit your plan")).toBeOnTheScreen();
     expect(screen.getByDisplayValue("Brunch plan")).toBeOnTheScreen();
@@ -1089,10 +1090,10 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Open Needs setup Plan Brunch plan")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Open Needs you now Plan Brunch plan")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Open Needs setup Plan Brunch plan"));
+    fireEvent.press(screen.getByLabelText("Open Needs you now Plan Brunch plan"));
     fireEvent.changeText(screen.getByLabelText("Name this plan"), "Brunch reset");
     fireEvent.press(screen.getByText("Just me"));
     fireEvent.press(screen.getByText("Start the quiz"));
@@ -1156,10 +1157,10 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Open Quiz open Plan Morgan's birthday")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Open Answer needed Plan Morgan's birthday")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Open Quiz open Plan Morgan's birthday"));
+    fireEvent.press(screen.getByLabelText("Open Answer needed Plan Morgan's birthday"));
     await waitFor(() => {
       expect(screen.getByText("Q1")).toBeOnTheScreen();
     });
@@ -1564,10 +1565,10 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Open Quiz open Plan Morgan's birthday")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Open Answer needed Plan Morgan's birthday")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Open Quiz open Plan Morgan's birthday"));
+    fireEvent.press(screen.getByLabelText("Open Answer needed Plan Morgan's birthday"));
     await waitFor(() => {
       expect(screen.getByText("Q3")).toBeOnTheScreen();
     });
@@ -1660,10 +1661,10 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Open Quiz open Plan Morgan's birthday")).toBeOnTheScreen();
+      expect(screen.getByLabelText("Open Answer needed Plan Morgan's birthday")).toBeOnTheScreen();
     });
 
-    fireEvent.press(screen.getByLabelText("Open Quiz open Plan Morgan's birthday"));
+    fireEvent.press(screen.getByLabelText("Open Answer needed Plan Morgan's birthday"));
     await waitFor(() => {
       expect(screen.getByText("Q3")).toBeOnTheScreen();
     });

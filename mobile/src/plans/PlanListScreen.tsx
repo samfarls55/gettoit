@@ -56,21 +56,21 @@ const avatarUri =
 const livePlanBuckets: LivePlanBucket[] = [
   {
     key: "created",
-    title: "Needs setup",
+    title: "Setup needed",
     actionLabel: "Finish setup",
-    stateBody: "Finish setup, then invite the group.",
+    stateBody: "Lock the basics, then send the quiz link.",
   },
   {
     key: "joined",
-    title: "Quiz open",
+    title: "Answer needed",
     actionLabel: "Answer quiz",
-    stateBody: "Answer the quiz or check whether the group is waiting.",
+    stateBody: "Your answers unblock the group's pick.",
   },
   {
     key: "decided",
-    title: "Pick ready",
-    actionLabel: "Open verdict",
-    stateBody: "Open the live verdict.",
+    title: "Verdict ready",
+    actionLabel: "Open pick",
+    stateBody: "Review the verdict and share the plan.",
   },
 ];
 
@@ -135,6 +135,16 @@ export function PlanListScreen({
     ),
   }));
   const nextUp = getNextUpPlan(liveBuckets);
+  const secondaryLiveBuckets: PlanBucketWithPlans[] = [];
+  for (const bucket of liveBuckets) {
+    const secondaryPlans = bucket.plans.filter(
+      (plan) => plan.id !== nextUp?.plan.id,
+    );
+
+    if (secondaryPlans.length > 0) {
+      secondaryLiveBuckets.push({ ...bucket, plans: secondaryPlans });
+    }
+  }
   const pastPlans = plans.history;
   const handleCreateGroupPlan = () => onCreatePlan?.("group");
 
@@ -194,7 +204,7 @@ export function PlanListScreen({
       >
         <View style={styles.hero}>
           <Text style={styles.title}>Your Plans</Text>
-          <Text style={styles.subtitle}>Here's what you're up to.</Text>
+          <Text style={styles.subtitle}>The next decision lives here.</Text>
         </View>
 
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
@@ -202,54 +212,52 @@ export function PlanListScreen({
         {nextUp ? (
           <NextUpPlanCard
             bucket={nextUp.bucket}
+            deleteError={
+              planPendingDelete?.id === nextUp.plan.id ? deleteError : null
+            }
+            isDeleting={deletingPlanId === nextUp.plan.id}
             onOpenPlan={onOpenPlan}
+            onConfirmDelete={handleConfirmDelete}
+            onRequestDelete={setPlanPendingDelete}
+            pendingDelete={planPendingDelete?.id === nextUp.plan.id}
             plan={nextUp.plan}
           />
         ) : null}
 
-        <View style={styles.section}>
-          <Text style={styles.liveTitle}>Plans in motion</Text>
-          <ScrollView
-            accessibilityLabel="Plans in motion secondary browsing"
-            contentContainerStyle={styles.liveRail}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-          >
-            {liveBuckets.flatMap((bucket) =>
-              bucket.plans.map((plan) => (
-                <LivePlanCard
-                  bucket={bucket}
-                  deleteError={
-                    planPendingDelete?.id === plan.id ? deleteError : null
-                  }
-                  isDeleting={deletingPlanId === plan.id}
-                  key={plan.id}
-                  onConfirmDelete={handleConfirmDelete}
-                  onOpenPlan={onOpenPlan}
-                  onRequestDelete={setPlanPendingDelete}
-                  pendingDelete={planPendingDelete?.id === plan.id}
-                  plan={plan}
-                />
-              )),
-            )}
-            <Pressable
-              accessibilityLabel="Create group Plan"
-              accessibilityRole="button"
-              onPress={handleCreateGroupPlan}
-              style={styles.createCard}
+        {secondaryLiveBuckets.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={[styles.sectionLabel, styles.sectionLabelInset]}>
+              Other active Plans
+            </Text>
+            <View
+              accessibilityLabel="Other active Plans"
+              style={styles.liveList}
             >
-              <View style={styles.createIcon}>
-                <Text style={styles.createIconLabel}>+</Text>
-              </View>
-              <Text style={styles.createTitle}>Start a Plan</Text>
-            </Pressable>
-          </ScrollView>
-        </View>
+              {secondaryLiveBuckets.flatMap((bucket) =>
+                bucket.plans.map((plan) => (
+                  <LivePlanCard
+                    bucket={bucket}
+                    deleteError={
+                      planPendingDelete?.id === plan.id ? deleteError : null
+                    }
+                    isDeleting={deletingPlanId === plan.id}
+                    key={plan.id}
+                    onConfirmDelete={handleConfirmDelete}
+                    onOpenPlan={onOpenPlan}
+                    onRequestDelete={setPlanPendingDelete}
+                    pendingDelete={planPendingDelete?.id === plan.id}
+                    plan={plan}
+                  />
+                )),
+              )}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.pastSection}>
-          <Text style={styles.pastTitle}>Closed Plans</Text>
+          <Text style={styles.sectionLabel}>Closed Plans</Text>
           {pastPlans.length > 0 ? (
-            <View style={styles.pastGrid}>
+            <View style={styles.pastList}>
               {pastPlans.map((plan) => (
                 <PastPlanCard
                   bucket={pastPlanBucket}
@@ -286,13 +294,18 @@ export function PlanListScreen({
           <Text style={styles.bottomActionTitle}>Ready when you are.</Text>
         </View>
         <Pressable
-          accessibilityLabel="Start a group Plan"
+          accessibilityLabel="Create group Plan"
           accessibilityRole="button"
           onPress={handleCreateGroupPlan}
           style={styles.startPlanButton}
         >
-          <DashboardIcon fallback="+" name="add" size={20} />
-          <Text style={styles.startPlanButtonLabel}>Start a Plan</Text>
+          <DashboardIcon
+            color={mobileTokens.color.ink}
+            fallback="+"
+            name="add"
+            size={20}
+          />
+          <Text style={styles.startPlanButtonLabel}>New Plan</Text>
         </Pressable>
       </View>
     </View>
@@ -301,44 +314,77 @@ export function PlanListScreen({
 
 function NextUpPlanCard({
   bucket,
+  deleteError,
+  isDeleting,
+  onConfirmDelete,
   onOpenPlan,
+  onRequestDelete,
+  pendingDelete,
   plan,
 }: {
   bucket: LivePlanBucket;
+  deleteError: string | null;
+  isDeleting: boolean;
+  onConfirmDelete: (plan: PlanListItem) => Promise<void> | void;
   onOpenPlan?: (plan: PlanListItem) => void;
+  onRequestDelete: (plan: PlanListItem | null) => void;
+  pendingDelete: boolean;
   plan: PlanListItem;
 }) {
   return (
     <View style={styles.nextUpSection}>
       <Text style={styles.nextUpEyebrow}>Needs you now</Text>
-      <Pressable
-        accessibilityLabel={`Open Needs you now Plan ${plan.title}`}
-        accessibilityRole="button"
-        onPress={() => onOpenPlan?.(plan)}
-        style={styles.nextUpCard}
-      >
+      <View style={styles.nextUpCard}>
         <View style={styles.nextUpHeader}>
           <View style={styles.nextUpTitleGroup}>
-            <Text style={styles.nextUpBucket}>{bucket.title}</Text>
             <Text numberOfLines={2} style={styles.nextUpTitle}>
               {plan.title}
             </Text>
           </View>
-          <View style={styles.statusChip}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>{bucket.title}</Text>
+          <View style={styles.cardHeaderActions}>
+            <View style={styles.statusChip}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>{bucket.title}</Text>
+            </View>
+            {bucket.key === "created" ? (
+              <DeletePlanButton
+                bucket={bucket}
+                isDeleting={isDeleting}
+                onRequestDelete={onRequestDelete}
+                plan={plan}
+              />
+            ) : null}
           </View>
         </View>
         <Text numberOfLines={2} style={styles.nextUpSubtitle}>
-          {plan.subtitle}
+          {bucket.stateBody}
         </Text>
-        <View style={[styles.voteButton, styles.nextUpAction]}>
+        <Pressable
+          accessibilityLabel={`Open Needs you now Plan ${plan.title}`}
+          accessibilityRole="button"
+          onPress={() => onOpenPlan?.(plan)}
+          style={[styles.voteButton, styles.nextUpAction]}
+        >
           <Text style={[styles.voteButtonLabel, styles.nextUpActionLabel]}>
             {bucket.actionLabel}
           </Text>
-          <DashboardIcon fallback=">" name="arrow_forward" size={20} />
-        </View>
-      </Pressable>
+          <DashboardIcon
+            color={mobileTokens.color.ink}
+            fallback=">"
+            name="arrow_forward"
+            size={20}
+          />
+        </Pressable>
+      </View>
+      {pendingDelete ? (
+        <DeleteConfirmationCard
+          deleteError={deleteError}
+          isDeleting={isDeleting}
+          onConfirmDelete={onConfirmDelete}
+          onRequestDelete={onRequestDelete}
+          plan={plan}
+        />
+      ) : null}
     </View>
   );
 }
@@ -362,23 +408,10 @@ function LivePlanCard({
   pendingDelete: boolean;
   plan: PlanListItem;
 }) {
-  const isDecided = bucket.key === "decided";
-
   return (
     <View style={styles.liveCardShell}>
       <View style={styles.liveCard}>
-        <Pressable
-          accessibilityLabel={`Open ${bucket.title} Plan ${plan.title}`}
-          accessibilityRole="button"
-          onPress={() => onOpenPlan?.(plan)}
-          style={styles.liveCardOpenArea}
-        >
-          <View
-            style={[
-              styles.cardWash,
-              isDecided ? styles.secondaryCardWash : styles.primaryCardWash,
-            ]}
-          />
+        <View style={styles.liveCardOpenArea}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleGroup}>
               <Text style={styles.bucketTitle}>{bucket.title}</Text>
@@ -386,99 +419,127 @@ function LivePlanCard({
                 {plan.title}
               </Text>
             </View>
-            <View style={styles.statusChip}>
-              <View style={styles.statusDot} />
-              <Text style={styles.statusText}>{bucket.title}</Text>
+            <View style={styles.cardHeaderActions}>
+              {bucket.key === "created" ? (
+                <DeletePlanButton
+                  bucket={bucket}
+                  isDeleting={isDeleting}
+                  onRequestDelete={onRequestDelete}
+                  plan={plan}
+                />
+              ) : null}
             </View>
           </View>
 
-          {isDecided ? (
-            <View style={styles.detailStack}>
-              <Text style={styles.stateTitle}>{bucket.title}</Text>
-              <Text numberOfLines={2} style={styles.detailLine}>
-                {bucket.stateBody}
-              </Text>
-            </View>
-          ) : (
-            <>
-              <View style={styles.stateCopyStack}>
-                <Text style={styles.stateTitle}>{bucket.title}</Text>
-                <Text numberOfLines={2} style={styles.stateBody}>
-                  {bucket.stateBody}
-                </Text>
-              </View>
-              <View style={styles.voteButton}>
-                <Text style={styles.voteButtonLabel}>
-                  {bucket.actionLabel}
-                </Text>
-              </View>
-            </>
-          )}
-        </Pressable>
-
-        {bucket.key === "created" ? (
+          <Text numberOfLines={2} style={styles.stateBody}>
+            {bucket.stateBody}
+          </Text>
           <Pressable
-            accessibilityLabel={`Delete ${bucket.title} Plan ${plan.title}`}
+            accessibilityLabel={`Open ${bucket.title} Plan ${plan.title}`}
             accessibilityRole="button"
-            disabled={isDeleting}
-            hitSlop={8}
-            onPress={() => onRequestDelete(plan)}
-            style={[
-              styles.deleteIconButton,
-              isDeleting && styles.disabledAction,
-            ]}
+            onPress={() => onOpenPlan?.(plan)}
+            style={styles.voteButton}
           >
-            <DashboardIcon
-              color={mobileTokens.color.danger}
-              fallback="x"
-              name="delete"
-              size={20}
-            />
+            <Text style={styles.voteButtonLabel}>{bucket.actionLabel}</Text>
           </Pressable>
-        ) : null}
+        </View>
       </View>
 
       {pendingDelete ? (
-        <View style={styles.confirmCard}>
-          <Text style={styles.confirmTitle}>Delete {plan.title}?</Text>
-          <Text style={styles.confirmBody}>
-            This deletes the Plan and ends its active room.
-          </Text>
-          {deleteError ? (
-            <Text accessibilityRole="alert" style={styles.deleteError}>
-              {deleteError}
-            </Text>
-          ) : null}
-          <View style={styles.confirmActions}>
-            <Pressable
-              accessibilityLabel={`Keep Plan ${plan.title}`}
-              accessibilityRole="button"
-              disabled={isDeleting}
-              onPress={() => onRequestDelete(null)}
-              style={[
-                styles.confirmGhostButton,
-                isDeleting && styles.disabledAction,
-              ]}
-            >
-              <Text style={styles.confirmGhostButtonLabel}>Keep Plan</Text>
-            </Pressable>
-            <Pressable
-              accessibilityLabel={`Confirm delete Plan ${plan.title}`}
-              accessibilityRole="button"
-              disabled={isDeleting}
-              onPress={() => void onConfirmDelete(plan)}
-              style={[
-                styles.confirmDeleteButton,
-                isDeleting && styles.disabledAction,
-              ]}
-            >
-              <Text style={styles.confirmDeleteButtonLabel}>
-                {isDeleting ? "Deleting..." : "Delete Plan"}
-              </Text>
-            </Pressable>
-          </View>
-        </View>
+        <DeleteConfirmationCard
+          deleteError={deleteError}
+          isDeleting={isDeleting}
+          onConfirmDelete={onConfirmDelete}
+          onRequestDelete={onRequestDelete}
+          plan={plan}
+        />
       ) : null}
+    </View>
+  );
+}
+
+function DeletePlanButton({
+  bucket,
+  isDeleting,
+  onRequestDelete,
+  plan,
+}: {
+  bucket: LivePlanBucket;
+  isDeleting: boolean;
+  onRequestDelete: (plan: PlanListItem | null) => void;
+  plan: PlanListItem;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={`Delete ${bucket.title} Plan ${plan.title}`}
+      accessibilityRole="button"
+      disabled={isDeleting}
+      hitSlop={8}
+      onPress={() => onRequestDelete(plan)}
+      style={[styles.deleteIconButton, isDeleting && styles.disabledAction]}
+    >
+      <DashboardIcon
+        color={mobileTokens.color.danger}
+        fallback="x"
+        name="delete"
+        size={20}
+      />
+    </Pressable>
+  );
+}
+
+function DeleteConfirmationCard({
+  deleteError,
+  isDeleting,
+  onConfirmDelete,
+  onRequestDelete,
+  plan,
+}: {
+  deleteError: string | null;
+  isDeleting: boolean;
+  onConfirmDelete: (plan: PlanListItem) => Promise<void> | void;
+  onRequestDelete: (plan: PlanListItem | null) => void;
+  plan: PlanListItem;
+}) {
+  return (
+    <View style={styles.confirmCard}>
+      <Text style={styles.confirmTitle}>Delete {plan.title}?</Text>
+      <Text style={styles.confirmBody}>
+        This deletes the Plan and ends its active room.
+      </Text>
+      {deleteError ? (
+        <Text accessibilityRole="alert" style={styles.deleteError}>
+          {deleteError}
+        </Text>
+      ) : null}
+      <View style={styles.confirmActions}>
+        <Pressable
+          accessibilityLabel={`Keep Plan ${plan.title}`}
+          accessibilityRole="button"
+          disabled={isDeleting}
+          onPress={() => onRequestDelete(null)}
+          style={[
+            styles.confirmGhostButton,
+            isDeleting && styles.disabledAction,
+          ]}
+        >
+          <Text style={styles.confirmGhostButtonLabel}>Keep Plan</Text>
+        </Pressable>
+        <Pressable
+          accessibilityLabel={`Confirm delete Plan ${plan.title}`}
+          accessibilityRole="button"
+          disabled={isDeleting}
+          onPress={() => void onConfirmDelete(plan)}
+          style={[
+            styles.confirmDeleteButton,
+            isDeleting && styles.disabledAction,
+          ]}
+        >
+          <Text style={styles.confirmDeleteButtonLabel}>
+            {isDeleting ? "Deleting..." : "Delete Plan"}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -534,13 +595,10 @@ function PastPlanCard({
       onPress={() => onOpenPlan?.(plan)}
       style={styles.pastCard}
     >
-      <View style={styles.pastCardTop}>
-        <View style={styles.pastIcon}>
-          <DashboardIcon fallback="▰" name="event_note" size={18} />
-        </View>
-        <DashboardIcon fallback=">" name="chevron_right" size={22} />
+      <View style={styles.pastIcon}>
+        <DashboardIcon fallback="*" name="event_note" size={18} />
       </View>
-      <View>
+      <View style={styles.pastCardCopy}>
         <Text numberOfLines={1} style={styles.pastCardTitle}>
           {plan.title}
         </Text>
@@ -549,6 +607,12 @@ function PastPlanCard({
           {plan.subtitle}
         </Text>
       </View>
+      <DashboardIcon
+        color={mobileTokens.color.textSecondaryOnGradient}
+        fallback=">"
+        name="chevron_right"
+        size={22}
+      />
     </Pressable>
   );
 }
@@ -611,7 +675,7 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: mobileTokens.spacing[8],
-    paddingBottom: 132,
+    paddingBottom: 160,
     paddingTop: mobileTokens.spacing[10],
   },
   hero: {
@@ -671,13 +735,6 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: mobileTokens.spacing[2],
   },
-  nextUpBucket: {
-    color: mobileTokens.color.textSecondaryOnGradient,
-    fontFamily: labelFont,
-    fontSize: 12,
-    fontWeight: "500",
-    textTransform: "uppercase",
-  },
   nextUpTitle: {
     color: mobileTokens.color.paper,
     fontFamily: bodyFont,
@@ -704,22 +761,24 @@ const styles = StyleSheet.create({
   section: {
     gap: mobileTokens.spacing[2],
   },
-  liveTitle: {
-    color: mobileTokens.color.gold,
-    fontFamily: dashboardFont,
-    fontSize: mobileTokens.typography.headline.size,
-    fontWeight: mobileTokens.typography.headline.weight,
-    lineHeight: mobileTokens.typography.headline.lineHeight,
+  sectionLabel: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: labelFont,
+    fontSize: mobileTokens.typography.eyebrow.size,
+    fontWeight: mobileTokens.typography.eyebrow.weight,
+    lineHeight: 16,
+    textTransform: "uppercase",
+  },
+  sectionLabelInset: {
     paddingHorizontal: mobileTokens.spacing[5],
   },
-  liveRail: {
+  liveList: {
     gap: mobileTokens.spacing[4],
-    paddingBottom: mobileTokens.spacing[2],
     paddingHorizontal: mobileTokens.spacing[5],
   },
   liveCardShell: {
     gap: mobileTokens.spacing[3],
-    width: 294,
+    width: "100%",
   },
   liveCard: {
     backgroundColor: mobileTokens.color.surfaceContainerLow,
@@ -727,33 +786,21 @@ const styles = StyleSheet.create({
     borderRadius: mobileTokens.radius.default,
     borderTopColor: mobileTokens.color.glassTop,
     borderWidth: 1,
-    minHeight: 200,
-    overflow: "hidden",
-    position: "relative",
+    minHeight: 168,
   },
   liveCardOpenArea: {
     gap: mobileTokens.spacing[4],
-    minHeight: 200,
+    minHeight: 168,
     padding: mobileTokens.spacing[4],
-  },
-  cardWash: {
-    borderBottomLeftRadius: 128,
-    height: 128,
-    position: "absolute",
-    right: 0,
-    top: 0,
-    width: 128,
-  },
-  primaryCardWash: {
-    backgroundColor: "rgba(212, 175, 55, 0.10)",
-  },
-  secondaryCardWash: {
-    backgroundColor: "rgba(255, 183, 123, 0.10)",
   },
   cardHeader: {
     flexDirection: "row",
     gap: mobileTokens.spacing[3],
     justifyContent: "space-between",
+  },
+  cardHeaderActions: {
+    alignItems: "flex-end",
+    gap: mobileTokens.spacing[2],
   },
   cardTitleGroup: {
     flex: 1,
@@ -805,21 +852,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
-    position: "absolute",
-    right: mobileTokens.spacing[4],
-    top: 58,
     width: 44,
-    zIndex: 1,
-  },
-  stateCopyStack: {
-    gap: mobileTokens.spacing[2],
-    marginTop: mobileTokens.spacing[3],
-  },
-  stateTitle: {
-    color: mobileTokens.color.paper,
-    fontFamily: labelFont,
-    fontSize: 14,
-    fontWeight: "700",
   },
   stateBody: {
     color: mobileTokens.color.textSecondaryOnGradient,
@@ -834,6 +867,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginTop: "auto",
     minHeight: 40,
+    paddingHorizontal: mobileTokens.spacing[4],
   },
   voteButtonLabel: {
     color: mobileTokens.color.ink,
@@ -841,82 +875,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
   },
-  detailStack: {
-    gap: mobileTokens.spacing[3],
-    marginTop: "auto",
-  },
-  detailLine: {
-    color: mobileTokens.color.textSecondaryOnGradient,
-    fontFamily: bodyFont,
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  createCard: {
-    alignItems: "center",
-    backgroundColor: mobileTokens.color.surfaceContainerLow,
-    borderColor: mobileTokens.color.copper,
-    borderRadius: mobileTokens.radius.default,
-    borderWidth: 1,
-    gap: mobileTokens.spacing[3],
-    justifyContent: "center",
-    minHeight: 200,
-    padding: mobileTokens.spacing[4],
-    width: 160,
-  },
-  createIcon: {
-    alignItems: "center",
-    backgroundColor: "transparent",
-    borderColor: mobileTokens.color.copper,
-    borderRadius: mobileTokens.radius.full,
-    borderWidth: 1,
-    height: 48,
-    justifyContent: "center",
-    width: 48,
-  },
-  createIconLabel: {
-    color: mobileTokens.color.gold,
-    fontFamily: bodyFont,
-    fontSize: 28,
-  },
-  createTitle: {
-    color: mobileTokens.color.copper,
-    fontFamily: bodyFont,
-    fontSize: 20,
-    fontWeight: "600",
-    lineHeight: 28,
-    textAlign: "center",
-  },
   pastSection: {
     gap: mobileTokens.spacing[4],
     paddingHorizontal: mobileTokens.spacing[5],
   },
-  pastTitle: {
-    color: mobileTokens.color.paper,
-    fontFamily: dashboardFont,
-    fontSize: mobileTokens.typography.headline.size,
-    fontWeight: mobileTokens.typography.headline.weight,
-    lineHeight: mobileTokens.typography.headline.lineHeight,
-  },
-  pastGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  pastList: {
     gap: mobileTokens.spacing[3],
   },
   pastCard: {
+    alignItems: "center",
     backgroundColor: mobileTokens.color.surfaceContainerLow,
     borderColor: mobileTokens.color.glassStroke,
     borderRadius: mobileTokens.radius.default,
     borderTopColor: mobileTokens.color.glassTop,
     borderWidth: 1,
-    gap: mobileTokens.spacing[3],
-    minHeight: 104,
-    padding: mobileTokens.spacing[3],
-    width: "48%",
-  },
-  pastCardTop: {
-    alignItems: "center",
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: mobileTokens.spacing[3],
+    minHeight: 88,
+    padding: mobileTokens.spacing[3],
   },
   pastIcon: {
     alignItems: "center",
@@ -927,6 +903,10 @@ const styles = StyleSheet.create({
     height: 32,
     justifyContent: "center",
     width: 32,
+  },
+  pastCardCopy: {
+    flex: 1,
+    gap: 2,
   },
   pastCardTitle: {
     color: mobileTokens.color.paper,
@@ -1075,8 +1055,7 @@ const styles = StyleSheet.create({
     gap: mobileTokens.spacing[2],
     justifyContent: "center",
     minHeight: 44,
-    minWidth: 160,
-    paddingHorizontal: mobileTokens.spacing[4],
+    paddingHorizontal: mobileTokens.spacing[3],
   },
   startPlanButtonLabel: {
     color: mobileTokens.color.ink,
