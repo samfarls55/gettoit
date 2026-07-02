@@ -17,17 +17,31 @@ import type {
 } from "./planRepository";
 import { hasPlans } from "./planRepository";
 
+type PlanBucketKey = keyof PlanListSnapshot;
+type LivePlanBucketKey = Exclude<PlanBucketKey, "history">;
+
 type PlanBucket = {
-  key: keyof PlanListSnapshot;
+  key: PlanBucketKey;
   title: string;
 };
 
-type PlanBucketWithPlans = PlanBucket & {
+type LivePlanBucket = {
+  key: LivePlanBucketKey;
+  title: string;
+};
+
+type LivePlanBucketCopy = {
+  actionLabel: string;
+  stateBody: string;
+  stateTitle: string;
+};
+
+type PlanBucketWithPlans = LivePlanBucket & {
   plans: PlanListItem[];
 };
 
 type NextUpPlan = {
-  bucket: PlanBucket;
+  bucket: LivePlanBucket;
   plan: PlanListItem;
 };
 
@@ -43,11 +57,29 @@ type PlanListScreenProps = {
 const avatarUri =
   "https://lh3.googleusercontent.com/aida-public/AB6AXuB4NvCz-ozIWJU7CwGn1cPLKTB43XheUlbFFiwpeUSpz8Taqn7yz6CQksaWf4rJBOySVc3aHw5JxLmj9m-65SRAZwqtxa2-OxK_ca4fqnnC7OW2DZMik90bR_WzgHdvefPS9JRZuzy7dNkYIUmvjd2mdc8Dx5N9PqxU-8bUalxH0q1y4y1_2-uZjXLaItL7sJTatwEliCKD_TX2qifg0HsH19i_en7GD5CfAJB9iiO8Gvbmo1v3lVy1Mw";
 
-const livePlanBuckets: PlanBucket[] = [
+const livePlanBuckets: LivePlanBucket[] = [
   { key: "created", title: "Created" },
   { key: "joined", title: "Joined" },
   { key: "decided", title: "Decided" },
 ];
+
+const livePlanCopyByBucket: Record<LivePlanBucketKey, LivePlanBucketCopy> = {
+  created: {
+    actionLabel: "Finish setup",
+    stateBody: "Finish setup, then invite the group.",
+    stateTitle: "Needs setup",
+  },
+  joined: {
+    actionLabel: "Answer quiz",
+    stateBody: "Answer the quiz or check whether the group is waiting.",
+    stateTitle: "Quiz open",
+  },
+  decided: {
+    actionLabel: "Open Plan",
+    stateBody: "Open the live verdict.",
+    stateTitle: "Pick ready",
+  },
+};
 
 const pastPlanBucket: PlanBucket = { key: "history", title: "History" };
 const materialIconFont = "Material Symbols Outlined";
@@ -263,11 +295,11 @@ function NextUpPlanCard({
   onOpenPlan,
   plan,
 }: {
-  bucket: PlanBucket;
+  bucket: LivePlanBucket;
   onOpenPlan?: (plan: PlanListItem) => void;
   plan: PlanListItem;
 }) {
-  const actionLabel = actionLabelFor(bucket);
+  const bucketCopy = livePlanCopyByBucket[bucket.key];
 
   return (
     <View style={styles.nextUpSection}>
@@ -295,7 +327,7 @@ function NextUpPlanCard({
         </Text>
         <View style={[styles.voteButton, styles.nextUpAction]}>
           <Text style={[styles.voteButtonLabel, styles.nextUpActionLabel]}>
-            {actionLabel}
+            {bucketCopy.actionLabel}
           </Text>
           <DashboardIcon fallback=">" name="arrow_forward" size={20} />
         </View>
@@ -314,7 +346,7 @@ function LivePlanCard({
   pendingDelete,
   plan,
 }: {
-  bucket: PlanBucket;
+  bucket: LivePlanBucket;
   deleteError: string | null;
   isDeleting: boolean;
   onConfirmDelete: (plan: PlanListItem) => Promise<void> | void;
@@ -324,8 +356,7 @@ function LivePlanCard({
   plan: PlanListItem;
 }) {
   const isDecided = bucket.key === "decided";
-  const actionLabel = actionLabelFor(bucket);
-  const stateCopy = stateCopyFor(bucket);
+  const bucketCopy = livePlanCopyByBucket[bucket.key];
 
   return (
     <View style={styles.liveCardShell}>
@@ -357,21 +388,23 @@ function LivePlanCard({
 
           {isDecided ? (
             <View style={styles.detailStack}>
-              <Text style={styles.stateTitle}>{stateCopy.title}</Text>
+              <Text style={styles.stateTitle}>{bucketCopy.stateTitle}</Text>
               <Text numberOfLines={2} style={styles.detailLine}>
-                {stateCopy.body}
+                {bucketCopy.stateBody}
               </Text>
             </View>
           ) : (
             <>
               <View style={styles.stateCopyStack}>
-                <Text style={styles.stateTitle}>{stateCopy.title}</Text>
+                <Text style={styles.stateTitle}>{bucketCopy.stateTitle}</Text>
                 <Text numberOfLines={2} style={styles.stateBody}>
-                  {stateCopy.body}
+                  {bucketCopy.stateBody}
                 </Text>
               </View>
               <View style={styles.voteButton}>
-                <Text style={styles.voteButtonLabel}>{actionLabel}</Text>
+                <Text style={styles.voteButtonLabel}>
+                  {bucketCopy.actionLabel}
+                </Text>
               </View>
             </>
           )}
@@ -442,39 +475,6 @@ function LivePlanCard({
       ) : null}
     </View>
   );
-}
-
-function actionLabelFor(bucket: PlanBucket) {
-  if (bucket.key === "created") {
-    return "Finish setup";
-  }
-
-  if (bucket.key === "joined") {
-    return "Answer quiz";
-  }
-
-  return "Open Plan";
-}
-
-function stateCopyFor(bucket: PlanBucket) {
-  if (bucket.key === "created") {
-    return {
-      title: "Needs setup",
-      body: "Finish setup, then invite the group.",
-    };
-  }
-
-  if (bucket.key === "joined") {
-    return {
-      title: "Quiz open",
-      body: "Answer the quiz or check whether the group is waiting.",
-    };
-  }
-
-  return {
-    title: "Pick ready",
-    body: "Open the live verdict.",
-  };
 }
 
 function getNextUpPlan(liveBuckets: PlanBucketWithPlans[]): NextUpPlan | null {

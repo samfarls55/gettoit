@@ -137,14 +137,16 @@ describe("PlanListScreen on web", () => {
       plans: mixedPlanList,
     });
 
-    const exactTextNodes = Array.from(
-      container.querySelectorAll("span, div"),
-      (element) => element.textContent,
+    const renderedElementTexts = new Set(
+      Array.from(
+        container.querySelectorAll("span, div"),
+        (element) => element.textContent,
+      ),
     );
 
-    expect(exactTextNodes).not.toContain("A");
-    expect(exactTextNodes).not.toContain("M");
-    expect(exactTextNodes).not.toContain("+3");
+    expect(renderedElementTexts).not.toContain("A");
+    expect(renderedElementTexts).not.toContain("M");
+    expect(renderedElementTexts).not.toContain("+3");
     expect(container.textContent).toContain(
       "Finish setup, then invite the group.",
     );
