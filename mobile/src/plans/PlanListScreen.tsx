@@ -172,8 +172,17 @@ export function PlanListScreen({
           />
         </Pressable>
         <Text style={styles.brand}>GetToIt</Text>
-        <View style={styles.avatarButton}>
-          <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+        <View
+          accessibilityLabel="Account avatar"
+          accessibilityRole="image"
+          style={styles.avatarButton}
+        >
+          <Image
+            accessibilityElementsHidden
+            importantForAccessibility="no"
+            source={{ uri: avatarUri }}
+            style={styles.avatarImage}
+          />
         </View>
       </View>
 
@@ -201,6 +210,7 @@ export function PlanListScreen({
         <View style={styles.section}>
           <Text style={styles.liveTitle}>Plans in motion</Text>
           <ScrollView
+            accessibilityLabel="Plans in motion secondary browsing"
             contentContainerStyle={styles.liveRail}
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -265,7 +275,13 @@ export function PlanListScreen({
       </ScrollView>
 
       <View style={styles.bottomActions}>
-        <View style={styles.bottomActionCopy}>
+        <View
+          aria-selected
+          accessibilityLabel="Plans current section"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: true }}
+          style={styles.bottomActionCopy}
+        >
           <Text style={styles.bottomActionEyebrow}>Plans</Text>
           <Text style={styles.bottomActionTitle}>Ready when you are.</Text>
         </View>
@@ -562,9 +578,9 @@ const styles = StyleSheet.create({
   iconButton: {
     alignItems: "center",
     gap: 4,
-    height: 40,
+    height: 44,
     justifyContent: "center",
-    width: 40,
+    width: 44,
   },
   iconGlyph: {
     fontFamily: isWeb ? materialIconFont : dashboardFont,
@@ -581,10 +597,10 @@ const styles = StyleSheet.create({
   avatarButton: {
     alignItems: "center",
     borderRadius: mobileTokens.radius.full,
-    height: 40,
+    height: 44,
     justifyContent: "center",
     overflow: "hidden",
-    width: 40,
+    width: 44,
   },
   avatarImage: {
     height: 40,

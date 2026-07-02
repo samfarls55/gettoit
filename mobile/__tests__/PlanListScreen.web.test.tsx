@@ -87,6 +87,16 @@ async function renderPlanListScreen(
   };
 }
 
+function getRequiredElement(container: Element, selector: string) {
+  const element = container.querySelector<HTMLElement>(selector);
+
+  if (!element) {
+    throw new Error(`Expected element matching selector: ${selector}`);
+  }
+
+  return element;
+}
+
 describe("PlanListScreen on web", () => {
   beforeAll(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -219,6 +229,55 @@ describe("PlanListScreen on web", () => {
       2,
       planListWithLegacyBadges.history[0],
     );
+
+    await unmount();
+  });
+
+  it("exposes mobile dashboard accessibility affordances", async () => {
+    const onOpenPlan = jest.fn();
+    const { container, unmount } = await renderPlanListScreen({
+      onOpenPlan,
+      plans: mixedPlanList,
+    });
+
+    const settingsButton = getRequiredElement(
+      container,
+      '[aria-label="Open Settings"]',
+    );
+    const accountAvatar = getRequiredElement(
+      container,
+      '[aria-label="Account avatar"]',
+    );
+    const currentPlansTab = getRequiredElement(
+      container,
+      '[aria-label="Plans current section"]',
+    );
+    const plansInMotionRail = getRequiredElement(
+      container,
+      '[aria-label="Plans in motion secondary browsing"]',
+    );
+    const nextUpButton = getRequiredElement(
+      container,
+      '[aria-label="Open Needs you now Plan Brunch plan"]',
+    );
+
+    expect(getComputedStyle(settingsButton).width).toBe("44px");
+    expect(getComputedStyle(settingsButton).height).toBe("44px");
+    expect(accountAvatar.getAttribute("role")).toBe("img");
+    expect(currentPlansTab.getAttribute("aria-selected")).toBe("true");
+    expect(plansInMotionRail).toBeDefined();
+    expect(nextUpButton.getAttribute("tabindex")).toBe("0");
+
+    await act(async () => {
+      nextUpButton.focus();
+    });
+    expect(document.activeElement).toBe(nextUpButton);
+
+    await act(async () => {
+      nextUpButton.click();
+    });
+
+    expect(onOpenPlan).toHaveBeenCalledWith(mixedPlanList.created[0]);
 
     await unmount();
   });
