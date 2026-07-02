@@ -222,4 +222,49 @@ describe("PlanListScreen on web", () => {
 
     await unmount();
   });
+
+  it("exposes mobile dashboard accessibility affordances", async () => {
+    const onOpenPlan = jest.fn();
+    const { container, unmount } = await renderPlanListScreen({
+      onOpenPlan,
+      plans: mixedPlanList,
+    });
+
+    const settingsButton = container.querySelector<HTMLElement>(
+      '[aria-label="Open Settings"]',
+    );
+    const accountAvatar = container.querySelector<HTMLElement>(
+      '[aria-label="Account avatar"]',
+    );
+    const currentPlansSection = container.querySelector<HTMLElement>(
+      '[aria-label="Plans current section"]',
+    );
+    const secondaryPlanRail = container.querySelector<HTMLElement>(
+      '[aria-label="Plans in motion secondary browsing"]',
+    );
+    const nextUpButton = container.querySelector<HTMLElement>(
+      '[aria-label="Open Needs you now Plan Brunch plan"]',
+    );
+
+    expect(settingsButton).not.toBeNull();
+    expect(getComputedStyle(settingsButton as Element).width).toBe("44px");
+    expect(getComputedStyle(settingsButton as Element).height).toBe("44px");
+    expect(accountAvatar?.getAttribute("role")).toBe("img");
+    expect(currentPlansSection?.getAttribute("aria-selected")).toBe("true");
+    expect(secondaryPlanRail).not.toBeNull();
+    expect(nextUpButton?.getAttribute("tabindex")).toBe("0");
+
+    await act(async () => {
+      nextUpButton?.focus();
+    });
+    expect(document.activeElement).toBe(nextUpButton);
+
+    await act(async () => {
+      nextUpButton?.click();
+    });
+
+    expect(onOpenPlan).toHaveBeenCalledWith(mixedPlanList.created[0]);
+
+    await unmount();
+  });
 });
