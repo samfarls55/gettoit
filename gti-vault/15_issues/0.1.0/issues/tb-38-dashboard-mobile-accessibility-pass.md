@@ -1,5 +1,5 @@
 ---
-status: ready-for-agent
+status: done
 type: AFK
 github_issue: 378
 ---
@@ -14,14 +14,18 @@ Required design skill: invoke `$impeccable audit app dashboard page` before impl
 
 ## Acceptance criteria
 
-- [ ] Top dashboard controls meet the 44pt target-size baseline or have an equivalent hit target.
-- [ ] The active dashboard navigation/control exposes selected/current state where applicable.
-- [ ] The account/avatar visual is either a real accessible action or a non-interactive image with appropriate semantics.
-- [ ] Horizontal Plan browsing remains usable with keyboard/web and assistive technology, or the dashboard no longer depends on horizontal browsing for primary action.
-- [ ] Focus and accessibility assertions are covered by the smallest relevant mobile/web tests.
-- [ ] The AFK handoff or PR notes name the `$impeccable audit app dashboard page` invocation and its main finding.
+- [x] Top dashboard controls meet the 44pt target-size baseline or have an equivalent hit target.
+- [x] The active dashboard navigation/control exposes selected/current state where applicable.
+- [x] The account/avatar visual is either a real accessible action or a non-interactive image with appropriate semantics.
+- [x] Horizontal Plan browsing remains usable with keyboard/web and assistive technology, or the dashboard no longer depends on horizontal browsing for primary action.
+- [x] Focus and accessibility assertions are covered by the smallest relevant mobile/web tests.
+- [x] The AFK handoff or PR notes name the `$impeccable audit app dashboard page` invocation and its main finding.
 
 ## Blocked by
 
 - [#374](https://github.com/samfarls55/gettoit/issues/374) - TB-34: Dashboard Next Up primary path.
 - [#375](https://github.com/samfarls55/gettoit/issues/375) - TB-36: Dashboard real bottom actions.
+
+## Comments
+
+- 2026-07-02: Completed by Sandcastle and salvaged into `main` commit `838df8a`. Verified with `npm run mobile:verify` and `npx react-doctor@latest --verbose --scope changed` (100/100). GitHub issue #378 closed.
