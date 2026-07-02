@@ -101,6 +101,7 @@ export function PlanListScreen({
     ),
   }));
   const pastPlans = plans.history;
+  const handleCreateGroupPlan = () => onCreatePlan?.("group");
 
   const handleConfirmDelete = async (plan: PlanListItem) => {
     setDeleteError(null);
@@ -181,7 +182,7 @@ export function PlanListScreen({
             <Pressable
               accessibilityLabel="Create group Plan"
               accessibilityRole="button"
-              onPress={() => onCreatePlan?.("group")}
+              onPress={handleCreateGroupPlan}
               style={styles.createCard}
             >
               <View style={styles.createIcon}>
@@ -228,7 +229,7 @@ export function PlanListScreen({
         <Pressable
           accessibilityLabel="Start a group Plan"
           accessibilityRole="button"
-          onPress={() => onCreatePlan?.("group")}
+          onPress={handleCreateGroupPlan}
           style={styles.startPlanButton}
         >
           <DashboardIcon fallback="+" name="add" size={20} />

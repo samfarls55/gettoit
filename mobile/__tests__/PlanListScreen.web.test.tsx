@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 
-import { act } from "react";
+import { act, type ComponentProps } from "react";
 
 import type { PlanListSnapshot } from "../src/plans/planRepository";
 import { emptyPlanListSnapshot } from "../src/plans/planRepository";
@@ -29,8 +29,34 @@ const createdPlanList: PlanListSnapshot = {
   ],
 };
 
+async function renderPlanListScreen(
+  props: ComponentProps<typeof PlanListScreen>,
+) {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+
+  document.body.appendChild(container);
+
+  await act(async () => {
+    root.render(<PlanListScreen {...props} />);
+  });
+
+  return {
+    container,
+    async unmount() {
+      await act(async () => {
+        root.unmount();
+      });
+      container.remove();
+    },
+  };
+}
+
 describe("PlanListScreen on web", () => {
   beforeAll(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+      true;
+
     Object.defineProperty(globalThis, "fetch", {
       configurable: true,
       value: jest.fn(),
@@ -38,16 +64,8 @@ describe("PlanListScreen on web", () => {
   });
 
   it("does not nest the Created delete action inside the open-card button", async () => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-      true;
-
-    const container = document.createElement("div");
-    const root = createRoot(container);
-
-    document.body.appendChild(container);
-
-    await act(async () => {
-      root.render(<PlanListScreen plans={createdPlanList} />);
+    const { container, unmount } = await renderPlanListScreen({
+      plans: createdPlanList,
     });
 
     expect(
@@ -66,34 +84,19 @@ describe("PlanListScreen on web", () => {
       container.querySelector('[aria-label="Groups unavailable"]'),
     ).toBeNull();
 
-    await act(async () => {
-      root.unmount();
-    });
-    container.remove();
+    await unmount();
   });
 
   it("keeps Start Plan reachable in the bottom action area", async () => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
-      true;
-
-    const container = document.createElement("div");
-    const root = createRoot(container);
     const onCreatePlan = jest.fn();
-
-    document.body.appendChild(container);
-
-    await act(async () => {
-      root.render(
-        <PlanListScreen
-          onCreatePlan={onCreatePlan}
-          plans={emptyPlanListSnapshot}
-        />,
-      );
+    const { container, unmount } = await renderPlanListScreen({
+      onCreatePlan,
+      plans: emptyPlanListSnapshot,
     });
 
-    const startPlanButton = container.querySelector(
+    const startPlanButton = container.querySelector<HTMLElement>(
       '[aria-label="Start a group Plan"]',
-    ) as HTMLButtonElement | null;
+    );
 
     expect(startPlanButton).not.toBeNull();
     expect(startPlanButton?.getAttribute("aria-disabled")).toBeNull();
@@ -104,9 +107,6 @@ describe("PlanListScreen on web", () => {
 
     expect(onCreatePlan).toHaveBeenCalledWith("group");
 
-    await act(async () => {
-      root.unmount();
-    });
-    container.remove();
+    await unmount();
   });
 });
