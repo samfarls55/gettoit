@@ -209,6 +209,27 @@ function makeEmptyPlanRepository(): PlanRepository {
   };
 }
 
+function makeHistoryOnlyPlanRepository(): PlanRepository {
+  return {
+    listPlans: async () => ({
+      ...emptyPlanListSnapshot,
+      history: [
+        {
+          id: "history-noodles",
+          roomId: "room-history-noodles",
+          title: "Noodle crawl",
+          subtitle: "Closed verdict",
+          badge: "History",
+          routeTarget: "history",
+        },
+      ],
+    }),
+    savePlan: jest.fn(),
+    launchPlan: jest.fn(),
+    deletePlan: jest.fn(),
+  };
+}
+
 function makeAuthBoundary(overrides = {}) {
   return {
     deleteCurrentAccount: jest.fn().mockResolvedValue(undefined),
@@ -606,7 +627,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(nativePlanRepository.listPlans).toHaveBeenCalledTimes(1);
-      expect(screen.getByText("Runtime dinner")).toBeOnTheScreen();
+      expect(screen.getAllByText("Runtime dinner").length).toBeGreaterThan(0);
     });
 
   });
@@ -714,16 +735,58 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Brunch plan")).toBeOnTheScreen();
+      expect(screen.getAllByText("Brunch plan").length).toBeGreaterThan(0);
     });
 
-    expect(screen.getAllByText("Created")).toHaveLength(2);
+    expect(screen.getAllByText("Created")).toHaveLength(4);
     expect(screen.getAllByText("Joined")).toHaveLength(2);
     expect(screen.getAllByText("Decided")).toHaveLength(2);
     expect(screen.getAllByText("History")).toHaveLength(1);
     expect(screen.getByText("Birthday dinner")).toBeOnTheScreen();
     expect(screen.getByText("Sushi night")).toBeOnTheScreen();
     expect(screen.getByText("Noodle crawl")).toBeOnTheScreen();
+  });
+
+  it("promotes the highest-priority actionable Plan as Next up", async () => {
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeRoutedPlanRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Open Next up Plan Brunch plan"),
+      ).toBeOnTheScreen();
+    });
+
+    expect(screen.getByText("Next up")).toBeOnTheScreen();
+    expect(screen.getAllByText("Finish setup").length).toBeGreaterThan(0);
+    expect(
+      screen.queryByLabelText("Open Next up Plan Birthday dinner"),
+    ).toBeNull();
+
+    fireEvent.press(screen.getByLabelText("Open Next up Plan Brunch plan"));
+
+    expect(screen.getByText("Edit your plan")).toBeOnTheScreen();
+    expect(screen.getByDisplayValue("Brunch plan")).toBeOnTheScreen();
+  });
+
+  it("keeps history-only dashboards focused on starting a new Plan", async () => {
+    render(
+      <App
+        initialRouterState={linkedApplePlanListState}
+        planRepository={makeHistoryOnlyPlanRepository()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Noodle crawl")).toBeOnTheScreen();
+    });
+
+    expect(screen.queryByText("Next up")).toBeNull();
+    expect(screen.getByLabelText("Create group Plan")).toBeOnTheScreen();
   });
 
   it("deletes a Created Plan after confirmation and keeps joined Plans", async () => {
@@ -737,7 +800,7 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Brunch plan")).toBeOnTheScreen();
+      expect(screen.getAllByText("Brunch plan").length).toBeGreaterThan(0);
     });
 
     fireEvent.press(screen.getByLabelText("Delete Created Plan Brunch plan"));
@@ -753,7 +816,7 @@ describe("App", () => {
         planId: "pending-brunch",
       });
       expect(screen.queryByLabelText("Open Created Plan Brunch plan")).toBeNull();
-      expect(screen.getByText("Morgan's birthday")).toBeOnTheScreen();
+      expect(screen.getAllByText("Morgan's birthday").length).toBeGreaterThan(0);
       expect(screen.getByText("Plan deleted.")).toBeOnTheScreen();
     });
   });

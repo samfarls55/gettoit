@@ -100,6 +100,16 @@ export function PlanListScreen({
       (plan) => !locallyDeletedCreatedPlanIds.has(plan.id),
     ),
   }));
+  const nextUp = liveBuckets.reduce<{
+    bucket: PlanBucket;
+    plan: PlanListItem;
+  } | null>((selectedPlan, bucket) => {
+    if (selectedPlan || bucket.plans.length === 0) {
+      return selectedPlan;
+    }
+
+    return { bucket, plan: bucket.plans[0] };
+  }, null);
   const pastPlans = plans.history;
 
   const handleConfirmDelete = async (plan: PlanListItem) => {
@@ -153,6 +163,14 @@ export function PlanListScreen({
         </View>
 
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+
+        {nextUp ? (
+          <NextUpPlanCard
+            bucket={nextUp.bucket}
+            onOpenPlan={onOpenPlan}
+            plan={nextUp.plan}
+          />
+        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.liveTitle}>Live Plans</Text>
@@ -259,6 +277,50 @@ export function PlanListScreen({
           <Text style={styles.navLabel}>Profile</Text>
         </View>
       </View>
+    </View>
+  );
+}
+
+function NextUpPlanCard({
+  bucket,
+  onOpenPlan,
+  plan,
+}: {
+  bucket: PlanBucket;
+  onOpenPlan?: (plan: PlanListItem) => void;
+  plan: PlanListItem;
+}) {
+  const actionLabel = actionLabelFor(bucket);
+
+  return (
+    <View style={styles.nextUpSection}>
+      <Text style={styles.nextUpEyebrow}>Next up</Text>
+      <Pressable
+        accessibilityLabel={`Open Next up Plan ${plan.title}`}
+        accessibilityRole="button"
+        onPress={() => onOpenPlan?.(plan)}
+        style={styles.nextUpCard}
+      >
+        <View style={styles.nextUpHeader}>
+          <View style={styles.nextUpTitleGroup}>
+            <Text style={styles.nextUpBucket}>{bucket.title}</Text>
+            <Text numberOfLines={2} style={styles.nextUpTitle}>
+              {plan.title}
+            </Text>
+          </View>
+          <View style={styles.statusChip}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>{plan.badge}</Text>
+          </View>
+        </View>
+        <Text numberOfLines={2} style={styles.nextUpSubtitle}>
+          {plan.subtitle}
+        </Text>
+        <View style={styles.nextUpAction}>
+          <Text style={styles.nextUpActionLabel}>{actionLabel}</Text>
+          <DashboardIcon fallback=">" name="arrow_forward" size={20} />
+        </View>
+      </Pressable>
     </View>
   );
 }
@@ -575,6 +637,74 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginHorizontal: mobileTokens.spacing[5],
     padding: mobileTokens.spacing[3],
+  },
+  nextUpSection: {
+    gap: mobileTokens.spacing[3],
+    paddingHorizontal: mobileTokens.spacing[5],
+  },
+  nextUpEyebrow: {
+    color: mobileTokens.color.gold,
+    fontFamily: labelFont,
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0,
+    textTransform: "uppercase",
+  },
+  nextUpCard: {
+    backgroundColor: mobileTokens.color.surfaceContainerLow,
+    borderColor: mobileTokens.color.gold,
+    borderRadius: mobileTokens.radius.xl,
+    borderWidth: 1,
+    gap: mobileTokens.spacing[4],
+    minHeight: 184,
+    padding: mobileTokens.spacing[5],
+  },
+  nextUpHeader: {
+    flexDirection: "row",
+    gap: mobileTokens.spacing[3],
+    justifyContent: "space-between",
+  },
+  nextUpTitleGroup: {
+    flex: 1,
+    gap: mobileTokens.spacing[2],
+  },
+  nextUpBucket: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: labelFont,
+    fontSize: 12,
+    fontWeight: "500",
+    textTransform: "uppercase",
+  },
+  nextUpTitle: {
+    color: mobileTokens.color.paper,
+    fontFamily: bodyFont,
+    fontSize: 24,
+    fontWeight: "800",
+    lineHeight: 30,
+  },
+  nextUpSubtitle: {
+    color: mobileTokens.color.textSecondaryOnGradient,
+    fontFamily: bodyFont,
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  nextUpAction: {
+    alignItems: "center",
+    alignSelf: "stretch",
+    backgroundColor: "#554500",
+    borderRadius: mobileTokens.radius.lg,
+    flexDirection: "row",
+    gap: mobileTokens.spacing[2],
+    justifyContent: "center",
+    marginTop: "auto",
+    minHeight: 48,
+    paddingHorizontal: mobileTokens.spacing[4],
+  },
+  nextUpActionLabel: {
+    color: "#F4E098",
+    fontFamily: labelFont,
+    fontSize: 14,
+    fontWeight: "800",
   },
   section: {
     gap: mobileTokens.spacing[2],
