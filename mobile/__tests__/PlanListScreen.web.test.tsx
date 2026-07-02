@@ -59,11 +59,50 @@ describe("PlanListScreen on web", () => {
     expect(container.querySelector("button button")).toBeNull();
     expect(container.textContent).toContain("Finish setup");
     expect(container.textContent).not.toContain("Vote Now");
+    expect(container.textContent).not.toContain("Groups");
+    expect(container.textContent).not.toContain("Activity");
+    expect(container.textContent).not.toContain("Profile");
     expect(
-      container.querySelector(
-        '[aria-label="Groups unavailable"][aria-disabled="true"]',
-      ),
-    ).not.toBeNull();
+      container.querySelector('[aria-label="Groups unavailable"]'),
+    ).toBeNull();
+
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("keeps Start Plan reachable in the bottom action area", async () => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
+      true;
+
+    const container = document.createElement("div");
+    const root = createRoot(container);
+    const onCreatePlan = jest.fn();
+
+    document.body.appendChild(container);
+
+    await act(async () => {
+      root.render(
+        <PlanListScreen
+          onCreatePlan={onCreatePlan}
+          plans={emptyPlanListSnapshot}
+        />,
+      );
+    });
+
+    const startPlanButton = container.querySelector(
+      '[aria-label="Start a group Plan"]',
+    ) as HTMLButtonElement | null;
+
+    expect(startPlanButton).not.toBeNull();
+    expect(startPlanButton?.getAttribute("aria-disabled")).toBeNull();
+
+    await act(async () => {
+      startPlanButton?.click();
+    });
+
+    expect(onCreatePlan).toHaveBeenCalledWith("group");
 
     await act(async () => {
       root.unmount();
