@@ -22,6 +22,15 @@ type PlanBucket = {
   title: string;
 };
 
+type PlanBucketWithPlans = PlanBucket & {
+  plans: PlanListItem[];
+};
+
+type NextUpPlan = {
+  bucket: PlanBucket;
+  plan: PlanListItem;
+};
+
 type PlanListScreenProps = {
   plans: PlanListSnapshot;
   notice?: string | null;
@@ -100,16 +109,7 @@ export function PlanListScreen({
       (plan) => !locallyDeletedCreatedPlanIds.has(plan.id),
     ),
   }));
-  const nextUp = liveBuckets.reduce<{
-    bucket: PlanBucket;
-    plan: PlanListItem;
-  } | null>((selectedPlan, bucket) => {
-    if (selectedPlan || bucket.plans.length === 0) {
-      return selectedPlan;
-    }
-
-    return { bucket, plan: bucket.plans[0] };
-  }, null);
+  const nextUp = getNextUpPlan(liveBuckets);
   const pastPlans = plans.history;
 
   const handleConfirmDelete = async (plan: PlanListItem) => {
@@ -316,8 +316,10 @@ function NextUpPlanCard({
         <Text numberOfLines={2} style={styles.nextUpSubtitle}>
           {plan.subtitle}
         </Text>
-        <View style={styles.nextUpAction}>
-          <Text style={styles.nextUpActionLabel}>{actionLabel}</Text>
+        <View style={[styles.voteButton, styles.nextUpAction]}>
+          <Text style={[styles.voteButtonLabel, styles.nextUpActionLabel]}>
+            {actionLabel}
+          </Text>
           <DashboardIcon fallback=">" name="arrow_forward" size={20} />
         </View>
       </Pressable>
@@ -475,6 +477,16 @@ function actionLabelFor(bucket: PlanBucket) {
   }
 
   return "Open Plan";
+}
+
+function getNextUpPlan(liveBuckets: PlanBucketWithPlans[]): NextUpPlan | null {
+  const bucket = liveBuckets.find((planBucket) => planBucket.plans.length > 0);
+
+  if (!bucket) {
+    return null;
+  }
+
+  return { bucket, plan: bucket.plans[0] };
 }
 
 function Avatar({ label, tone }: { label: string; tone: "gold" | "copper" }) {
@@ -689,21 +701,13 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   nextUpAction: {
-    alignItems: "center",
     alignSelf: "stretch",
-    backgroundColor: "#554500",
-    borderRadius: mobileTokens.radius.lg,
     flexDirection: "row",
     gap: mobileTokens.spacing[2],
-    justifyContent: "center",
-    marginTop: "auto",
     minHeight: 48,
     paddingHorizontal: mobileTokens.spacing[4],
   },
   nextUpActionLabel: {
-    color: "#F4E098",
-    fontFamily: labelFont,
-    fontSize: 14,
     fontWeight: "800",
   },
   section: {

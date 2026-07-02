@@ -85,6 +85,10 @@ const committedSearchArea = {
   radiusMiles: 2,
 };
 
+function expectAnyTextOnScreen(text: string) {
+  expect(screen.getAllByText(text)[0]).toBeOnTheScreen();
+}
+
 function makeWritablePlanRepository(): PlanRepository {
   let snapshot: PlanListSnapshot = {
     ...emptyPlanListSnapshot,
@@ -627,7 +631,7 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(nativePlanRepository.listPlans).toHaveBeenCalledTimes(1);
-      expect(screen.getAllByText("Runtime dinner").length).toBeGreaterThan(0);
+      expectAnyTextOnScreen("Runtime dinner");
     });
 
   });
@@ -735,7 +739,7 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByText("Brunch plan").length).toBeGreaterThan(0);
+      expectAnyTextOnScreen("Brunch plan");
     });
 
     expect(screen.getAllByText("Created")).toHaveLength(4);
@@ -762,7 +766,7 @@ describe("App", () => {
     });
 
     expect(screen.getByText("Next up")).toBeOnTheScreen();
-    expect(screen.getAllByText("Finish setup").length).toBeGreaterThan(0);
+    expectAnyTextOnScreen("Finish setup");
     expect(
       screen.queryByLabelText("Open Next up Plan Birthday dinner"),
     ).toBeNull();
@@ -800,7 +804,7 @@ describe("App", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByText("Brunch plan").length).toBeGreaterThan(0);
+      expectAnyTextOnScreen("Brunch plan");
     });
 
     fireEvent.press(screen.getByLabelText("Delete Created Plan Brunch plan"));
@@ -816,7 +820,7 @@ describe("App", () => {
         planId: "pending-brunch",
       });
       expect(screen.queryByLabelText("Open Created Plan Brunch plan")).toBeNull();
-      expect(screen.getAllByText("Morgan's birthday").length).toBeGreaterThan(0);
+      expectAnyTextOnScreen("Morgan's birthday");
       expect(screen.getByText("Plan deleted.")).toBeOnTheScreen();
     });
   });
